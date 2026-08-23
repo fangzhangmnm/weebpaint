@@ -1,18 +1,19 @@
 // Azure AD App registration for WeebPaint。Phase 2（云同步）会用到 MSAL；
 // phase 1 本地持久化暂时不读取这里。
 //
-// 部署清单（已建好的 SPA app，All Microsoft account users）：
+// 部署清单（已建好的 SPA app，Personal Microsoft accounts only）：
 //   - Display name:  WeebPaint
 //   - Application (client) ID: 18c496a6-5d86-4ff5-8dd0-67d565480a3e
 //   - Object ID:     7ef0ff74-cdcc-44a6-8dca-60ec903fe3aa
 //   - Tenant ID:     c1fef054-68f1-48db-9097-61acbe59b8ac
-//   - Redirect URIs: SPA × 2（dev http://localhost / prod https://fangzhangmnm.github.io/weebpaint/）
+//   - Redirect URIs: SPA × 2（dev https://weebpaint.com/dev/ / prod https://weebpaint.com/）
 //
 // CLIENT_ID 占位时（"REPLACE_ME..."）走纯离线，不去碰 MSAL bundle。
 export const CLIENT_ID = "18c496a6-5d86-4ff5-8dd0-67d565480a3e";
 
-// common = 个人 + 组织都能登
-export const AUTHORITY = "https://login.microsoftonline.com/common";
+// consumers = 只认个人 MSA（注册的 Supported account types 已翻成 Personal only，
+// 走 /common 会被端点顶回 invalid_request userAudience）
+export const AUTHORITY = "https://login.microsoftonline.com/consumers";
 
 // AppFolder = approot 沙盒；offline_access 给 silent refresh token
 export const SCOPES = ["Files.ReadWrite.AppFolder", "offline_access"];

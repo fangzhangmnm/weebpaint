@@ -7,7 +7,7 @@ import { detectStoreAbsent, createNullStore, createDormantAuth } from "./store-a
 import type { Store } from "@internal/store";
 import { stripSessionExt, sessionFileName } from "./config.ts";
 import { storeUI } from "./store-ui.ts";
-import { CLIENT_ID, SCOPES } from "./config.ts";
+import { CLIENT_ID, SCOPES, AUTHORITY } from "./config.ts";
 import { zipReadEntry, zipPack, zipUnpack } from "./backend/zip.ts";
 import { pack7z, unpack7z } from "./sevenzip.ts";
 import { getPassword } from "./crypto-state.ts";
@@ -26,7 +26,7 @@ export const storeAbsent = detectStoreAbsent();
 type _Prov = ReturnType<typeof createOneDriveProvider>["provider"];
 type _Auth = ReturnType<typeof createOneDriveProvider>["auth"];
 function _assembleReal(): { provider: _Prov | null; auth: _Auth; store: Store } {
-  const od = createOneDriveProvider({ clientId: CLIENT_ID, scopes: SCOPES, msalUrl: "./vendor/msal/msal-browser.min.js" });
+  const od = createOneDriveProvider({ clientId: CLIENT_ID, scopes: SCOPES, authority: AUTHORITY, msalUrl: "./vendor/msal/msal-browser.min.js" });
   return { provider: od.provider, auth: od.auth, store: _createRealStore(od.provider, od.auth) };
 }
 
