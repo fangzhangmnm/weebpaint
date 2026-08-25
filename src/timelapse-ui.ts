@@ -70,13 +70,14 @@ function _wireDrag(): void {
   });
 }
 
-// ---- HUD 红点 chip（安全护栏：**正在录才显示**）----
-// user 2026-08-19 拍板：没有「暂停态」——stop 就是没在录（无红点无 chip），只是录像留着可 resume。
+// ---- HUD 录制 chip（护栏 C，2026-08-25 user 拍板「常驻指示灯，on/off 一眼可见」，
+//   覆盖 2026-08-19「stop=无 chip」细则）：这张画**开过录就常显**——录制中=红点呼吸「录制中」、
+//   停录=灰点静止「已停止」；从没录过才隐藏。静默关闭案的治本可见性：关了必须看得见。----
 function _renderChip(): void {
   const s = timelapseStatus();
-  const show = s.exists && s.on;
-  els.tlRecChip.classList.toggle("hidden", !show);
-  els.tlRecLabel.textContent = t("tl.rec");   // 「录制中」写全（中文有宽度）；不挂 data-i18n（换语言=reload）
+  els.tlRecChip.classList.toggle("hidden", !s.exists);
+  els.tlRecChip.classList.toggle("tl-rec-paused", s.exists && !s.on);
+  els.tlRecLabel.textContent = s.on ? t("tl.rec") : t("tl.state.paused");   // 不挂 data-i18n（换语言=reload）
 }
 
 function _renderMenuState(): void {
@@ -139,7 +140,16 @@ function _renderPanel(): void {
   // 「暂停录制」= stop（record-pause 已驳回，磁带机语义 stop 停段 + record 续录）、续录 = record ⏺。
   const row = _div("tl-actions tl-icon-row");
   row.appendChild(_iconBtn(s.on ? "stop" : "record", s.on ? t("tl.pause") : t("tl.resume"), s.on ? "" : "tl-primary", () => {
-    if (timelapseStatus().on) timelapsePause(); else timelapseResume();
+    void (async () => {
+      if (timelapseStatus().on) {
+        // 护栏 F（2026-08-25 user 拍板）：停录加轻确认，防误触静默关录（同 clear 的 sheet 惯例）。
+        const ok = await openConfirmSheet(t("tl.pauseConfirmTitle"), t("tl.pauseConfirmMsg"));
+        if (!ok) return;
+        timelapsePause();
+      } else {
+        timelapseResume();
+      }
+    })();
   }));
   const replayBtn = _iconBtn("replay", t("tl.preview"), "", () => { void _replayFullscreen(); });
   const exportBtn = _iconBtn("export", t("tl.export"), "", () => { void _exportFresh(); });

@@ -33,12 +33,18 @@ export class TimelapseDocState {
   avcC: Uint8Array | null = null;
   /** 上次落盘的完整 mp4（冻结 passthrough 用；活跃 re-mux 后刷新）。 */
   lastMp4: Uint8Array | null = null;
-  /** 回读出过什么问题（报 info 级 badge 用；null=健康）。 */
+  /** 回读出过什么问题（报 warning 级 badge 用；null=健康）。 */
   restoreIssue: TimelapseRestoreIssue | null = null;
+  /** 检疫区（护栏 E，2026-08-25 user 拍板「作废不删证据」）：回读失败时原字节收容于此，
+   *  保存时原样 passthrough 回 ora——绝不因为读不懂就把 entry 从文件里抹掉。
+   *  出所：startRecording（用户明确开新录）或 clear（用户明确清除）。 */
+  quarantineJson: string | null = null;
+  quarantineMp4: Uint8Array | null = null;
   /** motion 里已经进过 lastMp4 的前缀长度（「待保存帧数」= motion.length - 这个；冻结保存不动它）。 */
   savedMotionCount = 0;
 
-  /** 开录：pin 取景框。已有录像时不准换设置（要换=先 clear，UI 负责引导）。 */
+  /** 开录：pin 取景框。已有录像时不准换设置（要换=先 clear，UI 负责引导）。
+   *  用户明确开新录 = 检疫字节出所（旧的读不懂的 entry 被新录像取代）。 */
   startRecording(s: TimelapseSettings): void {
     if (this.settings) throw new Error("timelapse already recording; clear() first");
     if (!TIMELAPSE_LONG_EDGES.includes(s.longEdge)) throw new Error(`bad longEdge ${s.longEdge}`);
@@ -46,6 +52,7 @@ export class TimelapseDocState {
     this.settings = { ...s };
     this.sampler = new TimelapseSampler(0);
     this.on = true;
+    this.quarantineJson = null; this.quarantineMp4 = null; this.restoreIssue = null;
   }
 
   pause(): void { this.on = false; }
@@ -57,6 +64,7 @@ export class TimelapseDocState {
     this.settings = null; this.on = false; this.sampler = null;
     this.motion = []; this.avcC = null; this.lastMp4 = null; this.restoreIssue = null;
     this.savedMotionCount = 0;
+    this.quarantineJson = null; this.quarantineMp4 = null;
   }
 
   /** 录制中收到一个有可见变化的 commit：返回要不要采这帧。 */
@@ -81,7 +89,11 @@ export class TimelapseDocState {
    */
   serializeForSave(tail: TimelapseSample | null, frameW: number, frameH: number):
       { json: string; mp4: Uint8Array } | null {
-    if (!this.settings) return null;
+    if (!this.settings) {
+      // 无录像。检疫区有货（回读失败的原字节）→ 原样 passthrough（护栏 E：作废不删证据）。
+      if (this.quarantineJson != null) return { json: this.quarantineJson, mp4: this.quarantineMp4 ?? new Uint8Array(0) };
+      return null;
+    }
     let mp4 = this.lastMp4;
     if (this.on && tail && this.avcC) {
       mp4 = muxTimelapse(this.motion, tail, this.avcC, frameW, frameH);
@@ -90,23 +102,29 @@ export class TimelapseDocState {
     }
     if (!mp4) {
       // 开了录但一帧都没编出来（如编码器还没吐出首帧就保存）：只落 json 记住开关与设置。
-      return { json: this.toJson(), mp4: new Uint8Array(0) };
+      return { json: this.toJson(0), mp4: new Uint8Array(0) };
     }
-    return { json: this.toJson(), mp4 };
+    // 冻结 passthrough 时 motionSamples 必须与 lastMp4 里的实际样本数一致（= savedMotionCount）。
+    // 曾经写 motion.length：drain 出新帧但尾帧编不出（GL lost/编码器死）→ json 数字领先 mp4 →
+    // 下次打开 sample-count-mismatch 整段作废（timelapse 静默关闭案 §3 雷，2026-08-25 拆）。
+    return { json: this.toJson(this.savedMotionCount), mp4 };
   }
 
-  toJson(): string {
+  toJson(sampleCount: number): string {
     const s = this.settings!;
     const j: TimelapseJsonV1 = {
       v: 1, on: this.on, aspect: [s.aspectW, s.aspectH], longEdge: s.longEdge,
-      n: this.sampler?.n ?? 0, motionSamples: this.motion.length,
+      n: this.sampler?.n ?? 0, motionSamples: sampleCount,
     };
     return JSON.stringify(j);
   }
 
   /**
-   * 从 ora 回读。任何一步失败 → 自愈：返回带 restoreIssue 的空态（录像作废，绝不 throw）。
-   * mp4Bytes=null 表示 entry 缺席。
+   * 从 ora 回读。失败自愈原则（2026-08-25 护栏批改版，user 拍板「作废不删证据+雷也修」）：
+   *   - corrupt-json / corrupt-mp4：读不懂 → 原字节进检疫区（保存时 passthrough，不销毁），录像停。
+   *   - mp4-missing：json 健康只是素材没了 → **设置与开关保命**，从零继续录（不再连坐作废）。
+   *   - sample-count-mismatch：json 数字领先 mp4 → 按 mp4 实际样本数截断继续用（不再整段作废）。
+   * 绝不 throw。mp4Bytes=null 表示 entry 缺席。
    */
   static restore(json: string | null, mp4Bytes: Uint8Array | null): TimelapseDocState {
     const st = new TimelapseDocState();
@@ -118,30 +136,32 @@ export class TimelapseDocState {
           || typeof j.n !== "number" || typeof j.motionSamples !== "number") throw new Error("shape");
     } catch {
       st.restoreIssue = "corrupt-json";
+      st.quarantineJson = json; st.quarantineMp4 = mp4Bytes;
       return st;
     }
     st.settings = { aspectW: j.aspect[0], aspectH: j.aspect[1], longEdge: j.longEdge };
     st.sampler = new TimelapseSampler(j.n);
     st.on = !!j.on;
     if (mp4Bytes == null || mp4Bytes.length === 0) {
-      if (j.motionSamples > 0) {   // json 说有货但 mp4 没了：录像丢失，止损清空
-        const issue: TimelapseRestoreIssue = "mp4-missing";
-        const fresh = new TimelapseDocState();
-        fresh.restoreIssue = issue;
-        return fresh;
-      }
-      return st;   // 开了录还没落过帧：合法空录像
+      if (j.motionSamples > 0) st.restoreIssue = "mp4-missing";   // 素材丢了：报警但录制身份保命，从零续录
+      return st;
     }
     try {
       const d = demuxTimelapse(mp4Bytes);
-      if (j.motionSamples > d.samples.length) throw new Error("sample-count");
-      st.motion = d.samples.slice(0, j.motionSamples);   // 截掉尾帧（每次保存重新现编）
+      if (j.motionSamples > d.samples.length) {
+        // json 领先 mp4（旧版冻结保存的雷埋出来的档）：按 mp4 实际内容截断（末样本按尾帧丢弃），素材保住。
+        st.restoreIssue = "sample-count-mismatch";
+        st.motion = d.samples.slice(0, Math.max(0, d.samples.length - 1));
+      } else {
+        st.motion = d.samples.slice(0, j.motionSamples);   // 截掉尾帧（每次保存重新现编）
+      }
       st.avcC = d.avcC;
       st.lastMp4 = mp4Bytes;
       st.savedMotionCount = st.motion.length;   // 回读来的都已在盘上
-    } catch (e) {
+    } catch {
       const fresh = new TimelapseDocState();
-      fresh.restoreIssue = e instanceof Error && e.message === "sample-count" ? "sample-count-mismatch" : "corrupt-mp4";
+      fresh.restoreIssue = "corrupt-mp4";
+      fresh.quarantineJson = json; fresh.quarantineMp4 = mp4Bytes;
       return fresh;
     }
     return st;

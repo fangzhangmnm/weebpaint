@@ -2698,6 +2698,8 @@ body[data-mode="gallery"] .board { display: none !important; }
 }
 @keyframes tl-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .tl-rec-dot { animation: none; } }
+/* 停录态（护栏 C，2026-08-25）：chip 常显但灰点静止——「关了」必须一眼可见 */
+.tl-rec-chip.tl-rec-paused .tl-rec-dot { background: var(--ink-soft); animation: none; }
 
 /* 录制面板 */
 .float-panel.tl-panel { width: 300px; }

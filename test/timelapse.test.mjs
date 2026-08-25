@@ -293,3 +293,90 @@ describe("timelapse · 编码器注入槽", () => {
     eq(calls.encoded[0].key, true);
   });
 });
+
+// ---- 静默关闭案护栏批（2026-08-25 user 拍板 A-F 全做 + 拆雷；报告=ai-docs/20260825-timelapse-silent-off-investigation.md） ----
+
+describe("timelapse · 护栏 D：冻结保存不再埋 sample-count 雷", () => {
+  const SETTINGS = { aspectW: 1, aspectH: 1, longEdge: 512 };
+  const mkState = () => {
+    const st = new TimelapseDocState();
+    st.startRecording(SETTINGS);
+    st.pushMotionSample({ bytes: nalu(1), key: true }, FAKE_AVCC);
+    st.pushMotionSample({ bytes: nalu(2), key: false });
+    return st;
+  };
+
+  it("雷场景复现：mux 后 drain 出新帧、尾帧编不出（GL lost）→ 冻结保存 → 回读不作废", () => {
+    const st = mkState();
+    st.serializeForSave({ bytes: nalu(9), key: true }, 512, 512);   // 正常保存：lastMp4=2 motion+tail
+    st.pushMotionSample({ bytes: nalu(3), key: false });            // drain 出 2 帧新货（未再 mux）
+    st.pushMotionSample({ bytes: nalu(4), key: false });
+    const frozen = st.serializeForSave(null, 512, 512);             // tail=null → 冻结 passthrough
+    const back = TimelapseDocState.restore(frozen.json, frozen.mp4);
+    eq(back.restoreIssue, null, "json 计数与 mp4 一致，不再 mismatch");
+    eq(back.motion.length, 2, "素材=上次 mux 的 2 帧（冻结语义）");
+    eq(back.on, true, "录制开关活着");
+  });
+
+  it("旧版埋的雷档（json 领先 mp4）→ 截断续用而非整段作废", () => {
+    const st = mkState();
+    const out = st.serializeForSave({ bytes: nalu(9), key: true }, 512, 512);
+    const poisoned = JSON.stringify({ ...JSON.parse(out.json), motionSamples: 99 });   // 模拟旧版冻结保存写超
+    const back = TimelapseDocState.restore(poisoned, out.mp4);
+    eq(back.restoreIssue, "sample-count-mismatch", "问题要上报");
+    eq(back.settings !== null, true, "录制身份保命");
+    eq(back.motion.length, 2, "按 mp4 实际截断（3 样本去尾帧=2）");
+    eq(back.on, true);
+  });
+});
+
+describe("timelapse · 护栏 E：作废不删证据（检疫 passthrough）", () => {
+  const SETTINGS = { aspectW: 1, aspectH: 1, longEdge: 512 };
+
+  it("corrupt-json → 原字节进检疫，保存原样 passthrough，不销毁 entry", () => {
+    const rawJson = "{ not json !!";
+    const rawMp4 = new Uint8Array([1, 2, 3, 4]);
+    const st = TimelapseDocState.restore(rawJson, rawMp4);
+    eq(st.restoreIssue, "corrupt-json");
+    eq(st.settings, null, "录制停");
+    const out = st.serializeForSave(null, 0, 0);
+    eq(out.json, rawJson, "json 原样保留");
+    jeq(Array.from(out.mp4), Array.from(rawMp4), "mp4 原样保留");
+  });
+
+  it("corrupt-mp4 → 同样检疫 passthrough", () => {
+    const st0 = new TimelapseDocState();
+    st0.startRecording(SETTINGS);
+    st0.pushMotionSample({ bytes: nalu(1), key: true }, FAKE_AVCC);
+    const good = st0.serializeForSave({ bytes: nalu(9), key: true }, 512, 512);
+    const badMp4 = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
+    const st = TimelapseDocState.restore(good.json, badMp4);
+    eq(st.restoreIssue, "corrupt-mp4");
+    const out = st.serializeForSave(null, 0, 0);
+    eq(out.json, good.json);
+    jeq(Array.from(out.mp4), Array.from(badMp4));
+  });
+
+  it("检疫出所：startRecording（开新录）与 clear 都清检疫", () => {
+    const st = TimelapseDocState.restore("bad", null);
+    eq(st.restoreIssue, "corrupt-json");
+    st.startRecording(SETTINGS);
+    eq(st.quarantineJson, null);
+    eq(st.restoreIssue, null);
+    const st2 = TimelapseDocState.restore("bad", null);
+    st2.clear();
+    eq(st2.serializeForSave(null, 0, 0), null, "clear 后无 entry（用户明确清除）");
+  });
+
+  it("mp4-missing 不再连坐：设置与开关保命，从零续录", () => {
+    const st0 = new TimelapseDocState();
+    st0.startRecording(SETTINGS);
+    st0.pushMotionSample({ bytes: nalu(1), key: true }, FAKE_AVCC);
+    const out = st0.serializeForSave({ bytes: nalu(9), key: true }, 512, 512);
+    const back = TimelapseDocState.restore(out.json, null);   // mp4 entry 丢了
+    eq(back.restoreIssue, "mp4-missing", "要上报");
+    jeq(back.settings, SETTINGS, "取景框 pin 保住");
+    eq(back.on, true, "开关保住——录制不静默死");
+    eq(back.motion.length, 0, "素材确实没了，从零续");
+  });
+});

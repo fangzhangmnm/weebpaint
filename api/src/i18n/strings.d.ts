@@ -513,9 +513,24 @@ export declare const S: {
         readonly ja: "エンコーダー対応を確認中…";
     };
     readonly "tl.restoreLost": {
-        readonly zh: "过程录像数据损坏，已重置（画作不受影响）";
-        readonly en: "Timelapse footage was corrupted and has been reset (artwork unaffected)";
-        readonly ja: "タイムラプスのデータが破損していたためリセットしました（作品は無事です）";
+        readonly zh: "过程录像数据读取失败，录制已停止（原始数据已保留在文件里，画作不受影响）";
+        readonly en: "Timelapse data could not be read; recording stopped (raw data kept in file, artwork unaffected)";
+        readonly ja: "タイムラプスのデータを読み込めず録画を停止しました（元データはファイル内に保持・作品は無事です）";
+    };
+    readonly "tl.restoreDegraded": {
+        readonly zh: "过程录像素材部分受损，已按可读部分继续录制（画作不受影响）";
+        readonly en: "Timelapse footage partially damaged; continuing with the readable part (artwork unaffected)";
+        readonly ja: "タイムラプスの映像が一部破損していたため、読める部分から録画を継続します（作品は無事です）";
+    };
+    readonly "tl.pauseConfirmTitle": {
+        readonly zh: "停止录制";
+        readonly en: "Stop recording";
+        readonly ja: "録画を停止";
+    };
+    readonly "tl.pauseConfirmMsg": {
+        readonly zh: "停止后将不再记录绘画过程。已录素材保留，可随时继续录制。";
+        readonly en: "Painting will no longer be recorded. Existing footage is kept; you can resume anytime.";
+        readonly ja: "停止すると描画過程は記録されません。既存の映像は保持され、いつでも再開できます。";
     };
     readonly "tl.captureHalted": {
         readonly zh: "过程录像已暂停（编码器故障，已录素材已保留）";

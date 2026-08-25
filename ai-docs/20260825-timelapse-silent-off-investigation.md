@@ -53,3 +53,19 @@
 - **D 拆 §3 雷**：冻结路径 json 的 motionSamples 写 `savedMotionCount`（与 lastMp4 一致）而非 motion.length；或 restore 端 mismatch 降级为「按 mp4 实际样本数截断」而不是整体作废。
 - **E 作废不删证据**：restore 失败时原字节 passthrough 保留 entry（只停录不销毁），给未来版本修复留活口。
 - **F pause 加轻确认或 undo toast**：防误触。
+
+## 7. 拍板与落地（2026-08-25 当日，user 原话裁决）
+
+**user 裁决**：事故本身「人类回忆非常大概率 P4」（opus 窗口 v0.10.23 关云=变新文档；mp4 还在=视频完成，与 P4 素材不丢相符）；「P5 不排除」（双实例在其生产环境中频发生）；也可能只是误触 stop；「123 也不应该静默，雷也修」「abcdef 护栏都做」。
+
+**同日落地（v0.10.28）**：
+- **A**：`_dropEncoder` 改自动复活——编码器死后下一 commit 自动重建续录（IDR 起步，同 resume 语义），连挂 3 次才真 pause；编码成功清 strike。
+- **B**：captureHalted（第 3 strike）/ restore 问题全部升 **warning**（顶部 banner）；按「素材受损但录制活着」vs「读不懂已停录」分文案（`tl.restoreDegraded` / `tl.restoreLost` 改稿）。
+- **C**：HUD chip 改常驻——开过录就显示：录制中=红点呼吸「录制中」、停录=灰点静止「已停止」；覆盖 2026-08-19「stop=无 chip」细则（本次 user 拍板 on/off 一眼可见）。
+- **D**：雷拆双侧——写侧冻结保存 `motionSamples` 改写 `savedMotionCount`（与 lastMp4 一致）；读侧 mismatch 降级为按 mp4 实际截断（不作废）。
+- **E**：corrupt-json/corrupt-mp4 原字节进检疫区、保存原样 passthrough 回 ora（不销毁 entry）；出所=用户明确 startRecording 或 clear。**mp4-missing 不再连坐**：设置+开关保命从零续录。
+- **F**：停止录制加确认 sheet（同 clear 惯例；配合 C 的停录灰 chip，误触可见可逆）。
+- 测试：护栏回归 6 条入套件（雷场景复现 / 旧毒档截断 / 检疫 passthrough / 出所 / mp4-missing 保命）。
+
+**改名（夏音 hash→改名）核查**：`es.rename` = flushLocal（正常保存，timelapse 随行）+ `store.tryMove` 字节级搬移，不走 detach/adopt、不换文档身份 → **改名本身不是关录通路**；但它触发的保存与任何保存一样曾是 §3 雷的埋雷机会，拆雷后干净。
+- P4 通路本体（关云=变新文档）已随 opus 轮回滚不存在；云开关流程归无地骑士 session 重设计，不在本批。

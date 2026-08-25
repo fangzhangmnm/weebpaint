@@ -51,16 +51,18 @@ export function timelapseDetach(): void {
   _detached = true;
   _mEnc?.close(); _mEnc = null;
   _st = new TimelapseDocState();
-  _needKey = true; _frameSeq = 0;
+  _needKey = true; _frameSeq = 0; _encoderStrikes = 0;
   _notifyUi();
 }
 
 /** 文档载入完成（adoptModel 末尾调）：从 ora sidecar 回读录制态；回读问题报 info 一次（自愈=止损）。 */
 export function timelapseAdopt(loaded: { _timelapseJson?: string; _timelapseMp4?: Uint8Array } | DecodedPainting): void {
   _st = TimelapseDocState.restore(loaded._timelapseJson ?? null, loaded._timelapseMp4 ?? null);
-  if (_st.restoreIssue) reportError(t("tl.restoreLost"), "info");
+  // 回读问题报 warning（护栏 B，2026-08-25：info 状态栏一闪即逝，静默关闭案的帮凶）。
+  // 按 issue 分文案：mp4-missing/mismatch 是「素材受损但录制还活着」，corrupt 是「录像读不懂已停录（字节已检疫保留）」。
+  if (_st.restoreIssue) reportError(t(_st.settings ? "tl.restoreDegraded" : "tl.restoreLost"), "warning");
   _detached = false;
-  _needKey = true; _frameSeq = 0;
+  _needKey = true; _frameSeq = 0; _encoderStrikes = 0;
   _notifyUi();
 }
 
@@ -89,6 +91,7 @@ async function _captureFrame(): Promise<void> {
     });
     try { _mEnc.encode(frame, _needKey); _needKey = false; } finally { frame.close(); }
     if (_mEnc.dead) _dropEncoder("motion encoder died mid-stream");
+    else _encoderStrikes = 0;   // 编码成功 = 链路健康，strike 清零
   } catch (e) {
     _dropEncoder(String(e));
   } finally {
@@ -96,11 +99,22 @@ async function _captureFrame(): Promise<void> {
   }
 }
 
-/** 编码链路坏死 → 止损：停录（暂停语义，素材保住），报一次 info。resume 会重建编码器再试。 */
+/** 编码链路坏死 → 自动复活（护栏 A，2026-08-25 user 拍板）：丢掉死编码器，下一次 commit
+ *  自动重建再试（与手动 resume 同一条重建路：新编码器出 IDR，素材照旧续 mux）。
+ *  连挂 MAX_STRIKES 次才真 pause，且报 **warning**（护栏 B：顶部 banner，不再 info 一闪即逝）。
+ *  曾经：单次故障即永久暂停+info——iPad 退后台杀 VideoEncoder 一次，录制就静默死掉（静默关闭案 P2）。 */
+const ENCODER_MAX_STRIKES = 3;
+let _encoderStrikes = 0;
 function _dropEncoder(why: string): void {
-  reportError("[timelapse] capture halted (recording paused, footage kept): " + why, "log");
   _mEnc?.close(); _mEnc = null;
-  if (_st.on) { _st.pause(); reportError(t("tl.captureHalted"), "info"); _notifyUi(); }
+  _needKey = true;   // 重建的编码器从 IDR 开始（断片诚实，同 resume 语义）
+  _encoderStrikes++;
+  if (_encoderStrikes < ENCODER_MAX_STRIKES) {
+    reportError(`[timelapse] encoder died (strike ${_encoderStrikes}/${ENCODER_MAX_STRIKES}, auto-retry on next commit): ` + why, "log");
+    return;
+  }
+  reportError("[timelapse] capture halted after repeated encoder deaths (recording paused, footage kept): " + why, "log");
+  if (_st.on) { _st.pause(); reportError(t("tl.captureHalted"), "warning"); _notifyUi(); }
 }
 
 // ---- 保存接缝（session-state._encodeCurrentOraWithPeek 调） ----
@@ -111,7 +125,8 @@ function _dropEncoder(why: string): void {
  */
 export async function timelapseForSave(merged: { data: Uint8ClampedArray; w: number; h: number } | null,
                                        ): Promise<{ json: string; mp4: Uint8Array } | null> {
-  if (_detached || !_st.settings) return null;
+  if (_detached) return null;
+  if (!_st.settings) return _st.serializeForSave(null, 0, 0);   // 无录像：检疫字节 passthrough（护栏 E）或 null
   const s = _st.settings;
   const { w, h } = timelapseFrameDims(s);
   try {
@@ -173,6 +188,7 @@ export function timelapsePause(): void { _st.pause(); _notifyUi(); }
 export function timelapseResume(): void {
   _st.resume();
   _needKey = true;   // 断片重开 → IDR（spec §3：跳变诚实，不记「此处停录过」）
+  _encoderStrikes = 0;   // 手动续录 = 重新给满重试额度
   _notifyUi();
 }
 
