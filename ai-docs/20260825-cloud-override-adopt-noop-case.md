@@ -4,7 +4,7 @@
 > **✅ 交付回写（同日两轮，user 逐条拍板）**：§6 三修 = store 0.3.3 + WeebPaint 收货（takeCloud
 > resolution 透传 / 换世界线无条件 backup / keepMine deferred guard / CloudNetworkError+i18n 人话；
 > app 侧 B 形状重开管线重载）。§7 第二轮 = store 0.3.4 + v0.10.29 已推 dev（O3 copy-then-replace /
-> 全库 If-Match 家规 / 显式快进+逃生分叉）。§8 = 第三案调查记录（restore 本地腿覆盖，**待拍板未修**）。
+> 全库 If-Match 家规 / 显式快进+逃生分叉）。§8 = 第三案——**已修**（store 0.3.5 / v0.10.30 推 dev）：restore 撞名=改名恢复[快照时刻戳]，两腿对齐。
 > 风险分区：§1/§4/§6 涉 **store/同步引擎 = 红线区**，动手前必读 MASTER.md §A、走 `pwa-cloud-store` skill、改前 escalate human。本案卷只记事实与提案，**未获批不动码**。
 > 前传：`20260820-open-time-conflict-surface-handoff.md`（open 路径冲突 surface；本案是它的续集——surface 修好了，resolve 本身是半个操作）。
 
@@ -100,7 +100,7 @@ deferred guard（`push.ts:73-77` 同款，配 tryHeal 自愈闭环）。⑤ = `C
   （引擎 `RefreshOpts.probe`，逃生瞬间本地/谱系分毫不动，有测试钉住）。
 - P2（不快进、留给保存 412）已否决：在错误版本上画半天再二选一 = 人造恶性冲突，护栏必须在第一笔之前。
 
-## 8. 第三案调查记录（restore 本地腿覆盖；2026-08-25 调查完毕，**待拍板未修**）
+## 8. 第三案（restore 本地腿覆盖；2026-08-25 同日调查+拍板+修复，已闭案）
 
 `trash.restore`（store `trash.ts:72-88`）两条腿纪律不对称：**云端腿**撞名自动改名 "(2)" + `markSeen` 采纳
 etag（良好）；**本地腿** `local.restore`（`local-cache.ts:64-69`）= `moveTo` → `idb.rename` → **落点无条件
@@ -112,5 +112,8 @@ etag（良好）；**本地腿** `local.restore`（`local-cache.ts:64-69`）= `m
 2. **restore-onto-dirty**（顺藤摸出）：目标名有未推 dirty 字节 → 恢复直接覆盖，dirty 标志残留 → 下次 push
    把 trash 字节推上云，用户未推的编辑蒸发。违反 §A「dirty 绝不被无 backup 覆盖」。
 
-**修法方向（待 escalate 拍板）**：本地腿对齐云端腿——落点撞名改名恢复（如 `原名（恢复 stamp）`），绝不覆盖
-files 分区既有字节；`trash.restore` 已采纳返回名，结构现成，app 零改动。备份箱 UI（已记账）动工前必修。
+**✅ 已修（同日第三轮，store 0.3.5 `e387321`，v0.10.30 收货推 dev）**：共享策略 `move-aside.restoreTargetName`
+（真 local-cache / mock-local / 云端腿三处共用防漂移）——落点占用 → `原名 [yyyymmdd-hhmmss]`（**快照自己的
+时刻**，user 拍板「backup 的时间分辨率语义」；从 aside stamp 抽 14 位，拿不到退恢复时刻，仍撞补 -2/-3）；
+云端腿 `(2)(3)` 序号退役、trash.ts 透传 snapshotStamp、both-legs 收敛同一落点（测试钉住）；app 零改动
+（`gal.st.restoredRenamed` 现成）。备份箱 UI 的前置障碍就此清除。

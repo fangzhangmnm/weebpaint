@@ -177,7 +177,41 @@ A4 实锤（`session-state.ts:465`）；cloud-capability 接缝**已在 HEAD 不
 
 ---
 
-## 5. 综合：调查对设计的含义（事实推论，非拍板）
+## 5. single-file html 交付物约束（第五路调研，edited by Claude Fable 5 · 2026-08-25 追加）
+
+> 方法：文献（信源已核带 URL，此处存结论）+ 本机 Playwright 实测（Chromium 149 / Firefox 151，headless，Firefox 已用出厂默认策略重测；Safari 无法本机测全靠文献）。探针驱动脚本 `tmp/fileprobe-run.mjs` 可复跑。
+
+### 6.1 file://（双击打开）能力矩阵
+
+| 能力 | Chromium | Firefox | Safari |
+|---|---|---|---|
+| secure context | ✅ 实测 true（网传"file:// 非 secure context"是错的，MDN：potentially trustworthy） | ✅ true | ✅（文献） |
+| FSA picker | 暴露为 function（真机实际调用**未验**；权限系统视 file:// 为 opaque origin，不能持久授权） | ❌ 无 FSA | ❌ 无 FSA |
+| 内联 `<script type=module>` / import() blob/data | ✅ 实测 | ✅ 实测 | 未证 |
+| Worker | 外部文件 worker 封死；**blob/data classic worker ✅ 实测**；⚠ **module blob worker 实测死**（localhost 对照过） | blob/data 均 ✅（含 module） | 文献：blob 可、data 不可；未证 |
+| wasm `instantiate(ArrayBuffer)` | ✅ 实测 | ✅ 实测 | 未证 |
+| localStorage / IDB | ✅ 可用；⚠ **所有本地 html 共享一个 file:// 存储桶**（实测：另一目录 html 能读到本页写的 IDB/localStorage）；quota ~3GB；`persisted()===false` | ✅ 可用，**按目录隔离**；quota 10GB | ❌ **直接 SecurityError**（除非用户开 Develop→Disable Local File Restrictions）——裸存储访问=Mac 双击白屏 |
+| Service Worker | ❌ 实测死（origin 'null'） | ❌ | ❌ |
+| `<input type=file>` / `<a download>` | ✅ 实测 | ✅ | ✅（Decker/TiddlyWiki 先例） |
+| async clipboard | ❌ NotAllowedError（opaque origin 不可授权）；`execCommand('copy')` ✅ | writeText ✅（FF 不设权限门） | 未证 |
+| WebGL2 | ✅ 实测 | ✅ 实测 | 15+ 支持 |
+| 体积 | TiddlyWiki 经验：~20MB 起明显变慢，50-100MB 能跑但载入慢 | 同 | 同 |
+
+### 6.2 itch iframe（https 正常 origin）
+module/worker/wasm 全正常（Unity/Godot 游戏为存在性证明）；单文件 ≤200MB 免 zip 直传；SharedArrayBuffer 需勾实验选项且牺牲 Firefox（COEP credentialless）——现栈未用；⚠ **Chrome 系 `navigator.clipboard` 在 itch iframe 死**（allow 不含 clipboard，多年 feature request 未落地）→ 降级链 = paste 事件/execCommand（与 spec 20260819 §3「paste 原生事件为主通道」拍板天然对齐）。
+
+### 6.3 对本仓技术栈的三栏清单
+- **必须放弃**：SW 全家（更新检测/离线缓存——单文件本身即离线分发）、PWA 安装性、IDB 作为唯一真相（只能当缓存）、itch iframe 的 async clipboard 与一切 FSA、SharedArrayBuffer。
+- **必须改造**：bundle 内联进 html（现产物 esbuild 单 bundle，近乎免费）；7z-wasm base64 内嵌走现有 `wasmBinary` 注入口（1.6MB→~2.2MB；`src/sevenzip.ts` 已是 classic UMD+ArrayBuffer 形状）；未来 worker 必须 classic+blob（禁 module worker）；剪贴板统一降级链；存储访问全 try/catch 降级纯内存（Safari file:// 白屏雷）；资源全 data:/内嵌；体积压 ~20MB 内。
+- **白送**：WebGL2、wasm instantiate、input/download/drop、`zip.ts` 本来就 `useWebWorkers:false`、vendored 无 CDN 家规提前十年把 CDN 雷拆了。
+
+### 6.4 先例
+Decker/Wigglypaint：手写单 html、零 wasm/worker/SW，「保存 = 把数据+引擎整个 html 重新下载一份」（存档即应用本体）；TIC-80 现行 html 导出因 wasm 外置 fetch 在 file:// 必死（官方明说要本地服务器）；vite-plugin-singlefile 自认不覆盖 worker/worklet 内联。
+
+### 6.5 主要未证项（真机批）
+headed Chrome file:// 的 FSA picker 实际调用与 clipboard prompt；Safari file:// 的 worker/wasm/module 全套；itch 域 SW 注册。
+
+## 7. 综合：调查对设计的含义（事实推论，非拍板）
 
 1. **itch 环境不存在别的诚实模式**：FSA 死、IDB 不可托付、MSAL 无戏 ⇒ itch 版只能是「纯内存 + input/download」形态；该形态即 Wigglypaint 模式，是 itch 生态赢家形态。
 2. **Blockbench 网页版的 IDB 用途恰好只有一个：灾难备份**（30s 快照、正常关闭即删、启动横幅恢复、明文警告"备份只是备份"）——与「IDB 不当家」的目标同构，且"正常关闭即删"顺手缓解公用电脑残留。
