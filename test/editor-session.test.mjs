@@ -283,3 +283,51 @@ describe("editor-session › onSaved 保存成功回调", () => {
     eq(store.saves.length, 1);
   });
 });
+
+// ── takeCloud 换世界线重载（2026-08-25 案卷 20260825-cloud-override-adopt-noop-case.md §1）──
+//   save 途中冲突面选「云端覆盖本地」→ 本地字节已是云端版，内存 doc 是旧世界线：persist 收尾必须
+//   走重开管线整体换装（user 拍板 B 形状）。added by Claude Fable 5, 2026-08-25.
+describe("editor-session › takeCloud 换世界线重载", () => {
+  it("save 返回 resolution='takeCloud' → 重新 open + adopt 云端字节；flags 干净", async () => {
+    const store = mockStore(), editor = mockEditor();
+    const es = createEditorSession({ store, editor, isZip: true });
+    await es.open("a.ora");
+    eq(store.opened.length, 1); eq(editor.adopted.length, 1);
+    editor.fireChange();
+    store._pushResult = { pushed: true, resolution: "takeCloud" };   // save 途中用户选了云端覆盖本地
+    store._openReturns = new Blob(["CLOUD-WORLDLINE"]);              // 此刻本地字节已被 safePull 换成云端版
+    await es.flushAndPush();
+    eq(store.opened.length, 2, "takeCloud → 必须重新走 open 管线（修前 0 次 = 画布陈旧的事故根因）");
+    eq(editor.adopted.length, 2, "云端字节 adopt 进编辑器（全量重建，undo 栈自然从零起）");
+    eq(await editor.adopted[1].text(), "CLOUD-WORLDLINE", "装入的是换线后的字节");
+    eq(es.isDirty(), false, "换线后干净");
+    eq(es.isPushPending(), false, "两端一致，无待推");
+    eq(es.currentName(), "a.ora", "身份不变");
+  });
+  it("resolution='keepMine' / 无 resolution（旧 store）→ 不重载（向后兼容）", async () => {
+    const store = mockStore(), editor = mockEditor();
+    const es = createEditorSession({ store, editor });
+    await es.open("a.ora");
+    editor.fireChange();
+    store._pushResult = { pushed: true, resolution: "keepMine" };    // 本地胜 → 内存就是权威，无需动
+    await es.flushAndPush();
+    eq(store.opened.length, 1, "keepMine 不重载");
+    editor.fireChange();
+    store._pushResult = { pushed: true };                            // 旧 store：无 resolution 字段
+    await es.flushAndPush();
+    eq(store.opened.length, 1, "旧 store 无字段 → 行为不变（结构类型向后兼容）");
+    eq(editor.adopted.length, 1);
+  });
+  it("takeCloud 重载失败（open 返 null）→ 响亮抛错，绝不静默留旧画布", async () => {
+    const store = mockStore(), editor = mockEditor();
+    const es = createEditorSession({ store, editor });
+    await es.open("a.ora");
+    editor.fireChange();
+    store._pushResult = { pushed: true, resolution: "takeCloud" };
+    store._openReturns = null;                                       // 重载拿不到字节（几乎不可能，但必须响亮）
+    let err = null;
+    try { await es.flushAndPush(); } catch (e) { err = e; }
+    assert(err && String(err).includes("takeCloud reload failed"), "静默留旧画布 = 原事故复活，必须抛");
+    eq(es.isPushPending(), false, "pushed=true → 无待推（不会把旧画布再推上云）");
+  });
+});

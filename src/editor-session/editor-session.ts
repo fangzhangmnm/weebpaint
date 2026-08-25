@@ -40,7 +40,10 @@ export interface StoreLike {
   file(name: string, opts: { isZip: boolean; mode: "new" | "existing" }): {
     open(): Promise<Blob | null>;
     // pushed=false 不是错误，是事实（离线/冲突未解决/只落本地）→ 据此保住 push-pending，别乐观清。
-    save(bytes: Blob, opts?: { tryPush?: boolean; hint?: unknown }): Promise<{ pushed: boolean; reason?: string }>;
+    // resolution="takeCloud"（save 途中冲突面用户选了「云端覆盖本地」）= **换世界线**：本地字节已被云端版本
+    //   覆盖，内存里的 doc 是陈旧世界线 → persist 收尾必须整体重载（复用 open 管线）。旧 store 不回报
+    //   此字段（undefined）→ 行为退化为修前现状，结构类型天然向后兼容。
+    save(bytes: Blob, opts?: { tryPush?: boolean; hint?: unknown }): Promise<{ pushed: boolean; reason?: string; resolution?: string }>;
     tryMove(to: string): Promise<TryMoveResult>;   // 改身份/移动唯一入口（含 nameOccupied 占用检查）——挂在 file 上
     delete(): Promise<{ status: string }>;   // status 不是「成功」的同义词（cancelled/noop 也走这里）
   };
@@ -125,6 +128,7 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
     const need = force || (tryPush ? (_dirty || _pushPending) : _dirty);
     if (!_name || !need || _saving) return;
     _saving = true;
+    let takeCloudReload = false;   // save 途中用户选了「云端覆盖本地」→ 收尾必须整体重载（见 finally 之后）
     // ★ 失败回滚用（v417）：下面会**先**乐观清脏、**再** await save()。save() 抛异常时若不还原，
     //   本次编辑就在内存里被宣布"已落盘"而实际一个字节都没写 —— badge 画干净、autosave 看 need=false
     //   永不重试、退出时那个专为保存失败设计的「重试/丢弃」循环（session-state 的 while (es.isDirty())）
@@ -148,6 +152,7 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
       //   `res?.pushed !== true` 而非 `!res.pushed`：store 没报告结果（旧适配器/mock）时**假定没推上去**，
       //   保住 push-pending 下次重试。宁可多推一次，也不要静默清干净（优先级②）。
       if (tryPush) _pushPending = res?.pushed !== true || _editEpoch !== epochAtFreeze;   // 推上去的是 freeze 快照——之后的编辑还欠一推
+      takeCloudReload = res?.resolution === "takeCloud";   // 换世界线标记（重载在 finally 之后做，_saving 已放开）
       if (_createFor === _name) _createFor = null;   // 首存成功 → 这个身份已建，后续都是编辑
       // 落盘成功 → 通知 app 域字节变了（缩略图等派生缓存作废）。save() 能 resolve = 本地已写成
       //   （push 失败被 store 内部 catch 成 banner，不影响「字节已变」这个事实）。
@@ -163,6 +168,41 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
     } finally {
       _saving = false;
     }
+    // ── takeCloud 收尾：换世界线（2026-08-25 案卷 20260825-cloud-override-adopt-noop-case.md §1）──
+    // takeCloud 不是作用在 workspace 上的操作，是**文件版本模型的换世界线**（user 2026-08-25 拍板取 B 形状：
+    //   复用重开管线，不做引擎侧活替换）。此刻 store 本地字节已是云端版本、谱系已 markSynced，而内存 doc
+    //   还是被换掉的旧世界线——修前这里什么都不做，就是「画布陈旧 + UI 报 synced → 下次保存静默覆写云端」
+    //   的事故根因。openInto = 与 open() 同一条 vetted 管线（store.open → editor.adopt 全量重建）；
+    //   adopt 替换即新 session，undo 栈自然从零起（旧世界线的 undo 历史跨版本无效，被换掉的字节已在 .backup）。
+    //   freeze 快照之后、sheet 期间穿进来的编辑（键盘 undo 等）属于被丢弃的旧世界线，随重载一并让位。
+    if (takeCloudReload && _name) {
+      const ok = await openInto(_name);
+      // 重载失败（几乎不可能：字节刚写进本地、刚过 validateAdopt）→ 必须响亮：画布仍是旧世界线，
+      //   静默留着就是原事故的失败路径复活。抛给调用方 surface；flags 此刻 pushed=true → 无待推，
+      //   不会因此把陈旧画布再推上云。
+      if (!ok) throw new Error("[editor-session] takeCloud reload failed: canvas still shows the pre-override version — reopen the file");
+    }
+  }
+
+  // open 的装入段（open() 与 takeCloud 重载共用的同一条管线）：store.open（内含 freshness/冲突 surface/崩溃恢复）
+  //   → editor.adopt 全量重建 → 记身份 + 置干净。
+  // ★ 开一个身份是**事务性**的：没真的装入字节，会话就绝不指向它（v417 修，优先级 1 = OneDrive 不丢画）。
+  //   旧版无条件 `_name = name`，于是 blob==null（离线纯云端 / 文件锁定 / 本地字节没了）时：
+  //     · 画布上还是**上一张画**，身份却已经换成新名字 → 下次 autosave 把上一张画的像素写进新身份
+  //       → 退出时 pushOn:["exit"] 推上 OneDrive，覆盖掉目标那张画。
+  //     · boot 失败路径更隐蔽：boot.ts 的 session.setName(null) 只清 app 层的 _activeSessionName，
+  //       es._name 还留着 X.ora → 用户在空白画布上画一笔 → autosave 把空白覆盖到 X.ora。
+  //   `session.ts:48-52` 记着 AtlasMaker 0.7.2 就是这么吃掉一个加密文件的：**app 层的幽灵路径守卫
+  //   本身是对的**，它是被这里私留的第二份名字绕过去的。
+  //   失败时**保持原有 _name/_dirty 不动**（不是清成 null）：画布上仍是旧文档，它就该继续存回自己的身份。
+  async function openInto(name: string): Promise<boolean> {
+    const blob = await fileOf(name).open();      // open 内含 freshness / 冲突 surface（store 的 ui）/ 崩溃恢复
+    if (!blob) return false;                     // false = 文件缺失/锁定，doc 未装入（caller 据此回图库、别改活动名）
+    await editor.adopt(blob);
+    _name = name;
+    _dirty = false; _pushPending = false;        // 刚 adopt = 干净（本会话未编辑；desk 由 Unserialize 载入）
+    if (_createFor === name) _createFor = null;  // 这个名字已能从 store 打开 → 身份已建，不该再走 mode:"new"
+    return true;
   }
 
   function scheduleIdle(): void {
@@ -179,22 +219,7 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
     async open(name: string): Promise<boolean> {
       if (_name && _name !== name) await persist(pushOn.has("exit"));   // 切 doc 前先存旧的（退出语义）
       wireOnChange();
-      const blob = await fileOf(name).open();      // open 内含 freshness / 冲突 surface（store 的 ui）/ 崩溃恢复
-      // ★ 开一个身份是**事务性**的：没真的装入字节，会话就绝不指向它（v417 修，优先级 1 = OneDrive 不丢画）。
-      //   旧版无条件 `_name = name`，于是 blob==null（离线纯云端 / 文件锁定 / 本地字节没了）时：
-      //     · 画布上还是**上一张画**，身份却已经换成新名字 → 下次 autosave 把上一张画的像素写进新身份
-      //       → 退出时 pushOn:["exit"] 推上 OneDrive，覆盖掉目标那张画。
-      //     · boot 失败路径更隐蔽：boot.ts 的 session.setName(null) 只清 app 层的 _activeSessionName，
-      //       es._name 还留着 X.ora → 用户在空白画布上画一笔 → autosave 把空白覆盖到 X.ora。
-      //   `session.ts:48-52` 记着 AtlasMaker 0.7.2 就是这么吃掉一个加密文件的：**app 层的幽灵路径守卫
-      //   本身是对的**，它是被这里私留的第二份名字绕过去的。
-      //   失败时**保持原有 _name/_dirty 不动**（不是清成 null）：画布上仍是旧文档，它就该继续存回自己的身份。
-      if (!blob) return false;                     // false = 文件缺失/锁定，doc 未装入（caller 据此回图库、别改活动名）
-      await editor.adopt(blob);
-      _name = name;
-      _dirty = false; _pushPending = false;        // 刚 adopt = 干净（本会话未编辑；desk 由 Unserialize 载入）
-      if (_createFor === name) _createFor = null;  // 这个名字已能从 store 打开 → 身份已建，不该再走 mode:"new"
-      return true;
+      return openInto(name);                       // 装入段抽成 openInto（与 takeCloud 重载共用；事务性保证见其注释）
     },
 
     adopted(name: string, opts?: { create?: boolean }): void {   // new-doc/import：编辑器内容由 app 装入（非 store.open）→ 当前 + 脏

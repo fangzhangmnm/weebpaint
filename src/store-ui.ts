@@ -72,7 +72,16 @@ export const storeUI: StoreUI = {
   },
 
   // 错误必 surface（ADR-0009 绝不吞 console）。接统一 error-badge：error/warning→顶层 banner、info→状态栏、log→仅 console。
-  reportError: (err: unknown, level): void => { reportError(err, level ?? "error"); },
+  //   CloudNetworkError（库 2026-08-25 起：provider fetch 网络层 throw 的类型化封装，Safari 原文是裸
+  //   `TypeError: Load failed`）→ 用户可见换 i18n 人话（级别不降：保存失败必须显眼），原始错误进 console 供诊断。
+  reportError: (err: unknown, level): void => {
+    if ((err as { name?: string } | null)?.name === "CloudNetworkError") {
+      reportError(err, "log");                                    // 诊断轨：原错（含 Graph 路径/cause）只进 console
+      reportError(new Error(t("err.cloudNetwork")), level ?? "error");   // 用户轨：人话 banner，级别照旧
+      return;
+    }
+    reportError(err, level ?? "error");
+  },
 
   // 「跳过到离线」逃生闸（对齐旧 cloud-freshness）：引擎 freshness.open 拿 {probe, settle}，probe 与 fetchMeta race，
   //   finally 调 settle。用户点「跳过到离线」→ probe resolve → 读本地（无硬超时，用户即超时）。

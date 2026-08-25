@@ -1222,6 +1222,7 @@ export const S = {
   "print.title":  { zh: "打印", en: "Print", ja: "印刷" },
   // 杂项 UI
   "err.unknown":     { zh: "未知错误", en: "Unknown error", ja: "不明なエラー" },
+  "err.cloudNetwork": { zh: "网络不通：暂时连不上云端。你的画都还在本地，稍后可重试。", en: "Network unreachable: could not reach the cloud. Your work is safe locally — try again later.", ja: "ネットワークに接続できません。作品はローカルに保存されています。後で再試行してください。" },
   "err.dismissHint": { zh: "点击关闭", en: "tap to dismiss", ja: "タップで閉じる" },
   "busy.working":    { zh: "处理中…", en: "Working…", ja: "処理中…" },
   "board.noWebgl2a": { zh: "此设备不支持 WebGL2 —— 无法运行画布", en: "This device has no WebGL2 — the canvas cannot run", ja: "この端末は WebGL2 非対応のためキャンバスを実行できません" },
