@@ -22,7 +22,7 @@ import { flattenViewLeaves } from "./backend/workpiece/painting-view.ts";
 import { tLatin } from "./i18n/index.ts";
 import { isSignedIn, store as _store } from "./app-store.ts";
 import type { EncryptedBlob } from "./app-store.ts";   // 密文 at-rest 字节（branded）；B2：类型经接缝转口
-import { openInputSheet, openConfirmSheet, openChoiceSheet, lockSyncGate } from "./sheets.ts";
+import { openInputSheet, openConfirmSheet, openChoiceSheet, lockSyncGate, settleSyncGate } from "./sheets.ts";
 import { readHandleFile, writeHandleBlob, handleMtime, hasWeebPaintTraces, type LocalFileHandle } from "./local-file-session.ts";
 import { pathFolder } from "./gallery/gallery-path.ts";
 import { invalidateCachedThumb } from "./gallery/cloud-thumb-cache.ts";
@@ -775,6 +775,72 @@ async function saveAs(newName: string): Promise<void> {
   updateSaveStatus(); gallery.refresh();
 }
 
+// ── 回线/回前台：打开中文档的显式快进（P1，user 2026-08-25 拍板；案卷 20260825-cloud-override-adopt-noop-case.md
+//    第二案的修复；added by Claude Fable 5）─────────────────────────────────────────────────
+// 旧姿势 = app.ts 裸调 pullIfClean() 不接结果：快进换掉 IDB 字节后画布照旧、UI 无声 → 用户在陈旧
+//   世界线上画+保存，If-Match 恰好匹配刚被推进的 base → 云端新版被静默覆写（这条路连 .backup 都没有）。
+// 新姿势：
+//   · 平价段（绝大多数次）：一次 fetchMeta 比 etag，没变 → 静默完事，零下载零遮罩。
+//   · 云端真动了才显式接管（onReplaceStart）：升全屏 sync gate——**护栏在用户第一笔之前**——
+//     附「先继续画（另存新画）」逃生（JRP 慢网课：无硬超时，用户即超时）。
+//   · fast-forwarded → 复用重开管线整体换装（与 takeCloud 同 B 形状：IDB/谱系/画布一起换世界线）
+//     + 封 "cloud-refresh" checkpoint（revert 锚指向新世界线，堵孪生洞）。
+//   · escaped → 分叉 consent（2026-08-25 拍板：逃生=显式开新画，不是「回头再弹 412」）：当前画面
+//     saveAs 成新身份（mode:"new" 正门，红线全在）；原名旧字节留作缓存、云端新版仍是正主
+//     （迟到完成的下载 = 原名缓存的静默刷新，画布已属新身份无从被碰）。之后推送全走新身份。
+let _refreshInFlight = false;   // 回线+回前台常成对触发 → 去重
+async function refreshOpenDoc(): Promise<void> {
+  if (!_activeSessionName || _localFile || _isLazyBlankSession || _refreshInFlight) return;
+  if (!es || es.isDirty() || es.isPushPending()) return;   // 只干净快进；dirty 的分歧留给保存 412 冲突面（引擎 dirty-skip 双保险）
+  const name = _activeSessionName;
+  _refreshInFlight = true;
+  let gateUp = false;
+  let onSkip: () => void = () => {};
+  const probe = new Promise<void>((res) => { onSkip = res; });
+  try {
+    const r = await _file(name).pullIfClean({
+      onReplaceStart: () => {
+        gateUp = true;
+        void lockSyncGate<"fork" | null>({
+          title: t("cf.cloudNewerTitle"), message: t("cf.body.pulling", { name }), showSpinner: true,
+          actions: [{ label: t("cf.act.forkContinue"), value: "fork" }],
+        }).then((v) => { if (v === "fork") onSkip(); });
+      },
+      probe,
+    });
+    if (r?.status === "fast-forwarded") {
+      if (gateUp) { settleSyncGate(null); gateUp = false; }   // 先落遮罩再重载（adoptModel 自带 _loadingDoc 门）
+      const ok = await es.open(toFull(name));                 // 同名重开 = openInto 管线（freshness 刚 markSynced → in-sync 快路径 → readLocal → adopt 全量重建）
+      if (!ok) { setStatus(t("ss.refreshReloadFailed", { name }), true); return; }   // 响亮，绝不静默留旧画布
+      void _captureCheckpoint(name, "cloud-refresh");
+      setStatus(t("ss.refreshedFromCloud", { name }));
+      updateSaveStatus(); gallery.refresh();
+    } else if (r?.status === "escaped") {
+      if (gateUp) { settleSyncGate(null); gateUp = false; }   // fork 按钮自身已关 gate，settle 兜底无害
+      await _forkAfterEscape(name);
+    }
+  } catch (e) { reportError(new Error("[session] refreshOpenDoc failed: " + String(e)), "log"); }
+  finally { if (gateUp) settleSyncGate(null); _refreshInFlight = false; }
+}
+
+// 逃生分叉：saveAs = 现成深模块（mode:"new" 撞名护栏 + checkpoint + 切身份 + push）。秒级撞名重试一次。
+async function _forkAfterEscape(origName: string): Promise<void> {
+  const d = new Date();
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  const stamp = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
+  for (const forkName of [`${origName}（分叉 ${stamp}）`, `${origName}（分叉 ${stamp}-2）`]) {
+    try {
+      await saveAs(forkName);
+      setStatus(t("ss.forkedFromRefresh", { name: forkName }));
+      return;
+    } catch (e) {
+      if ((e as { name?: string })?.name === "CloudNameCollisionError") continue;
+      throw e;
+    }
+  }
+  throw new Error("[session] fork name collision twice - giving up");
+}
+
 // setName(name)：改活动身份（内存 + 持久 appState.currentFile 两轨齐动）。
 // setName(name, { persist: false })：**只动内存**——给 boot 加载失败用。
 //   幽灵 path 纪律（feedback-phantom-current-path）：加载失败要把内存名降回 safe default（防 save 走 rename
@@ -808,6 +874,7 @@ export const session = {
   // 无地走本地轨；残影墙期间（_esMuted）es 绝不标脏（防跨写，见无地节注释）。
   markEdited() { if (_localFile) { _markLocalDirty(); return; } if (es && !_esMuted) es.markDirty(); },
   setName, restore: restoreSession, saveAs,
+  refreshOpenDoc,   // 回线/回前台的显式快进（P1 2026-08-25）——app.ts 事件侧唯一入口，别再裸调 pullIfClean
   // 显式换文档挽留门（fill 预览三选；user 2026-08-21）——给 session 外的换内容入口复用
   //   （import-image 的 .ora 导入为新身份）。session 内的 openItem/newDoc/openLocalFile 已内联。
   gateFillOnSwitch: _gateFillOnSwitch,

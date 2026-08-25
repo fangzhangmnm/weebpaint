@@ -1,6 +1,6 @@
 /** 何时封存 checkpoint。**显式枚举**而不是在 adopt 里埋钩子——因为 revert 也走 adopt，
  *  埋在里面就会「回滚完顺手把快照覆盖掉」。加新入口时来这里加一条，别在深处埋。 */
-export type CheckpointTrigger = "gallery-open" | "new-doc" | "save-as" | "boot-restore" | "revert";
+export type CheckpointTrigger = "gallery-open" | "new-doc" | "save-as" | "boot-restore" | "revert" | "cloud-refresh";
 export declare function shouldCapture(trigger: CheckpointTrigger): boolean;
 /** checkpoint 的 IDB key。fullName = 库身份全名（X.ora），slot 恒 0（结构留多档余地）。
  *  `:` 安全：文件名里的 `:` 被 config.sessionFileName 剥掉了，不会和分隔符打架。 */

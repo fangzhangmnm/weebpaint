@@ -34,6 +34,7 @@ export interface StoreLike {
         }): Promise<{
             pushed: boolean;
             reason?: string;
+            resolution?: string;
         }>;
         tryMove(to: string): Promise<TryMoveResult>;
         delete(): Promise<{

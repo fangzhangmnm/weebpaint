@@ -17,7 +17,9 @@ export type CheckpointTrigger =
   | "new-doc"         // 新建画布（首存之后）→ 封存（revert = 回到空白）
   | "save-as"         // 另存为新身份 → 封存（新身份的"打开态"就是此刻）
   | "boot-restore"    // 冷启动 / tab 重开 → **不**封存
-  | "revert";         // 回滚 → **不**封存
+  | "revert"          // 回滚 → **不**封存
+  | "cloud-refresh";  // 云端快进后整装重载（2026-08-25）→ 封存：revert 锚必须指向新世界线，
+                      //   否则「回到打开时」会把刚快进来的云端版又用旧世界线覆写回去（案卷 §1 的孪生洞）
 
 const CAPTURE: Record<CheckpointTrigger, boolean> = {
   "gallery-open": true,
@@ -25,6 +27,7 @@ const CAPTURE: Record<CheckpointTrigger, boolean> = {
   "save-as": true,
   "boot-restore": false,
   "revert": false,
+  "cloud-refresh": true,
 };
 
 export function shouldCapture(trigger: CheckpointTrigger): boolean {

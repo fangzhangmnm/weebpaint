@@ -3855,6 +3855,24 @@ export declare const S: {
         readonly ja: "クラウドに同期しました：{name}";
         readonly tok: "pana tawa poki sewi li pini: {name}";
     };
+    readonly "ss.refreshedFromCloud": {
+        readonly zh: "已更新到云端最新版本：{name}";
+        readonly en: "Updated to the latest cloud version: {name}";
+        readonly ja: "クラウド最新バージョンに更新しました：{name}";
+        readonly tok: "sitelen {name} li kama sin tan poki sewi";
+    };
+    readonly "ss.forkedFromRefresh": {
+        readonly zh: "已另存为「{name}」继续画；原作品会保持云端最新";
+        readonly en: "Saved as “{name}” to keep painting; the original will follow the cloud version";
+        readonly ja: "「{name}」として保存して続行します。元の作品はクラウド版に従います";
+        readonly tok: "sitelen sina li awen lon nimi sin \"{name}\". sitelen pi nimi pini li kama sama poki sewi";
+    };
+    readonly "ss.refreshReloadFailed": {
+        readonly zh: "云端新版本已下载，但画布重载失败——请回图库重新打开「{name}」";
+        readonly en: "The newer cloud version was downloaded but the canvas failed to reload — reopen “{name}” from the gallery";
+        readonly ja: "クラウド新バージョンをダウンロードしましたが、キャンバスの再読み込みに失敗しました。ギャラリーから「{name}」を開き直してください";
+        readonly tok: "sitelen sin li lon ilo ni, taso lipu sitelen li ken ala kama sin. o open sin e \"{name}\" tan lipu ale";
+    };
     readonly "ss.pushNotDone": {
         readonly zh: "没能推送到云端：{name}（离线或有冲突未解决，文件仍在本地）";
         readonly en: "Couldn't push to cloud: {name} (offline or unresolved conflict; the file is still local)";
@@ -5235,6 +5253,18 @@ export declare const S: {
         readonly ja: "「{name}」にはまだアップロードしていない変更がこの端末にあります。";
         readonly tok: "ilo ni li jo e ante pi pana ala pi sitelen \"{name}\".";
     };
+    readonly "cf.body.pulling": {
+        readonly zh: "正在取回「{name}」的云端新版本…";
+        readonly en: "Fetching the newer cloud version of “{name}”…";
+        readonly ja: "「{name}」のクラウド新バージョンを取得中…";
+        readonly tok: "mi kama jo e sitelen sin \"{name}\" tan poki sewi";
+    };
+    readonly "cf.act.forkContinue": {
+        readonly zh: "先继续画（另存新画）";
+        readonly en: "Keep painting (save as a new painting)";
+        readonly ja: "描き続ける（新しい作品として保存）";
+        readonly tok: "o sitelen awen (sitelen sin li kama)";
+    };
     readonly "cf.act.localWins": {
         readonly zh: "本地覆盖云端";
         readonly en: "Local overwrites cloud";
@@ -6562,6 +6592,11 @@ export declare const S: {
         readonly zh: "未知错误";
         readonly en: "Unknown error";
         readonly ja: "不明なエラー";
+    };
+    readonly "err.cloudNetwork": {
+        readonly zh: "网络不通：暂时连不上云端。你的画都还在本地，稍后可重试。";
+        readonly en: "Network unreachable: could not reach the cloud. Your work is safe locally — try again later.";
+        readonly ja: "ネットワークに接続できません。作品はローカルに保存されています。後で再試行してください。";
     };
     readonly "err.dismissHint": {
         readonly zh: "点击关闭";
