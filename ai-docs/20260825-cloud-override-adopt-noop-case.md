@@ -1,6 +1,10 @@
 # 案卷：cloud override local 后画布不重载（adopt 从未接线）+ 保存 TypeError: Load failed
 
-> created 20260825 · as-of WeebPaint v0.10.28 / @internal/store 0.3.0（回滚后）· 2026-08-25
+> created 20260825 · as-of WeebPaint v0.10.29 / @internal/store 0.3.4 · 2026-08-25 · by Claude Fable 5
+> **✅ 交付回写（同日两轮，user 逐条拍板）**：§6 三修 = store 0.3.3 + WeebPaint 收货（takeCloud
+> resolution 透传 / 换世界线无条件 backup / keepMine deferred guard / CloudNetworkError+i18n 人话；
+> app 侧 B 形状重开管线重载）。§7 第二轮 = store 0.3.4 + v0.10.29 已推 dev（O3 copy-then-replace /
+> 全库 If-Match 家规 / 显式快进+逃生分叉）。§8 = 第三案调查记录（restore 本地腿覆盖，**待拍板未修**）。
 > 风险分区：§1/§4/§6 涉 **store/同步引擎 = 红线区**，动手前必读 MASTER.md §A、走 `pwa-cloud-store` skill、改前 escalate human。本案卷只记事实与提案，**未获批不动码**。
 > 前传：`20260820-open-time-conflict-surface-handoff.md`（open 路径冲突 surface；本案是它的续集——surface 修好了，resolve 本身是半个操作）。
 
@@ -69,3 +73,44 @@
 2. **网络错文案**：save/push 的 catch 区分网络层 throw（无 `.status`）→ 人话文案（i18n）+ 或降级，参照 store `8fef121` SW 网关同款处理；问号云语义不变。
 3. 雷 (a)(b)（§4）修复：weakOverride 顺序/原子性重排；keepMine 接 deferred guard。
 4. §5 revert UX（人类已 park，宣发前另开单）。
+
+**✅ 交付形状（2026-08-25 第一轮，user 拍板 ①取 B ③⑤ 做 ④后置）**：store 0.3.3（`d2864f8`/`383a17e`）+
+WeebPaint `73f1af9`/`7f002e0`。①B = `SaveResult.resolution` 透传 + editor-session `openInto` 重开管线整装换线
+（undo 栈随重开天然清零 = 文件版本模型，非 undo 操作模型——user 语义：takeCloud 是换世界线不是 workspace 操作）；
+另加 takeCloud **无条件** `.backup`（`forceBackup`，freshness 静默快进不传 = ADR-0016 不动）。③ = keepMine
+deferred guard（`push.ts:73-77` 同款，配 tryHeal 自愈闭环）。⑤ = `CloudNetworkError`（只在 fetch 自身 throw 处
+包装，防自家 TypeError 被误装网络错）+ app 侧 i18n 人话（error 级不降）。
+
+## 7. 第二轮交付（2026-08-25 同日，user 拍板 O3 + P1 + 全库 If-Match 家规）
+
+- **雷(a) 修复 = O3 copy-then-replace**（store 0.3.4，`65a5bc9`…`35e0a2c`）：`CloudProvider.copy` 新原语
+  （Graph 异步 copy，202+监控轮询，预算 ~5min——服务端复制不走用户带宽，超时抛在 replace 之前=安全中止）；
+  weakOverride = copy loser 进 .backup（**原位不动**）→ **If-Match CAS replace**（「我覆盖的正是我刚备份的那版」）。
+  ghost 窗口与空窗期盲覆盖双双结构性消失；全库最后一个裸 replace 收编。
+- **全库 If-Match 家规**（user 原话要义：「全库以后只能用 if match，进语法检测护栏」；澄清：If-Match 是零带宽的
+  请求头 CAS，本库本就处处用，唯 weakOverride 尾腿裸奔）：graph 层运行时护栏（`replace` 无 eTag 直接 throw）+
+  `test/ifmatch-guard.test.ts` 语法扫描；顺手修存量真缺口——**onedrive-provider 的 delete 适配器吞 eTag**，
+  purge 的 If-Match（v435）从没到过 Graph（mock 比真机严，测试全绿掩盖真机裸奔）。
+- **第二案（§B-1，pullIfClean 裸调）修复 = P1 显式快进**（WeebPaint v0.10.29，`af3a375`，已推 dev）：
+  `session.refreshOpenDoc()` 成为回线/回前台唯一入口。平价段 = 一次 fetchMeta（etag 没变零打扰）；真快进才
+  显式接管：**第一笔之前**升全屏 gate+转圈 + 「先继续画（另存新画）」逃生（JRP 慢网课，用户即超时）。
+  fast-forwarded → 重开管线换线 + 封 `cloud-refresh` checkpoint（revert 锚指向新世界线，堵孪生洞）。
+  **逃生语义（user 拍板）= 分叉 consent，非「回头弹 412」**：escaped → `saveAs("原名（分叉 stamp）")`
+  正门（mode:"new" 红线全在，不越狱）；原名旧字节留缓存、云端新版仍是正主；迟到下载 = 原名缓存无害刷新
+  （引擎 `RefreshOpts.probe`，逃生瞬间本地/谱系分毫不动，有测试钉住）。
+- P2（不快进、留给保存 412）已否决：在错误版本上画半天再二选一 = 人造恶性冲突，护栏必须在第一笔之前。
+
+## 8. 第三案调查记录（restore 本地腿覆盖；2026-08-25 调查完毕，**待拍板未修**）
+
+`trash.restore`（store `trash.ts:72-88`）两条腿纪律不对称：**云端腿**撞名自动改名 "(2)" + `markSeen` 采纳
+etag（良好）；**本地腿** `local.restore`（`local-cache.ts:64-69`）= `moveTo` → `idb.rename` → **落点无条件
+覆盖 files 分区同名字节**，且不动 dirty/head。两个恶果：
+
+1. **restore-while-open**（原怀疑，坐实+加重）：恢复一个正打开的同名 → IDB 被换、画布陈旧 → 下一次
+   autosave/save 用陈旧画布把恢复来的字节盖回去。此时 trash 分区那份已被 move 走 → **恢复的字节真丢**
+   （纯本地件无云端腿兜底时）。UI 先报「已恢复」后被静默吞 = 谎报成功。
+2. **restore-onto-dirty**（顺藤摸出）：目标名有未推 dirty 字节 → 恢复直接覆盖，dirty 标志残留 → 下次 push
+   把 trash 字节推上云，用户未推的编辑蒸发。违反 §A「dirty 绝不被无 backup 覆盖」。
+
+**修法方向（待 escalate 拍板）**：本地腿对齐云端腿——落点撞名改名恢复（如 `原名（恢复 stamp）`），绝不覆盖
+files 分区既有字节；`trash.restore` 已采纳返回名，结构现成，app 零改动。备份箱 UI（已记账）动工前必修。
