@@ -135,6 +135,10 @@ function itemToG(it: { path: string; syncState: string; lastModified?: number; s
     //   **云端**戳（listing cf 优先），若字节仍本地优先取，就会把旧本地字节配新云 token 写进缩略图缓存 = 永不自愈。
     //   conflict 也算：token 同样是云戳，只有云字节配得上它（本地 dirty 字节没有可用的本地戳；缓存诚实 > 展示偏好）。
     cloudNewer: it.syncState === "newer-on-cloud" || it.syncState === "conflict",
+    // badge 去压扁（老账 C，20260820 handoff §2C；user 2026-08-25 拍板开工）：这两态不再被压平成
+    //   synced/unpushed——分叉工作流后「原名有云端新版待看」的可见性全靠它们。
+    newerOnCloud: it.syncState === "newer-on-cloud",
+    conflict: it.syncState === "conflict",
   };
 }
 // watchFolder（网盘模型）：订阅**当前文件夹** → 立即本地帧、云端到了同一 cb 再闪。app 只知「这一夹更新了」。

@@ -62,6 +62,11 @@ const ICON = {
   // 两者必须视觉可分——别合并。pendingGone 共享库还没有，暂用 assets/weebpaint_legacy.svg 的本地图形。
   ghost: iconHtml("cloud-unavailable"),
   pendingGone: iconHtml("cloud-pending"),
+  // badge 去压扁（老账 C，2026-08-25）。stopgap = 现库图标（user 指示不烤中文）：newerOnCloud=download
+  //   （云端有新版可取）、conflictBoth=split（两条世界线分开了）。理想图标 cloud-download / cloud-conflict
+  //   已登记 SVG Icons TODO.md，入库后重跑 extract+inline 换真图。
+  newerOnCloud: iconHtml("download"),
+  conflictBoth: iconHtml("split"),
   lock: iconHtml("lock"),
   image: iconHtml("image"),   // 图片次级 tile 角标（v0.9.34）
 };
@@ -784,7 +789,7 @@ function makeGallery(host: GalleryHost) {
                 <button type="button" @click="copy(row.item)"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#copy"/></svg><span>{{ L.copy }}</span></button>
                 <button v-if="row.t.badge==='cloudOnly'" type="button" @click="openTile(row.item)"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#download"/></svg><span>{{ L.pullLocal }}</span></button>
                 <button v-if="row.t.badge==='localOnly'" type="button" @click="push(row.item)"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#cloud-upload"/></svg><span>{{ L.pushCloud }}</span></button>
-                <button v-if="row.t.badge==='dirtyBoth'" type="button" @click="push(row.item)"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#cloud-upload"/></svg><span>{{ L.pushCloud }}</span></button>
+                <button v-if="row.t.badge==='dirtyBoth' || row.t.badge==='conflictBoth'" type="button" @click="push(row.item)"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#cloud-upload"/></svg><span>{{ L.pushCloud }}</span></button>
                 <button v-if="row.item.local && row.item.cloud" type="button" @click="unload(row.item)"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#unload-local-cache"/></svg><span>{{ L.unloadLocal }}</span></button>
                 <button v-if="row.item.local && !row.t.encrypted" type="button" @click="encryptItem(row.item)"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#lock"/></svg><span>{{ L.encrypt }}</span></button>
                 <button v-if="row.item.local && row.t.encrypted" type="button" @click="decryptItem(row.item)"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#unlock"/></svg><span>{{ L.decrypt }}</span></button>

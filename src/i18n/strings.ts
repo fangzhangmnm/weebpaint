@@ -1165,6 +1165,8 @@ export const S = {
   "gv.badge.ghost":       { zh: "云端副本已被移动或删除，本地有未推送的修改 —— 可「重命名留存」或「丢弃」", en: "Cloud copy was moved or deleted while local has unpushed edits — “rename & keep” or “discard”", ja: "クラウド側が移動/削除され、ローカルに未プッシュの変更があります——「改名して保持」か「破棄」を" },
   "gv.badge.pendingGone": { zh: "云端副本已消失，本地干净副本待处理 —— 可「重新上传」推回云端，或「删除」；宽限期后自动移入回收站", en: "Cloud copy is gone; clean local copy pending — “re-upload” to push it back, or “delete”; auto-trashed after the grace period", ja: "クラウド側が消失、ローカルのクリーンな複製が保留中——「再アップロード」か「削除」を。猶予期間後は自動でゴミ箱へ" },
   "gv.badge.dirtyBoth":   { zh: "本地+云端 · 本地有未推改动", en: "Local+cloud · unpushed local edits", ja: "ローカル+クラウド · 未プッシュの変更あり" },
+  "gv.badge.newerOnCloud": { zh: "云端有新版本 —— 打开会自动更新到云端版", en: "A newer version exists in the cloud — opening will update to it", ja: "クラウドに新しいバージョンがあります——開くと自動的に更新されます" },
+  "gv.badge.conflictBoth": { zh: "云端与本机各有新改动 —— 打开或推送时会请你裁决", en: "New changes both in the cloud and on this device — you'll be asked to resolve on open or push", ja: "クラウドとこの端末の両方に新しい変更があります——開くかプッシュ時に選択を求められます" },
   "gv.badge.syncedBoth":  { zh: "本地+云端（已同步）", en: "Local+cloud (synced)", ja: "ローカル+クラウド（同期済み）" },
   "gv.badge.cloudOnly":   { zh: "纯云端（未拉到本地）", en: "Cloud only (not downloaded)", ja: "クラウドのみ（未ダウンロード）" },
   "gv.badge.localOnly":   { zh: "仅本地（未上传云端）", en: "Local only (not uploaded)", ja: "ローカルのみ（未アップロード）" },

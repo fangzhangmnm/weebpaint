@@ -38,10 +38,12 @@ export interface GItem extends Omit<GalleryItem, "local" | "cloud"> {
   ghost?: boolean;
   pendingGone?: boolean;   // clean cloud-gone 孤儿、防抖 grace 内（云端刚没了，本地干净副本待处理）
   cloudNewer?: boolean;    // 云端字节比本地新（newer-on-cloud / conflict）→ ThumbCell 取图走 source:"cloud"（见 app-store.itemToG）
+  newerOnCloud?: boolean;  // 本地 clean ∧ 云端动过（打开会静默快进采纳）——badge 去压扁（老账 C，2026-08-25）
+  conflict?: boolean;      // 本地 dirty ∧ 云端动过（保存/推送会弹冲突面）——badge 去压扁（老账 C，2026-08-25）
 }
 
 // 文件 tile 的同步徽章（图标 SVG 在组件 template 里按 kind 渲）。ghost = cloud-gone dirty 孤儿；pendingGone = cloud-gone clean（grace 内）。
-export type BadgeKind = "syncedBoth" | "dirtyBoth" | "cloudOnly" | "localOnly" | "ghost" | "pendingGone";
+export type BadgeKind = "syncedBoth" | "dirtyBoth" | "cloudOnly" | "localOnly" | "ghost" | "pendingGone" | "newerOnCloud" | "conflictBoth";
 
 export interface GalleryTile {
   name: string;          // 全 path-name（key / 移动改名用）
@@ -74,7 +76,11 @@ export function tileFor(
     //   宽限期后 reconcile 会自动移入回收站。用户可「重新上传」（推回云端）或「删除」（提前入回收站）。
     badge = "pendingGone"; badgeTitle = t("gv.badge.pendingGone");
   } else if (isLocal && isCloud) {
-    if (opts.signedIn && item.dirty) { badge = "dirtyBoth"; badgeTitle = t("gv.badge.dirtyBoth"); }
+    // 去压扁（老账 C）：conflict/newer-on-cloud 不再冒充 unpushed/synced。优先级 conflict > newer-on-cloud >
+    //   dirty > synced（conflict 蕴含 dirty，必须先判）。
+    if (opts.signedIn && item.conflict) { badge = "conflictBoth"; badgeTitle = t("gv.badge.conflictBoth"); }
+    else if (opts.signedIn && item.newerOnCloud) { badge = "newerOnCloud"; badgeTitle = t("gv.badge.newerOnCloud"); }
+    else if (opts.signedIn && item.dirty) { badge = "dirtyBoth"; badgeTitle = t("gv.badge.dirtyBoth"); }
     else { badge = "syncedBoth"; badgeTitle = t("gv.badge.syncedBoth"); }
   } else if (isCloud) {
     badge = "cloudOnly"; badgeTitle = t("gv.badge.cloudOnly");

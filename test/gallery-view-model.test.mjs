@@ -123,3 +123,25 @@ describe("gallery · naturalCompare 自然排序", () => {
     assert(arr.indexOf("ABC2") < arr.indexOf("abc10"), "跨大小写数字段仍数值比");
   });
 });
+
+// badge 去压扁（老账 C，20260820 handoff §2C；user 2026-08-25 拍板）added by Claude Fable 5
+describe("gallery-view-model · tileFor 去压扁（newer-on-cloud / conflict）", () => {
+  const local = { name: "a", updatedAt: 100, size: 10, thumb: {} };
+  const cloud = { id: "c1", size: 20, lastModifiedDateTime: "2026-01-01T00:00:00Z" };
+  it("newer-on-cloud（clean ∧ 云端动过）→ newerOnCloud，不再冒充 synced", () => {
+    const t = tileFor({ name: "a", local, cloud, dirty: false, newerOnCloud: true }, { signedIn: true, activeName: null });
+    eq(t.badge, "newerOnCloud");
+  });
+  it("conflict（dirty ∧ 云端动过）→ conflictBoth，不再冒充 unpushed；优先于 dirtyBoth", () => {
+    const t = tileFor({ name: "a", local, cloud, dirty: true, conflict: true }, { signedIn: true, activeName: null });
+    eq(t.badge, "conflictBoth");
+  });
+  it("未登录 → 两态不参与（离线不谎报云端知识）", () => {
+    const t = tileFor({ name: "a", local, cloud, dirty: false, newerOnCloud: true }, { signedIn: false, activeName: null });
+    eq(t.badge, "syncedBoth");
+  });
+  it("ghost/pendingGone 仍最高优先", () => {
+    const t = tileFor({ name: "a", local, cloud, dirty: true, conflict: true, ghost: true }, { signedIn: true, activeName: null });
+    eq(t.badge, "ghost");
+  });
+});
