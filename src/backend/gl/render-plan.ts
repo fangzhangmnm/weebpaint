@@ -113,6 +113,9 @@ export function buildPlan(nodes: PlanNode[], updated: Set<number>, bg: BgKind): 
         if (clipNoBase) continue;
         if (!needsIsolation(n)) { out.push(...unitsOf(n.children)); continue; }
         const children = unitsOf(n.children);
+        // 无可见渲染子项的隔离组（空组/全隐/只剩无基底 clip 子层）合成不出任何像素 → 不产 unit。
+        // 不跳会走到 makeSeg 空段 → unitIds([]) 崩（动态帧空组落单必踩；夏音 v0.3 组内落笔 TypeError 案）。
+        if (children.length === 0) continue;
         const dynamic = children.some(isDynamic) || (clipBaseId !== null && baseIsDynamic(base as PlanLeaf));
         out.push({ u: "group", node: n, unitMode: groupUnitMode(n), clipBaseId, children, dynamic });
       }

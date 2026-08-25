@@ -155,3 +155,65 @@ describe("render-plan · float / 多 updated / key 稳定性", () => {
     eq(sig(p.rootSteps), "leaf1 leaf3 leaf4", "2 消失；1、4 单叶直画（无 bg 单叶不成段）");
   });
 });
+
+// 夏音 v0.3 案（v0.10.27）：空 children 隔离组在动态帧落单 → makeSeg 空段 → unitIds([]) TypeError。
+//   潜伏自 S7b（静止帧被并进邻居段掩盖）；修复 = unitsOf 对空 children 隔离组不产 unit。
+describe("render-plan · 空隔离组不产 unit（组内落笔 TypeError 回归案）", () => {
+  it("空组（source-over）+ 旁边落笔 overlay → 不崩，空组零贡献", () => {
+    const p = buildPlan([L(1, { overlay: true }), G(2, [], { mode: "source-over" })], new Set(), "checker");
+    eq(sig(p.rootSteps), "leaf1", "空组消失；1 直画");
+  });
+  it("空组 + 旁边变换 float → 不崩", () => {
+    const p = buildPlan([L(1, { float: true }), G(2, [], { mode: "source-over" })], new Set([1]), "checker");
+    eq(sig(p.rootSteps), "leaf1 float1", "叶+float，空组消失");
+  });
+  it("全隐子层组 / 只剩无基底 clip 子层的组 → 同空组", () => {
+    const p1 = buildPlan([L(1, { overlay: true }), G(2, [L(3, { visible: false })], { mode: "source-over" })], new Set(), "checker");
+    eq(sig(p1.rootSteps), "leaf1", "全隐子层组消失");
+    const p2 = buildPlan([L(1, { overlay: true }), G(2, [L(3, { clip: true })], { mode: "source-over" })], new Set(), "checker");
+    eq(sig(p2.rootSteps), "leaf1", "组内 clip 无基底 → 子层不画 → 组消失");
+  });
+  it("组内落笔 + 同组空子组 → 不崩（递归消除）", () => {
+    const p = buildPlan([G(2, [L(3, { overlay: true }), G(4, [], { mode: "source-over" })], { mode: "source-over" })], new Set(), "checker");
+    eq(sig(p.rootSteps), "group2[leaf3]", "空子组消失，组内 live 叶照画");
+  });
+  it("静止帧空组本来就无害（并进 prefix 段）——对照", () => {
+    const p = buildPlan([L(1), G(2, [], { mode: "source-over" })], new Set(), "checker");
+    eq(sig(p.rootSteps), "seg(pre,source-over,1)", "整树一段");
+  });
+});
+
+// 迷你 fuzz：任意树形 × 任意 updated × 任意 bg，buildPlan 永不 throw（整类护栏，~50ms）。
+describe("render-plan · fuzz 永不崩", () => {
+  it("2000 随机树（组嵌套/隐藏/clip/float/overlay/半透明组）全部可规划", () => {
+    let seed = 20260825;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    const modes = ["source-over", "multiply", "screen", "pass-through"];
+    let id = 0;
+    const mkNodes = (depth, budget) => {
+      const n = [];
+      const count = 1 + Math.floor(rnd() * 4);
+      for (let i = 0; i < count && budget.n > 0; i++) {
+        budget.n--;
+        if (depth < 3 && rnd() < 0.35) {
+          n.push({ kind: "group", id: ++id, opacity: rnd() < 0.2 ? 0.5 : 1, mode: modes[Math.floor(rnd() * 4)],
+                   clip: rnd() < 0.15, visible: rnd() < 0.9, children: mkNodes(depth + 1, budget) });
+        } else {
+          n.push({ kind: "leaf", id: ++id, opacity: 1, mode: modes[Math.floor(rnd() * 3)], clip: rnd() < 0.3,
+                   visible: rnd() < 0.85, hasContent: rnd() < 0.8, float: rnd() < 0.1, overlay: rnd() < 0.1 });
+        }
+      }
+      return n;
+    };
+    for (let t = 0; t < 2000; t++) {
+      id = 0;
+      const nodes = mkNodes(0, { n: 12 });
+      const ids = [];
+      const walk = (ns) => ns.forEach((x) => { ids.push(x.id); if (x.children) walk(x.children); });
+      walk(nodes);
+      const upd = new Set(ids.filter(() => rnd() < 0.15));
+      buildPlan(nodes, upd, ["none", "checker", "color"][Math.floor(rnd() * 3)]);   // throw = fail
+    }
+    assert(true, "2000 棵树全部规划成功");
+  });
+});

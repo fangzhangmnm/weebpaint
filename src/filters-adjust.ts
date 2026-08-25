@@ -24,6 +24,7 @@ import { iconHtml } from "./ui/icon.ts";
 // Filter 对象（filters.js 未类型化 → 描述本面板用到的接口）。
 interface FilterLike {
   id: string; title: string; modes: string[]; category?: string;
+  hiddenInMenu?: boolean;   // true = 注册但不进菜单（曲线 UI 暂禁，2026-08-25）
   defaults(): Record<string, unknown>;
   buildBody(body: HTMLElement, state: unknown, onChange: () => void): void;
   bake(src: Uint8ClampedArray, out: Uint8ClampedArray, params: unknown, mask: Uint8Array | null, w: number, h: number): void;
@@ -210,7 +211,7 @@ function _renderFilterMenu() {
   const container = document.getElementById("adjustFilterList");
   if (!container) return;
   container.innerHTML = "";
-  const all = listFilters() as FilterLike[];
+  const all = (listFilters() as FilterLike[]).filter((F) => !F.hiddenInMenu);
   const adjustmentRegion = all.filter((F) => (F.category || "adjustment") === "adjustment" && F.modes.includes("region"));
   const brushFilters     = all.filter((F) => F.modes.includes("brush"));
   const artistFilters    = all.filter((F) => F.category === "artist");

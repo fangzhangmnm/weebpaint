@@ -7,6 +7,7 @@ interface CurvesBuildState {
 export declare class CurvesFilter {
     static id: string;
     static title: string;
+    static hiddenInMenu: boolean;
     static category: string;
     static modes: string[];
     static bleedRadius: (params: import("../filters.ts").FilterParams | null) => number;

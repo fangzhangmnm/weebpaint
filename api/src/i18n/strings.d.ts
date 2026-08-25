@@ -97,10 +97,10 @@ export declare const S: {
         readonly tok: "o tawa tomo sitelen";
     };
     readonly "menu.newArtwork": {
-        readonly zh: "新建…";
-        readonly en: "New…";
-        readonly ja: "新規…";
-        readonly tok: "sitelen sin…";
+        readonly zh: "新建 / 打开…";
+        readonly en: "New / Open…";
+        readonly ja: "新規 / 開く…";
+        readonly tok: "sitelen sin / open…";
     };
     readonly "menu.openLocalFile": {
         readonly zh: "打开本地文件…";
@@ -728,7 +728,7 @@ export declare const S: {
     };
     readonly "menu.exportHub": {
         readonly zh: "导出与另存…";
-        readonly en: "Export & save a copy…";
+        readonly en: "Export & save…";
         readonly ja: "書き出しと別名保存…";
         readonly tok: "pana en awen…";
     };
@@ -5003,6 +5003,12 @@ export declare const S: {
         readonly en: "Usage: unknown";
         readonly ja: "使用量：不明";
         readonly tok: "suli awen: mi sona ala";
+    };
+    readonly "gs.cloudDisabledNoGallery": {
+        readonly zh: "云端功能已停用，图库不可用（可在设置里重新开启）";
+        readonly en: "Cloud features are disabled; the gallery is unavailable (re-enable in settings)";
+        readonly ja: "クラウド機能が無効のため、ギャラリーは利用できません（設定で再度有効化できます）";
+        readonly tok: "ilo sewi li lape la, poki sitelen li ken ala. (o open e ona lon lawa)";
     };
     readonly "gs.quotaCritical": {
         readonly zh: "本地存储 {pct}% 已满 — 立即去图库卸载不常用的作品";

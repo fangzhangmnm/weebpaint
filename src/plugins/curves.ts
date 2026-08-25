@@ -15,6 +15,8 @@ interface CurvesBuildState {
 export class CurvesFilter {
   static id = "curves";
   static title = t("flt.curves.title");
+  // UI 坏损，入口暂禁（user 2026-08-25 拍板「曲线先禁用ui到时候整理」）；代码保留，整理轮重开。
+  static hiddenInMenu = true;
   static category = "adjustment";
   static modes = ["region"];
   static bleedRadius = CurvesKernel.bleedRadius;
