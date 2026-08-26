@@ -6313,6 +6313,16 @@ export declare const S: {
         readonly en: "Local+cloud · unpushed local edits";
         readonly ja: "ローカル+クラウド · 未プッシュの変更あり";
     };
+    readonly "gv.badge.newerOnCloud": {
+        readonly zh: "云端有新版本 —— 打开会自动更新到云端版";
+        readonly en: "A newer version exists in the cloud — opening will update to it";
+        readonly ja: "クラウドに新しいバージョンがあります——開くと自動的に更新されます";
+    };
+    readonly "gv.badge.conflictBoth": {
+        readonly zh: "云端与本机各有新改动 —— 打开或推送时会请你裁决";
+        readonly en: "New changes both in the cloud and on this device — you'll be asked to resolve on open or push";
+        readonly ja: "クラウドとこの端末の両方に新しい変更があります——開くかプッシュ時に選択を求められます";
+    };
     readonly "gv.badge.syncedBoth": {
         readonly zh: "本地+云端（已同步）";
         readonly en: "Local+cloud (synced)";

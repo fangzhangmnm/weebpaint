@@ -18,6 +18,7 @@ import { els } from "./els.ts";
 import { t } from "./i18n/index.ts";
 import { setMenuOpen } from "./settings-menu.ts";
 import { session } from "./session-state.ts";
+import { homeDisplayName } from "./doc-home.ts";
 import { isCloudEnabled } from "./cloud-capability.ts";
 import { openChoiceSheet } from "./sheets.ts";
 import { runSaveAsFlow } from "./topbar-menu.ts";   // hub「复制一份到图库」= 原另存为（逻辑在 topbar-menu，红线原样）
@@ -58,13 +59,11 @@ function _selCropRect(): { x: number; y: number; w: number; h: number } | null {
 // v0.5.20：导出图片/导出项目合并为一个「导出」入口——format=ora/psd 即项目语义（所有图层·文件）。
 function _isProjectFormat(fmt: string): boolean { return (getExporter(fmt)?.kind ?? "image") === "project"; }
 
-// 导出文件名的基名（v0.9.31，QA ③）：无地本地文件模式 session.name 恒 null（双墙设计），
-//   用打开的本地文件 stem；否则用 store 裸名（自带夹前缀）。所有导出 sink 共用
-//   （含 timelapse mp4 导出——app.ts 接线 initTimelapseUi，别在那边再长一份分叉）。
+// 导出文件名的基名（v0.9.31，QA ③；P1 2026-08-26 收敛进 doc-home.homeDisplayName）：
+//   file 家用文件 stem；gallery 家用户口 path（自带夹前缀）；transient/无 doc 兜 "export"。
+//   所有导出 sink 共用（含 timelapse mp4 导出——app.ts 接线 initTimelapseUi，别在那边再长一份分叉）。
 export function exportBaseName(): string {
-  const lf = session.localFile;
-  if (lf) return lf.name.replace(/\.[^.]+$/, "") || "export";
-  return session.name ?? "export";   // name=null ∧ 非无地 不该发生；防御兜底别让文件名变 "null"
+  return homeDisplayName(session.home, "export");
 }
 
 // 云盘去向的前置闸（v0.9.31，QA ③④）：返回拒绝文案或 null=放行。encode 之前调，别白编码。
@@ -73,7 +72,7 @@ export function exportBaseName(): string {
 //   - 加密作品：加密模型承诺明文字节不落云端（v0.9.30 起）。
 function _cloudSinkBlocked(): string | null {
   if (storeAbsent) return t("tm.exportCloudUnavailable");
-  if (session.localFile) return t("tm.exportLocalDocNoCloud");
+  if (session.home?.kind === "file") return t("tm.exportLocalDocNoCloud");
   if (session.enc.encrypted) return t("tm.exportEncryptedNoCloud");
   return null;
 }

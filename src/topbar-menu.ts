@@ -20,6 +20,7 @@
 //   setMenuOpen、decodeOraToPainting 等（以实际 import 块为准）。
 
 import { session } from "./session-state.ts";
+import { homeDisplayName } from "./doc-home.ts";
 import { isUnlocked } from "./crypto-state.ts";
 import { checkpointAgeMinutes } from "./checkpoint-policy.ts";
 import { els } from "./els.ts";
@@ -62,10 +63,9 @@ function closeSheet(sheet: HTMLElement, backdrop: HTMLElement) {
 //   若想改成「每 N 次再提醒」或跨刷新记忆，改这一个旗子的读写即可；点背板/Esc 取消**不**记防烦）。
 let _cloudSignInPromptDeclined = false;
 function smartSaveAndPush() {
-  if (session.localFile) { void session.saveAndPush(); return; }
-  // 无活动文档（gallery-first 未绑 session / 云关 boot 空白画布）：走旧路 → 「无文档不能保存」的
-  //   诚实提示（saveAndPush 首行分支）。没有文档就没有「登录同步」可谈，不弹。
-  if (!session.name) { void session.saveAndPush(); return; }
+  // 非 gallery 家（file 家=写回文件 / 无 doc=「无文档不能保存」诚实提示 / transient=P2 前无产者）：
+  //   一律交 saveAndPush 内部按家派发；「登录同步」只对 gallery 家有意义，不弹。
+  if (session.home?.kind !== "gallery") { void session.saveAndPush(); return; }
   if (!isCloudEnabled()) { void session.save({ commitPending: true }); return; }
   if (isSignedIn()) { void session.saveAndPush(); return; }
   // —— 已配置未登录：本地保存照做（不 await——sheet 弹出与 IDB 事务并行，beforeunload 偷存同款姿态）——
@@ -144,7 +144,7 @@ export function initTopbarMenu(ctx: AppContext) {
   // name 空（gallery-first 未绑 session）→ 只推游标。门机制全在库内（app 不再直调 setCloudDirty，ADR-0016 §4）。
   const _editGate = () => {
     if (session.loadingDoc) return;             // 加载期 clearHistory 的 histchange 不算编辑（session 的适配器已挂两信号→es 标脏）
-    if (!session.name) return;
+    if (session.home?.kind !== "gallery") return;   // file 家的脏徽章由 session 内部脏轨自己驱动
     updateSaveStatus();
   };
   window.addEventListener("wp:histchange", _editGate);
@@ -271,8 +271,10 @@ export function initTopbarMenu(ctx: AppContext) {
   //   无快照时点击走下面 tm.noOpenSnapshot 的 status 兜底，无需再藏。
   els.menuRevertToOpen?.addEventListener("click", async () => {
     setMenuOpen(false);
-    if (!session.name) { setStatus(t("tm.noActiveSession"), true); return; }
-    const cp = await session.readCheckpoint(session.name);
+    // revert = gallery 家专属（checkpoint key=户口；file 家的 revert=打开点快照，归 P4 revert v2）。
+    const home = session.home;
+    if (home?.kind !== "gallery") { setStatus(t("tm.noActiveSession"), true); return; }
+    const cp = await session.readCheckpoint(home.path);
     if (!cp || !cp.blob) {
       // 加密作品的快照按密文存；锁定/密码不对时解不出 → 说清楚是"要密码"，别含糊成"没有快照"。
       setStatus(session.enc.encrypted && !isUnlocked() ? t("tm.revertFailedNeedPassword") : t("tm.noOpenSnapshot"), true);
@@ -297,7 +299,7 @@ export function initTopbarMenu(ctx: AppContext) {
       const loaded = await decodeOraToPainting(cp.blob);
       // 既有身份（不是新建）→ 首存 mode:"existing"，就是要写回原文件；且**不重新封存快照**
       //   （否则刚回滚掉的状态立刻覆盖快照，只能 revert 一次）。
-      session.adoptAsExisting(loaded, session.name);
+      session.adoptAsExisting(loaded, home.path);
       // R4：revert 是内容变化（像素回到旧快照）→ 必须走 clean→dirty 门标云脏。
       //   旧版只 edits.mark() 不标云脏 → 云端永远收不到 revert，且 clean 快进会无备份吃掉 revert 结果。
       session.markEdited();
@@ -373,18 +375,19 @@ export function initTopbarMenu(ctx: AppContext) {
 //   （菜单点击），module 级 editMode/setStatus 届时已绑定。
 export async function runSaveAsFlow(): Promise<void> {
   editMode.applyPendingTransient();
-  // 无地本地文件模式（spec §7）：另存为 = 收编入库。session.name 恒 null（双墙设计）→ 建议名用
-  //   本地文件 stem（不是「无题 副本」）；且没有「与当前名字相同」可言——文件 stem 不是 store 身份，
-  //   同名入库合法（撞已有作品由下面 nameOccupied 预检 + mode:"new" 护栏兜）。
-  const lf = session.localFile;
-  const oldName = session.name || t("nd.untitled");
-  let candidate = lf ? (lf.name.replace(/\.[^.]+$/, "") || oldName) : `${oldName} ${t("name.copySuffix")}`;
+  // file 家（spec §7）：另存为 = 收编入库 → 建议名用本地文件 stem（不是「无题 副本」）；
+  //   且没有「与当前名字相同」可言——文件 stem 不是 store 身份，同名入库合法
+  //   （撞已有作品由下面 nameOccupied 预检 + mode:"new" 护栏兜）。
+  const home = session.home;
+  const isFileHome = home?.kind === "file";
+  const oldName = home?.kind === "gallery" ? home.path : t("nd.untitled");
+  let candidate = isFileHome ? homeDisplayName(home, oldName) : `${oldName} ${t("name.copySuffix")}`;
   while (true) {
     const input = await openInputSheet(t("tm.saveAs"), candidate, { placeholder: t("tm.newArtworkNamePlaceholder") });
     if (input === null) return;
     const trimmed = input.trim();
     if (!trimmed) { setStatus(t("tm.nameEmpty"), true); candidate = ""; continue; }
-    if (!lf && trimmed === oldName) { setStatus(t("tm.nameSameAsCurrent"), true); candidate = trimmed; continue; }
+    if (!isFileHome && trimmed === oldName) { setStatus(t("tm.nameSameAsCurrent"), true); candidate = trimmed; continue; }
     const occ = await sessionNameConflict(trimmed);   // 统一 store.files.nameOccupied（boolean：local + 在线 remote）
     if (occ) { setStatus(t("tm.nameExists", { name: trimmed }), true); candidate = trimmed; continue; }
     // 极端 race（预检后到落盘间被占）→ file(name,{mode:"new"}) 的护栏抛 CloudNameCollisionError，

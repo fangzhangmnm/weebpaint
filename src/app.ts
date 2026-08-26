@@ -425,7 +425,8 @@ initDevConsole();
 const gallery = mountGallery(document.getElementById("galleryMount")!, {
   signedIn: () => isSignedIn(),
   online: () => navigator.onLine !== false,
-  activeName: () => session.name,
+  // gallery 的「活动项」只对 gallery 家有意义（file/transient 家在图库里没有对应卡片）。
+  activeName: () => { const h = session.home; return h?.kind === "gallery" ? h.path : null; },
   confirm: (title, m) => openConfirmSheet(title, m),
   input: (title, d, o) => openInputSheet(title, d, o),
   chooseFolder: async (title, message, options) => {
@@ -498,7 +499,7 @@ window.addEventListener("online", async () => {
   updateCloudAuthUI();
   if (isSignedIn()) _store.files.drainOfflineQueue().catch((e) => reportError(new Error("drainOfflineQueue: " + String(e)), "log"));   // N3：重连重放离线删队列
   if (!els.galleryFull.classList.contains("hidden")) gallery.refresh();
-  if (isSignedIn() && session.name) void session.refreshOpenDoc();   // 回线：显式快进（P1 2026-08-25——裸 pullIfClean 不接结果=画布陈旧的第二案，禁用回）
+  if (isSignedIn() && session.home?.kind === "gallery") void session.refreshOpenDoc();   // 回线：显式快进（P1 2026-08-25——裸 pullIfClean 不接结果=画布陈旧的第二案，禁用回）
 });
 window.addEventListener("offline", () => { updateCloudAuthUI(); });
 
@@ -591,7 +592,7 @@ new PwaShell({
   },
   onForeground: () => {
     pullSettingsAndState();                                   // 前台：拉 4 库
-    if (isSignedIn() && session.name) void session.refreshOpenDoc();   // 当前文件显式快进（P1 2026-08-25）
+    if (isSignedIn() && session.home?.kind === "gallery") void session.refreshOpenDoc();   // 当前文件显式快进（P1 2026-08-25）
     // 图库开着回前台 → 刷新列表（fire-and-forget，判据同 auth/online 现有姿势）。云端帧只在
     //   watchFolder 订阅时来一次，不刷的话别的设备的新保存永远看不到——这一刀只让「回前台」变诚实；
     //   长驻前台的轮询要 store 从被动库变主动 agent = 更大的 ADR（ai-docs/20260528-backlog.md

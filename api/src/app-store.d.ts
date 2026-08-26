@@ -37,6 +37,8 @@ declare function itemToG(it: {
     ghost: boolean;
     pendingGone: boolean;
     cloudNewer: boolean;
+    newerOnCloud: boolean;
+    conflict: boolean;
 };
 export interface CloudImageItem {
     path: string;

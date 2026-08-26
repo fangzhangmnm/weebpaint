@@ -5,6 +5,16 @@
 > 范围：app 侧。store 侧只列 agenda（结案 doc §5），契约由 store 轮与人类逐条定。
 > 纪律：纯 d.ts 风格草案，非生成物；命名用既有标准词，领域词只给领域物。
 
+> **落地回写（v0.11.0 / 2026-08-26，edited by Claude Fable 5）**：P1「身份联合类型 + 家动词」slice 已落
+> `src/doc-home.ts`（DocHome 原样；`handle` 用仓内 `LocalFileHandle` 最小面 = FileSystemFileHandle 结构等价）。
+> 形状差异：① DocHomeKeeper 拆成两半——**状态持权** = doc-home keeper（`docHome()`/`fileDirty()` 只读 +
+> `claimHomeAuthority()` 单持权动词，workpiece 令牌手法，session-state 是唯一持权者），**编排动词**（save/saveAs/exit）
+> 仍在 session 门面；`settle()` 待 P2（transient 本 slice 无产者，`saveRoute` 已派发 + 矩阵测试钉）；`exportTo` 仍归
+> export-import-menu hub（导出不清 dirty 由「导出路径拿不到 clearFileDirty」结构保证）。② 新增纯件：`saveRoute()`
+> （(家×动作) 保存派发表）、`homeDisplayName()`（导出/建议名基名）、`SOLE_GALLERY_ID`（P3 registry 铸 id 前的占位）。
+> ③ `session.name`/`session.localFile` 已私有化 → `session.home` 联合快照，消费点全部 switch/kind 判别。
+> 契约测试 = `test/doc-home.test.mjs`。
+
 ```ts
 // ─── doc 的家（P1 核心）────────────────────────────────────────────
 /** 一画一家。徽章/保存/checkpoint/锁 全部 switch 此联合类型（exhaustive，编译器守）。 */

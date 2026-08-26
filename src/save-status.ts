@@ -8,6 +8,7 @@ import { els } from "./els.ts";
 import { isSignedIn } from "./app-store.ts";
 import { isCloudEnabled } from "./cloud-capability.ts";
 import { session } from "./session-state.ts";
+import { assertNever } from "./doc-home.ts";
 import { t, tLatin } from "./i18n/index.ts";
 import { iconHtml } from "./ui/icon.ts";
 
@@ -61,29 +62,42 @@ function computeSaveState() {
   return isSignedIn() ? "synced" : "local-only";
 }
 export function updateSaveStatus() {
-  // v0.9.24 无地本地文件模式（spec §7）：徽章双态 = 脏盘（蓝盘+角点，点=写回文件）/ 灰盘（已保存到文件）。
-  //   dirty 可见是「弃自动保存」设计成立的硬前提之一（没有它就是煤气灯）。
-  const lf = session.localFile;
-  if (lf) {
-    els.topSaveBtn.dataset.state = lf.dirty ? "dirty" : "local-only";
-    els.topSaveBtn.style.opacity = ""; els.topSaveBtn.style.color = "";
-    els.topSaveBtn.innerHTML = ICON_DISK;
-    els.topSaveBtn.title = tLatin(lf.dirty ? "save.localFileDirty" : "save.localFileSaved", { name: lf.name });
-    return;
-  }
-  // gallery-first: 没绑 session → 隐藏 save btn（没东西可保存）
-  if (!session.name) {
+  // 徽章永远回答「这画住哪 + 安不安全」——P1 2026-08-26 起 switch DocHome 联合类型（exhaustive，
+  //   加第四种家时这里编译期报错，而不是静默走 gallery 分支）。
+  const home = session.home;
+  // 无 doc（图库态）→ 隐藏 save btn（没东西可保存）。
+  if (!home) {
     els.topSaveBtn.dataset.state = "none";
     els.topSaveBtn.innerHTML = ICON_DISK;
     els.topSaveBtn.title = tLatin("save.none");
     return;
+  }
+  switch (home.kind) {
+    case "file": {
+      // v0.9.24 文件家（spec §7）：徽章双态 = 脏盘（蓝盘+角点，点=写回文件）/ 灰盘（已保存到文件）。
+      //   dirty 可见是「弃自动保存」设计成立的硬前提之一（没有它就是煤气灯）。
+      els.topSaveBtn.dataset.state = session.dirty ? "dirty" : "local-only";
+      els.topSaveBtn.style.opacity = ""; els.topSaveBtn.style.color = "";
+      els.topSaveBtn.innerHTML = ICON_DISK;
+      els.topSaveBtn.title = tLatin(session.dirty ? "save.localFileDirty" : "save.localFileSaved", { name: home.fileName });
+      return;
+    }
+    case "transient": {
+      // P2 前无产者；真出现时按「无家=最危险」呈现：脏盘常亮（保存入口=安家仪式）。
+      els.topSaveBtn.dataset.state = "dirty";
+      els.topSaveBtn.innerHTML = ICON_DISK;
+      els.topSaveBtn.title = tLatin("save.none");
+      return;
+    }
+    case "gallery": break;   // 落到下方云徽章矩阵
+    default: return assertNever(home);
   }
   const state = computeSaveState();
   els.topSaveBtn.dataset.state = state;
   els.topSaveBtn.style.opacity = ""; els.topSaveBtn.style.color = "";   // 永不残留旧的内联灰/蓝，颜色一律交给 CSS 的 [data-state]
   //   ⚠ 按钮**永远可点**（零 disabled 逻辑）：synced 态的灰只是"没什么可存"的视觉，不是禁用。
   //   v409 起点它必 encode+推（forceSaveAndPush，让时间戳走字）。徽章只看内容脏，desk 改动 UI 静默。
-  const name = session.name;
+  const name = home.path;   // gallery 家：户口 path = 库裸名
   if (state === "saving") { els.topSaveBtn.innerHTML = ICON_CLOUD_SAVING; els.topSaveBtn.title = tLatin("save.saving", { name }); }
   else if (state === "dirty")  { els.topSaveBtn.innerHTML = ICON_DISK; els.topSaveBtn.title = tLatin("save.dirty", { name }); }
   else if (state === "unpushed") { els.topSaveBtn.innerHTML = ICON_CLOUD_PENDING; els.topSaveBtn.title = tLatin("save.unpushed", { name }); }

@@ -8,7 +8,7 @@ type LoadedDoc = DecodedPainting;
  *  加密容器 / 外来 ora → 不原位，把 File 还给调用方走导入路径（返回 File）。 */
 declare function openLocalFile(handle: LocalFileHandle): Promise<File | null>;
 /** 离开无地模式（回图库/开别的画/新建/导入前必过的门）。脏 → 问保存/丢弃；取消 → false（调用方中止）。
- *  ⚠ 只清 _localFile，**不清 _esMuted**——残影墙要等 es 重新绑定身份（_esRebound）才解除。 */
+ *  ⚠ 只清 file 家，**不清 _esMuted**——残影墙要等 es 重新绑定身份（_esRebound）才解除。 */
 declare function leaveLocalFile(): Promise<boolean>;
 /** 外部导入：装入一个解好的 doc，作为**新身份**。首存 mode:"new"（撞名抛，不静默覆盖）。 */
 declare function adoptAsNew(loaded: LoadedDoc, name: string): void;
@@ -57,17 +57,16 @@ export declare const session: {
     };
     encryptCurrent: typeof encryptCurrent;
     decryptCurrent: typeof decryptCurrent;
-    readonly name: string | null;
+    /** doc 的家（P1 2026-08-26，唯一身份读面）：null=无 doc（图库态）。消费点 switch home.kind
+     *  （exhaustive + assertNever）——旧 `session.name`/`session.localFile` 已私有化，别加回来：
+     *  两个平行可选字段就是当年「无地双墙」一类事故的温床，联合类型让错分支在编译期死。 */
+    readonly home: Readonly<import("./doc-home.ts").DocHome> | null;
     readonly loadingDoc: boolean;
     readonly loadedDocIsNewer: boolean;
     readonly loadedDocNewerConfirmed: boolean;
     readonly dirty: boolean;
     readonly pushPending: boolean;
     readonly saving: boolean;
-    readonly localFile: {
-        name: string;
-        dirty: boolean;
-    } | null;
     openLocalFile: typeof openLocalFile;
     leaveLocalFile: typeof leaveLocalFile;
     markEdited(): void;
@@ -91,7 +90,7 @@ export declare const session: {
     readEncryptedBytes(): Promise<EncryptedBlob | null>;
     /** 当前 doc 的完整 .ora 字节（**明文**；2026-08-21「导出与另存」hub 的「存为本地 .ora」用）。
      *  与显式保存同一落盘形（_encodeCurrentOraWithPeek：meta+timelapse+mergedimage）；加密作品也出
-     *  明文——内存本就是解密态，入口 sheet 文案已说清。纯导出副本：不落库、不碰 es/_localFile 身份。 */
+     *  明文——内存本就是解密态，入口 sheet 文案已说清。纯导出副本：不落库、不碰 es/_fileHome() 身份。 */
     encodeCurrentOra(): Promise<Blob>;
     readCheckpoint: typeof _readSessionCheckpoint;
     dropCheckpoint: typeof _dropCheckpoint;

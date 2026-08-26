@@ -24,6 +24,7 @@ import { isSignedIn, store as _store } from "./app-store.ts";
 import type { EncryptedBlob } from "./app-store.ts";   // 密文 at-rest 字节（branded）；B2：类型经接缝转口
 import { openInputSheet, openConfirmSheet, openChoiceSheet, lockSyncGate, settleSyncGate } from "./sheets.ts";
 import { readHandleFile, writeHandleBlob, handleMtime, hasWeebPaintTraces, type LocalFileHandle } from "./local-file-session.ts";
+import { claimHomeAuthority, docHome, fileDirty, saveRoute, SOLE_GALLERY_ID } from "./doc-home.ts";
 import { pathFolder } from "./gallery/gallery-path.ts";
 import { invalidateCachedThumb } from "./gallery/cloud-thumb-cache.ts";
 import { sessionFileName, sessionBareName, stripSessionExt } from "./config.ts";
@@ -67,8 +68,20 @@ let checkQuotaAndWarn: AppContext["checkQuotaAndWarn"];
 //   E 骑士开工清单，详 src/gallery/gallery.ts 文件头。
 let gallery: AppContext["gallery"];
 
-// ---- session 拥有的 SSoT 状态 ----
-let _activeSessionName: string | null = t("nd.untitled");   // 幽灵 path 保护：boot 成功/主动 open/new/save-as 才升级真名
+// ---- doc 的家（P1 2026-08-26）：SSoT 迁入 doc-home keeper，本模块 module-init 持走唯一 authority ----
+// 旧三根平行状态（_activeSessionName / _localFile / 隐式 null=无 doc）塌缩成一个 DocHome 联合值：
+//   gallery 家 ⇔ 旧 _activeSessionName 非空；file 家 ⇔ 旧 _localFile 非空；null ⇔ 无 doc（图库态）。
+//   不变量（原代码已成立，联合类型把它变成结构事实）：两者永不同时在场。
+//   transient 家：类型/派发已就绪（doc-home.ts + 矩阵测试），本 slice 无产者——产者随 P1 后续
+//   canvas-first boot / P2 Editor-only 落地。
+const _homeAuth = claimHomeAuthority();
+// 幽灵 path 保护：boot 成功/主动 open/new/save-as 才升级真名。初始占位「未命名」沿旧制直赋
+//   （不走 _setActive：module load 期不许持 Web Lock / 碰持久层）。
+_homeAuth.setHome({ kind: "gallery", galleryId: SOLE_GALLERY_ID, path: t("nd.untitled") });
+/** gallery 家的库裸名；非 gallery 家（file/transient/无 doc）= null（旧 _activeSessionName 语义原样）。 */
+function _activeName(): string | null { const h = docHome(); return h?.kind === "gallery" ? h.path : null; }
+/** file 家快照；非 file 家 = null（旧 _localFile 语义原样，dirty 拆去 keeper 的 fileDirty()）。 */
+function _fileHome() { const h = docHome(); return h?.kind === "file" ? h : null; }
 let _isLazyBlankSession = false;
 let _loadedDocIsNewer = false;
 let _loadedDocWriterVer: string | null = null;
@@ -78,10 +91,10 @@ let _loadingDoc = false;
 const AUTOSAVE_IDLE_MS = 30_000;   // v0.4.11 用户拍板：停笔 30 秒即落盘（旧 3min 墙钟 gate 删——dirty 门已足够：存完即净，再编辑本身重置空闲时钟）
 
 const _phase = reactive<{ current: "gallery" | "editing" | "lazyblank" }>({ current: "gallery" });
-function _recomputePhase() { _phase.current = !_activeSessionName ? "gallery" : _isLazyBlankSession ? "lazyblank" : "editing"; }
+function _recomputePhase() { _phase.current = !_activeName() ? "gallery" : _isLazyBlankSession ? "lazyblank" : "editing"; }
 
 const _enc = reactive<{ encrypted: boolean }>({ encrypted: false });
-// 边界（薄库身份=全名）：app 内部 _activeSessionName 是**裸** session 名；跨到库/editor-session 前统一 sessionFileName
+// 边界（薄库身份=全名）：app 内部 _activeName() 是**裸** session 名；跨到库/editor-session 前统一 sessionFileName
 //   转全名（X→X.ora）。加密件 .zip 由库内部据字节态翻转，app 只传明文全名。OUT 侧（itemToG）用 stripSessionExt 还原。
 const toFull = (name: string) => sessionFileName(name);
 // **活动文档名的唯一写入口**（v437）。在这里归一化一次，之后全 app 的 `item.name === session.name`
@@ -89,16 +102,18 @@ const toFull = (name: string) => sessionFileName(name);
 //   为什么必须归一：store 那边的身份是 sessionBareName 之后的；app 若存用户敲进来的原始名，
 //   `a:b` 与 `a_b` 会永久失配（详见 config.ts 的长注释）。
 function _setActive(name: string | null): void {
-  _activeSessionName = name == null ? null : sessionBareName(name);
-  setCurrentSessionName(_activeSessionName ?? "");
+  const bare = name == null ? null : sessionBareName(name);
+  _homeAuth.setHome(bare == null ? null : { kind: "gallery", galleryId: SOLE_GALLERY_ID, path: bare });
+  setCurrentSessionName(bare ?? "");
   // 双实例互认（2026-08-21）：身份唯一写入口 = 锁收口点。持有 doc ⇔ 长持它的 Web Lock
   //   （open/restore/newDoc/saveAs/adopt/rename 全从这收口；null=退图库/无地接管 → 释放。
   //   无地**不持锁**：无 store 身份、FS handle 拿不到全路径无稳定唯一键，且已有 mtime 陈旧对表兜底）。
-  if (_activeSessionName != null) holdDocLock(_activeSessionName); else releaseDocLock();
+  if (bare != null) holdDocLock(bare); else releaseDocLock();
 }
 const _file = (name: string) => _store.file(toFull(name), { isZip: true, mode: "existing" });   // WeebPaint work-file = ora-zip 容器（有 peek）
 async function _refreshEncrypted() {
-  try { _enc.encrypted = _activeSessionName ? await _file(_activeSessionName).isEncrypted() : false; }
+  const name = _activeName();
+  try { _enc.encrypted = name ? await _file(name).isEncrypted() : false; }
   catch { _enc.encrypted = false; }
 }
 
@@ -106,19 +121,19 @@ async function _refreshEncrypted() {
 // doc 的家 = 本地文件句柄而非 store 身份。session 级零持久化托底（human 拍板）：不进图库、
 // 刷新即散、崩溃即丢（beforeunload 只拦 UI 层关闭，任务管理器/断电是拍板接受的逃生通道）。
 //
-// 【数据安全双墙】无地期间 _activeSessionName 恒 null → 所有 store 身份路径被既有守卫短路；
+// 【数据安全双墙】无地期间 _activeName() 恒 null → 所有 store 身份路径被既有守卫短路；
 // 但 es 仍持有上一个 store doc 的名字，若无地编辑标脏了它，autosave 会把**无地画布的像素**
 // encode 后写进旧 doc 名下（幽灵路径级事故，AtlasMaker 0.7.2 同类）。所以：
-//   墙① _localFile 在场 → es 的 onChange/markEdited 改走本地脏轨，es 永不标脏；
+//   墙① _fileHome() 在场 → es 的 onChange/markEdited 改走本地脏轨，es 永不标脏；
 //   墙② _esMuted 残影墙：无地退出后 canvas 像素 ≠ es._name 的内容，直到 es 重新绑定身份
 //       （openItem/newDoc/adopt/saveAs/restore 任一成功）之前 es 仍不许标脏。
 // Windows 对齐（拍板）：无自动保存、blur/pagehide 不落盘（es 干净 = persist 天然 no-op）、
 // Ctrl+S 显式写回 + mtime 陈旧对表；beforeunload 的偷存在无地降级为 no-op（静默写用户文件违背文件语义）。
-let _localFile: { handle: LocalFileHandle; fileName: string; lastModified: number; dirty: boolean } | null = null;
+// （P1 2026-08-26：状态本体 = doc-home keeper 的 file 家 + fileDirty()；本节只剩残影墙旗子。）
 let _esMuted = false;
 
 function _markLocalDirty() {
-  if (_localFile && !_localFile.dirty) { _localFile.dirty = true; updateSaveStatus(); }
+  if (_fileHome() && !fileDirty()) { _homeAuth.markFileDirty(); updateSaveStatus(); }
 }
 /** es 重新绑定 store 身份（open/adopt/新建/另存成功）→ 解除残影墙。 */
 function _esRebound() { _esMuted = false; }
@@ -136,9 +151,10 @@ async function openLocalFile(handle: LocalFileHandle): Promise<File | null> {
   if (es.isDirty()) await saveNow();             // 旧 store doc 先落盘（openItem 同款；无地时已被上一行清场）
   _esMuted = true;   // 墙②先立再换内容：adoptModel 之后 canvas 就不再是 es._name 的像素了
   adoptModel(loaded);
-  _setActive(null); _isLazyBlankSession = false; _recomputePhase();
+  _setActive(null); _isLazyBlankSession = false;   // 先离旧家（释放锁 + 清持久 currentFile）
   _enc.encrypted = false;
-  _localFile = { handle, fileName: file.name, lastModified: file.lastModified, dirty: false };
+  _homeAuth.setHome({ kind: "file", handle, fileName: file.name, lastSeenMtime: file.lastModified });
+  _recomputePhase();
   updateSaveStatus();
   await setGalleryOpen(false);
   setStatus(t("lf.opened", { name: file.name }));
@@ -147,7 +163,8 @@ async function openLocalFile(handle: LocalFileHandle): Promise<File | null> {
 
 /** Ctrl+S / save 按钮在无地模式的落点：encode → mtime 陈旧对表 → 原子写回句柄。 */
 async function saveLocalFileNow(): Promise<boolean> {
-  if (!_localFile) return false;
+  const fh = _fileHome();
+  if (!fh) return false;
   _applyPendingForExplicitSave();   // 无地保存全部来自显式动作（implicit 在 saveNow 就 no-op 了）
   if (_loadedDocIsNewer && !_loadedDocNewerConfirmed) {
     const ok = await openConfirmSheet(t("ss.overwriteNewerTitle"), t("ss.overwriteNewerMsg", { writer: String(_loadedDocWriterVer), version: WEEBPAINT_VERSION }));
@@ -156,17 +173,21 @@ async function saveLocalFileNow(): Promise<boolean> {
   }
   try {
     // 陈旧对表（FS Access 无 etag，mtime 是零成本的 freshness 检查）：文件在我们打开后被外部改过 → 问。
-    const mt = await handleMtime(_localFile.handle);
-    if (mt != null && mt !== _localFile.lastModified) {
-      const ok = await openConfirmSheet(t("lf.staleTitle"), t("lf.staleMsg", { name: _localFile.fileName }));
+    const mt = await handleMtime(fh.handle);
+    if (mt != null && mt !== fh.lastSeenMtime) {
+      const ok = await openConfirmSheet(t("lf.staleTitle"), t("lf.staleMsg", { name: fh.fileName }));
       if (!ok) { setStatus(t("ss.saveCancelled")); return false; }
     }
     const { bytes } = await _encodeCurrentOraWithPeek();
-    await writeHandleBlob(_localFile.handle, bytes);
-    _localFile.lastModified = (await handleMtime(_localFile.handle)) ?? Date.now();
-    _localFile.dirty = false;
+    await writeHandleBlob(fh.handle, bytes);
+    // await 间隙家可能已换（挽留 sheet 期间新文件落地等）——只有仍是同一个家才前移对表基准/清脏
+    //   （旧代码此处改的是已脱钩的对象快照，效果等价；keeper 动词换家后调会响亮 throw，故先对指纹）。
+    if (docHome() === fh) {
+      _homeAuth.patchFileMtime((await handleMtime(fh.handle)) ?? Date.now());
+      _homeAuth.clearFileDirty();
+    }
     updateSaveStatus();
-    setStatus(t("lf.saved", { name: _localFile.fileName }));
+    setStatus(t("lf.saved", { name: fh.fileName }));
     return true;
   } catch (e) {
     reportError(new Error("[local-file] save failed: " + String(e)), "warning");
@@ -176,18 +197,19 @@ async function saveLocalFileNow(): Promise<boolean> {
 }
 
 /** 离开无地模式（回图库/开别的画/新建/导入前必过的门）。脏 → 问保存/丢弃；取消 → false（调用方中止）。
- *  ⚠ 只清 _localFile，**不清 _esMuted**——残影墙要等 es 重新绑定身份（_esRebound）才解除。 */
+ *  ⚠ 只清 file 家，**不清 _esMuted**——残影墙要等 es 重新绑定身份（_esRebound）才解除。 */
 async function leaveLocalFile(): Promise<boolean> {
-  if (!_localFile) return true;
-  if (_localFile.dirty) {
-    const c = await openChoiceSheet<"save" | "discard">(t("lf.leaveTitle"), _localFile.fileName, [
+  const fh = _fileHome();
+  if (!fh) return true;
+  if (fileDirty()) {
+    const c = await openChoiceSheet<"save" | "discard">(t("lf.leaveTitle"), fh.fileName, [
       { label: t("lf.leaveSave"), value: "save", primary: true },
       { label: t("lf.leaveDiscard"), value: "discard" },
     ]);
     if (!c) return false;
     if (c === "save" && !(await saveLocalFileNow())) return false;
   }
-  _localFile = null;
+  if (_fileHome()) _homeAuth.setHome(null);   // sheet 期间可能已被别的入口换家（原代码同样只清引用）
   updateSaveStatus();
   return true;
 }
@@ -288,7 +310,7 @@ function _docIsBlankUnnamed() {
     for (const L of flattenViewLeaves(doc.layers)) if (L.bboxW > 0 && L.bboxH > 0) { _isLazyBlankSession = false; _recomputePhase(); return false; }
     return true;
   }
-  if (_activeSessionName && _activeSessionName !== t("nd.untitled")) return false;
+  if (_activeName() && _activeName() !== t("nd.untitled")) return false;
   for (const L of flattenViewLeaves(doc.layers)) if (L.bboxW > 0 && L.bboxH > 0) return false;
   return true;
 }
@@ -357,7 +379,7 @@ function adoptAsExisting(loaded: LoadedDoc, name: string) {
   _adoptCommon(loaded, name, {});
 }
 function _adoptCommon(loaded: LoadedDoc, name: string, opts: { create?: boolean }) {
-  if (_localFile) _localFile = null;   // 同步入口无法弹确认——调用方（import-image 的 .ora 分支）已过 leaveLocalFile 门
+  if (_fileHome()) _homeAuth.setHome(null);   // 同步入口无法弹确认——调用方（import-image 的 .ora 分支）已过 leaveLocalFile 门
   adoptModel(loaded);
   _setActive(name); _isLazyBlankSession = false; _recomputePhase();
   es.adopted(toFull(name), opts);
@@ -433,10 +455,15 @@ async function _gateFillOnSwitch(): Promise<boolean> {
 
 // ---- 保存（本地）----
 async function saveNow(opts: { implicit?: boolean; commitPending?: boolean } = {}) {
-  // 无地分流：显式保存 → 写回本地文件；implicit（beforeunload 偷存等）→ no-op——
-  //   静默写用户磁盘文件违背 Windows 文件语义（Alt+F4 = 不保存，human 拍板）。
-  if (_localFile) { if (!opts.implicit) await saveLocalFileNow(); return; }
-  if (!_activeSessionName) return;
+  // 保存 = 送回家（P1 2026-08-26）：按家派发，表 = doc-home.saveRoute（矩阵契约测试钉）。
+  //   file+implicit=noop：静默写用户磁盘文件违背 Windows 文件语义（Alt+F4 = 不保存，human 拍板）。
+  const route = saveRoute(docHome(), opts);
+  if (route === "noop") return;
+  if (route === "file-writeback") { await saveLocalFileNow(); return; }
+  if (route === "settle") {   // transient 本 slice 无产者（P2 安家仪式落地前不可达）——真到了必须响亮，不许静默丢保存
+    reportError(new Error("[doc-home] settle requested but not implemented until P2"), "error"); return;
+  }
+  if (!_activeName()) return;   // gallery 家恒有名；防御保持旧守卫
   if (_docIsBlankUnnamed()) return;
   if (editMode.hasPendingTransient()) { if (opts.implicit) return; editMode.applyPendingTransient(); }
   if (opts.commitPending && !opts.implicit) commitFillNow();   // 显式保存入口（Ctrl+Shift+S 等）自带收口
@@ -450,7 +477,7 @@ async function saveNow(opts: { implicit?: boolean; commitPending?: boolean } = {
   try {
     await es.flushLocal();   // encode（+peek）→ store.file.save({tryPush:false})；只落本地（consent-safe）
                              // desk 不进 need：内容脏时顺手被 _buildOraMeta 捞走，不自己驱动落盘（v409）
-    setStatus(t("ss.saved", { name: _activeSessionName ?? "" }));
+    setStatus(t("ss.saved", { name: _activeName() ?? "" }));
     checkQuotaAndWarn();
   } catch (e) { reportError(new Error("[session] save failed: " + String(e)), "log"); setStatus(t("ss.saveFailed", { error: errMsg(e) })); }
   finally { updateSaveStatus(); }
@@ -461,15 +488,15 @@ async function saveNow(opts: { implicit?: boolean; commitPending?: boolean } = {
 //   没有它，保存瞬间 dirty 已翻 false、pushPending 还挂着 → 徽章闪「问号虚云」（unpushed 终态），语义不对。
 let _pushInFlight = false;
 async function saveAndPush() {
-  if (_localFile) { await saveLocalFileNow(); return; }   // 无地：Ctrl+S/save 按钮 = 写回本地文件（无云腿）
-  if (!_activeSessionName) { setStatus(t("ss.noDocCannotSave"), true); return; }
+  if (_fileHome()) { await saveLocalFileNow(); return; }   // file 家：Ctrl+S/save 按钮 = 写回本地文件（无云腿；= saveRoute 的 file-writeback）
+  const name = _activeName();
+  if (!name) { setStatus(t("ss.noDocCannotSave"), true); return; }
   _applyPendingForExplicitSave();   // Ctrl+S/save 按钮 = 显式保存：fill 预览 commit + transient apply（QA 2026-08-21）
   // 版本降级守卫：新版本文档未确认 → 只本地不推（saveNow 的 confirm 已挡本地覆盖，这里挡推）。
   if (_loadedDocIsNewer && !_loadedDocNewerConfirmed) {
     await saveNow();
     if (!_loadedDocNewerConfirmed) { setStatus(t("ss.notPushedNewer"), true); return; }
   }
-  const name = _activeSessionName;
   _pushInFlight = true;
   updateSaveStatus();
   try {
@@ -490,42 +517,44 @@ async function saveAndPush() {
 
 // ---- 加密 / 解除（对活动 doc；at-rest 字节换容器，内存态透明不动）----
 async function encryptCurrent() {
-  if (!_activeSessionName || _isLazyBlankSession) { setStatus(t("ss.openOrSaveBeforeEncrypt"), true); return; }
+  const name = _activeName();   // 快照一次（TS 无法跨调用窄化；语义同旧局部变量读法）
+  if (!name || _isLazyBlankSession) { setStatus(t("ss.openOrSaveBeforeEncrypt"), true); return; }
   const online = () => isSignedIn() && navigator.onLine !== false;
-  if (await _file(_activeSessionName).isEncrypted()) { setStatus(t("ss.alreadyEncrypted")); return; }
+  if (await _file(name).isEncrypted()) { setStatus(t("ss.alreadyEncrypted")); return; }
   const pw = await ensureNewPassword();
   if (pw == null) { setStatus(t("ss.cancelled")); return; }
   setPassword(pw);
-  await withBusy(t("ss.encryptingBusy", { name: _activeSessionName ?? "" }), async () => {
+  await withBusy(t("ss.encryptingBusy", { name }), async () => {
     try {
       await saveNow();   // flush 活 doc 明文 → store 读它打包
-      const res = await _file(_activeSessionName!).encrypt({ isOnline: online });
+      const res = await _file(name).encrypt({ isOnline: online });
       if (res.status === "offline") { setStatus(t("ss.encryptNeedsOnline"), true); return; }
       if (res.status === "already") { setStatus(t("ss.alreadyEncrypted")); return; }
       await _refreshEncrypted(); updateSaveStatus();
-      setStatus(res.status === "cloud-deferred" ? t("ss.encryptedDeferred", { name: _activeSessionName ?? "" }) : t("ss.encrypted", { name: _activeSessionName ?? "" }), res.status === "cloud-deferred");
-      gallery?.invalidateEncrypted?.(_activeSessionName!);   // #11：清图库锁态缓存（refresh 不清，probe 有缓存守卫）
+      setStatus(res.status === "cloud-deferred" ? t("ss.encryptedDeferred", { name }) : t("ss.encrypted", { name }), res.status === "cloud-deferred");
+      gallery?.invalidateEncrypted?.(name);   // #11：清图库锁态缓存（refresh 不清，probe 有缓存守卫）
       gallery?.refresh?.();
     } catch (e) { setStatus(t("ss.encryptFailed", { error: errMsg(e) }), true); }
   });
 }
 async function decryptCurrent() {
-  if (!_activeSessionName) { setStatus(t("ss.noDocOpen"), true); return; }
+  const name = _activeName();
+  if (!name) { setStatus(t("ss.noDocOpen"), true); return; }
   const online = () => isSignedIn() && navigator.onLine !== false;
-  if (!(await _file(_activeSessionName).isEncrypted())) { setStatus(t("ss.notEncrypted")); return; }
+  if (!(await _file(name).isEncrypted())) { setStatus(t("ss.notEncrypted")); return; }
   const ok = await openConfirmSheet(t("ss.decryptConfirmTitle"), t("ss.decryptConfirmMsg"));
   if (!ok) return;
-  if (!(await ensureUnlocked(_activeSessionName))) { setStatus(t("ss.cancelledNeedPassword"), true); return; }
-  await withBusy(t("ss.decryptingBusy", { name: _activeSessionName ?? "" }), async () => {
+  if (!(await ensureUnlocked(name))) { setStatus(t("ss.cancelledNeedPassword"), true); return; }
+  await withBusy(t("ss.decryptingBusy", { name }), async () => {
     try {
       await saveNow();
-      const res = await _file(_activeSessionName!).decrypt({ isOnline: online });
+      const res = await _file(name).decrypt({ isOnline: online });
       if (res.status === "offline") { setStatus(t("ss.decryptNeedsOnline"), true); return; }
       if (res.status === "locked") { setStatus(t("ss.cancelledNeedPassword"), true); return; }
       if (res.status === "not-encrypted") { setStatus(t("ss.notEncrypted")); return; }
       await _refreshEncrypted(); updateSaveStatus();
-      setStatus(t("ss.decrypted", { name: _activeSessionName ?? "" }));
-      gallery?.invalidateEncrypted?.(_activeSessionName!);   // #11：解除加密后小锁图标不清的病根——缓存守卫跳过已探项
+      setStatus(t("ss.decrypted", { name }));
+      gallery?.invalidateEncrypted?.(name);   // #11：解除加密后小锁图标不清的病根——缓存守卫跳过已探项
       gallery?.refresh?.();
     } catch (e) { setStatus(t("ss.decryptFailed", { error: errMsg(e) }), true); }
   });
@@ -533,9 +562,9 @@ async function decryptCurrent() {
 
 // ---- rename（UI 循环 + es.rename）----
 async function renameCurrentSession({ suggested, reason }: { suggested?: string; reason?: string } = {}) {
-  if (_localFile) { setStatus(t("lf.renameNotSupported"), true); return; }   // 无地：改名=文件系统操作，v1 不做（另存为可收编入库）
+  if (_fileHome()) { setStatus(t("lf.renameNotSupported"), true); return; }   // 无地：改名=文件系统操作，v1 不做（另存为可收编入库）
   editMode.applyPendingTransient();
-  const oldName = _activeSessionName!;
+  const oldName = _activeName()!;
   let candidate = suggested || oldName;
   let note = "";
   while (true) {
@@ -577,22 +606,23 @@ async function exitCanvasToGallery() {
   //   setGalleryOpen 里 apply transient：浮层挖洞的半成品先被推上了云）。
   _applyPendingForExplicitSave();
   if (!(await leaveLocalFile())) return;   // 无地且脏 → 问；取消 = 留在画布
-  if (_activeSessionName) {
+  const name = _activeName();
+  if (name) {
     // v409（D-Q6）：退出**只有内容脏/push-pending 才推**；只改 desk（无像素编辑）→ 不推不落本地，
     //   下次开 revert 到上次保存的快照。user 2026-07-14：「退出应该只有 contentdirty 才强制推云，workspace dirty 可抛」。
-    await withBusy(t("ss.savingBusy", { name: _activeSessionName ?? "" }), async () => {
+    await withBusy(t("ss.savingBusy", { name }), async () => {
       try { await es.flushAndPush(); } catch (e) { reportError(new Error("[exit] save failed: " + String(e)), "log"); }
     });
     // 内存脏没落成（保存失败/取消）→ 显式问重试/丢弃，绝不无条件宣布干净（K2 红线）。
     while (es.isDirty() && !_docIsBlankUnnamed()) {
       const choice = await lockSyncGate({
-        title: t("ss.localSaveIncompleteTitle"), message: t("ss.localSaveIncompleteMsg", { name: _activeSessionName ?? "" }), showSpinner: false,
+        title: t("ss.localSaveIncompleteTitle"), message: t("ss.localSaveIncompleteMsg", { name }), showSpinner: false,
         actions: [{ label: t("ss.retrySave"), value: "retry", primary: true }, { label: t("ss.exitDiscard"), value: "discard" }],
       });
       if (choice !== "retry") break;
-      await withBusy(t("ss.savingBusy", { name: _activeSessionName ?? "" }), async () => { try { await es.flushAndPush(); } catch (e) { reportError(new Error("[exit] retry failed: " + String(e)), "log"); } });
+      await withBusy(t("ss.savingBusy", { name }), async () => { try { await es.flushAndPush(); } catch (e) { reportError(new Error("[exit] retry failed: " + String(e)), "log"); } });
     }
-    gallery.setFolder(pathFolder(_activeSessionName));
+    gallery.setFolder(pathFolder(name));
   }
   _setActive(null); _recomputePhase();
   _enc.encrypted = false; _isLazyBlankSession = false; updateSaveStatus();
@@ -645,7 +675,7 @@ async function newDoc({ name, w, h, layer0Name, layer0Pixels }: { name: string; 
 
 // ---- 打开图库 item ----
 async function openItem(item: GalleryItem) {
-  if (item.name === _activeSessionName) { setGalleryOpen(false); return; }
+  if (item.name === _activeName()) { setGalleryOpen(false); return; }
   // 双实例互认（2026-08-21）：同画双开 = 本地字节互覆（store 层的修另行处理），入口拦住。
   //   警告 + 默认取消（openConfirmSheet 的 Esc/点背板都是取消），用户明确确认才继续。
   //   排在 leaveLocalFile 之前：先警告再谈保存，取消时什么都没发生。
@@ -696,7 +726,7 @@ async function pushItem(item: GalleryItem) {
 
 // ---- 卸载本地副本（offload：清 shadow；非法=唯一副本→store 抛 OffloadIllegalError→banner）----
 async function unloadItem(item: GalleryItem) {
-  const isActive = item.name === _activeSessionName;
+  const isActive = item.name === _activeName();
   // ⚠ 顺序（v417 修）：**先退出画布（落盘+推云），再 offload**。反过来的后果是数据安全问题，不只是 badge 错：
   //   store 的 head dirty（head.isDirty，落盘才置）和 es 的**内容脏**（wp:histchange 驱动）是两个不同的东西
   //   —— 注意这里说的不是 desk/workspaceDirty，那个概念 v409 已撤销（editor-state.ts:117）。用户画了几笔但还没
@@ -734,12 +764,12 @@ async function _restoreSessionAttempt(name: string): Promise<boolean> {
   //   并行 pullandreconcile 下，fire and forget 不用 await」）。**绝不 await**：对齐是锦上添花，
   //   不该让开画等网络（且离线/local-only 内部本就 no-op）。
   pullSettingsAndState();
-  // 无地闸（QA 2026-08-21 P0）：restoreSession 曾是唯一没设 _localFile 闸的 es 重绑入口——
+  // 无地闸（QA 2026-08-21 P0）：restoreSession 曾是唯一没设 _fileHome() 闸的 es 重绑入口——
   //   双击 .ora 启动时 launchQueue 的 openLocalFile 先落地、boot 自动恢复慢半拍（等网络/密码）后落地，
   //   画布被换成上次 session 的画而保存目标仍是用户磁盘文件 → Ctrl+S 把别的画整体写进用户 .ora。
   //   每个 await 关口后都要重查（openLocalFile 的接管块是同步的，查到就是真接管了）；
   //   es 适配器的 adopt 里还有最后一道硬闸兜 es.open 内部的窗口。
-  if (_localFile) return false;
+  if (_fileHome()) return false;
   try {
     // 加密件的冷启动/tab 重开契约（v415 核对确认现状即正确，勿"优化"掉）：
     //   ① 先问密码（ensureUnlocked 在 busy 外弹，验的是 peek，便宜）；
@@ -750,9 +780,9 @@ async function _restoreSessionAttempt(name: string): Promise<boolean> {
     //      取消密码常是瞬态的，清了下次冷启动就再也不自动开这张画）——见 boot.ts。
     //   store 侧的两半已有 node 覆盖（seal.test.ts：无密码写抛 LOCKED 绝不静默存明文；锁定读返 null）。
     if (await _file(name).isEncrypted()) { if (!(await ensureUnlocked(name))) return false; }
-    if (_localFile) return false;   // 密码框/加密探测悬着期间本地文件落地 → 让位
+    if (_fileHome()) return false;   // 密码框/加密探测悬着期间本地文件落地 → 让位
     if (!(await es.open(toFull(name)))) return false;   // 文件缺失/锁定 → 未装入。边界转全名。
-    if (_localFile) return false;   // es.open 期间本地文件落地（adopt 硬闸已挡画布；这里别再抢身份）
+    if (_fileHome()) return false;   // es.open 期间本地文件落地（adopt 硬闸已挡画布；这里别再抢身份）
     _esRebound();
     _setActive(name); _isLazyBlankSession = false; _recomputePhase(); _refreshEncrypted();
     updateSaveStatus();
@@ -767,7 +797,7 @@ async function saveAs(newName: string): Promise<void> {
   const { bytes, peek } = await _encodeCurrentOraWithPeek();
   // 另存为=写**新身份** → mode:"new"（撞名不静默覆盖；topbar 已 nameOccupied 预检，这里 store 层再兜底红线）。
   await _store.file(toFull(newName), { isZip: true, mode: "new" }).save(bytes, { tryPush: true, hint: peek ? { peek } : undefined });
-  if (_localFile) { _localFile = null; }   // 收编：内容已进库（就是刚写的字节），不算丢弃，无需问
+  if (_fileHome()) _homeAuth.setHome(null);   // 收编：内容已进库（就是刚写的字节），不算丢弃，无需问
   _setActive(newName); _isLazyBlankSession = false; _recomputePhase();
   es.adopted(toFull(newName));   // es 切到新名（内容即新名的；下轮 autosave 若跑=同内容 re-save，无害）。边界转全名。
   _esRebound();
@@ -790,9 +820,9 @@ async function saveAs(newName: string): Promise<void> {
 //     （迟到完成的下载 = 原名缓存的静默刷新，画布已属新身份无从被碰）。之后推送全走新身份。
 let _refreshInFlight = false;   // 回线+回前台常成对触发 → 去重
 async function refreshOpenDoc(): Promise<void> {
-  if (!_activeSessionName || _localFile || _isLazyBlankSession || _refreshInFlight) return;
+  const name = _activeName();   // gallery 家专属（file 家/无家 name=null 即短路——旧 _localFile 闸吸收进联合类型）
+  if (!name || _isLazyBlankSession || _refreshInFlight) return;
   if (!es || es.isDirty() || es.isPushPending()) return;   // 只干净快进；dirty 的分歧留给保存 412 冲突面（引擎 dirty-skip 双保险）
-  const name = _activeSessionName;
   _refreshInFlight = true;
   let gateUp = false;
   let onSkip: () => void = () => {};
@@ -848,11 +878,12 @@ async function _forkAfterEscape(origName: string): Promise<void> {
 //   失败不只是"文件真没了"：加密画取消密码框 / 离线只有云端副本 都会返 false。清了它们就再也不自动开了。
 function setName(name: string | null, opts: { persist?: boolean } = {}) {
   // 同样归一化（v437）：这条路是 gallery 移动文件后同步活动名的，不归一就会把用户敲的
-  //   原始名塞回来，重新制造 `item.name === session.name` 的失配。
-  _activeSessionName = name == null ? null : sessionBareName(name);
-  if (opts.persist !== false) setCurrentSessionName(_activeSessionName as string);
+  //   原始名塞回来，重新制造 `item.name === session.home.path` 的失配。
+  const bare = name == null ? null : sessionBareName(name);
+  _homeAuth.setHome(bare == null ? null : { kind: "gallery", galleryId: SOLE_GALLERY_ID, path: bare });
+  if (opts.persist !== false) setCurrentSessionName(bare ?? "");
   // 双实例互认：同 _setActive——换身份=换锁（gallery 移动文件同步活动名也算换身份）。
-  if (_activeSessionName != null) holdDocLock(_activeSessionName); else releaseDocLock();
+  if (bare != null) holdDocLock(bare); else releaseDocLock();
   _recomputePhase();
 }
 
@@ -860,19 +891,20 @@ function setName(name: string | null, opts: { persist?: boolean } = {}) {
 export const session = {
   enc: _enc,
   encryptCurrent, decryptCurrent,
-  get name() { return _activeSessionName; },
+  /** doc 的家（P1 2026-08-26，唯一身份读面）：null=无 doc（图库态）。消费点 switch home.kind
+   *  （exhaustive + assertNever）——旧 `session.name`/`session.localFile` 已私有化，别加回来：
+   *  两个平行可选字段就是当年「无地双墙」一类事故的温床，联合类型让错分支在编译期死。 */
+  get home() { return docHome(); },
   get loadingDoc() { return _loadingDoc; },
   get loadedDocIsNewer() { return _loadedDocIsNewer; },
   get loadedDocNewerConfirmed() { return _loadedDocNewerConfirmed; },
-  get dirty() { return _localFile ? _localFile.dirty : (es ? es.isDirty() : false); },   // 内存脏（save-status/beforeunload 用；无地走本地轨）
+  get dirty() { return _fileHome() ? fileDirty() : (es ? es.isDirty() : false); },   // 内存脏（save-status/beforeunload 用；file 家走 keeper 脏轨）
   get pushPending() { return es ? es.isPushPending() : false; },   // 已落本地但没上云（徽章第四态；与 dirty 正交）
   get saving() { return _pushInFlight; },   // v0.5.9：saveAndPush 在飞（app 层过程态，徽章显转圈云）
-  // 无地本地文件模式（spec §7）：只读快照给 UI（save-status 徽章/守卫文案）。
-  get localFile() { return _localFile ? { name: _localFile.fileName, dirty: _localFile.dirty } : null; },
   openLocalFile, leaveLocalFile,
   // app 驱动内容变化（revert 回滚；blender 冗余双标无害）→ 标脏。参考图已迁 wp:sidecarchange（S5）。
   // 无地走本地轨；残影墙期间（_esMuted）es 绝不标脏（防跨写，见无地节注释）。
-  markEdited() { if (_localFile) { _markLocalDirty(); return; } if (es && !_esMuted) es.markDirty(); },
+  markEdited() { if (_fileHome()) { _markLocalDirty(); return; } if (es && !_esMuted) es.markDirty(); },
   setName, restore: restoreSession, saveAs,
   refreshOpenDoc,   // 回线/回前台的显式快进（P1 2026-08-25）——app.ts 事件侧唯一入口，别再裸调 pullIfClean
   // 显式换文档挽留门（fill 预览三选；user 2026-08-21）——给 session 外的换内容入口复用
@@ -885,13 +917,14 @@ export const session = {
   /** 当前作品的 at-rest **密文**字节（原样，不解壳、不要密码）。非加密件 → null。
    *  先 saveNow()：at-rest 字节是「上次保存」的内容，不先落盘就会导出成旧版本。 */
   async readEncryptedBytes(): Promise<EncryptedBlob | null> {
-    if (!_activeSessionName) return null;
+    const name = _activeName();
+    if (!name) return null;
     await saveNow();                              // 未保存编辑先落盘（seal 会在写入前包壳 → 落地即密文）
-    return await _file(_activeSessionName).getEncryptedBlob();
+    return await _file(name).getEncryptedBlob();
   },
   /** 当前 doc 的完整 .ora 字节（**明文**；2026-08-21「导出与另存」hub 的「存为本地 .ora」用）。
    *  与显式保存同一落盘形（_encodeCurrentOraWithPeek：meta+timelapse+mergedimage）；加密作品也出
-   *  明文——内存本就是解密态，入口 sheet 文案已说清。纯导出副本：不落库、不碰 es/_localFile 身份。 */
+   *  明文——内存本就是解密态，入口 sheet 文案已说清。纯导出副本：不落库、不碰 es/_fileHome() 身份。 */
   async encodeCurrentOra(): Promise<Blob> {
     _applyPendingForExplicitSave();   // 显式导出动作：fill 预览等 pending 一并收口（同 saveAs 首行）
     const { bytes } = await _encodeCurrentOraWithPeek();
@@ -926,7 +959,7 @@ export function initSession(ctx: AppContext) {
         // 无地硬闸（QA 2026-08-21 P0）：decode 的 await 期间本地文件接管了画布 → 这次 adopt 再落地
         //   就是「画布=store 画、保存目标=用户磁盘文件」的撕裂态（Ctrl+S 会把别的画写进用户 .ora）。
         //   抛错让 es.open 按「没开成」收场（restoreSession/openItem 都已按 false 处理）。
-        if (_localFile) throw new Error("[session] adopt blocked: local-file session took over the canvas");
+        if (_fileHome()) throw new Error("[session] adopt blocked: local-file session took over the canvas");
         adoptModel(loaded);
       },
       encode: async () => await _encodeCurrentOraWithPeek(),
@@ -940,7 +973,7 @@ export function initSession(ctx: AppContext) {
       onChange: (cb: () => void) => {
         const h = () => {
           if (_loadingDoc) return;
-          if (_localFile) { _markLocalDirty(); return; }   // 墙①：无地编辑走本地脏轨，es 永不标脏
+          if (_fileHome()) { _markLocalDirty(); return; }   // 墙①：无地编辑走本地脏轨，es 永不标脏
           if (_esMuted) return;                            // 墙②：无地残影——es 身份未重绑前 canvas ≠ es._name，标脏=跨写
           cb();
         };

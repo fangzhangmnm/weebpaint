@@ -295,7 +295,7 @@ export function initSettingsMenu(ctx: AppContext) {
   document.getElementById("menuCloudEnabled")?.addEventListener("click", async () => {
     if (!isAuthConfigured()) return;   // 灰显强制关：容器不支持云，点了也不动用户存值
     const next = !isCloudEnabled();
-    if (!next && session.name) {
+    if (!next && session.home?.kind === "gallery") {   // 关云前 flush 只对 gallery 家有意义（file 家无云腿）
       // 关闭前 flush：有活动 store 画 → 先存（登录着才带云腿；**未登录只本地**——v1.1 headless 实锤：
       //   未登录跑 saveAndPush 会让云腿把「Not signed in」推上红 banner，关云的动作自己先炸一条云错误）。
       //   没落成（内存脏残留 / 登录态云腿仍 pending）→ 提示并**不切换**。
