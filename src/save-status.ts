@@ -8,7 +8,7 @@ import { els } from "./els.ts";
 import { isSignedIn } from "./app-store.ts";
 import { isCloudEnabled } from "./cloud-capability.ts";
 import { session } from "./session-state.ts";
-import { assertNever } from "./doc-home.ts";
+import { assertNever, type DocHome } from "./doc-home.ts";
 import { t, tLatin } from "./i18n/index.ts";
 import { iconHtml } from "./ui/icon.ts";
 
@@ -61,10 +61,19 @@ function computeSaveState() {
   if (session.pushPending && isSignedIn()) return "unpushed";
   return isSignedIn() ? "synced" : "local-only";
 }
+// 标题栏 = 画名 + dirty 点（verdicts §2.1：document.title 不产生历史记录，零 spam）。
+//   跟着 updateSaveStatus 走——它已经是「家/脏」全部状态迁移的中心渲染点（editGate/标脏/保存/换家全经过）。
+//   file 家显示文件全名（含 .ora，文件语义诚实）；gallery 家显示户口 path；transient=P2 前无产者。
+function _updateDocTitle(home: Readonly<DocHome> | null) {
+  const name = home ? (home.kind === "file" ? home.fileName : home.kind === "gallery" ? home.path : "") : "";
+  document.title = `${session.dirty ? "● " : ""}${name ? name + " — " : ""}WeebPaint`;
+}
+
 export function updateSaveStatus() {
   // 徽章永远回答「这画住哪 + 安不安全」——P1 2026-08-26 起 switch DocHome 联合类型（exhaustive，
   //   加第四种家时这里编译期报错，而不是静默走 gallery 分支）。
   const home = session.home;
+  _updateDocTitle(home);
   // 无 doc（图库态）→ 隐藏 save btn（没东西可保存）。
   if (!home) {
     els.topSaveBtn.dataset.state = "none";

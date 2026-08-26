@@ -5,7 +5,7 @@
 //
 // 旧 app.js 「菜单：导入 / 导出 / 剪贴板」区逐字搬来；app.js 短路成 import + initExportImportMenu() 装配。
 // 导入/导出偏好存 desk（per-doc desk state，见 editor-state.ts）；boot 的 _updateMenuSubLabels() 进 init。
-// stampNow（导出文件名时间戳）只此处用，一并搬入。
+// 导出文件名时间戳走命名器官（naming.downloadStamp，P1 2026-08-26 提拔）。
 //
 // 依赖直 import（叶/单例）：exporters / els / settings-menu(setMenuOpen) / session-state(session) /
 //   session.js(下载·分享·剪贴板) / import-image(导入)。
@@ -19,6 +19,7 @@ import { t } from "./i18n/index.ts";
 import { setMenuOpen } from "./settings-menu.ts";
 import { session } from "./session-state.ts";
 import { homeDisplayName } from "./doc-home.ts";
+import { downloadStamp } from "./naming.ts";
 import { isCloudEnabled } from "./cloud-capability.ts";
 import { openChoiceSheet } from "./sheets.ts";
 import { runSaveAsFlow } from "./topbar-menu.ts";   // hub「复制一份到图库」= 原另存为（逻辑在 topbar-menu，红线原样）
@@ -35,11 +36,7 @@ import type { AppContext } from "./app-context.ts";
 const errMsg = (e: unknown): string => String((e as { message?: unknown })?.message || e);
 let doc: AppContext["doc"], setStatus: AppContext["setStatus"], board: AppContext["board"];
 
-// 导出文件名时间戳（YYYYMMDD-HHMM）—— 仅导出图片路径用
-function stampNow() {
-  const d = new Date();
-  return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}-${String(d.getHours()).padStart(2,"0")}${String(d.getMinutes()).padStart(2,"0")}`;
-}
+// 导出文件名时间戳 → P1 2026-08-26 提拔进命名器官（naming.downloadStamp），此处只消费。
 
 // v120: 主菜单导出/导入 重组（user：「导出项目和导出语义分开」+「小扳手」)
 // - 主行 = 按 sticky config 一键执行；🔧 = 弹 inline popup 改 config
@@ -82,7 +79,7 @@ function _cloudSinkBlocked(): string | null {
 //   撞名自动后缀（mode:"new" 首存护栏仍兜底）。save 默认 best-effort push：
 //   toast 按 pushed 事实说话（在线=已上云 / 离线=已存本地待补推），不谎报。
 async function _exportBlobToCloud(blob: Blob, ext: string): Promise<void> {
-  const name = await nextFreeExportName(`${exportBaseName()}-${stampNow()}`, ext, (n) => store.files.nameOccupied(n).then(Boolean));
+  const name = await nextFreeExportName(`${exportBaseName()}-${downloadStamp()}`, ext, (n) => store.files.nameOccupied(n).then(Boolean));
   const r = await store.file(name, { isZip: false, mode: "new" }).save(blob);
   setStatus(r.pushed ? t("tm.exportedCloud", { name }) : t("tm.exportedCloudLocal", { name }), true);
 }
@@ -208,7 +205,7 @@ export function initExportImportMenu(ctx: AppContext) {
         const exp = getExporter(c.target === "print" ? (c.format === "jpg" ? "jpg" : "png") : c.format) || getExporter("png");
         if (exp.busyHint) setStatus(exp.busyHint, true);
         const blob = await exp.encode(doc, { scope: c.scope, cropRect, defringe: desk.export.defringe, bg: desk.export.bg });
-        const r = await shareOrDownloadBlob(blob, `${exportBaseName()}-${stampNow()}.${exp.ext}`, exp.mime);
+        const r = await shareOrDownloadBlob(blob, `${exportBaseName()}-${downloadStamp()}.${exp.ext}`, exp.mime);
         setStatus(r.method === "share" ? t("tm.sharePanelOpened") : r.method === "cancel" ? t("tm.shareCancelled") : t("tm.extDownloadedUpper", { ext: exp.ext.toUpperCase() }));
       }
     } catch (e) { reportError(new Error(t("tm.exportFailed", { err: String(errMsg(e)) })), "warning"); }   // #34：剪贴板/分享权限被拒也走 banner，不再静默状态栏

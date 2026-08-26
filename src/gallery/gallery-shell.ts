@@ -23,6 +23,7 @@ import { reportError } from "../error-badge.ts";
 import { els } from "../els.ts";
 import { readImageFromClipboard } from "../session.ts";
 import { uniqueBareName } from "./gallery-model.ts";   // 撞名后缀兜底（纯·已 pin）；占用检查按库身份（全名 X.ora）查
+import { galleryDefaultName } from "../naming.ts";     // P1 命名器官：yyyymmdd-hex4（v217 惯例）+ 禁「未命名」
 import { humanSize } from "./gallery-view-model.ts";   // 展示格式化（纯·KiB/MiB）；此前本模块私有一份逐字节拷贝，2026-08-21 收敛
 import { isSignedIn } from "../app-store.ts";
 import { anchorPopupToBtn } from "../anchored-popup.ts";
@@ -82,16 +83,9 @@ export async function setGalleryOpen(open: boolean) {
 }
 
 // 新建作品 sheet
-// v217: 文件名改成 yyyymmdd-xxxx（4 位随机 hex），同步生成无延迟。
-// 冲突概率 1/65536，可接受；不再需要 async 枚举已有文件。
-function _newDocName() {
-  const d = new Date();
-  const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-  const rand = Math.floor(Math.random() * 0x10000).toString(16).padStart(4, "0");
-  return `${stamp}-${rand}`;
-}
+// v217 惯例 yyyymmdd-hex4 → P1 2026-08-26 提拔进命名器官（src/naming.ts），此处只消费。
 export function openNewDocSheet() {
-  const base = _newDocName();
+  const base = galleryDefaultName();
   const folder = gallery.getFolder();
   els.newDocName.value = folder ? `${folder}/${base}` : base;
   _selectPreset(DEFAULT_PRESET);
@@ -308,7 +302,7 @@ export function initGalleryShell(ctx: AppContext) {
       if (!blob) { setStatus(t("gs.clipboardNoImage")); return; }
       // 命名规范「有名保名，无名日期」（spec 20260820 §7）：剪贴板无来源名 → 走新建同款
       // yyyymmdd-xxxx 生成器（旧 "clipboard" 死名产出 clipboard 1/2/3… 分叉，已废）。
-      const file = new File([blob], `${_newDocName()}.png`, { type: blob.type || "image/png" });
+      const file = new File([blob], `${galleryDefaultName()}.png`, { type: blob.type || "image/png" });
       await importImageAsNewDoc(file);
       setGalleryOpen(false);
     } catch (e) {
@@ -341,7 +335,7 @@ export function initGalleryShell(ctx: AppContext) {
   }
 
   els.newDocConfirm.addEventListener("click", async () => {
-    const nameRaw = (els.newDocName.value || "").trim() || t("gs.untitled");
+    const nameRaw = (els.newDocName.value || "").trim() || galleryDefaultName();   // 禁「未命名」（verdicts §2.1）：空输入落日期名
     let w, h;
     const presetVal = _presetVal || DEFAULT_PRESET;
     // v0.7.32：preset 值 = canvas-templates.json 的模板 id（此前是 "WxH" 字面量）。模板查不到
