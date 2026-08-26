@@ -88,7 +88,7 @@ const TEMPLATE = `<style>
 }
 .act svg { width: 18px; height: 18px; display: block; }
 .act:hover { background: color-mix(in srgb, var(--ink, #e8eaed) 8%, transparent); color: var(--ink, #e8eaed); }
-.act[aria-pressed="true"] { background: color-mix(in srgb, var(--accent, #4c8bf5) 18%, transparent); color: var(--accent, #4c8bf5); }
+.act[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
 .close { background: transparent; border: none; color: var(--ink-soft, #9aa0a6); cursor: pointer; padding: 0 4px; }
 .close svg { width: 16px; height: 16px; display: block; }
 .grip {
