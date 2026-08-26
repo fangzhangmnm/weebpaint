@@ -14,6 +14,18 @@
 > （(家×动作) 保存派发表）、`homeDisplayName()`（导出/建议名基名）、`SOLE_GALLERY_ID`（P3 registry 铸 id 前的占位）。
 > ③ `session.name`/`session.localFile` 已私有化 → `session.home` 联合快照，消费点全部 switch/kind 判别。
 > 契约测试 = `test/doc-home.test.mjs`。
+>
+> **落地回写②（v0.11.1–0.11.3 / 2026-08-26，edited by Claude Fable 5）**：P1 其余项：
+> ④ **NamingOrgan** 落 `src/naming.ts`（galleryDefaultName=yyyymmdd-hex4 / downloadStamp / downloadName；
+> 撞名 -1/-2 留在有占用谓词的 sink 侧 = cloud-image-model.nextFreeExportName，本地下载浏览器自补 (1)）；
+> 新建空输入禁「未命名」落日期名。⑤ **标题栏** = save-status `_updateDocTitle`（document.title=画名+dirty 点，
+> 跟 updateSaveStatus 中心渲染点）。⑥ **IntakeHub** = import-image.ts 扶正（`sniffFileKind` 唯一嗅探 +
+> `intakeOraDoc` 唯一 ora 进口，picker/拖拽/launchQueue/file-input 四路全走；wp:importOraFile 事件通道删；
+> 笔刷字节仍归 brush-io，P5 轮再议）。⑦ **SaveHub 打开侧**：「打开本地文件」恒显单按钮，FSA 优先静默落
+> file input（导入为新身份），AbortError 不降级重弹；保存侧派发已由 saveRoute+既有「导出与另存」hub 覆盖。
+> ⑧ **canvas-first boot**：404/崩溃断路/双实例锁 三条失败路落画布（boot-restore outcomes 改 blank-*）；
+> ⚠ 解释留痕：「上次就停在图库」（currentFile=""，用户离开时的有意状态）仍落图库——verdicts §2.4 的
+> 「永不 404 跳 gallery」按字面只约束失败路；若 user 要「首开也 canvas-first」再翻这半格。
 
 ```ts
 // ─── doc 的家（P1 核心）────────────────────────────────────────────
