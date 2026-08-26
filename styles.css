@@ -2232,6 +2232,11 @@ body[data-mode="gallery"] .board { display: none !important; }
   color: var(--ink-soft);
 }
 .gallery-tile-state-icon svg { width: 12px; height: 12px; display: block; }
+/* badge 去压扁两态的染色（2026-08-25，甲方回执「conflict 可考虑黄、download 建议蓝」+ 现状 ground）：
+   琥珀 #d99a20 = topbar .tool[data-state="unpushed"] 同款（同一「云侧待你处理」语义族；刻意与 .enc 锁的
+   #c98a00 略异）；蓝 = accent（信息级「有新版可取」，同 dirty 点的色源）。其余 badge 保持 --ink-soft 灰。 */
+.gallery-tile-state-icon.b-conflictBoth { color: #d99a20; }
+.gallery-tile-state-icon.b-newerOnCloud { color: var(--accent, #4c8bf5); }
 /* "编辑中" 角标叠在第 1 行（name）右侧，可压住右端文字（用户：可重叠） */
 .gallery-tile.active .gallery-tile-name-row::after {
   content: "编辑中";

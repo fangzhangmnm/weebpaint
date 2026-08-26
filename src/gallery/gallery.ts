@@ -62,11 +62,11 @@ const ICON = {
   // 两者必须视觉可分——别合并。pendingGone 共享库还没有，暂用 assets/weebpaint_legacy.svg 的本地图形。
   ghost: iconHtml("cloud-unavailable"),
   pendingGone: iconHtml("cloud-pending"),
-  // badge 去压扁（老账 C，2026-08-25）。stopgap = 现库图标（user 指示不烤中文）：newerOnCloud=download
-  //   （云端有新版可取）、conflictBoth=split（两条世界线分开了）。理想图标 cloud-download / cloud-conflict
-  //   已登记 SVG Icons TODO.md，入库后重跑 extract+inline 换真图。
-  newerOnCloud: iconHtml("download"),
-  conflictBoth: iconHtml("split"),
+  // badge 去压扁（老账 C，2026-08-25）。真图已收货（同日美工交付）：cloud-download=cloud-upload 精确镜像、
+  //   cloud-conflict=感叹号收云内（与 cloud-pending 问号云成对，实/虚线一眼可分）。染色在 styles.css
+  //   （.b-newerOnCloud 蓝 / .b-conflictBoth 琥珀，对齐 topbar data-state 语义族——甲方回执 + 现状 ground）。
+  newerOnCloud: iconHtml("cloud-download"),
+  conflictBoth: iconHtml("cloud-conflict"),
   lock: iconHtml("lock"),
   image: iconHtml("image"),   // 图片次级 tile 角标（v0.9.34）
 };
@@ -768,7 +768,7 @@ function makeGallery(host: GalleryHost) {
               <div class="gallery-tile-name" :title="row.t.fullPath">{{ row.t.displayName }}</div>
               <div class="gallery-tile-meta">
                 <span v-if="row.t.encrypted" class="gallery-tile-state-icon enc" :title="L.encrypted" v-html="ICON.lock"></span>
-                <span class="gallery-tile-state-icon" :title="row.t.badgeTitle" v-html="badgeIcon(row.t.badge)"></span>
+                <span :class="'gallery-tile-state-icon b-' + row.t.badge" :title="row.t.badgeTitle" v-html="badgeIcon(row.t.badge)"></span>
                 <span>{{ fmtMeta(row.t) }}</span>
               </div>
             </div>
