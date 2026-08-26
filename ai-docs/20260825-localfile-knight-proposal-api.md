@@ -1,0 +1,96 @@
+# 无地骑士 提案 .h（目标契约草案）
+
+> created 20260825 · as-of v0.10.30 / 2026-08-25 · by Claude Fable 5
+> 按 API ritual：现状 .h = 仓内 `api/`（v0.10.30 现值）；本文 = **pin 住的目标契约**——实现中形状变了必须回写本文。
+> 范围：app 侧。store 侧只列 agenda（结案 doc §5），契约由 store 轮与人类逐条定。
+> 纪律：纯 d.ts 风格草案，非生成物；命名用既有标准词，领域词只给领域物。
+
+```ts
+// ─── doc 的家（P1 核心）────────────────────────────────────────────
+/** 一画一家。徽章/保存/checkpoint/锁 全部 switch 此联合类型（exhaustive，编译器守）。 */
+type DocHome =
+  | { kind: "gallery"; galleryId: string; path: string }   // 户口 =（gallery-id, 相对path）
+  | { kind: "file"; handle: FileSystemFileHandle; fileName: string; lastSeenMtime: number }
+  | { kind: "transient" };                                  // 无家；行李牌见 CrashStore
+
+/** 家动词唯一持权模块（workpiece 令牌同手法：别处无权清 dirty / 改家）。 */
+interface DocHomeKeeper {
+  home(): DocHome;
+  dirty(): boolean;                       // 相对「家」的 dirty；导出永不清它
+  /** 保存 = 送回家。gallery→store 正门；file→器官写回（mtime 对表在器官内）；transient→安家仪式。 */
+  save(opts?: { implicit?: boolean }): Promise<SaveOutcome>;
+  /** 安家仪式（transient 专用）：gallery 在挂 → 进图库（默认名 yyyymmdd-hex4）；否则 FSA/下载。 */
+  settle(target: "gallery" | "file"): Promise<SaveOutcome>;
+  /** 导出 = 寄明信片：任意去向，永不清 dirty（图库模式画的下载也走这）。 */
+  exportTo(sink: ExportSink): Promise<void>;
+}
+
+// ─── crash 库（P2；app 自有 IDB，db 名带 weebpaint-bd6cece69075d759 前缀）──
+/** 行李牌：每次打开现铸、正常关闭即焚、永不写进文件、永不参与匹配（非身份）。 */
+type LuggageTag = string;
+type CrashRecordState = "crash" | "pending-adoption";   // 后者：redirect 前存，回程显式领养
+interface CrashStore {
+  /** 盲快照：与 save 完全同一 encodeDocToOra 字节（mp4 sidecar passthrough）。同 tag 覆盖写单帧。 */
+  put(tag: LuggageTag, bytes: Blob, meta: { state: CrashRecordState; homeHint?: DocHome; name: string; at: number }): Promise<void>;
+  /** 正常关闭即删。⚠ pending-adoption 在场时本调用必须拒绝该 tag（unload≠关闭），契约测试钉。 */
+  dropOnCleanClose(tag: LuggageTag): Promise<void>;
+  listAtBoot(): Promise<CrashRecordMeta[]>;   // crash→恢复横幅；pending-adoption→领养流程
+  adopt(tag: LuggageTag): Promise<Blob>;      // 事务化（取+删）防双领养；领养出的 doc 视为 dirty
+}
+
+// ─── gallery 登记（P3；device-local 小 IDB；非 0607 之 registry：per-gallery、永不同步）──
+interface GalleryRegistry {
+  list(): Promise<GalleryLink[]>;
+  link(src: { kind: "onedrive"; account: string } | { kind: "folder"; handle: FileSystemDirectoryHandle },
+       label: string): Promise<GalleryLink>;          // 铸 opaque id；db 名 = ns.gallery-<id>
+  unlink(id: string): Promise<void>;                  // 永不动源字节；缓存保留，删归还原出厂/深清
+  lastActive(): Promise<string | null>;               // 「当前 gallery」= tab 级，registry 只记上次
+  /** attach 时孤儿扫描：无主缓存库有 dirty → surfaced，永不静默 GC。 */
+  scanOrphans(): Promise<OrphanReport[]>;
+  rememberBrushRack(handle: FileSystemFileHandle): Promise<void>;   // Editor-only 笔架句柄（能静默就静默）
+}
+interface GalleryLink { id: string; kind: "onedrive" | "folder"; label: string; dbName: string }
+
+// ─── 文件器官（P1；现役 local-file-session.ts 扶正，mtime 纪律封在器官内）──
+interface LocalFileOrgan {                              // 已知失败：TOCTOU 毫秒窗（契约头注明）
+  pickOpen(): Promise<FileSystemFileHandle | null>;     // AbortError = 用户取消 ≠ 不支持
+  pickSave(suggestedName: string): Promise<FileSystemFileHandle | null>;
+  /** 写回 = 读-比-写：mtime 与 lastSeenMtime 不符 → 抛 StaleFileError（app 出冲突面），绝不静默覆盖。
+   *  语法扫描测试：仓内不许出现绕过本方法的裸 createWritable（抄 If-Match 家规护栏）。 */
+  writeBack(h: FileSystemFileHandle, bytes: Blob, lastSeenMtime: number): Promise<{ newMtime: number }>;
+  supportsFSA(): boolean;                               // false → save hub 落 download、open 落 input
+}
+
+// ─── save / intake hub（P1；各一个按钮，静默 fallback）────────────────
+interface SaveHub {   /** 家在哪就送哪；transient 走 settle；FSA 不可用同手势落 download。 */ }
+interface IntakeHub { /** 字节进口唯一接缝：picker/drop/paste/launchQueue → 嗅格式 → 开成 doc / 进图层 / 进笔刷。 */ }
+
+// ─── revert v2（P4；checkpoint-policy 纯策略扩展）──────────────────
+type CheckpointTrigger = "open" | "new-doc" | "save-as" | "cloud-refresh"
+  | "resume-first-input"     // 新：输入间隔 ≥ N 分钟后的首笔之前拍（copy-on-write；不依赖 visibility）
+  | "pre-revert";            // 新：revert 前自动拍当前态 = undo revert
+interface CheckpointRing {
+  /** key = 户口 or 行李牌；ring 按字节预算滚动淘汰（桌面 64MB / 移动 32MB，常量可调）= revert list。 */
+  capture(key: string, trigger: CheckpointTrigger, bytes: Blob): Promise<void>;
+  list(key: string): Promise<CheckpointMeta[]>;   // 显示人话：「回到 今天 14:02（打开时）」
+}
+
+// ─── 命名器官（P1；提拔 export-import-menu.ts:40 现成代码）─────────────
+interface NamingOrgan {
+  galleryDefaultName(): string;                  // yyyymmdd-hex4（v217 惯例）；禁「未命名」
+  downloadName(base: string): string;            // 名-YYYYMMDD-HHMM，撞名 -1/-2
+}
+```
+
+## 器官登记表（契约头只写已知失败情况）
+
+| 器官 | 契约件 | 已知失败（摘要，全表见结案 §3） |
+|---|---|---|
+| store（云/folder gallery） | `@internal/store` api/（标准词，不再包一层） | 见库内 DATA SAFETY GUIDELINE |
+| 文件器官 | LocalFileOrgan | TOCTOU 窗；FSA 平台矩阵；itch iframe 死 |
+| crash 库 | CrashStore | 整源驱逐；file:// 共桶可读；Safari file:// 全灭 |
+| registry | GalleryRegistry | IDB 驱逐→重 link+孤儿扫描 |
+| 下载/上传 | SaveHub/IntakeHub 降级链 | 下载无完成信号（责任移交拍板） |
+| 剪贴板 | 降级链（async→paste/execCommand） | itch iframe Chrome async 死 |
+| WebGL | `weebpaint-backend-interface.ts`（已在，勿动勿漂移） | 见其头注释 |
+| Web Locks | instance-locks（锁名 `gallery-id:相对path`） | file:// 共桶 scope 未证 |
