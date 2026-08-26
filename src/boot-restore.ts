@@ -17,6 +17,9 @@ export interface RestorePorts {
   restore(name: string): Promise<boolean>;
   /** 只改内存里的活动名，**不动持久的 currentFile**（= session.setName(x, {persist:false})）。 */
   setNameMemoryOnly(name: string | null): void;
+  /** 「上次就停在图库」（wanted 为空 = 用户离开时的**有意**状态）的落点。
+   *  ⚠ canvas-first（P1 2026-08-26，verdicts §2.4「boot 永不 404 跳 gallery」）：只有这条有意路
+   *  还落图库；失败/断路/锁 三条路一律落画布——图库不是失败的垃圾桶。 */
   openGallery(): Promise<void>;
   updateSaveStatus(): void;
   onOpened(name: string): void;
@@ -35,13 +38,16 @@ export interface RestorePorts {
   // ── 云端功能开关（2026-08-21，cloud-capability 接缝）：关 = boot 不自动恢复 store 画 ──
   /** 关闭态恒 false（含容器未配置 auth）。 */
   isCloudEnabled(): boolean;
-  /** 关闭态的落点：**不开图库**（图库入口整体隐藏），停在 boot 的空白画布（app.ts 出生即
-   *  backend.blank 2048²、无 session 绑定；gallery overlay 本就默认 hidden，所以多半是 no-op+提示）。
-   *  ⚠ 纯 UI 落点，零数据变更：currentFile/标记一个都不碰（开关打回来下次冷启动照常自动恢复）。 */
+  /** 空白画布落点（canvas-first，P1 2026-08-26）：云关 + 失败/断路/锁 四条路共用。停在 boot 的
+   *  空白画布（app.ts 出生即 backend.blank 2048²、无 session 绑定；gallery overlay 本就默认
+   *  hidden，所以多半是 no-op）——具体为什么没开，由各路自己的 on* 回调如实提示。
+   *  ⚠ 纯 UI 落点，零数据变更：currentFile/标记一个都不碰。 */
   openBlankCanvas(): Promise<void>;
+  /** 云关落点的提示文案（为什么没自动开上次的画）——与 openBlankCanvas 分离：落点共用、文案各表。 */
+  onCloudOff(): void;
 }
 
-export type RestoreOutcome = "restored" | "gallery-no-name" | "gallery-failed" | "gallery-crash-loop" | "gallery-locked-elsewhere" | "blank-cloud-off";
+export type RestoreOutcome = "restored" | "gallery-no-name" | "blank-failed" | "blank-crash-loop" | "blank-locked-elsewhere" | "blank-cloud-off";
 
 export async function restoreLastSession(p: RestorePorts): Promise<RestoreOutcome> {
   // ★ 云端功能关（2026-08-21）：不自动恢复、也不落图库（gating ①把图库藏了）→ 空白画布。
@@ -51,6 +57,7 @@ export async function restoreLastSession(p: RestorePorts): Promise<RestoreOutcom
     p.setNameMemoryOnly(null);          // 幽灵路径纪律①同款：内存名必须是 safe default
     p.updateSaveStatus();
     await p.openBlankCanvas();
+    p.onCloudOff();
     return "blank-cloud-off";
   }
   const wanted = p.getWantedName();
@@ -69,9 +76,9 @@ export async function restoreLastSession(p: RestorePorts): Promise<RestoreOutcom
   if (await p.isDocLockedElsewhere(wanted)) {
     p.setNameMemoryOnly(null);
     p.updateSaveStatus();
-    await p.openGallery();
+    await p.openBlankCanvas();          // canvas-first：不跳 gallery，status 说清「在另一窗口」
     p.onLockedElsewhere(wanted);
-    return "gallery-locked-elsewhere";
+    return "blank-locked-elsewhere";
   }
   // ★ 纪律③（崩溃环断路，v0.10.9）：标记 == 想开的画 ⇒ 上次 boot 死在开它的半路（小内存设备
   //   开超大文件 OOM 被杀等——tab 直接死，永远走不到下面的「优雅失败」分支）。若无此闸，
@@ -81,9 +88,9 @@ export async function restoreLastSession(p: RestorePorts): Promise<RestoreOutcom
   if (p.getRestoreAttempt() === wanted) {
     p.setNameMemoryOnly(null);
     p.updateSaveStatus();
-    await p.openGallery();
+    await p.openBlankCanvas();          // canvas-first：断路落画布，status 说清为什么没自动开
     p.onCrashLoopSkipped(wanted);
-    return "gallery-crash-loop";
+    return "blank-crash-loop";
   }
   p.setRestoreAttempt(wanted);
   await p.flushMarker();
@@ -98,7 +105,7 @@ export async function restoreLastSession(p: RestorePorts): Promise<RestoreOutcom
   p.setRestoreAttempt(null);
   p.setNameMemoryOnly(null);
   p.updateSaveStatus();
-  await p.openGallery();
+  await p.openBlankCanvas();            // canvas-first（verdicts §2.4）：404 不跳 gallery，status 如实报
   p.onNotFound(wanted);
-  return "gallery-failed";
+  return "blank-failed";
 }

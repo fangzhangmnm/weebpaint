@@ -26,6 +26,7 @@ function ports(over: Partial<RestorePorts> = {}) {
     // 云端功能开关（2026-08-21）：默认开（= 现状行为）
     isCloudEnabled: () => true,
     openBlankCanvas: async () => { log.push("openBlankCanvas"); },
+    onCloudOff: () => log.push("cloudOff"),
     ...over,
   };
   let marker: string | null = over.getRestoreAttempt ? over.getRestoreAttempt() : null;
@@ -48,7 +49,7 @@ test("没有上次的画 → 停图库，且内存名降回 null（别留着上�
 
 test("★ 打开失败 → 内存名降回 null（幽灵路径纪律①）", async () => {
   const { p, log, mem } = ports({ restore: async () => false });
-  eq(await restoreLastSession(p), "gallery-failed");
+  eq(await restoreLastSession(p), "blank-failed");
   eq(mem(), null, "★ 否则后续 save/rename 会拿「加载失败的 path」当 oldName 去动（AtlasMaker 0.7.2 吃过一个加密文件）");
   assert(log.includes("notFound(X)"), "如实告知没找到");
 });
@@ -75,31 +76,33 @@ test("★ 打开失败 → 持久的 currentFile 必须还在（纪律②：失�
     onLockedElsewhere: () => {},
     isCloudEnabled: () => true,
     openBlankCanvas: async () => {},
+    onCloudOff: () => {},
   };
-  eq(await restoreLastSession(p), "gallery-failed");
+  eq(await restoreLastSession(p), "blank-failed");
   eq(persisted, "X", "★ 持久名还在");
   eq(p.getWantedName(), "X", "★ 下次冷启动仍会尝试打开它（v406-v408 这里连它一起清了，v409 修）");
   assert(log.includes("mem"), "内存名确实被降过（纪律①）");
 });
 
-test("失败路径的顺序：先降内存名、再刷徽章、再开图库、最后报错（别先报错后甩人）", async () => {
+test("失败路径的顺序：先降内存名、再刷徽章、再落画布、最后报错（别先报错后甩人）", async () => {
   const { p, log } = ports({ restore: async () => false });
   await restoreLastSession(p);
-  // 前三步 = 断路标记生命周期（纪律③）：写标记 → flush 落盘 → 优雅失败清标记；其后顺序同旧约。
-  eq(log.join(" > "), "marker=X > flushMarker > marker=null > setNameMemoryOnly(null) > updateSaveStatus > openGallery > notFound(X)");
+  // 前三步 = 断路标记生命周期（纪律③）：写标记 → flush 落盘 → 优雅失败清标记；
+  // 落点 = 画布（canvas-first，P1 2026-08-26：boot 永不 404 跳 gallery），其余顺序同旧约。
+  eq(log.join(" > "), "marker=X > flushMarker > marker=null > setNameMemoryOnly(null) > updateSaveStatus > openBlankCanvas > notFound(X)");
 });
 
 // ── 纪律③：崩溃环断路器（v0.10.9，「小内存设备开超大文件 OOM 锁死环」案）──────────────
 
-test("★ 标记==想开的画 → 断路：跳过自动开、停图库、restore 根本不被调、标记保留", async () => {
+test("★ 标记==想开的画 → 断路：跳过自动开、落画布、restore 根本不被调、标记保留", async () => {
   let restoreCalled = false;
   const { p, log, marker } = ports({
     getRestoreAttempt: () => "X",                       // 上次 boot 死在开 X 的半路
     restore: async () => { restoreCalled = true; return true; },
   });
-  eq(await restoreLastSession(p), "gallery-crash-loop");
+  eq(await restoreLastSession(p), "blank-crash-loop");
   eq(restoreCalled, false, "★ 断路的意义就是不再碰那张必死的画");
-  assert(log.includes("openGallery"), "停图库（用户至少能进 app 了）");
+  assert(log.includes("openBlankCanvas"), "落画布（canvas-first；用户至少能进 app 了）");
   assert(log.includes("crashLoopSkipped(X)"), "如实告知为什么没自动开");
   eq(marker(), "X", "标记保留——之后每次 boot 都跳，直到某张画成功打开（setCurrentSessionName 清）");
 });
@@ -120,7 +123,7 @@ test("成功 → 标记清回 null（下次冷启动照常自动开）", async (
 
 test("★ 优雅失败（取消密码/离线）→ 标记也清：断路器不毒化纪律②的瞬态 retry 语义", async () => {
   const { p, marker } = ports({ restore: async () => false });
-  eq(await restoreLastSession(p), "gallery-failed");
+  eq(await restoreLastSession(p), "blank-failed");
   eq(marker(), null, "★ 下次冷启动仍会尝试打开它——只有「崩溃」（标记没被清成）才断路");
 });
 
@@ -133,16 +136,16 @@ test("陈旧标记 ≠ 想开的画 → 不断路，照常开（换过文档后�
 
 // ── 纪律④：双实例互认（Web Locks，2026-08-21 双实例案）─────────────────────
 
-test("★ 活锁在场 → 不自动开：停图库、restore 不被调、如实报「另一窗口」而非崩溃", async () => {
+test("★ 活锁在场 → 不自动开：落画布、restore 不被调、如实报「另一窗口」而非崩溃", async () => {
   let restoreCalled = false;
   const { p, log, mem } = ports({
     isDocLockedElsewhere: async () => true,
     restore: async () => { restoreCalled = true; return true; },
   });
-  eq(await restoreLastSession(p), "gallery-locked-elsewhere");
+  eq(await restoreLastSession(p), "blank-locked-elsewhere");
   eq(restoreCalled, false, "★ 同画双开=本地字节互覆，入口就得拦住");
   eq(mem(), null, "内存名降回 safe default（幽灵路径纪律①同款）");
-  assert(log.includes("openGallery"), "停图库");
+  assert(log.includes("openBlankCanvas"), "落画布（canvas-first）");
   assert(log.includes("lockedElsewhere(X)"), "如实告知正在另一个窗口");
   assert(!log.some((l) => l.startsWith("crashLoopSkipped")), "不是崩溃，不报 crashLoop");
 });
@@ -156,7 +159,7 @@ test("★ 活锁在场 + 崩溃标记在场 → 不判崩溃（断路器误触�
     getRestoreAttempt: () => "X",
     restore: async () => { restoreCalled = true; return true; },
   });
-  eq(await restoreLastSession(p), "gallery-locked-elsewhere");
+  eq(await restoreLastSession(p), "blank-locked-elsewhere");
   eq(restoreCalled, false);
   assert(!log.some((l) => l.startsWith("crashLoopSkipped")), "★ 有人持锁 = 上个实例活着，不是崩溃");
   assert(!log.some((l) => l.startsWith("marker=")), "标记不写不清——断路器语义原样保留");
@@ -171,7 +174,7 @@ test("无锁 + 崩溃标记在场 → 原崩溃断路行为一字不变（真崩
     getRestoreAttempt: () => "X",
     restore: async () => { restoreCalled = true; return true; },
   });
-  eq(await restoreLastSession(p), "gallery-crash-loop");
+  eq(await restoreLastSession(p), "blank-crash-loop");
   eq(restoreCalled, false, "断路：不再碰那张必死的画");
   assert(log.includes("crashLoopSkipped(X)"), "照常报 crashLoop");
   eq(marker(), "X", "标记保留语义不变");

@@ -63,6 +63,9 @@ export async function bootRestoreSession(ctx: AppContext) {
     //   停在 boot 的空白画布（app.ts 出生即 backend.blank 2048²；gallery overlay 默认 hidden，
     //   这里只补一句 status 说明为什么没开上次的画）。currentFile/标记零变更（关→开自愈）。
     isCloudEnabled: () => isCloudEnabled(),
-    openBlankCanvas: async () => { setStatus(t("mi.bootCloudOff")); },
+    // canvas-first（P1 2026-08-26）：空白画布落点 = 纯 no-op（gallery overlay 本就默认 hidden，
+    //   app 出生即 blank 画布）；为什么没开上次的画由各路 on* 回调的 status 各表。
+    openBlankCanvas: async () => {},
+    onCloudOff: () => setStatus(t("mi.bootCloudOff")),
   });
 }
