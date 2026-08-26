@@ -1,9 +1,11 @@
-// 职责（单一）：图片/.ora 导入——照片新建 doc / 叠为新层 / 文件选择器 / 大图导入询问 sheet / 拖拽落图。
-// 三条入口：
+// 职责（单一）：**intake hub——doc 字节进口唯一接缝**（P1 2026-08-26 扶正，提案 = proposal-api IntakeHub；
+// 笔刷字节归 brush-io，P5 轮再议）。picker / 拖拽 / launchQueue / file-input / 粘贴(经 wp:paste 链) →
+// sniffFileKind 嗅格式 → 开成 doc（intakeOraDoc：原位优先，其余导入新身份）/ 进图层 / 参考图。
+// 三条图片入口：
 //   _openImagePicker()      图层面板「导入图片」按钮 → 触发 oraFileInput（强制走 importImageAsLayer）
 //   importImageAsNewDoc()   图库「导入照片 / 剪贴板新建」语义：照片当新 doc 打底（doc 尺寸 = 照片，cap 8192）
 //   importImageAsLayer()    photobash / Ctrl+V 粘贴 / 桌面拖拽：图片叠为当前 doc 的新层（含自动 lift transform）
-// oraFileInput change-handler 按文件类型分流（.ora→session.adopt / image→As{NewDoc|ViewLeaf}）。
+// oraFileInput change-handler 按 sniffFileKind 分流（.ora/.zip→intakeOraDoc / image→As{NewDoc|ViewLeaf}）。
 // 大图（> 护栏 max(2048, 画布长边)，v0.9.22）走 _openBigImportSheet 询问 适配护栏 / 保原 / 自定义尺寸。
 // 与 app 经 ctx 绑核心单例（doc/board/input/...）；leaf 依赖直接 import（session/resample/ora/els）。
 // 「导入照片(新建)」复用 session.newDoc 骨架（像素经 layer0Pixels 走 wp2.load 正门，v0.9.33），不再自建 PaintingView/做 doc 替换。
@@ -24,7 +26,7 @@ import { setTool, updateLassoToolbar } from "./toolbar.ts";
 import { openChoiceSheet } from "./sheets.ts";
 import { setReferenceFromFile } from "./side-windows.ts";
 import { importGuardLimit, needsBigImportSheet } from "./clipboard-policy.ts";
-import { droppedOraHandle, consumeLaunchFiles } from "./local-file-session.ts";
+import { droppedOraHandle, consumeLaunchFiles, type LocalFileHandle } from "./local-file-session.ts";
 import { pickCloudImage } from "./cloud-picker-host.ts";
 import { _suppressTransientPanels, _commitTransform, _cancelTransform } from "./transient-panels.ts";
 import type { AppContext } from "./app-context.ts";
@@ -237,8 +239,26 @@ export async function importImageAsLayer(file: File, opts: { center?: { x: numbe
   setStatus(t("mi.importedAsLayer", { name: file.name }));
 }
 
-// .ora 导入为**新身份**（v0.9.24 从 oraFileInput change-handler 提出，供 file-input / drop 降级 /
-// 无地入口的加密·外来 ora 回退共用）。首存 mode:"new"，撞名抛而不静默覆盖
+// ── intake hub 接缝（P1 2026-08-26）─────────────────────────────────────────
+/** 格式嗅探（唯一一份；此前 input change 与 drop 各抄一份正则）。
+ *  "ora-zip" = 加密容器导出件（ADR-0012）——能导入不能原位。 */
+export function sniffFileKind(f: File): "ora" | "ora-zip" | "image" | "other" {
+  if (/\.ora$/i.test(f.name)) return "ora";
+  if (/\.zip$/i.test(f.name)) return "ora-zip";
+  if ((f.type || "").startsWith("image/")) return "image";
+  return "other";
+}
+
+/** .ora 开成 doc 的**唯一进口**：菜单 picker / 拖拽 / 双击唤起 launchQueue / file-input 降级 全走这。
+ *  原位优先：有句柄 → session.openLocalFile（明文+有 WeebPaint 痕迹才真原位=file 家）；
+ *  交还的（无句柄 / 加密容器 / 外来 ora）落导入为新身份（gallery 家）。 */
+export async function intakeOraDoc(src: { handle?: LocalFileHandle | null; file?: File | null }): Promise<void> {
+  const fallback = src.handle ? await session.openLocalFile(src.handle) : src.file ?? null;
+  if (fallback) await importOraFileAsNew(fallback);
+}
+
+// .ora 导入为**新身份**（v0.9.24 从 oraFileInput change-handler 提出；intakeOraDoc 的 fallback 腿）。
+// 首存 mode:"new"，撞名抛而不静默覆盖
 // （v415 前走 existing → 导入同名 .ora 会静默盖掉已有作品，活的数据丢失）。
 async function importOraFileAsNew(file: File) {
   if (!(await session.gateFillOnSwitch())) return;   // 挽留门：fill 预览挂着 → 应用/丢弃/取消（user 2026-08-21）
@@ -293,19 +313,18 @@ export function initImportImage(ctx: AppContext) {
   // v0.5.19 导入剪贴板（+菜单）：复用 Ctrl+V 全链路（selection-ops 的 wp:paste——读剪贴板→新层视口居中→错误上 banner）
   document.getElementById("layerImportClipboardBtn")?.addEventListener("click", () => window.dispatchEvent(new CustomEvent("wp:paste")));
 
-  // file-input plumbing：按文件类型分流（.ora→adopt / image→As{NewDoc|ViewLeaf}）。
+  // file-input plumbing：按 sniffFileKind 分流（.ora/.zip→intakeOraDoc / image→As{NewDoc|ViewLeaf}）。
   els.oraFileInput.addEventListener("change", async (e: Event) => {
     const file = (e.target as HTMLInputElement).files?.[0];
     // 图库里"导入照片"语义：把照片当新 doc 打底（不是叠到当前）
     const asNewDoc = _addImportAsNewDoc;
     _addImportAsNewDoc = false;
     if (!file) return;
-    const isOra = /\.(ora|zip)$/i.test(file.name);   // .zip = 加密容器导出件（ADR-0012）
-    const isImage = (file.type || "").startsWith("image/");
+    const kind = sniffFileKind(file);
     try {
-      if (isOra) {
-        await importOraFileAsNew(file);
-      } else if (isImage) {
+      if (kind === "ora" || kind === "ora-zip") {
+        await intakeOraDoc({ file });   // file-input 无句柄 → 导入为新身份腿
+      } else if (kind === "image") {
         if (asNewDoc) {
           await importImageAsNewDoc(file);
           setGalleryOpen(false);
@@ -331,14 +350,12 @@ export function initImportImage(ctx: AppContext) {
     // v0.9.24 无地（spec §7）：拖 .ora 进来 → 文件系统句柄 → 本地原位打开（图库里也可用，
     //   openLocalFile 自己关图库）。⚠ droppedOraHandle 的句柄收集必须在本处理器**首个 await 之前**
     //   同步发生（DataTransferItemList 随后失效）。拿不到句柄（浏览器不支持）/加密/外来 ora → 导入新身份。
-    const oraFile = files.find((f: File) => /\.ora$/i.test(f.name));
+    const oraFile = files.find((f: File) => sniffFileKind(f) === "ora");
     if (oraFile) {
       e.preventDefault();
       const handlePromise = droppedOraHandle(e.dataTransfer);   // 同步收集，await 在后
       try {
-        const h = await handlePromise;
-        const fallback = h ? await session.openLocalFile(h) : oraFile;
-        if (fallback) await importOraFileAsNew(fallback);
+        await intakeOraDoc({ handle: await handlePromise, file: oraFile });
       } catch (err) { setStatus(t("mi.dropFailed", { err: errMsg(err) }), true); }
       return;
     }
@@ -358,17 +375,12 @@ export function initImportImage(ctx: AppContext) {
     } catch (err) { setStatus(t("mi.dropFailed", { err: errMsg(err) }), true); }
   });
 
-  // v0.9.24 无地入口的回退通道：topbar 菜单「打开本地文件」遇到加密/外来 ora → 派此事件走导入。
-  window.addEventListener("wp:importOraFile", (e: Event) => {
-    const file = (e as CustomEvent<File>).detail;
-    if (file) void importOraFileAsNew(file).catch((err) => setStatus(t("mi.importFailed", { err: errMsg(err) }), true));
-  });
+  // （wp:importOraFile 事件通道已删 P1 2026-08-26：唯一派发者 topbar「打开本地文件」改直调 intakeOraDoc——
+  //   hub 就是接缝，不再隔一层事件。）
   // v0.9.24 安装态 PWA：双击 .ora 唤起（manifest file_handlers + launchQueue；非安装态静默 no-op）。
   consumeLaunchFiles((h) => {
-    void (async () => {
-      const fallback = await session.openLocalFile(h);
-      if (fallback) await importOraFileAsNew(fallback);
-    })().catch((err) => reportError(new Error("[local-file] launch open failed: " + String(err)), "warning"));
+    void intakeOraDoc({ handle: h })
+      .catch((err) => reportError(new Error("[local-file] launch open failed: " + String(err)), "warning"));
   });
 
   // 图库「导入照片」入口（galleryAddPopup → addImportPhoto）设 _addImportAsNewDoc 经此函数。

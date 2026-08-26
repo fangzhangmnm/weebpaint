@@ -1286,8 +1286,9 @@
         <!-- v0.9.25 编辑器内新建（user 2026-08-20）：弹图库加号同款三选 popup（新建/从图片/从剪切板），
              不用回图库。无地模式照常可用——三入口都汇到 session.newDoc 的 leaveLocalFile 门 -->
         <!-- 2026-08-21 甲方拍板「新建/打开」并一条：本行开三选 popup（新建/从图片/从剪切板），
-             「打开本地文件」并入该 popup 当第四项（addOpenLocalFile，FS Access 在场才显示）——
-             原独立 menuOpenLocalFile 行已删，打开逻辑原样（v0.9.24 spec §7 不变）。 -->
+             「打开本地文件」并入该 popup 当第四项（addOpenLocalFile；P1 2026-08-26 起恒显：
+             FSA 优先原位打开，不可用同一按钮静默落 file input=导入为新身份）——
+             原独立 menuOpenLocalFile 行已删（v0.9.24 spec §7 + verdicts §2.1 单按钮拍板）。 -->
         <button class="menu-item menu-item-with-icon" id="menuNewArtwork" type="button" role="menuitem" aria-haspopup="true"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#new"/></svg>
         <span class="menu-item-label" data-i18n="menu.newArtwork">新建 / 打开…</span>
       </button>

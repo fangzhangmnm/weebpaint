@@ -30,6 +30,7 @@ import { signIn, isSignedIn } from "./app-store.ts";   // auth 是公共面（cl
 import { isCloudEnabled } from "./cloud-capability.ts";
 import { sessionNameConflict } from "./session-name.ts";
 import { supportsFileSystemAccess, pickLocalOraFile } from "./local-file-session.ts";
+import { intakeOraDoc } from "./import-image.ts";
 import { anchorPopupToBtn } from "./anchored-popup.ts";
 import { isBusyActive } from "./fullscreen-busy.ts";
 import { reportError } from "./error-badge.ts";
@@ -245,22 +246,31 @@ export function initTopbarMenu(ctx: AppContext) {
     setMenuOpen(false);
     session.rename();
   });
-  // v0.9.24 无地本地文件（spec ai-docs/20260819-clipboard-and-local-file-spec.md §7）：
-  //   FS Access 在场才显示（Chromium 桌面；标签页即全功能，不依赖 PWA）。打开 = 明文+有痕迹 ora
-  //   原位编辑；加密/外来 ora 交还导入路径（wp:importOraFile 由 import-image 接，走既有解锁/新身份逻辑）。
-  //   2026-08-21 入口并进「新建/打开」三选 popup（addOpenLocalFile，编辑器/图库两语境共用）——
-  //   独立菜单行已删，逻辑原样只挪入口。
+  // 打开本地文件 = **单按钮静默 fallback**（P1 2026-08-26，verdicts §2.1：「保存/打开各一个按钮，
+  //   FSA 优先，不可用落 input/download；AbortError（用户取消）≠ 环境不支持，不许降级重弹」）。
+  //   FSA（Chromium 桌面）：picker → intakeOraDoc（明文+有痕迹原位=file 家；加密/外来交导入新身份）。
+  //   无 FSA（Safari/Firefox/file://）：同一按钮落 file input——拿不到写回句柄，本就不存在「原位」，
+  //   .ora/.zip 走导入为新身份（gallery 家）。2026-08-21 入口并进「新建/打开」三选 popup。
   const openLocalBtn = document.getElementById("addOpenLocalFile") as HTMLButtonElement | null;
-  if (openLocalBtn && supportsFileSystemAccess()) {
+  if (openLocalBtn) {
     openLocalBtn.hidden = false;
     openLocalBtn.addEventListener("click", async () => {
       setMenuOpen(false);
       els.galleryAddPopup.classList.add("hidden");   // popup 语境：点了即收
       try {
-        const h = await pickLocalOraFile();
-        if (!h) return;   // 用户取消 picker
-        const fallback = await session.openLocalFile(h);
-        if (fallback) window.dispatchEvent(new CustomEvent("wp:importOraFile", { detail: fallback }));
+        if (supportsFileSystemAccess()) {
+          const h = await pickLocalOraFile();
+          if (!h) return;   // AbortError=用户取消 → 到此为止，绝不再弹 input（降级重弹禁令）
+          await intakeOraDoc({ handle: h });
+          return;
+        }
+        const inp = document.createElement("input");   // 现造现用：oraFileInput 是「导入」语义（收图片、置层），别混用
+        inp.type = "file"; inp.accept = ".ora,.zip";
+        inp.addEventListener("change", () => {
+          const f = inp.files?.[0];
+          if (f) void intakeOraDoc({ file: f }).catch((e) => reportError(new Error("[local-file] open failed: " + String(e)), "warning"));
+        });
+        inp.click();
       } catch (e) { reportError(new Error("[local-file] open failed: " + String(e)), "warning"); }
     });
   }
