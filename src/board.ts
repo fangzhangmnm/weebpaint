@@ -2,7 +2,6 @@
 import { t } from "./i18n/index.ts";
 import { sourceWarpMatrix, sourceDestQuad, integerRigidOf } from "./floating-transform.ts";
 import type { WarpBakeFn } from "./floating-transform.ts";
-import { PREF_DEFAULTS } from "./app-prefs.ts";   // pixel-grid 默认值 SSoT（别在本文件硬编码第二份）
 import { reportError } from "./error-badge.ts";
 import { GLBoard } from "./shell/gl-board.ts";
 import { BrowserGl2Port } from "./shell/browser-gl2-port.ts";
@@ -186,9 +185,9 @@ export class Board {
     this._showCheckerboard = false;
     // v163 像素栅格：放大到 PIXEL_GRID_FADE_LO 以上渐显 1 doc-px 网格（像素画对齐）。
     //   只画可见区域格线（性能）；很细很淡；全局开关可关。
-    //   真值由 app.ts 的 fixup 相经 settings-menu 的 renderSettingsFromPrefs() 灌入（SSoT = PREF_DEFAULTS["pixel-grid"]）；
-    //   这里只是构造期占位，别在这硬编码第二份默认值。
-    this._pixelGridEnabled = PREF_DEFAULTS["pixel-grid"];
+    //   P5 Slice C：per-doc（SSoT = desk.pixelGrid，随 .ora 走），载入经 wp:applyEditorState 由
+    //   settings-menu 灌入；这里只是构造期占位（工厂默认开）。
+    this._pixelGridEnabled = true;
     // #10 主栅格：per-doc 配置（desk.grid），由 settings-menu 经 setDocGrid 灌入；这里只是占位默认。
     this._docGridOn = false;
     this._docGridCell = 16;

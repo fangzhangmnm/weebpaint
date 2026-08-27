@@ -171,6 +171,9 @@ declare function freshGroups(): {
     };
     viewport: EditorViewport | null;
     checkboard: boolean;
+    pixelGrid: boolean;
+    longPressPick: boolean;
+    menuTab: string;
     pressureDisabled: boolean;
 };
 export type EditorGroups = ReturnType<typeof freshGroups>;
@@ -340,6 +343,9 @@ export declare const desk: {
     };
     viewport: EditorViewport | null;
     checkboard: boolean;
+    pixelGrid: boolean;
+    longPressPick: boolean;
+    menuTab: string;
     pressureDisabled: boolean;
     Serialize(): EditorGroups;
     Unserialize(json: unknown): void;

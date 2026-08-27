@@ -1,7 +1,3 @@
-declare const KEYS: {
-    readonly lang: "weebpaint.boot.lang";
-};
-export type BootSnapshotKey = keyof typeof KEYS;
-export declare function readBootSnapshot(k: BootSnapshotKey): string | null;
-export declare function writeBootSnapshot(k: BootSnapshotKey, v: string | null): void;
-export {};
+export type BootSnapshotKey = "lang";
+export declare function readBootSnapshot(_k: BootSnapshotKey): string | null;
+export declare function writeBootSnapshot(_k: BootSnapshotKey, v: string | null): void;

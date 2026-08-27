@@ -361,6 +361,12 @@ store escalation ①（appfolder 根 collection）**作废**；「同帐多库�
   兜底读）；boot-snapshot 只剩 lang 键；localUserPreference/syncedUserPreference 两导出退役
   （consumers 全部 preferences.get/set 化）。state 半边：appState struct 照旧（gallery 键为主，
   P3 一并处理）。测试 = test/app-prefs.test.mjs。
-- **Slice C（待做）**：per-doc 三项迁 desk（pixel-grid/long-press-pick/menu-tab，工厂默认）+
-  设置 sheet scope 分区 + 三枚 scope 图标登记 SVG Icons TODO。
+- **Slice C 数据半边（v0.11.12 / 2026-08-27）**：per-doc 三项迁 desk（pixelGrid/longPressPick/menuTab，
+  desk 即 SSoT、apply* 直写、wp:applyEditorState 回灌、老 .ora 缺字段=工厂默认起、切换不标脏同
+  checkboard）；三键移出 PREF_REGISTRY（旧 collection 偏好按拍板不迁）；**boot-snapshot 收编
+  device-kv**（user 追问「boot snapshot 还需要吗」→ lang 缓存结构上仍需（gallery 层异步 + t() eval
+  期锁死 + reload 制），但裸 localStorage 身份取消：cache:boot-lang 键经 device-kv，legacy 键兜底读；
+  全 app 裸 localStorage 清零）。
+- **Slice C UI 半边（待做）**：设置 sheet scope 分区（「这幅画/这台设备/你的账号(库)」人话标题 +
+  行尾 scope 微章 + 未登录折叠）+ 三枚 scope 图标登记 SVG Icons TODO。
 - **Slice D（待做）**：brush-rack 写路径收敛（gallery 层照旧 collection）。

@@ -16,23 +16,11 @@ export declare const PREF_REGISTRY: {
         readonly scope: "device";
         readonly def: boolean;
     };
-    readonly "menu-tab": {
-        readonly scope: "device";
-        readonly def: string;
-    };
     readonly lang: {
         readonly scope: "gallery";
         readonly def: string | null;
     };
     readonly "gen-ai": {
-        readonly scope: "gallery";
-        readonly def: boolean;
-    };
-    readonly "long-press-pick": {
-        readonly scope: "gallery";
-        readonly def: boolean;
-    };
-    readonly "pixel-grid": {
         readonly scope: "gallery";
         readonly def: boolean;
     };

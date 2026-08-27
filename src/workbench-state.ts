@@ -18,7 +18,6 @@
 //   （全局 pressureToSize/Opacity 已 deprecate 2026-07-14 → 每笔自带的 sizeCoeff/opaCoeff，见 brush.ts:397。）
 
 import { reactive } from "../vendor/vue/vue.esm-browser.prod.js";
-import { PREF_DEFAULTS } from "./app-prefs.ts";   // 手势开关默认值（真值由 app.ts fixup 相灌入，见下）
 import type { EditorRuntimeState, DialReactive, ToolDial } from "./app-context.ts";
 
 // 编辑器 RAM 态的形状契约见 AppContext（EditorRuntimeState / DialReactive）——本模块是其唯一构造者。
@@ -47,13 +46,11 @@ export function useDials(): { state: EditorRuntimeState; dialReactive: DialReact
     filterBrush: null,
     color: "#1b1b1b",   // 归 desk.brushTool.color SSoT（boot bind 灌入 / doc 载入覆盖）；删 weebpaint.color LS 种子
     // （全局压感开关 pressureToSize/Opacity 已 deprecate 2026-07-14 → 每笔自带，见 resolved-brush；删 weebpaint.pToSize/pToOpacity LS）
-    // 手势开关 = 跨设备偏好（synced-user-preference collection）。
-    // ⚠v409 起 useDials 在 collection hydrate **之前**跑（TLA 门已拆）→ 这里只能拿到 DEFAULTS。
-    //   真值由 app.ts 的 fixup 相（await prefsReady）经 settings-menu 的 renderSettingsFromPrefs() 灌入。
-    //   消费方是 thunk 惰性读（app.ts 的 getLongPressPickEnabled/getSingleFingerDraw，每次 pointerdown 求值）
-    //   → 灌入即生效，不需要反应式。
-    longPressPick: PREF_DEFAULTS["long-press-pick"],
-    singleFingerDraw: PREF_DEFAULTS["single-finger-draw"],
+    // 手势开关（P5）：longPressPick = per-doc（SSoT=desk.longPressPick，载入经 wp:applyEditorState
+    //   由 settings-menu 灌入本热镜像）；singleFingerDraw = device 层（preferences，同步读，fixup 灌入）。
+    //   消费方是 thunk 惰性读（app.ts 每次 pointerdown 求值）→ 灌入即生效，不需要反应式。
+    longPressPick: true,
+    singleFingerDraw: false,
     pickMode: "composite",  // 吸色取样 composite|layer；归 desk.colorPicker.layerMode SSoT（bind 灌入/载入覆盖）；删 webpaint.pickMode LS
     // v125 checkerboard 从全局 LS 改 per-doc（跟文件走）。初始 false；adopt 时按文件值覆盖；新建默认 false。
     checkerboard: false,
@@ -205,6 +202,12 @@ function freshGroups() {
     colorPicker:   { layerMode: "composite" as string },                           // pick-mode: "composite" | "layer"
     viewport:      null as EditorViewport | null,
     checkboard:    false,
+    // P5 Slice C（user 2026-08-27 拍板 per-doc）：像素栅格「必跟 ora」/ 长按吸色「跟文件」/ ☰停留页
+    //   「editor 里的=per doc」。新画/老画（缺字段）一律工厂默认起——**不做**「设为新画默认」种子
+    //   机制 v1（user：「非常赞」）。切换不标脏（同 checkboard，人类 2026-06-10 钉）。
+    pixelGrid:     true,
+    longPressPick: true,
+    menuTab:       "file" as string,
     // v0.6.15 禁用笔压（user：「显然跟着 ora 走，是 editor state」）：开 = 忽略压感恒定 0.5
     pressureDisabled: false,
   };
@@ -355,6 +358,11 @@ export const desk = {
   //   故 setter 生产代码不调；留着是为了 Unserialize/测试能构造完整 desk。
   get viewport(): EditorViewport | null { return S.g.viewport; }, set viewport(v: EditorViewport | null) { S.g.viewport = v; },
   get checkboard(): boolean { return S.g.checkboard; }, set checkboard(v: boolean) { S.g.checkboard = v; },
+  // P5 per-doc 三项：desk **即**运行时 SSoT（区别于上面 viewport/checkboard 的存时镜像形）；
+  //   apply* 直写这里，载入经 wp:applyEditorState 回灌 UI，Serialize 顺手带走。
+  get pixelGrid(): boolean { return S.g.pixelGrid; }, set pixelGrid(v: boolean) { S.g.pixelGrid = v; },
+  get longPressPick(): boolean { return S.g.longPressPick; }, set longPressPick(v: boolean) { S.g.longPressPick = v; },
+  get menuTab(): string { return S.g.menuTab; }, set menuTab(v: string) { S.g.menuTab = v; },
   // 禁用笔压（per-doc desk）：绑 dialReactive.pressureOff（UI 反应式 + 引擎 thunk 同源），未绑定回落 S.g
   get pressureDisabled(): boolean { return _bind ? _bind.getPressureOff() : S.g.pressureDisabled; },
   set pressureDisabled(v: boolean) { if (_bind) _bind.setPressureOff(v); else S.g.pressureDisabled = v; },

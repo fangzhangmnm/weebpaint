@@ -23,12 +23,11 @@ export const PREF_REGISTRY = {
   "single-finger-draw":   { scope: "device", def: false as boolean },            // 硬件耦合：同人 iPad 开/台式关（VS Code machine-scope 先例）
   "stylus-smooth-params": { scope: "device", def: {} as Record<string, number> },// 数位板/笔硬件调参
   "cloud-enabled":        { scope: "device", def: true as boolean },             // ⚠ 过渡态（§9.8：P3 registry 收编后退役）
-  "menu-tab":             { scope: "device", def: "file" as string },            // ⚠ 过渡态（user 拍板 per-doc；Slice C 迁 desk）
   // gallery（跟身份/库走；P3 per-gallery，现 = synced collection）
   "lang":                 { scope: "gallery", def: null as string | null },
   "gen-ai":               { scope: "gallery", def: false as boolean },
-  "long-press-pick":      { scope: "gallery", def: true as boolean },            // ⚠ user 拍板跟文件；Slice C 迁 desk
-  "pixel-grid":           { scope: "gallery", def: true as boolean },            // ⚠ user 拍板必跟 ora；Slice C 迁 desk
+  // （ora scope 三项 pixel-grid / long-press-pick / menu-tab 不在本表：per-doc 归 desk（Slice C），
+  //   老的 collection 偏好按拍板不迁移——工厂默认起。）
   // session（不持久化；「不持久化档不设」的唯一例外 = show-fps，user 明允）
   "show-fps":             { scope: "session", def: false as boolean },
 } as const;
@@ -84,7 +83,7 @@ export const preferences = {
 // device 键从 legacy collection 迁入：device-kv 没有值 && collection 里有非默认值 → 拷。
 // 旧居：color-theme/menu-tab/cloud-enabled 在 _local；single-finger-draw/stylus-smooth-params 在 _synced。
 const _LEGACY_HOME: Partial<Record<PrefKey, () => Collection | undefined>> = {
-  "color-theme": () => _local, "menu-tab": () => _local, "cloud-enabled": () => _local,
+  "color-theme": () => _local, "cloud-enabled": () => _local,
   "single-finger-draw": () => _synced, "stylus-smooth-params": () => _synced,
 };
 export function seedDevicePrefsFromLegacy(): void {

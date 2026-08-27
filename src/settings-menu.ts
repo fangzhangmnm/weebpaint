@@ -62,7 +62,7 @@ function renderLongPressPick(on: boolean) {
 }
 function applyLongPressPick(on: boolean) {
   renderLongPressPick(on);
-  preferences.set("long-press-pick", !!on);   // gallery 层（Slice C 迁 desk=跟画）
+  desk.longPressPick = !!on;   // P5 Slice C：per-doc（跟画走；切换不标脏，存时随 desk 落）
 }
 function renderSingleFingerDraw(on: boolean) {
   state.singleFingerDraw = !!on;
@@ -81,14 +81,14 @@ export function applyCheckerboard(on: boolean) {
   board.requestRender();
 }
 
-// v163 像素栅格：全局开关（视图辅助），跨设备偏好（synced-user-preference），默认开
+// v163 像素栅格 → P5 per-doc（desk.pixelGrid，跟 ora 走；user 拍板）
 function renderPixelGrid(on: boolean) {
   board.setPixelGridEnabled?.(!!on);
   setMenuItem(els.menuPixelGrid, !!on);
 }
 function applyPixelGrid(on: boolean) {
   renderPixelGrid(on);
-  preferences.set("pixel-grid", !!on);   // gallery 层（Slice C 迁 desk=跟画）
+  desk.pixelGrid = !!on;   // P5 Slice C：per-doc（user 拍板「必跟 ora」）
 }
 
 // v275 FPS 计：dev 性能读数（角落 overlay）；跨设备偏好（synced-user-preference），默认关。防煤气灯。
@@ -175,16 +175,13 @@ function _renderShortcutsSheet() {
 // collection hydrate 后由 app.ts 的 fixup 相调：把 4 个 synced 开关的**真值**灌进 RAM/DOM/board。
 //   **只 render 不写盘**（见上方纪律）——这是 P0-1 的修复核心：boot 路径永不 setItem。
 export function renderSettingsFromPrefs(): void {
-  // v0.5.27：☰ 停留页回灌（设备本地 pref；无效值回 file）
-  const savedTab = preferences.get("menu-tab");   // device 过渡态（Slice C 迁 desk=跟画）
-  if (_menuTabs.some((b) => b.dataset.menuTab === savedTab)) { _menuTab = savedTab; _applyMenuTab(); }
-
-  renderPixelGrid(preferences.get("pixel-grid"));
+  // P5 Slice C：pixel-grid/long-press-pick/menu-tab 已 per-doc（desk）——由 wp:applyEditorState
+  //   处的 _renderPerDocFromDesk 随每次载入回灌，不在本函数（本函数只管非 per-doc 层）。
   renderFps(preferences.get("show-fps"));
   renderGenAI(genAiEnabled());
-  renderCloudEnabled();   // 云端功能开关真值回灌（设备本地 pref；只 render 不写盘）
-  renderLongPressPick(preferences.get("long-press-pick"));
+  renderCloudEnabled();   // 云端功能开关真值回灌（device 层；只 render 不写盘）
   renderSingleFingerDraw(preferences.get("single-finger-draw"));
+  _renderPerDocFromDesk();   // boot 首帧也灌一次（此刻 desk=工厂默认；开画后 applyEditorState 再灌真值）
 }
 
 export function setMenuOpen(open: boolean) {
@@ -202,6 +199,13 @@ export function setMenuOpen(open: boolean) {
 // v0.6C tab 分页状态（module 级：init 建，renderSettingsFromPrefs 回灌持久化值）
 let _menuTab = "file";
 let _menuTabs: HTMLElement[] = [];
+
+// P5 Slice C：per-doc 三项（desk SSoT）→ UI/热镜像回灌。载入（wp:applyEditorState）与 boot 首帧共用。
+function _renderPerDocFromDesk() {
+  renderPixelGrid(desk.pixelGrid);
+  renderLongPressPick(desk.longPressPick);
+  if (_menuTabs.some((b) => b.dataset.menuTab === desk.menuTab)) { _menuTab = desk.menuTab; _applyMenuTab(); }
+}
 let _menuPages: HTMLElement[] = [];
 function _applyMenuTab() {
   for (const b of _menuTabs) b.setAttribute("aria-pressed", b.dataset.menuTab === _menuTab ? "true" : "false");
@@ -223,7 +227,7 @@ export function initSettingsMenu(ctx: AppContext) {
     for (const b of _menuTabs) b.addEventListener("click", (e: Event) => {
       e.stopPropagation();
       _menuTab = b.dataset.menuTab!;
-      preferences.set("menu-tab", _menuTab);   // v0.5.27：停留页持久化（device 过渡态，Slice C 迁 desk）
+      desk.menuTab = _menuTab;   // v0.5.27 停留页 → P5 per-doc（editor 语境跟画走，user 拍板）
       _applyMenuTab();
     });
     _applyMenuTab();
@@ -239,7 +243,7 @@ export function initSettingsMenu(ctx: AppContext) {
     setStatus(t("status.singleFingerDraw", { s: state.singleFingerDraw ? t("common.on") : t("common.off") }));
   });
   // desk 载入：文档的 checkboard 回灌到 board（applyCheckerboard 只写 board+mirror，不写 desk→不标脏；守人类 2026-06-10 决定）。
-  window.addEventListener("wp:applyEditorState", () => applyCheckerboard(desk.checkboard));
+  window.addEventListener("wp:applyEditorState", () => { applyCheckerboard(desk.checkboard); _renderPerDocFromDesk(); });
   els.menuCheckerboard.addEventListener("click", () => {
     applyCheckerboard(!state.checkerboard);
     // UI 态不 mark dirty（user 2026-06-10）：棋盘是观感开关，下次真编辑保存时顺手捞进 state.json。

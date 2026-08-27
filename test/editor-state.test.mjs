@@ -167,3 +167,24 @@ test("[editor-state] v0.7.40 蚂蚁线 per-tool：双默认开、stale fill 组�
   eq(desk.fillTool.showAnts, true, "fillTool.showAnts 不受影响");
   desk.reset();
 });
+
+// P5 Slice C（2026-08-27）：per-doc 三项（pixel-grid/long-press-pick/menu-tab 迁 desk，user 拍板）。
+test("desk P5 三项：工厂默认 pixelGrid=开 / longPressPick=开 / menuTab=file", () => {
+  desk.reset();
+  eq(desk.pixelGrid, true); eq(desk.longPressPick, true); eq(desk.menuTab, "file");
+});
+test("desk P5 三项：Serialize/Unserialize 往返（跟 .ora 走）", () => {
+  desk.reset();
+  desk.pixelGrid = false; desk.longPressPick = false; desk.menuTab = "settings";
+  const json = desk.Serialize();
+  desk.reset();
+  desk.Unserialize(json);
+  eq(desk.pixelGrid, false); eq(desk.longPressPick, false); eq(desk.menuTab, "settings");
+  desk.reset();
+});
+test("desk P5 三项：老 .ora（缺字段）→ 工厂默认起（拍板：不迁移旧偏好、不做种子机制）", () => {
+  desk.reset();
+  desk.Unserialize({ export: { format: "png" } });   // 老文件形状：无三字段
+  eq(desk.pixelGrid, true); eq(desk.longPressPick, true); eq(desk.menuTab, "file");
+  desk.reset();
+});
