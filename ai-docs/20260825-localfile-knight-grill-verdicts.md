@@ -73,7 +73,7 @@
 ### 2.3 Gallery（多实例 + 本地文件夹）
 - 数据契约 = **多 gallery 共存**（RealHome 标准）+ local file；WeebPaint UX = 单 gallery，但**「当前 gallery」是 tab 级**（双 tab 双 gallery 合法）。**热插拔不重启**（「以后是可以能避免重启的不要懒」）。
 - **registry 铸 id**：device-local 小 IDB（铸的 opaque id + 句柄/账号引用 + 标签 + last-active）；id 非路径；db 名 = `weebpaint-bd6cece69075d759.gallery-<id>`。**GUID 命名空间 = `weebpaint-bd6cece69075d759`**（永久固定，preimage 由 user 自持、不进仓不进 lint，注释只写 "namespace token, preimage held by owner"）。
-- **`.weebpaint` 源内标记否决**（= in-file GUID 在 gallery 尺度复刻；「一个源只有一个历史这个机制我们所有的红线都建立在这个上面」）。
+- **`.weebpaint` 源内标记否决**（= in-file GUID 在 gallery 尺度复刻；「一个源只有一个历史这个机制我们所有的红线都建立在这个上面」）。〔界线补注 2026-08-27，user 确认（edited by Claude Fable 5）：否决的实质 = **身份标记**——`.weebpaint/` 作为**存在标记/管理容器**（collections+安全网，store 保留根 `.<appId>` 现状）合法；里面永不放 gallery id/GUID，registry id 永远 device-local，同夹二挂查重只靠 isSameEntry。详 P3 案卷 `20260827-p3-gallery-multiinstance-grill-verdicts.md` §1.3。〕
 - 孤儿缓存库 = 可弃缓存；attach 时扫孤儿 dirty → surfaced；无 dirty 可 GC（挂深清）；dirty 永不静默删。Chromium FSA 句柄大概率随改名存活（真机验证项）。
 - WeebPaint 不用 RealHome 多源共存展示模型（那是消费型订阅语义，workshop 概念归 RealHome 系）；**跨源移动不做**——大批量管理归 file explorer（创世思路）。
 - 每个 gallery 自带笔刷和 settings（PPSSPP 语义：每库一套 config）。
