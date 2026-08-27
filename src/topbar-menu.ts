@@ -226,7 +226,7 @@ export function initTopbarMenu(ctx: AppContext) {
   // v0.9.25 编辑器内新建（user 2026-08-20）：复用图库加号的三选 popup（新建/从图片/从剪切板），
   //   三个条目的 handler 全在 gallery-shell（init 时已接好，与图库开合无关）——这里只开 popup，
   //   零逻辑重复。「新建文件夹」是图库视图操作，编辑器语境隐藏（图库加号打开时恢复）。
-  //   无地模式不禁用：三入口都汇到 session.newDoc 的 leaveLocalFile 门（脏 → 保存/丢弃/取消）。
+  //   无地模式不禁用：三入口都汇到 session.newDoc 的 leaveLocalDoc 门（脏 → 保存/丢弃/取消）。
   document.getElementById("menuNewArtwork")?.addEventListener("click", (e: Event) => {
     e.stopPropagation();
     setMenuOpen(false);

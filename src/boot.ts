@@ -63,9 +63,10 @@ export async function bootRestoreSession(ctx: AppContext) {
     //   停在 boot 的空白画布（app.ts 出生即 backend.blank 2048²；gallery overlay 默认 hidden，
     //   这里只补一句 status 说明为什么没开上次的画）。currentFile/标记零变更（关→开自愈）。
     isCloudEnabled: () => isCloudEnabled(),
-    // canvas-first（P1 2026-08-26）：空白画布落点 = 纯 no-op（gallery overlay 本就默认 hidden，
-    //   app 出生即 blank 画布）；为什么没开上次的画由各路 on* 回调的 status 各表。
-    openBlankCanvas: async () => {},
+    // P2（2026-08-26）：云关落点 = transient 家新画布（此前 home:null 裸奔：Ctrl+S 死路、崩溃全丢）。
+    //   settle 安家仪式 / T-crash 盲快照 / 三键挽留 随 transient 家生效（user 拍板「关gallery进
+    //   local first则要么双击打开进文件要么新画布」）。
+    openBlankCanvas: async () => { session.beginTransientBlank(); },
     onCloudOff: () => setStatus(t("mi.bootCloudOff")),
     // P1.5：云开态画布落点 = lazyblank 可画新画布（session 自管日期身份，首笔自动安家）。
     openFreshCanvas: async () => { session.beginLazyBlank(); },

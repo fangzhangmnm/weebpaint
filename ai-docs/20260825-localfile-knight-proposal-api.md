@@ -37,8 +37,19 @@
 > 接线：file 家行李牌（openLocalFile 现铸/离家即焚）+ 30s 空闲盲快照（bgJobs，serial 门防重编码，
 > 与保存同一 `_encodeCurrentOraWithPeek` 字节）+ 显式写回成功清旧帧 + pagehide(非 bfcache)=正常关闭即删
 > + boot 恢复横幅 `src/crash-banner.ts`（非模态浮卡；恢复=领养→uniqueNameFor 新身份→adoptAsNew=dirty
-> 到首次真保存；流产 put-back 防「点恢复中途取消=丢画」）。**P2 余**：transient 产者（云关 blank→transient
-> + settle 安家仪式）+ Editor-only 三键挽留 + pending-adoption 产者（P3 redirect 流）+ 夏音 v0.3 真机基准。
+> 到首次真保存；流产 put-back 防「点恢复中途取消=丢画」）。
+>
+> **落地回写④（v0.11.6 / 2026-08-26，edited by Claude Fable 5）**：**transient 产者 + settle + 三键挽留**：
+> 云关 boot 空白画布 = transient 家（此前 home:null 裸奔：Ctrl+S 死路、崩溃全丢；user 拍板「关gallery进
+> local first则要么双击打开进文件要么新画布」）。`settle` 形状与提案差异：**无 target 参数**（现阶段唯一
+> 去向=file：云关无 gallery 可安、云开无 transient 产者——Editor Only 挂 gallery 的双去向到 P3/P6 再回填；
+> 实名 `settleToFile`，FSA 另存框→写→**换家即清 dirty**（keeper.setHome 结构保证「回家才清」）；无 FSA 落
+> download=责任移交 toast、dirty 如实留着、**不算安家**）。keeper 的 mark/clearFileDirty 扩到 file|transient
+> 同轨（gallery/无家仍 throw）。三键挽留 = `leaveLocalDoc`（原 leaveLocalFile 扩容）：离开脏 transient →
+> 保存(settle)/丢弃/取消，download 未安家不放行。盲快照/行李牌/pagehide 即删全覆盖 transient；
+> 崩溃恢复云关分支 = `adoptAsTransient`（不落看不见的图库，立即标脏+重挂保护）。
+> **P2 余**：pending-adoption 产者（P3 redirect 流）+ 夏音 v0.3 真机基准；云关「新建」popup 仍建
+> IDB 图库画（2026-08-21 v1 刻意范围，未动——要不要也 transient 化留给 user）。
 
 ```ts
 // ─── doc 的家（P1 核心）────────────────────────────────────────────

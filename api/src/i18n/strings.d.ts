@@ -897,6 +897,12 @@ export declare const S: {
         readonly ja: "未保存の変更あり、Ctrl+Sで書き戻し · {name}";
         readonly tok: "ante li awen ala. o luka e Ctrl+S · {name}";
     };
+    readonly "save.transientDirty": {
+        readonly zh: "这幅画还没有家——点击保存成文件";
+        readonly en: "This artwork has no home yet — click to save it to a file";
+        readonly ja: "この作品にはまだ保存先がありません——クリックでファイルに保存";
+        readonly tok: "sitelen ni li jo ala e tomo. o luka ni tawa awen lon lipu.";
+    };
     readonly "save.localFileSaved": {
         readonly zh: "已保存到本地文件 · {name}";
         readonly en: "Saved to local file · {name}";
@@ -3783,6 +3789,12 @@ export declare const S: {
         readonly ja: "ローカルファイルに未保存の変更";
         readonly tok: "lipu ilo li jo e ante awen ala";
     };
+    readonly "lf.leaveTransientTitle": {
+        readonly zh: "这幅画还没保存成文件";
+        readonly en: "This artwork hasn't been saved to a file yet";
+        readonly ja: "この作品はまだファイルに保存されていません";
+        readonly tok: "sitelen ni li awen ala lon lipu";
+    };
     readonly "lf.leaveSave": {
         readonly zh: "保存并继续";
         readonly en: "Save and continue";
@@ -3843,6 +3855,12 @@ export declare const S: {
         readonly ja: "空白のキャンバスのため、まだ保存する内容がありません";
         readonly tok: "supa sitelen li ala. ijo awen li lon ala.";
     };
+    readonly "ss.settleDownloaded": {
+        readonly zh: "已开始下载 {name}（此浏览器不支持文件写回；下载文件由你保管，画布上的画仍未关联文件）";
+        readonly en: "Download of {name} started (this browser can't write back to files; the download is in your hands — the canvas is still not linked to a file)";
+        readonly ja: "{name} のダウンロードを開始しました（このブラウザはファイルへの書き戻しに未対応です。ダウンロードはお手元で管理してください。キャンバスはまだファイルに関連付けられていません）";
+        readonly tok: "ilo li pana e {name} tawa sina. ilo ni li ken ala awen tawa lipu. o awen e ona.";
+    };
     readonly "cb.crashFound": {
         readonly zh: "上次异常退出，有未保存的画：{name}";
         readonly en: "Unsaved artwork from an abnormal exit: {name}";
@@ -3890,6 +3908,12 @@ export declare const S: {
         readonly en: "Recovered as new artwork: {name} (not yet saved — review, then save)";
         readonly ja: "新しい作品として復元しました：{name}（まだ保存されていません。確認して保存してください）";
         readonly tok: "sitelen sin {name} li kama. ona li awen ala. o lukin o awen.";
+    };
+    readonly "cb.recoveredTransient": {
+        readonly zh: "已恢复：{name}（还没有家——点保存按钮存成文件）";
+        readonly en: "Recovered: {name} (no home yet — click save to store it as a file)";
+        readonly ja: "復元しました：{name}（まだ保存先がありません。保存ボタンでファイルに保存してください）";
+        readonly tok: "sitelen {name} li kama sin. ona li jo ala e tomo. o awen e ona lon lipu.";
     };
     readonly "cb.recoverFailed": {
         readonly zh: "恢复失败：{err}（快照已放回，可重试）";

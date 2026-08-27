@@ -17,6 +17,7 @@ import { withBusy } from "./fullscreen-busy.ts";
 import { stripSessionExt } from "./config.ts";
 import { reportError } from "./error-badge.ts";
 import { t } from "./i18n/index.ts";
+import { isCloudEnabled } from "./cloud-capability.ts";
 import type { AppContext } from "./app-context.ts";
 
 const errMsg = (e: unknown): string => String((e as { message?: unknown })?.message || e);
@@ -60,9 +61,17 @@ async function _recover(m: CrashRecordMeta): Promise<void> {
   const putBack = () => crashStore.put(m.tag, bytes, { state: m.state, name: m.name, at: m.at, homeKind: m.homeKind }).catch(() => {});
   try {
     if (!(await session.gateFillOnSwitch())) { void putBack(); return; }   // fill 预览挂着 → 三选；取消=不恢复
-    if (!(await session.leaveLocalFile())) { void putBack(); return; }     // file 家且脏 → 先问；取消=不恢复
+    if (!(await session.leaveLocalDoc())) { void putBack(); return; }     // file/transient 家且脏 → 三键挽留；取消=不恢复
     if (session.dirty) await session.save();                               // 当前画先落盘（openItem 同款）
     const base = stripSessionExt(m.name) || t("nd.untitled");
+    if (!isCloudEnabled()) {
+      // 云关（Editor Only 姿态）：图库不可见——恢复为 transient（立即标脏 + 重挂 T-crash），
+      //   用户经保存按钮 settle 成文件。落进看不见的图库 = 数据蟑螂旅馆，不做。
+      const loaded = await withBusy(t("cb.recoveringBusy", { name: base }), () => decodeOraToPainting(bytes));
+      session.adoptAsTransient(loaded, base);
+      setStatus(t("cb.recoveredTransient", { name: base }), true);
+      return;
+    }
     const name = await uniqueNameFor(`${base}${t("cb.recoveredSuffix")}`);
     const loaded = await withBusy(t("cb.recoveringBusy", { name }), () => decodeOraToPainting(bytes));
     session.adoptAsNew(loaded, name);   // 新身份 + es 记脏：恢复出的 doc 视为 dirty 直到首次真保存

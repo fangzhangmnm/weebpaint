@@ -197,6 +197,7 @@ export const S = {
   "save.synced":     { zh: "已同步云端（上次保存时）· 点击检查是否有新版本 · {name}", en: "Synced to cloud (at last save) · tap to check for newer · {name}", ja: "クラウド同期済み（前回保存時）· タップで更新確認 · {name}", tok: "sitelen li lon poki sewi · sina luka la mi alasa e sin · {name}" },
   "save.localOnly":  { zh: "已存本地（IDB 易失，登录云端更安全） · {name}", en: "Saved locally (IDB is volatile; sign in for safety) · {name}", ja: "ローカル保存済み（IDBは揮発性、クラウド推奨） · {name}", tok: "sitelen li awen lon ilo ni taso · poki sewi li awen pona · {name}" },
   "save.localFileDirty": { zh: "有未保存修改，Ctrl+S 写回 · {name}", en: "Unsaved changes — Ctrl+S writes back · {name}", ja: "未保存の変更あり、Ctrl+Sで書き戻し · {name}", tok: "ante li awen ala. o luka e Ctrl+S · {name}" },
+  "save.transientDirty": { zh: "这幅画还没有家——点击保存成文件", en: "This artwork has no home yet — click to save it to a file", ja: "この作品にはまだ保存先がありません——クリックでファイルに保存", tok: "sitelen ni li jo ala e tomo. o luka ni tawa awen lon lipu." },
   "save.localFileSaved": { zh: "已保存到本地文件 · {name}", en: "Saved to local file · {name}", ja: "ローカルファイルに保存済み · {name}", tok: "sitelen li awen lon lipu ilo · {name}" },
   // 终态：存进本地了，但云端那条腿没成（离线/冲突取消/落地未确认）。必须和 synced 长得不一样——
   //   这正是「远端文件不一样而 UI 从没说过」的渲染面。
@@ -720,6 +721,7 @@ export const S = {
   "lf.staleTitle": { zh: "文件已被外部修改", en: "File changed outside WeebPaint", ja: "ファイルが外部で変更されています", tok: "lipu li ante tan ilo ante" },
   "lf.staleMsg": { zh: "{name} 在打开后被其他程序改过。继续保存会覆盖那些修改。", en: "{name} was modified by another program after it was opened. Saving will overwrite those changes.", ja: "{name} は開いた後に他のプログラムで変更されました。保存するとその変更を上書きします。", tok: "ilo ante li ante e {name}. awen la ante ona li weka." },
   "lf.leaveTitle": { zh: "本地文件有未保存修改", en: "Local file has unsaved changes", ja: "ローカルファイルに未保存の変更", tok: "lipu ilo li jo e ante awen ala" },
+  "lf.leaveTransientTitle": { zh: "这幅画还没保存成文件", en: "This artwork hasn't been saved to a file yet", ja: "この作品はまだファイルに保存されていません", tok: "sitelen ni li awen ala lon lipu" },
   "lf.leaveSave": { zh: "保存并继续", en: "Save and continue", ja: "保存して続行", tok: "o awen. o tawa." },
   "lf.leaveDiscard": { zh: "丢弃修改", en: "Discard changes", ja: "変更を破棄", tok: "o weka e ante" },
   "lf.renameNotSupported": { zh: "本地文件模式不支持重命名（可用「另存为」存入图库）", en: "Rename is not supported in local-file mode (use Save As to add it to the gallery)", ja: "ローカルファイルモードでは名前変更できません（「別名で保存」でギャラリーへ）", tok: "nimi sin li ken ala lon nasin lipu ilo. o kepeken「awen sama nimi ante」" }, 
@@ -730,6 +732,7 @@ export const S = {
   "ss.docNewerWarning": { zh: "这画由 {writer} 写的，你是 {version} —— 编辑保存会丢失新版特有的层属性。建议先刷新升级。", en: "This artwork was written by {writer}; you're on {version} — editing and saving will lose layer properties specific to the newer version. Consider refreshing to upgrade first.", ja: "この作品は {writer} で作成されましたが、あなたは {version} です —— 編集・保存すると新しいバージョン固有のレイヤー属性が失われます。先に更新してアップグレードすることをおすすめします。", tok: "ilo {writer} li sitelen e ona. taso sina kepeken e ilo {version}. sina ante la ijo pi ilo sin li weka. nasin pona: o open sin e mi." }, 
   "ss.noDocCannotSave": { zh: "没打开作品，无法保存", en: "No artwork open; cannot save", ja: "作品が開かれていないため保存できません", tok: "sitelen li open ala la awen li ken ala" },
   "ss.blankNothingToSave": { zh: "空白画布，还没有需要保存的内容", en: "Blank canvas; nothing to save yet", ja: "空白のキャンバスのため、まだ保存する内容がありません", tok: "supa sitelen li ala. ijo awen li lon ala." },
+  "ss.settleDownloaded": { zh: "已开始下载 {name}（此浏览器不支持文件写回；下载文件由你保管，画布上的画仍未关联文件）", en: "Download of {name} started (this browser can't write back to files; the download is in your hands — the canvas is still not linked to a file)", ja: "{name} のダウンロードを開始しました（このブラウザはファイルへの書き戻しに未対応です。ダウンロードはお手元で管理してください。キャンバスはまだファイルに関連付けられていません）", tok: "ilo li pana e {name} tawa sina. ilo ni li ken ala awen tawa lipu. o awen e ona." },
   // T-crash 恢复横幅（P2 2026-08-26，crash-banner.ts）
   "cb.crashFound": { zh: "上次异常退出，有未保存的画：{name}", en: "Unsaved artwork from an abnormal exit: {name}", ja: "前回異常終了した際の未保存の作品があります：{name}", tok: "ilo li moli la sitelen {name} li awen ala. ", },
   "cb.recover": { zh: "恢复", en: "Recover", ja: "復元", tok: "kama sin" },
@@ -739,6 +742,7 @@ export const S = {
   "cb.recoveredSuffix": { zh: "（恢复）", en: " (recovered)", ja: "（復元）", tok: " (kama sin)" },
   "cb.recoveringBusy": { zh: "正在恢复 {name}…", en: "Recovering {name}…", ja: "{name} を復元しています…", tok: "mi kama sin e {name}…" },
   "cb.recovered": { zh: "已恢复为新画：{name}（尚未保存，请检查后保存）", en: "Recovered as new artwork: {name} (not yet saved — review, then save)", ja: "新しい作品として復元しました：{name}（まだ保存されていません。確認して保存してください）", tok: "sitelen sin {name} li kama. ona li awen ala. o lukin o awen." },
+  "cb.recoveredTransient": { zh: "已恢复：{name}（还没有家——点保存按钮存成文件）", en: "Recovered: {name} (no home yet — click save to store it as a file)", ja: "復元しました：{name}（まだ保存先がありません。保存ボタンでファイルに保存してください）", tok: "sitelen {name} li kama sin. ona li jo ala e tomo. o awen e ona lon lipu." },
   "cb.recoverFailed": { zh: "恢复失败：{err}（快照已放回，可重试）", en: "Recovery failed: {err} (snapshot put back; you can retry)", ja: "復元に失敗しました：{err}（スナップショットは戻したため再試行できます）", tok: "kama sin li pakala: {err}. ona li awen. o sin." },
   "ss.notPushedNewer": { zh: "未推送：这画由更新版本写成，你取消了覆盖（本地与云端都保持原样）", en: "Not pushed: this artwork was written by a newer version and you cancelled the overwrite (local and cloud both left unchanged)", ja: "プッシュしていません：この作品は新しいバージョンで作成されており、上書きをキャンセルしました（ローカルとクラウドはどちらもそのまま）", tok: "mi pana ala: ilo sin li sitelen e ona. sina weka e awen. ilo ni en poki sewi li awen sama." }, 
   "ss.savedLocalIdb": { zh: "已存本地：{name}（IDB 易失，登录云端更安全）", en: "Saved locally: {name} (IndexedDB is volatile; sign in to the cloud for safety)", ja: "ローカルに保存しました：{name}（IndexedDB は消えやすいため、クラウドにサインインすると安全です）", tok: "awen lon ilo ni: {name}. ilo ni li ken weka e ijo. poki sewi li awen pona." }, 

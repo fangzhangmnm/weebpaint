@@ -19,14 +19,15 @@ export declare const SOLE_GALLERY_ID = "default";
 export declare function assertNever(x: never): never;
 /** 只读快照（冻结对象；消费者拿不到可变引用，改家只能走 authority 动词）。 */
 export declare function docHome(): Readonly<DocHome> | null;
-/** file 家的 dirty（非 file 家恒 false）。gallery 家的 dirty 不在这儿——问 editor-session。 */
+/** file/transient 家的 dirty（gallery/无家恒 false）。gallery 家的 dirty 不在这儿——问 editor-session。 */
 export declare function fileDirty(): boolean;
 export interface HomeAuthority {
     /** 换家（安家/搬家/离家=null）。换家即换世界线：file-dirty 归零（新家相对自己天然干净）。 */
     setHome(h: DocHome | null): void;
-    /** file 家标脏（编辑落笔）。非 file 家调用 = 结构 bug，throw（不静默吞）。 */
+    /** file/transient 家标脏（编辑落笔）。gallery/无家调用 = 结构 bug，throw（不静默吞）。 */
     markFileDirty(): void;
-    /** file 家清脏——**只有写回文件成功后**允许调（导出永不清 dirty 由「导出路径根本拿不到本方法」结构保证）。 */
+    /** file/transient 家清脏——**只有写回文件成功后**允许调（transient 的清脏走 setHome 安家=换家归零；
+     *  导出永不清 dirty 由「导出路径根本拿不到本方法」结构保证）。 */
     clearFileDirty(): void;
     /** 写回成功后前移 mtime 对表基准（陈旧检查的比较对象）。非 file 家 throw。 */
     patchFileMtime(lastSeenMtime: number): void;

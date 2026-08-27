@@ -92,10 +92,12 @@ export function updateSaveStatus() {
       return;
     }
     case "transient": {
-      // P2 前无产者；真出现时按「无家=最危险」呈现：脏盘常亮（保存入口=安家仪式）。
-      els.topSaveBtn.dataset.state = "dirty";
+      // P2 transient（云关新画布，未安家）：脏 = 蓝盘（点击=settle 安家仪式）；净 = 空白新画布，
+      //   与「未打开作品」同灰态（没内容可保存）。
+      els.topSaveBtn.dataset.state = session.dirty ? "dirty" : "none";
+      els.topSaveBtn.style.opacity = ""; els.topSaveBtn.style.color = "";
       els.topSaveBtn.innerHTML = ICON_DISK;
-      els.topSaveBtn.title = tLatin("save.none");
+      els.topSaveBtn.title = tLatin(session.dirty ? "save.transientDirty" : "save.none");
       return;
     }
     case "gallery": break;   // 落到下方云徽章矩阵

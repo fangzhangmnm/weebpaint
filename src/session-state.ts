@@ -14,7 +14,7 @@ import { reactive } from "../vendor/vue/vue.esm-browser.prod.js";
 import { WEEBPAINT_VERSION } from "./version.ts";
 import { reportError } from "./error-badge.ts";
 import { setBrushColor } from "./color-panel.ts";
-import { thumbBlobFromBytes, setCurrentSessionName } from "./session.ts";
+import { thumbBlobFromBytes, setCurrentSessionName, triggerDownload } from "./session.ts";
 import { renderNodesToBytes } from "./backend/doc-render.ts";
 import { encodeDocToOra, decodeOraToPainting, paintingDataToEncodeDoc, parseAppVersion, type DecodedPainting } from "./backend/ora.ts";
 import { ORA_FORMAT_VERSION } from "./backend/ora-stack-xml.ts";
@@ -23,7 +23,7 @@ import { tLatin } from "./i18n/index.ts";
 import { isSignedIn, store as _store } from "./app-store.ts";
 import type { EncryptedBlob } from "./app-store.ts";   // 密文 at-rest 字节（branded）；B2：类型经接缝转口
 import { openInputSheet, openConfirmSheet, openChoiceSheet, lockSyncGate, settleSyncGate } from "./sheets.ts";
-import { readHandleFile, writeHandleBlob, handleMtime, hasWeebPaintTraces, type LocalFileHandle } from "./local-file-session.ts";
+import { readHandleFile, writeHandleBlob, handleMtime, hasWeebPaintTraces, supportsSaveFilePicker, pickSaveOraFile, type LocalFileHandle } from "./local-file-session.ts";
 import { claimHomeAuthority, docHome, fileDirty, saveRoute, SOLE_GALLERY_ID } from "./doc-home.ts";
 import { galleryDefaultName } from "./naming.ts";
 import { crashStore, mintLuggageTag, type LuggageTag } from "./crash-store.ts";
@@ -147,9 +147,80 @@ function _dropLuggage() {
   if (tag) crashStore.dropOnCleanClose(tag).catch(() => {});   // best-effort：清扫失败顶多多一条陈旧横幅
 }
 
+/** file/transient 家快照判别（本地脏轨的门；P2 起 transient 与 file 同轨）。 */
+function _localHomeKind(): "file" | "transient" | null {
+  const k = docHome()?.kind;
+  return k === "file" || k === "transient" ? k : null;
+}
 function _markLocalDirty() {
   _editSerial++;
-  if (_fileHome() && !fileDirty()) { _homeAuth.markFileDirty(); updateSaveStatus(); }
+  if (_localHomeKind() && !fileDirty()) { _homeAuth.markFileDirty(); updateSaveStatus(); }
+}
+
+// ── transient 家（P2 2026-08-26；user 拍板「关gallery进local first则要么双击打开进文件要么新画布」）──
+// 产者 = 云关 boot 的空白画布（boot-restore.openBlankCanvas → beginTransientBlank）。
+// 此前云关空白画布 = home:null 裸奔（Ctrl+S 死路「没打开作品」、崩溃全丢）；transient 化后：
+//   Ctrl+S = settle 安家仪式（FSA 存成文件→file 家；无 FSA 落 download=责任移交，不清 dirty）、
+//   T-crash 盲快照覆盖、离开时三键挽留（保存/丢弃/取消）。
+// _transientName = 展示名（谥号模式日期名：横幅/建议文件名用）——**不是身份**（transient 无家无户口）。
+let _transientName: string | null = null;
+function beginTransientBlank(): void {
+  _homeAuth.setHome({ kind: "transient" });
+  _transientName = galleryDefaultName();
+  _luggageTag = mintLuggageTag(); _snapSerial = _editSerial;
+  _isLazyBlankSession = false; _recomputePhase();
+  _enc.encrypted = false;
+  updateSaveStatus();
+}
+
+/** 崩溃快照恢复为 transient（云关语境专用——云开走 adoptAsNew 进图库）：装入字节但**不安家**
+ *  （云关的图库不可见，落进去=数据蟑螂旅馆），恢复出的 doc 立即标脏 + 重新挂 T-crash 保护，
+ *  用户经 settle 存成文件。es 不绑（残影墙同 openLocalFile：_esMuted 立墙防跨写）。 */
+function adoptAsTransient(loaded: LoadedDoc, displayName: string): void {
+  _esMuted = true;   // 墙②先立再换内容（openLocalFile 同款）
+  adoptModel(loaded);
+  releaseDocLock();          // 不走 _setActive：云关自愈红线——currentFile 一个指头都不碰
+  _isLazyBlankSession = false;
+  _enc.encrypted = false;
+  _homeAuth.setHome({ kind: "transient" });
+  _transientName = displayName;
+  _luggageTag = mintLuggageTag(); _snapSerial = _editSerial;
+  _homeAuth.markFileDirty(); _editSerial++;   // 视为 dirty 直到首次真保存 + 立即重挂盲快照保护
+  _recomputePhase();
+  updateSaveStatus();
+}
+
+/** settle 安家仪式（transient 专用；verdicts §2.1 单按钮静默 fallback）：
+ *  FSA → 系统另存框 → 写文件 → **家变 file**（keeper.setHome 换家即清 dirty=「回家才清」宪法条款）；
+ *  无 FSA → download（责任移交 + toast；下载 ≠ 家 → dirty 不清、家不变）。
+ *  返回 true = 真安家了。picker 取消（AbortError→null）= 取消，绝不降级重弹。 */
+async function settleToFile(): Promise<boolean> {
+  const suggested = `${_transientName ?? galleryDefaultName()}.ora`;
+  _applyPendingForExplicitSave();   // settle 必是显式动作：fill 预览等 pending 一并收口
+  try {
+    if (supportsSaveFilePicker()) {
+      // 顺序纪律：先开 OS 保存框再 encode（picker 要吃 user-gesture 活化，大画 encode 秒级不能排前面）。
+      const h = await pickSaveOraFile(suggested);
+      if (!h) { setStatus(t("ss.saveCancelled")); return false; }
+      const { bytes } = await _encodeCurrentOraWithPeek();
+      await writeHandleBlob(h, bytes);
+      _homeAuth.setHome({ kind: "file", handle: h, fileName: h.name, lastSeenMtime: (await handleMtime(h)) ?? Date.now() });
+      _transientName = null;
+      if (_luggageTag) { crashStore.dropOnCleanClose(_luggageTag).catch(() => {}); _snapSerial = _editSerial; }
+      else { _luggageTag = mintLuggageTag(); _snapSerial = _editSerial; }
+      updateSaveStatus();
+      setStatus(t("lf.saved", { name: h.name }));
+      return true;
+    }
+    const { bytes } = await _encodeCurrentOraWithPeek();
+    triggerDownload(bytes, suggested);
+    setStatus(t("ss.settleDownloaded", { name: suggested }), true);   // 下载开始=责任移交（拍板）；没回家，dirty 如实留着
+    return false;
+  } catch (e) {
+    reportError(new Error("[settle] save to file failed: " + String(e)), "warning");
+    setStatus(t("lf.saveFailed", { error: errMsg(e) }), true);
+    return false;
+  }
 }
 /** es 重新绑定 store 身份（open/adopt/新建/另存成功）→ 解除残影墙。 */
 function _esRebound() { _esMuted = false; }
@@ -163,14 +234,14 @@ async function openLocalFile(handle: LocalFileHandle): Promise<File | null> {
   const loaded = await decodeOraToPainting(file) as LoadedDoc;
   if (!hasWeebPaintTraces(loaded)) return file;   // 外来 ora（Krita 等）→ 导入为新 doc，绝不原位覆写别人的文件
   if (!(await _gateFillOnSwitch())) return null; // 挽留门：fill 预览挂着 → 应用/丢弃/取消（user 2026-08-21）
-  if (!(await leaveLocalFile())) return null;    // 已在无地且脏 → 先问（保存/丢弃/取消）
+  if (!(await leaveLocalDoc())) return null;    // 已在无地且脏 → 先问（保存/丢弃/取消）
   if (es.isDirty()) await saveNow();             // 旧 store doc 先落盘（openItem 同款；无地时已被上一行清场）
   _esMuted = true;   // 墙②先立再换内容：adoptModel 之后 canvas 就不再是 es._name 的像素了
   adoptModel(loaded);
   _setActive(null); _isLazyBlankSession = false;   // 先离旧家（释放锁 + 清持久 currentFile）
   _enc.encrypted = false;
   _homeAuth.setHome({ kind: "file", handle, fileName: file.name, lastSeenMtime: file.lastModified });
-  _luggageTag = mintLuggageTag(); _snapSerial = _editSerial;   // T-crash：新家现铸新牌（旧牌上面 leaveLocalFile 已焚）
+  _luggageTag = mintLuggageTag(); _snapSerial = _editSerial;   // T-crash：新家现铸新牌（旧牌上面 leaveLocalDoc 已焚）
   _recomputePhase();
   updateSaveStatus();
   await setGalleryOpen(false);
@@ -215,20 +286,25 @@ async function saveLocalFileNow(): Promise<boolean> {
   }
 }
 
-/** 离开无地模式（回图库/开别的画/新建/导入前必过的门）。脏 → 问保存/丢弃；取消 → false（调用方中止）。
- *  ⚠ 只清 file 家，**不清 _esMuted**——残影墙要等 es 重新绑定身份（_esRebound）才解除。 */
-async function leaveLocalFile(): Promise<boolean> {
-  const fh = _fileHome();
-  if (!fh) return true;
+/** 离开 file/transient 家（回图库/开别的画/新建/导入前必过的门；P2 起 = 三键挽留：保存/丢弃/取消）。
+ *  脏 → 问；取消 → false（调用方中止）。file 家保存=写回；transient 保存=settle 安家仪式
+ *  （settle 落 download=责任移交未安家 → 同样不放行离开，用户要么 FSA 真安家要么显式丢弃）。
+ *  ⚠ 只清家，**不清 _esMuted**——残影墙要等 es 重新绑定身份（_esRebound）才解除。 */
+async function leaveLocalDoc(): Promise<boolean> {
+  const kind = _localHomeKind();
+  if (!kind) return true;
   if (fileDirty()) {
-    const c = await openChoiceSheet<"save" | "discard">(t("lf.leaveTitle"), fh.fileName, [
+    const label = kind === "file" ? _fileHome()!.fileName : (_transientName ?? "");
+    const c = await openChoiceSheet<"save" | "discard">(t(kind === "file" ? "lf.leaveTitle" : "lf.leaveTransientTitle"), label, [
       { label: t("lf.leaveSave"), value: "save", primary: true },
       { label: t("lf.leaveDiscard"), value: "discard" },
     ]);
     if (!c) return false;
-    if (c === "save" && !(await saveLocalFileNow())) return false;
+    if (c === "save") {
+      if (!(kind === "file" ? await saveLocalFileNow() : await settleToFile())) return false;
+    }
   }
-  if (_fileHome()) { _homeAuth.setHome(null); _dropLuggage(); }   // sheet 期间可能已被别的入口换家（原代码同样只清引用）
+  if (_localHomeKind()) { _homeAuth.setHome(null); _dropLuggage(); _transientName = null; }   // sheet 期间可能已被别的入口换家（原代码同样只清引用）
   updateSaveStatus();
   return true;
 }
@@ -398,7 +474,7 @@ function adoptAsExisting(loaded: LoadedDoc, name: string) {
   _adoptCommon(loaded, name, {});
 }
 function _adoptCommon(loaded: LoadedDoc, name: string, opts: { create?: boolean }) {
-  if (_fileHome()) { _homeAuth.setHome(null); _dropLuggage(); }   // 同步入口无法弹确认——调用方（import-image 的 .ora 分支）已过 leaveLocalFile 门
+  if (_fileHome()) { _homeAuth.setHome(null); _dropLuggage(); }   // 同步入口无法弹确认——调用方（import-image 的 .ora 分支）已过 leaveLocalDoc 门
   adoptModel(loaded);
   _setActive(name); _isLazyBlankSession = false; _recomputePhase();
   es.adopted(toFull(name), opts);
@@ -479,8 +555,9 @@ async function saveNow(opts: { implicit?: boolean; commitPending?: boolean } = {
   const route = saveRoute(docHome(), opts);
   if (route === "noop") return;
   if (route === "file-writeback") { await saveLocalFileNow(); return; }
-  if (route === "settle") {   // transient 本 slice 无产者（P2 安家仪式落地前不可达）——真到了必须响亮，不许静默丢保存
-    reportError(new Error("[doc-home] settle requested but not implemented until P2"), "error"); return;
+  if (route === "settle") {   // transient 显式保存 = 安家仪式（P2）；空白不弹 picker（没内容可安）
+    if (!_docIsBlankUnnamed()) await settleToFile(); else setStatus(t("ss.blankNothingToSave"));
+    return;
   }
   if (!_activeName()) return;   // gallery 家恒有名；防御保持旧守卫
   if (_docIsBlankUnnamed()) return;
@@ -508,11 +585,12 @@ async function saveNow(opts: { implicit?: boolean; commitPending?: boolean } = {
 let _pushInFlight = false;
 async function saveAndPush() {
   if (_fileHome()) { await saveLocalFileNow(); return; }   // file 家：Ctrl+S/save 按钮 = 写回文件（无云腿；= saveRoute 的 file-writeback）
+  // 空白守卫先行（lazyblank / 空白 transient）：es 未绑或无内容——不拦的话 lazyblank 会谎报
+  //   「已同步 <名>」（煤气灯）、空白 transient 会弹一个没内容的另存框。首笔后守卫自动失效。
+  if (_docIsBlankUnnamed()) { setStatus(t("ss.blankNothingToSave")); return; }
+  if (_localHomeKind() === "transient") { await settleToFile(); return; }   // transient：保存 = 安家仪式（P2）
   const name = _activeName();
   if (!name) { setStatus(t("ss.noDocCannotSave"), true); return; }
-  // lazyblank 空白期（P1.5）：es 未绑、磁盘上无此身份——es.persist 的 !_name 门会静默 no-op，
-  //   不拦的话下面会照报「已同步 <名>」（煤气灯）。首笔安家后本守卫自动失效（旗自翻）。
-  if (_docIsBlankUnnamed()) { setStatus(t("ss.blankNothingToSave")); return; }
   _applyPendingForExplicitSave();   // Ctrl+S/save 按钮 = 显式保存：fill 预览 commit + transient apply（QA 2026-08-21）
   // 版本降级守卫：新版本文档未确认 → 只本地不推（saveNow 的 confirm 已挡本地覆盖，这里挡推）。
   if (_loadedDocIsNewer && !_loadedDocNewerConfirmed) {
@@ -627,7 +705,7 @@ async function exitCanvasToGallery() {
   // 显式离开编辑场景：pending 先收口再落盘（QA 2026-08-21——此前 exit 是先 flushAndPush 再等
   //   setGalleryOpen 里 apply transient：浮层挖洞的半成品先被推上了云）。
   _applyPendingForExplicitSave();
-  if (!(await leaveLocalFile())) return;   // 无地且脏 → 问；取消 = 留在画布
+  if (!(await leaveLocalDoc())) return;   // 无地且脏 → 问；取消 = 留在画布
   const name = _activeName();
   if (name) {
     // v409（D-Q6）：退出**只有内容脏/push-pending 才推**；只改 desk（无像素编辑）→ 不推不落本地，
@@ -659,7 +737,7 @@ async function exitCanvasToGallery() {
 //   取消路径照报「已新建」（谎报）。
 async function newDoc({ name, w, h, layer0Name, layer0Pixels }: { name: string; w: number; h: number; layer0Name?: string; layer0Pixels?: Uint8ClampedArray }): Promise<boolean> {
   if (!(await _gateFillOnSwitch())) return false;   // 挽留门：fill 预览挂着 → 应用/丢弃/取消（user 2026-08-21）
-  if (!(await leaveLocalFile())) return false;   // 无地且脏 → 问；取消 = 不新建
+  if (!(await leaveLocalDoc())) return false;   // 无地且脏 → 问；取消 = 不新建
   if (es.isDirty()) await saveNow();
   // 新 doc = 本版现写：清掉**旧 doc** 残留的「新版本写的」旗标（adoptModel 才复位它，newDoc 路径
   //   此前不清 → 下面 busy 内的 saveNow 会为一张全新的画弹「覆盖新版本文档」确认 —— 旗标跨 doc 泄漏，
@@ -700,12 +778,12 @@ async function openItem(item: GalleryItem) {
   if (item.name === _activeName()) { setGalleryOpen(false); return; }
   // 双实例互认（2026-08-21）：同画双开 = 本地字节互覆（store 层的修另行处理），入口拦住。
   //   警告 + 默认取消（openConfirmSheet 的 Esc/点背板都是取消），用户明确确认才继续。
-  //   排在 leaveLocalFile 之前：先警告再谈保存，取消时什么都没发生。
+  //   排在 leaveLocalDoc 之前：先警告再谈保存，取消时什么都没发生。
   if (await isDocLockedElsewhere(sessionBareName(item.name))) {
     if (!(await openConfirmSheet(t("ss.docLockedElsewhereTitle"), t("ss.docLockedElsewhereMsg", { name: item.name })))) return;
   }
   if (!(await _gateFillOnSwitch())) return;   // 挽留门：fill 预览挂着 → 应用/丢弃/取消（user 2026-08-21）
-  if (!(await leaveLocalFile())) return;   // 无地且脏 → 问；取消 = 不开
+  if (!(await leaveLocalDoc())) return;   // 无地且脏 → 问；取消 = 不开
   if (es.isDirty()) await saveNow();
   // 开画顺带把 4 个 settings/state collection 拉云对齐（v409，user 2026-07-14：「开画作的时候可以顺便
   //   并行 pullandreconcile 下，fire and forget 不用 await」）。**绝不 await**：对齐是锦上添花，
@@ -935,15 +1013,16 @@ export const session = {
   get loadingDoc() { return _loadingDoc; },
   get loadedDocIsNewer() { return _loadedDocIsNewer; },
   get loadedDocNewerConfirmed() { return _loadedDocNewerConfirmed; },
-  get dirty() { return _fileHome() ? fileDirty() : (es ? es.isDirty() : false); },   // 内存脏（save-status/beforeunload 用；file 家走 keeper 脏轨）
+  get dirty() { return _localHomeKind() ? fileDirty() : (es ? es.isDirty() : false); },   // 内存脏（save-status/beforeunload 用；file/transient 家走 keeper 脏轨）
   get pushPending() { return es ? es.isPushPending() : false; },   // 已落本地但没上云（徽章第四态；与 dirty 正交）
   get saving() { return _pushInFlight; },   // v0.5.9：saveAndPush 在飞（app 层过程态，徽章显转圈云）
-  openLocalFile, leaveLocalFile,
+  openLocalFile, leaveLocalDoc,
   // app 驱动内容变化（revert 回滚；blender 冗余双标无害）→ 标脏。参考图已迁 wp:sidecarchange（S5）。
   // 无地走本地轨；残影墙期间（_esMuted）es 绝不标脏（防跨写，见无地节注释）。
-  markEdited() { if (_fileHome()) { _markLocalDirty(); return; } if (es && !_esMuted) es.markDirty(); },
+  markEdited() { if (_localHomeKind()) { _markLocalDirty(); return; } if (es && !_esMuted) es.markDirty(); },
   setName, restore: restoreSession, saveAs,
   beginLazyBlank,   // P1.5 boot「可画新画布」落点（boot-restore.openFreshCanvas 唯一调用方）
+  beginTransientBlank,   // P2 云关 boot 落点（boot-restore.openBlankCanvas 唯一调用方）：transient 家新画布
   refreshOpenDoc,   // 回线/回前台的显式快进（P1 2026-08-25）——app.ts 事件侧唯一入口，别再裸调 pullIfClean
   // 显式换文档挽留门（fill 预览三选；user 2026-08-21）——给 session 外的换内容入口复用
   //   （import-image 的 .ora 导入为新身份）。session 内的 openItem/newDoc/openLocalFile 已内联。
@@ -951,6 +1030,7 @@ export const session = {
   save: saveNow, saveAndPush,
   // adopt 的两个意图显式分开（别再合成一个带 flag 的）：import=新身份 / revert=既有身份。
   adoptAsNew, adoptAsExisting,
+  adoptAsTransient,   // P2：崩溃恢复的云关分支（不落看不见的图库；crash-banner 唯一调用方）
   rename: renameCurrentSession, exit: exitCanvasToGallery, newDoc, open: openItem, push: pushItem, unload: unloadItem,
   /** 当前作品的 at-rest **密文**字节（原样，不解壳、不要密码）。非加密件 → null。
    *  先 saveNow()：at-rest 字节是「上次保存」的内容，不先落盘就会导出成旧版本。 */
@@ -1011,7 +1091,7 @@ export function initSession(ctx: AppContext) {
       onChange: (cb: () => void) => {
         const h = () => {
           if (_loadingDoc) return;
-          if (_fileHome()) { _markLocalDirty(); return; }   // 墙①：无地编辑走本地脏轨，es 永不标脏
+          if (_localHomeKind()) { _markLocalDirty(); return; }   // 墙①：file/transient 家编辑走本地脏轨，es 永不标脏
           if (_esMuted) return;                            // 墙②：无地残影——es 身份未重绑前 canvas ≠ es._name，标脏=跨写
           // P1.5 lazyblank 首笔安家（涂鸦自动进图库，verdicts §1.2）：真出现内容（bbox>0，
           //   _docIsBlankUnnamed 自翻旗）→ 此刻才绑 es（首存 mode:"new"）+ 持久化身份
@@ -1045,15 +1125,17 @@ export function initSession(ctx: AppContext) {
   //   同 30s 空闲节律、同 isMidOperation 让路；serial 门 = 没新内容不重编码（fileDirty 到显式保存才清，
   //   不能当「有没有新东西」的门用）。与保存**完全同一** encodeDocToOra 字节（mp4 sidecar passthrough 顺带）。
   ctx.bgJobs.register("t-crash-snapshot", 6, () => {
-    const fh = _fileHome();
-    if (fh && _luggageTag && fileDirty() && _editSerial !== _snapSerial && !ctx.isMidOperation()) {
+    const homeAtStart = docHome();
+    const kind = homeAtStart?.kind === "file" || homeAtStart?.kind === "transient" ? homeAtStart.kind : null;
+    if (kind && _luggageTag && fileDirty() && _editSerial !== _snapSerial && !ctx.isMidOperation()) {
       const serial = _editSerial;
+      const name = homeAtStart!.kind === "file" ? homeAtStart!.fileName : (_transientName ?? t("nd.untitled"));
       void (async () => {
         try {
           const { bytes } = await _encodeCurrentOraWithPeek();
           // encode 的 await 间隙可能换家/领养——对指纹再写，别把别的画写进这张牌。
-          if (docHome() === fh && _luggageTag) {
-            await crashStore.put(_luggageTag, bytes, { state: "crash", name: fh.fileName, at: Date.now(), homeKind: "file" });
+          if (docHome() === homeAtStart && _luggageTag) {
+            await crashStore.put(_luggageTag, bytes, { state: "crash", name, at: Date.now(), homeKind: kind });
             _snapSerial = serial;
           }
         } catch (e) { reportError(new Error("[t-crash] snapshot failed (best-effort, load-bearing layers unaffected): " + String(e)), "log"); }

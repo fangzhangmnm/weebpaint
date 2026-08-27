@@ -4,12 +4,19 @@ import { type LocalFileHandle } from "./local-file-session.ts";
 import type { AppContext } from "./app-context.ts";
 import type { GalleryItem } from "./gallery/gallery-model.ts";
 type LoadedDoc = DecodedPainting;
+declare function beginTransientBlank(): void;
+/** 崩溃快照恢复为 transient（云关语境专用——云开走 adoptAsNew 进图库）：装入字节但**不安家**
+ *  （云关的图库不可见，落进去=数据蟑螂旅馆），恢复出的 doc 立即标脏 + 重新挂 T-crash 保护，
+ *  用户经 settle 存成文件。es 不绑（残影墙同 openLocalFile：_esMuted 立墙防跨写）。 */
+declare function adoptAsTransient(loaded: LoadedDoc, displayName: string): void;
 /** 打开本地 .ora：明文 + 有 WeebPaint 痕迹 → 原位打开（返回 null）；
  *  加密容器 / 外来 ora → 不原位，把 File 还给调用方走导入路径（返回 File）。 */
 declare function openLocalFile(handle: LocalFileHandle): Promise<File | null>;
-/** 离开无地模式（回图库/开别的画/新建/导入前必过的门）。脏 → 问保存/丢弃；取消 → false（调用方中止）。
- *  ⚠ 只清 file 家，**不清 _esMuted**——残影墙要等 es 重新绑定身份（_esRebound）才解除。 */
-declare function leaveLocalFile(): Promise<boolean>;
+/** 离开 file/transient 家（回图库/开别的画/新建/导入前必过的门；P2 起 = 三键挽留：保存/丢弃/取消）。
+ *  脏 → 问；取消 → false（调用方中止）。file 家保存=写回；transient 保存=settle 安家仪式
+ *  （settle 落 download=责任移交未安家 → 同样不放行离开，用户要么 FSA 真安家要么显式丢弃）。
+ *  ⚠ 只清家，**不清 _esMuted**——残影墙要等 es 重新绑定身份（_esRebound）才解除。 */
+declare function leaveLocalDoc(): Promise<boolean>;
 /** 外部导入：装入一个解好的 doc，作为**新身份**。首存 mode:"new"（撞名抛，不静默覆盖）。 */
 declare function adoptAsNew(loaded: LoadedDoc, name: string): void;
 /** revert 回滚：装入一个解好的 doc，身份**不变**（首存 mode:"existing"，就是要写回原文件）。
@@ -69,18 +76,20 @@ export declare const session: {
     readonly pushPending: boolean;
     readonly saving: boolean;
     openLocalFile: typeof openLocalFile;
-    leaveLocalFile: typeof leaveLocalFile;
+    leaveLocalDoc: typeof leaveLocalDoc;
     markEdited(): void;
     setName: typeof setName;
     restore: typeof restoreSession;
     saveAs: typeof saveAs;
     beginLazyBlank: typeof beginLazyBlank;
+    beginTransientBlank: typeof beginTransientBlank;
     refreshOpenDoc: typeof refreshOpenDoc;
     gateFillOnSwitch: typeof _gateFillOnSwitch;
     save: typeof saveNow;
     saveAndPush: typeof saveAndPush;
     adoptAsNew: typeof adoptAsNew;
     adoptAsExisting: typeof adoptAsExisting;
+    adoptAsTransient: typeof adoptAsTransient;
     rename: typeof renameCurrentSession;
     exit: typeof exitCanvasToGallery;
     newDoc: typeof newDoc;

@@ -45,7 +45,7 @@ describe("doc-home · keeper 单持权（workpiece 令牌同手法）", () => {
     eq(fileDirty(), false, "换家后 file-dirty 不许残留（残留=下一个 file 家背上一个家的脏）");
   });
 
-  it("★非 file 家动 file-dirty = 结构 bug，throw 不静默吞", () => {
+  it("★gallery/无家动 file-dirty = 结构 bug，throw 不静默吞", () => {
     _resetHomeKeeperForTest();
     const auth = claimHomeAuthority();
     auth.setHome(GAL);
@@ -54,6 +54,17 @@ describe("doc-home · keeper 单持权（workpiece 令牌同手法）", () => {
       try { auth[op](); } catch { threw = true; }
       assert(threw, `${op} 在 gallery 家必须 throw`);
     }
+  });
+
+  it("transient 家（P2）：脏轨与 file 家同轨；settle 安家（setHome 换家）即归零", () => {
+    _resetHomeKeeperForTest();
+    const auth = claimHomeAuthority();
+    auth.setHome(TRA);
+    eq(fileDirty(), false, "空白 transient 干净");
+    auth.markFileDirty();
+    eq(fileDirty(), true, "落笔标脏");
+    auth.setHome(FIL);   // settle 到文件 = 换家
+    eq(fileDirty(), false, "安家即净（保存=回家才清 dirty 的宪法条款）");
   });
 
   it("patchFileMtime：写回后前移对表基准；快照不可变（返回新对象）", () => {

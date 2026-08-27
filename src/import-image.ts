@@ -262,7 +262,7 @@ export async function intakeOraDoc(src: { handle?: LocalFileHandle | null; file?
 // （v415 前走 existing → 导入同名 .ora 会静默盖掉已有作品，活的数据丢失）。
 async function importOraFileAsNew(file: File) {
   if (!(await session.gateFillOnSwitch())) return;   // 挽留门：fill 预览挂着 → 应用/丢弃/取消（user 2026-08-21）
-  if (!(await session.leaveLocalFile())) return;   // 无地且脏 → 先问（adoptAsNew 是同步入口，门在这里过）
+  if (!(await session.leaveLocalDoc())) return;   // 无地且脏 → 先问（adoptAsNew 是同步入口，门在这里过）
   // 旧 doc 先落盘（openItem/newDoc 同款；此前这条路径缺它）：不落盘的话上面挽留门「应用并继续」
   //   刚 commit 的填色会随 adoptAsNew（clearHistory+load 换内容）直接蒸发——sheet 就成了谎报；
   //   顺带堵上「.ora 导入丢当前画未 autosave 编辑」的同源旧洞。
