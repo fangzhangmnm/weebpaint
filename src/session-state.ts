@@ -34,8 +34,8 @@ import { serializedToolStatePatch, desk } from "./workbench-state.ts";
 import { getBlenderSyncState, applyBlenderSyncState } from "./blender-sync.ts";
 import { ensureNewPassword, ensureUnlocked } from "./enc-thumbs.ts";
 import { setPassword, getPassword } from "./crypto-state.ts";
-import { shouldCapture, checkpointKey, type CheckpointTrigger } from "./checkpoint-policy.ts";
-import { getCheckpoint, putCheckpoint, deleteCheckpoint } from "./storage.ts";
+import { shouldCapture, checkpointKey, planRingEviction, ringBudget, isNewSitting, type CheckpointTrigger, type RingEntryMeta } from "./checkpoint-policy.ts";
+import { getCheckpoint, deleteCheckpoint, ringPut, ringGet, ringAll, ringDelete, ringDeleteByDoc, mintRingId } from "./storage.ts";
 import { els } from "./els.ts";
 import type { AppContext } from "./app-context.ts";
 import type { GalleryItem } from "./gallery/gallery-model.ts";
@@ -140,11 +140,32 @@ let _esMuted = false;
 let _luggageTag: LuggageTag | null = null;
 let _editSerial = 0;    // file 家编辑计数（histchange/sidecarchange 驱动）
 let _snapSerial = 0;    // 上次盲快照时的计数——「没新内容就不重拍」门
-/** 释放行李牌（离开 file 家的每条路都要过这）：正常关闭即删（pending-adoption 由库内拒删）。 */
+// P4 坐下判定（输入间隔 qualifier，§2.7）：上次输入时刻。换 doc 重置（adoptModel），防跨 doc 误判。
+let _lastInputAt: number | null = null;
+
+/** 新的一次坐下的首笔 → 封存「坐下前态」（copy-on-write：首笔还没被 autosave/写回追上，
+ *  at-rest/磁盘字节此刻仍是坐下前的样子——与「真快进第一笔之前升 gate」同手法）。 */
+async function _captureResumePoint(): Promise<void> {
+  try {
+    const name = _activeName();
+    if (name && !_isLazyBlankSession) { await _captureCheckpoint(name, "resume-first-input"); return; }
+    const fh = _fileHome();
+    if (fh && _luggageTag) {   // file 家：磁盘字节 = 上次写回态 = 坐下前态
+      const bytes = await readHandleFile(fh.handle);
+      await _ringCapture(_luggageTag, "resume-first-input", bytes, false);
+    }
+    // transient / lazyblank：无 at-rest 可封（T-crash 盲快照另行兜底），跳过。
+  } catch (e) { reportError(new Error("[checkpoint] resume capture failed: " + String(e)), "log"); }
+}
+/** 释放行李牌（离开 file/transient 家的每条路都要过这）：正常关闭即删（pending-adoption 由库内拒删）；
+ *  该牌名下的 revert ring（file 家打开点快照等，session 级）随牌焚（拍板 §2.7）。 */
 function _dropLuggage() {
   const tag = _luggageTag;
   _luggageTag = null;
-  if (tag) crashStore.dropOnCleanClose(tag).catch(() => {});   // best-effort：清扫失败顶多多一条陈旧横幅
+  if (tag) {
+    crashStore.dropOnCleanClose(tag).catch(() => {});   // best-effort：清扫失败顶多多一条陈旧横幅
+    ringDeleteByDoc(tag).catch(() => {});
+  }
 }
 
 /** file/transient 家快照判别（本地脏轨的门；P2 起 transient 与 file 同轨）。 */
@@ -242,6 +263,8 @@ async function openLocalFile(handle: LocalFileHandle): Promise<File | null> {
   _enc.encrypted = false;
   _homeAuth.setHome({ kind: "file", handle, fileName: file.name, lastSeenMtime: file.lastModified });
   _luggageTag = mintLuggageTag(); _snapSerial = _editSerial;   // T-crash：新家现铸新牌（旧牌上面 leaveLocalDoc 已焚）
+  // 打开点快照（P4 §2.7：file 家 revert 锚；session 级挂行李牌，正常关闭随牌焚）——字节现成（刚读的文件），零重编码。
+  void _ringCapture(_luggageTag, "local-open", file, false).catch((e) => reportError(new Error("[checkpoint] local-open capture failed: " + String(e)), "log"));
   _recomputePhase();
   updateSaveStatus();
   await setGalleryOpen(false);
@@ -448,7 +471,7 @@ function adoptModel(loaded: LoadedDoc) {
     }
     applyEditorStateToUI();   // desk：Unserialize 后把面板/checkboard 回灌 UI（各模块订阅 wp:applyEditorState）
     timelapseAdopt(loaded);   // 录制态从 ora sidecar 回读（per-doc sticky；回读失败自愈=作废+info）
-  } finally { _loadingDoc = false; }
+  } finally { _loadingDoc = false; _lastInputAt = Date.now(); }   // 换 doc = 坐下时钟归零（防跨 doc 误判新坐下）
 }
 
 // ── adopt 的两个意图，显式拆开（v415）────────────────────────────────────────────────────
@@ -484,34 +507,75 @@ function _adoptCommon(loaded: LoadedDoc, name: string, opts: { create?: boolean 
 
 // ---- checkpoint / revert（v415 重接；prod 有、dev 在 store cutover 删 _store.seal 后成了 stub）----
 // 落盘 = app 自己的 weebpaint 库的 checkpoints store；策略（key/何时封/加密怎么办）在纯模块 checkpoint-policy.ts。
-/** 封存「本次打开这幅画」的快照。fire-and-forget：**绝不阻塞开画**，失败只 log。
+/** ring 落盘共用段（P4 revert v2）：淘汰计划（字节预算，最旧先走）→ 删 → 写新档。
+ *  docKey = 户口全名（gallery）或行李牌 tag（file 家，session 级）。 */
+async function _ringCapture(docKey: string, trigger: CheckpointTrigger, bytes: Blob, encrypted: boolean): Promise<void> {
+  const all = await ringAll();
+  const budget = ringBudget(typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches);
+  await ringDelete(planRingEviction(all, bytes.size, budget));
+  const at = Date.now();
+  await ringPut({ id: mintRingId(at), docKey, trigger, at, size: bytes.size, encrypted, bytes });
+}
+/** 封存 gallery 家快照（at-rest 字节）。fire-and-forget：**绝不阻塞开画**，失败只 log。
  *  加密作品存**密文容器**字节（getEncryptedBlob）——绝不退化成 encodeDocToOra 的明文（红线）。 */
 async function _captureCheckpoint(name: string, trigger: CheckpointTrigger) {
   if (!shouldCapture(trigger)) return;
   try {
-    const full = toFull(name);
     const f = _file(name);
     const cipher = await f.getEncryptedBlob();          // 加密件 → at-rest 密文；明文件 → null
     const bytes: Blob | null = cipher ?? await f.open();   // 明文件取当前 at-rest 明文字节
     if (!bytes) return;                                 // 没字节可封（纯云端未缓存 / 锁定）→ 静默跳过
-    await putCheckpoint(checkpointKey(full), { name: full, slot: 0, at: Date.now(), bytes, encrypted: cipher != null });
+    await _ringCapture(toFull(name), trigger, bytes, cipher != null);
   } catch (e) { reportError(new Error("[checkpoint] capture failed (open unaffected): " + String(e)), "log"); }
 }
-/** 读回快照。加密的先解壳（内存密码；锁定/错密码 → null 由调用方提示要密码）。 */
-async function _readSessionCheckpoint(name: string): Promise<{ blob: Blob; at: number } | null> {
+/** 当前 doc 的 revert 列表（新→旧）。gallery 家按户口、file 家按行李牌；
+ *  ring 空且 gallery 家 → legacy v1 单槽兜底（升级窗口期已开着的画还能「回到打开时」）。 */
+async function _listCheckpoints(): Promise<RingEntryMeta[]> {
   try {
-    const rec = await getCheckpoint(checkpointKey(toFull(name)));
+    const name = _activeName();
+    const docKey = name ? toFull(name) : (_fileHome() && _luggageTag ? _luggageTag : null);
+    if (!docKey) return [];
+    const mine = (await ringAll()).filter((r) => r.docKey === docKey)
+      .map(({ id, docKey: k, trigger, at, size, encrypted }) => ({ id, docKey: k, trigger, at, size, encrypted }))
+      .sort((a, b) => b.at - a.at);
+    if (mine.length || !name) return mine;
+    const legacy = await getCheckpoint(checkpointKey(toFull(name)));
+    return legacy ? [{ id: "legacy", docKey, trigger: "gallery-open", at: legacy.at, size: legacy.bytes?.size ?? 0, encrypted: legacy.encrypted }] : [];
+  } catch (e) { reportError(new Error("[checkpoint] list failed: " + String(e)), "log"); return []; }
+}
+/** 按 id 读回一档。加密的先解壳（内存密码；锁定/错密码 → null 由调用方提示要密码）。 */
+async function _readCheckpointEntry(id: string): Promise<{ blob: Blob; at: number } | null> {
+  try {
+    const name = _activeName();
+    const rec = id === "legacy"
+      ? (name ? await getCheckpoint(checkpointKey(toFull(name))) : null)
+      : await ringGet(id);
     if (!rec || !rec.bytes) return null;
     if (!rec.encrypted) return { blob: rec.bytes, at: rec.at };
+    if (!name) return null;                              // 加密档只可能是 gallery 家（file 家原位=明文件）
     const pw = getPassword(name);
     if (!pw) return null;                                // 锁定 → 调用方提示「需要密码」
     const plain = await _store.encryption.tryDecryptEncryptedBlob(rec.bytes, pw);
     return plain ? { blob: plain, at: rec.at } : null;
   } catch (e) { reportError(new Error("[checkpoint] read failed: " + String(e)), "log"); return null; }
 }
-/** 作品被删/改名 → 丢掉它的快照（按 key 精确清，**不做全库扫描**）。 */
+/** undo revert（拍板：revert 前自动拍当前态一档）。gallery 家：先 flush 再取 at-rest（加密=密文，红线安全）；
+ *  file 家：live encode 直接进 ring（明文件；**不写用户磁盘**——写回是显式动作，pre-revert 不是）。 */
+async function capturePreRevert(): Promise<void> {
+  const name = _activeName();
+  if (name) { await saveNow(); await _captureCheckpoint(name, "pre-revert"); return; }
+  const fh = _fileHome();
+  if (fh && _luggageTag) {
+    const { bytes } = await _encodeCurrentOraWithPeek();
+    await _ringCapture(_luggageTag, "pre-revert", bytes, false);
+  }
+}
+/** 作品被删/改名 → 丢掉它的快照（legacy 单槽 + 整份 ring；按 docKey 精确清）。 */
 async function _dropCheckpoint(name: string) {
-  try { await deleteCheckpoint(checkpointKey(toFull(name))); } catch (e) { reportError(new Error("[checkpoint] cleanup failed: " + String(e)), "log"); }
+  try {
+    await deleteCheckpoint(checkpointKey(toFull(name)));
+    await ringDeleteByDoc(toFull(name));
+  } catch (e) { reportError(new Error("[checkpoint] cleanup failed: " + String(e)), "log"); }
 }
 
 // 显式保存前收口 pending 状态（QA 2026-08-21 像素图标事故）：fill 预览是第一类持久工具、不在
@@ -1048,7 +1112,16 @@ export const session = {
     const { bytes } = await _encodeCurrentOraWithPeek();
     return bytes;
   },
-  readCheckpoint: _readSessionCheckpoint, dropCheckpoint: _dropCheckpoint,
+  // revert v2（P4 2026-08-26）：列表/按档读/undo-revert 封存。旧 readCheckpoint(name) 单槽面已退役。
+  listCheckpoints: _listCheckpoints, readCheckpointEntry: _readCheckpointEntry, capturePreRevert,
+  dropCheckpoint: _dropCheckpoint,
+  /** file 家 revert：内容换成快照、**家不变**（handle/牌照旧）、标脏（revert=相对磁盘的内容变化）。 */
+  adoptIntoCurrentFileHome(loaded: LoadedDoc): void {
+    if (!_fileHome()) throw new Error("[session] adoptIntoCurrentFileHome outside file home");
+    adoptModel(loaded);
+    _homeAuth.markFileDirty(); _editSerial++;   // 标脏 + 重新武装盲快照
+    updateSaveStatus();
+  },
   // （v415 删掉一批零读者的 facade 条目：current/lazyBlank/docLastSavedAt/sessionOpenedAt/
   //   loadedDocWriterVer/refreshEncrypted/encodeOra/buildOraMeta/markOpenedNow/markNewerConfirmed/
   //   markSavedNow/resetSavedAt。背后的私有实现该活的都还活着，只是不再从这个门面漏出去。）
@@ -1091,6 +1164,11 @@ export function initSession(ctx: AppContext) {
       onChange: (cb: () => void) => {
         const h = () => {
           if (_loadingDoc) return;
+          // P4 坐下判定（§2.7）：输入间隔 ≥ 阈值 → 这是新的一次坐下的首笔，先封「坐下前态」
+          //   （fire-and-forget：capture 读 at-rest/磁盘，不碰画布，首笔零延迟）。
+          const now = Date.now();
+          if (isNewSitting(_lastInputAt, now)) void _captureResumePoint();
+          _lastInputAt = now;
           if (_localHomeKind()) { _markLocalDirty(); return; }   // 墙①：file/transient 家编辑走本地脏轨，es 永不标脏
           if (_esMuted) return;                            // 墙②：无地残影——es 身份未重绑前 canvas ≠ es._name，标脏=跨写
           // P1.5 lazyblank 首笔安家（涂鸦自动进图库，verdicts §1.2）：真出现内容（bbox>0，

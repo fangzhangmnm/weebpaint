@@ -4407,6 +4407,72 @@ export declare const S: {
         readonly ja: "変更を元に戻す";
         readonly tok: "kama sin tawa tenpo pini";
     };
+    readonly "tm.revertListMsg": {
+        readonly zh: "选择要回到的时间点（之后的修改将丢失；回滚前会自动留一档「回滚前」可反悔）";
+        readonly en: "Pick a point to revert to (later changes will be lost; a \"before revert\" snapshot is kept so you can undo)";
+        readonly ja: "戻る時点を選んでください（それ以降の変更は失われます。「戻す前」のスナップショットが自動保存されるため取り消せます）";
+        readonly tok: "o wile e tenpo. ante pi tenpo kama li weka. taso mi awen e tenpo ni la sina ken kama sin.";
+    };
+    readonly "tm.revertEntry": {
+        readonly zh: "回到 {when}（{trig}）";
+        readonly en: "Back to {when} ({trig})";
+        readonly ja: "{when} に戻す（{trig}）";
+        readonly tok: "tawa {when} ({trig})";
+    };
+    readonly "ckpt.today": {
+        readonly zh: "今天 {time}";
+        readonly en: "today {time}";
+        readonly ja: "今日 {time}";
+        readonly tok: "tenpo suno ni {time}";
+    };
+    readonly "ckpt.yesterday": {
+        readonly zh: "昨天 {time}";
+        readonly en: "yesterday {time}";
+        readonly ja: "昨日 {time}";
+        readonly tok: "tenpo suno pini {time}";
+    };
+    readonly "ckpt.date": {
+        readonly zh: "{date} {time}";
+        readonly en: "{date} {time}";
+        readonly ja: "{date} {time}";
+        readonly tok: "{date} {time}";
+    };
+    readonly "ckpt.trig.open": {
+        readonly zh: "打开时";
+        readonly en: "when opened";
+        readonly ja: "開いた時";
+        readonly tok: "tenpo open";
+    };
+    readonly "ckpt.trig.newDoc": {
+        readonly zh: "新建时";
+        readonly en: "when created";
+        readonly ja: "作成時";
+        readonly tok: "tenpo pali";
+    };
+    readonly "ckpt.trig.saveAs": {
+        readonly zh: "另存为时";
+        readonly en: "when saved as";
+        readonly ja: "別名保存時";
+        readonly tok: "tenpo awen sin";
+    };
+    readonly "ckpt.trig.cloudRefresh": {
+        readonly zh: "云端更新时";
+        readonly en: "at cloud update";
+        readonly ja: "クラウド更新時";
+        readonly tok: "tenpo pi kama sewi";
+    };
+    readonly "ckpt.trig.sitting": {
+        readonly zh: "上次坐下";
+        readonly en: "previous session";
+        readonly ja: "前回の作業";
+        readonly tok: "tenpo pali pini";
+    };
+    readonly "ckpt.trig.preRevert": {
+        readonly zh: "回滚前";
+        readonly en: "before revert";
+        readonly ja: "戻す前";
+        readonly tok: "tenpo pi kama sin ala";
+    };
     readonly "tm.revertMessage": {
         readonly zh: "回到约 {min} 分钟前的快照（本次打开或上次保存时的版本）。\n之后所有修改将丢失。";
         readonly en: "Revert to the snapshot from about {min} minutes ago (when opened or last saved). All changes after that will be lost.";

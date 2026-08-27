@@ -20,8 +20,9 @@ const DB_NAME = "weebpaint";
 const STORE_SESSIONS = "sessions";        // 仅 upgrade 里用来 deleteObjectStore，别再读写
 const STORE_THUMBS = "gallery-thumbs";    // 图库缩略图缓存专用 store，key = store 文件身份 X.ora（cloud-thumb-cache.ts）
 const STORE_IMAGE_THUMBS = "image-thumbs"; // 云盘图片缩略图缓存，key = 全名 path 含扩展名（gallery/image-thumbs.ts）
-const STORE_CHECKPOINTS = "checkpoints";  // revert 快照，key = checkpointKey(fullName, slot)
-const REQUIRED_STORES = [STORE_THUMBS, STORE_IMAGE_THUMBS, STORE_CHECKPOINTS];
+const STORE_CHECKPOINTS = "checkpoints";  // revert v1 单槽快照（legacy 只读兜底，v0.11.8 起停写；ring 接班）
+const STORE_RING = "checkpoint-ring";     // revert v2 ring（P4 2026-08-26）：多档 at-rest 快照，字节预算滚动淘汰
+const REQUIRED_STORES = [STORE_THUMBS, STORE_IMAGE_THUMBS, STORE_CHECKPOINTS, STORE_RING];
 
 let _dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -194,3 +195,60 @@ export async function deleteCheckpoint(key: string): Promise<void> {
     tx.onerror = () => reject(tx.error);
   });
 }
+
+// ── checkpoint-ring（revert v2，P4 2026-08-26；added by Claude Fable 5）──────────────────
+// 一条 = 一幅画在某个封存时刻的 at-rest 字节快照（加密件=密文容器，明文永不落盘——红线同 v1）。
+// key = record.id（存储层生成）；淘汰策略（字节预算/最旧先走）在 checkpoint-policy.planRingEviction，
+//   编排在 session-state——这里只管搬运。旧单槽 checkpoints store 保留为 legacy 只读兜底
+//   （升级窗口期已开着的画还能「回到打开时」），新写全进 ring。
+import type { CheckpointTrigger, RingEntryMeta } from "./checkpoint-policy.ts";
+export interface RingRecord extends RingEntryMeta { bytes: Blob }
+
+export function mintRingId(at: number): string {
+  return at.toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+}
+export async function ringPut(rec: RingRecord): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_RING, "readwrite");
+    tx.objectStore(STORE_RING).put(rec, rec.id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+export async function ringGet(id: string): Promise<RingRecord | null> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_RING, "readonly");
+    const req = tx.objectStore(STORE_RING).get(id);
+    req.onsuccess = () => resolve((req.result as RingRecord) || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+/** 全 ring meta（不含 bytes 字段本身仍在记录里，但 Blob 是惰性引用——遍历 meta 不搬字节）。 */
+export async function ringAll(): Promise<RingRecord[]> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_RING, "readonly");
+    const req = tx.objectStore(STORE_RING).getAll();
+    req.onsuccess = () => resolve((req.result as RingRecord[]) ?? []);
+    req.onerror = () => reject(req.error);
+  });
+}
+export async function ringDelete(ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_RING, "readwrite");
+    const s = tx.objectStore(STORE_RING);
+    for (const id of ids) s.delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+/** 按 docKey 清整份 ring（改名/删除作品、file 家正常关闭随行李牌焚）。 */
+export async function ringDeleteByDoc(docKey: string): Promise<void> {
+  const all = await ringAll();
+  await ringDelete(all.filter((r) => r.docKey === docKey).map((r) => r.id));
+}
+export { type CheckpointTrigger as RingTrigger };

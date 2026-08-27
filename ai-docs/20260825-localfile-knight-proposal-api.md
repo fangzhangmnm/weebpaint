@@ -50,6 +50,20 @@
 > 崩溃恢复云关分支 = `adoptAsTransient`（不落看不见的图库，立即标脏+重挂保护）。
 > **P2 余**：pending-adoption 产者（P3 redirect 流）+ 夏音 v0.3 真机基准；云关「新建」popup 仍建
 > IDB 图库画（2026-08-21 v1 刻意范围，未动——要不要也 transient 化留给 user）。
+>
+> **落地回写⑤（v0.11.7-0.11.8 / 2026-08-26，edited by Claude Fable 5）**：v0.11.7 = 收货
+> @internal/store 0.5.0（app 迁移面 cloudItemId→cloudRef ×3；dispose/dirty facet/folder provider 为 P3 备货）。
+> v0.11.8 = **P4 revert v2 全量**：CheckpointRing 落 `storage.ts` checkpoint-ring store +
+> `checkpoint-policy` ring 纯策略（planRingEviction 字节预算桌面64/移动32MB 最旧先走、**新档永不淘汰**
+> ——超预算巨档也存；isNewSitting 输入间隔 qualifier 15min 可调；humanCheckpointTime 人话时间）。
+> 与提案差异：capture/list 不是独立 CheckpointRing 接口对象——capture 编排留 session-state
+> （`_ringCapture` 共用段 + `_captureCheckpoint` at-rest 路），存储 CRUD 在 storage.ts；key 用记录字段
+> docKey（户口全名 X.ora / 行李牌 tag）而非拼接 key。triggers 沿用既有命名（gallery-open 而非提案的
+> open）+ 新增 local-open（file 家打开点快照）。落地项：resume-first-input（histchange 里 gap 判定，
+> copy-on-write 取 at-rest/磁盘字节=坐下前态）、pre-revert=undo revert（gallery 家先 saveNow 再取
+> at-rest——加密件密文红线；file 家 live encode 进 ring 不写用户磁盘）、file 家 revert
+> （adoptIntoCurrentFileHome：内容换/家不变/标脏；ring 随行李牌焚）、revert UI=多档列表
+> （「回到 今天 14:02（打开时）」cap 8 档）、legacy v1 单槽只读兜底（升级窗口期不丢「回到打开时」）。
 
 ```ts
 // ─── doc 的家（P1 核心）────────────────────────────────────────────

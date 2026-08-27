@@ -1,6 +1,7 @@
 import { type DecodedPainting } from "./backend/ora.ts";
 import type { EncryptedBlob } from "./app-store.ts";
 import { type LocalFileHandle } from "./local-file-session.ts";
+import { type RingEntryMeta } from "./checkpoint-policy.ts";
 import type { AppContext } from "./app-context.ts";
 import type { GalleryItem } from "./gallery/gallery-model.ts";
 type LoadedDoc = DecodedPainting;
@@ -22,12 +23,18 @@ declare function adoptAsNew(loaded: LoadedDoc, name: string): void;
 /** revert 回滚：装入一个解好的 doc，身份**不变**（首存 mode:"existing"，就是要写回原文件）。
  *  **不封存 checkpoint** —— 否则刚回滚掉的状态立刻把快照覆盖了，只能 revert 一次。 */
 declare function adoptAsExisting(loaded: LoadedDoc, name: string): void;
-/** 读回快照。加密的先解壳（内存密码；锁定/错密码 → null 由调用方提示要密码）。 */
-declare function _readSessionCheckpoint(name: string): Promise<{
+/** 当前 doc 的 revert 列表（新→旧）。gallery 家按户口、file 家按行李牌；
+ *  ring 空且 gallery 家 → legacy v1 单槽兜底（升级窗口期已开着的画还能「回到打开时」）。 */
+declare function _listCheckpoints(): Promise<RingEntryMeta[]>;
+/** 按 id 读回一档。加密的先解壳（内存密码；锁定/错密码 → null 由调用方提示要密码）。 */
+declare function _readCheckpointEntry(id: string): Promise<{
     blob: Blob;
     at: number;
 } | null>;
-/** 作品被删/改名 → 丢掉它的快照（按 key 精确清，**不做全库扫描**）。 */
+/** undo revert（拍板：revert 前自动拍当前态一档）。gallery 家：先 flush 再取 at-rest（加密=密文，红线安全）；
+ *  file 家：live encode 直接进 ring（明文件；**不写用户磁盘**——写回是显式动作，pre-revert 不是）。 */
+declare function capturePreRevert(): Promise<void>;
+/** 作品被删/改名 → 丢掉它的快照（legacy 单槽 + 整份 ring；按 docKey 精确清）。 */
 declare function _dropCheckpoint(name: string): Promise<void>;
 declare function _gateFillOnSwitch(): Promise<boolean>;
 declare function saveNow(opts?: {
@@ -103,8 +110,12 @@ export declare const session: {
      *  与显式保存同一落盘形（_encodeCurrentOraWithPeek：meta+timelapse+mergedimage）；加密作品也出
      *  明文——内存本就是解密态，入口 sheet 文案已说清。纯导出副本：不落库、不碰 es/_fileHome() 身份。 */
     encodeCurrentOra(): Promise<Blob>;
-    readCheckpoint: typeof _readSessionCheckpoint;
+    listCheckpoints: typeof _listCheckpoints;
+    readCheckpointEntry: typeof _readCheckpointEntry;
+    capturePreRevert: typeof capturePreRevert;
     dropCheckpoint: typeof _dropCheckpoint;
+    /** file 家 revert：内容换成快照、**家不变**（handle/牌照旧）、标脏（revert=相对磁盘的内容变化）。 */
+    adoptIntoCurrentFileHome(loaded: LoadedDoc): void;
     awaitCloudPushIdle: () => Promise<void>;
 };
 export declare function initSession(ctx: AppContext): void;

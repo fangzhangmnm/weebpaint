@@ -8,7 +8,8 @@
 // **红线（CRITICAL）**：本模块只接线，**绝不**改任何 session.* 调用的参数/顺序/语义。
 //   另存为（runSaveAsFlow，入口 2026-08-21 挪进「导出与另存」hub 的「复制一份到图库」，
 //   由 export-import-menu 的 choice sheet 调）用 session.saveAs（内部 = store.file(name,{mode:"new"}).save）；
-//   menuRevert 用 session.readCheckpoint + session.adoptAsExisting（**既有身份**，别错用 adoptAsNew）。
+//   menuRevert 用 session.listCheckpoints/readCheckpointEntry + adoptAsExisting（gallery 家，**既有身份**，
+//   别错用 adoptAsNew）/ adoptIntoCurrentFileHome（file 家）。
 //   要改 store 行为 → STOP，escalate。
 //
 // 留在 app.js（核心 HUD glue，**不**搬）：setStatus / updateZoomLabel / board.render HUD hook。
@@ -22,7 +23,7 @@
 import { session } from "./session-state.ts";
 import { homeDisplayName } from "./doc-home.ts";
 import { isUnlocked } from "./crypto-state.ts";
-import { checkpointAgeMinutes } from "./checkpoint-policy.ts";
+import { checkpointAgeMinutes, humanCheckpointTime } from "./checkpoint-policy.ts";
 import { els } from "./els.ts";
 import { openInputSheet, openConfirmSheet, openChoiceSheet, lockSyncGate } from "./sheets.ts";
 import { setMenuOpen } from "./settings-menu.ts";
@@ -281,35 +282,53 @@ export function initTopbarMenu(ctx: AppContext) {
   //   无快照时点击走下面 tm.noOpenSnapshot 的 status 兜底，无需再藏。
   els.menuRevertToOpen?.addEventListener("click", async () => {
     setMenuOpen(false);
-    // revert = gallery 家专属（checkpoint key=户口；file 家的 revert=打开点快照，归 P4 revert v2）。
+    // revert v2（P4 2026-08-26，verdicts §2.7）：多档 ring 列表——gallery 家按户口、file 家按行李牌
+    //   （打开点快照/坐下快照，session 级）；transient 无 at-rest 无 revert（T-crash 另行兜底）。
     const home = session.home;
-    if (home?.kind !== "gallery") { setStatus(t("tm.noActiveSession"), true); return; }
-    const cp = await session.readCheckpoint(home.path);
-    if (!cp || !cp.blob) {
+    if (home?.kind !== "gallery" && home?.kind !== "file") { setStatus(t("tm.noActiveSession"), true); return; }
+    const entries = await session.listCheckpoints();
+    if (!entries.length) {
       // 加密作品的快照按密文存；锁定/密码不对时解不出 → 说清楚是"要密码"，别含糊成"没有快照"。
       setStatus(session.enc.encrypted && !isUnlocked() ? t("tm.revertFailedNeedPassword") : t("tm.noOpenSnapshot"), true);
       return;
     }
-    // cp.at 由 putCheckpoint 恒写 → 不需要兜底（旧的 `|| session.sessionOpenedAt` 是假兜底：
-    //   _sessionOpenedAt 的唯一写入者 markOpenedNow 零调用者，它恒为 0）。
-    const ageMin = checkpointAgeMinutes(cp.at, Date.now());
-    const choice = await lockSyncGate({
-      title: t("tm.revertTitle"),
-      message: t("tm.revertMessage", { min: ageMin }),
-      actions: [
-        { label: t("tm.cancel"), value: "cancel" },
-        { label: t("tm.revert"), value: "ok", primary: true },
-      ],
-    });
-    if (choice !== "ok") return;
+    // 显示人话（拍板：「回到 今天 14:02（打开时）」）；新→旧，cap 8 档。
+    const TRIG_KEY = {
+      "gallery-open": "ckpt.trig.open", "local-open": "ckpt.trig.open", "new-doc": "ckpt.trig.newDoc",
+      "save-as": "ckpt.trig.saveAs", "cloud-refresh": "ckpt.trig.cloudRefresh",
+      "resume-first-input": "ckpt.trig.sitting", "pre-revert": "ckpt.trig.preRevert",
+    } as const;
+    const now = Date.now();
+    const label = (m: { at: number; trigger: string }) => {
+      const w = humanCheckpointTime(m.at, now);
+      const when = w.day === "today" ? t("ckpt.today", { time: w.time })
+        : w.day === "yesterday" ? t("ckpt.yesterday", { time: w.time })
+        : t("ckpt.date", { date: w.date, time: w.time });
+      return t("tm.revertEntry", { when, trig: t(TRIG_KEY[m.trigger as keyof typeof TRIG_KEY] ?? "ckpt.trig.open") });
+    };
+    const picked = await openChoiceSheet<string>(t("tm.revertTitle"), t("tm.revertListMsg"),
+      entries.slice(0, 8).map((m, i) => ({ label: label(m), value: m.id, primary: i === 0 })));
+    if (!picked) return;
     editMode.applyPendingTransient();
     try {
-      // cp.blob 已是**明文**：加密作品的快照按密文容器存，readCheckpoint 里用内存密码解好了
-      //   （锁定/错密码 → readCheckpoint 返 null，上面那个分支已提示"无快照"）。
+      // undo revert（拍板）：先封当前态一档。失败不阻断——gallery 家 capture 内已 saveNow 落盘、
+      //   仍可恢复；只响 warning。
+      await session.capturePreRevert().catch((e: unknown) => reportError(new Error("[checkpoint] pre-revert capture failed: " + String(e)), "warning"));
+      const cp = await session.readCheckpointEntry(picked);
+      if (!cp || !cp.blob) {
+        setStatus(session.enc.encrypted && !isUnlocked() ? t("tm.revertFailedNeedPassword") : t("tm.noOpenSnapshot"), true);
+        return;
+      }
+      const ageMin = checkpointAgeMinutes(cp.at, Date.now());
+      // cp.blob 已是**明文**：加密作品的快照按密文容器存，readCheckpointEntry 里用内存密码解好了。
       const loaded = await decodeOraToPainting(cp.blob);
-      // 既有身份（不是新建）→ 首存 mode:"existing"，就是要写回原文件；且**不重新封存快照**
-      //   （否则刚回滚掉的状态立刻覆盖快照，只能 revert 一次）。
-      session.adoptAsExisting(loaded, home.path);
+      if (home.kind === "file") {
+        session.adoptIntoCurrentFileHome(loaded);   // 内容换、家不变（handle/牌照旧）、已标脏
+      } else {
+        // 既有身份（不是新建）→ 首存 mode:"existing"，就是要写回原文件；trigger 表 "revert": false
+        //   保证本 adopt 不顺手封存（否则只能 revert 一次）。
+        session.adoptAsExisting(loaded, home.path);
+      }
       // R4：revert 是内容变化（像素回到旧快照）→ 必须走 clean→dirty 门标云脏。
       //   旧版只 edits.mark() 不标云脏 → 云端永远收不到 revert，且 clean 快进会无备份吃掉 revert 结果。
       session.markEdited();
