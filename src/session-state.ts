@@ -26,6 +26,7 @@ import { openInputSheet, openConfirmSheet, openChoiceSheet, lockSyncGate, settle
 import { readHandleFile, writeHandleBlob, handleMtime, hasWeebPaintTraces, type LocalFileHandle } from "./local-file-session.ts";
 import { claimHomeAuthority, docHome, fileDirty, saveRoute, SOLE_GALLERY_ID } from "./doc-home.ts";
 import { galleryDefaultName } from "./naming.ts";
+import { crashStore, mintLuggageTag, type LuggageTag } from "./crash-store.ts";
 import { pathFolder } from "./gallery/gallery-path.ts";
 import { invalidateCachedThumb } from "./gallery/cloud-thumb-cache.ts";
 import { sessionFileName, sessionBareName, stripSessionExt } from "./config.ts";
@@ -133,7 +134,21 @@ async function _refreshEncrypted() {
 // （P1 2026-08-26：状态本体 = doc-home keeper 的 file 家 + fileDirty()；本节只剩残影墙旗子。）
 let _esMuted = false;
 
+// ── T-crash 行李牌（P2 2026-08-26；库/契约 = crash-store.ts，拍板 = verdicts §2.2）──
+// file 家 doc 的灾难恢复快照收件地址：打开现铸、只活在 RAM+crash 库、正常关闭即焚。
+// 附加层纪律：下面所有 crashStore 调用全 fire-and-forget + 内部 catch——本层坏死不许影响承重层。
+let _luggageTag: LuggageTag | null = null;
+let _editSerial = 0;    // file 家编辑计数（histchange/sidecarchange 驱动）
+let _snapSerial = 0;    // 上次盲快照时的计数——「没新内容就不重拍」门
+/** 释放行李牌（离开 file 家的每条路都要过这）：正常关闭即删（pending-adoption 由库内拒删）。 */
+function _dropLuggage() {
+  const tag = _luggageTag;
+  _luggageTag = null;
+  if (tag) crashStore.dropOnCleanClose(tag).catch(() => {});   // best-effort：清扫失败顶多多一条陈旧横幅
+}
+
 function _markLocalDirty() {
+  _editSerial++;
   if (_fileHome() && !fileDirty()) { _homeAuth.markFileDirty(); updateSaveStatus(); }
 }
 /** es 重新绑定 store 身份（open/adopt/新建/另存成功）→ 解除残影墙。 */
@@ -155,6 +170,7 @@ async function openLocalFile(handle: LocalFileHandle): Promise<File | null> {
   _setActive(null); _isLazyBlankSession = false;   // 先离旧家（释放锁 + 清持久 currentFile）
   _enc.encrypted = false;
   _homeAuth.setHome({ kind: "file", handle, fileName: file.name, lastSeenMtime: file.lastModified });
+  _luggageTag = mintLuggageTag(); _snapSerial = _editSerial;   // T-crash：新家现铸新牌（旧牌上面 leaveLocalFile 已焚）
   _recomputePhase();
   updateSaveStatus();
   await setGalleryOpen(false);
@@ -186,6 +202,8 @@ async function saveLocalFileNow(): Promise<boolean> {
     if (docHome() === fh) {
       _homeAuth.patchFileMtime((await handleMtime(fh.handle)) ?? Date.now());
       _homeAuth.clearFileDirty();
+      // T-crash：真保存成功 → 旧快照作废（磁盘上的字节已是最新；留着=boot 弹陈旧横幅）。牌不焚，续用。
+      if (_luggageTag) { crashStore.dropOnCleanClose(_luggageTag).catch(() => {}); _snapSerial = _editSerial; }
     }
     updateSaveStatus();
     setStatus(t("lf.saved", { name: fh.fileName }));
@@ -210,7 +228,7 @@ async function leaveLocalFile(): Promise<boolean> {
     if (!c) return false;
     if (c === "save" && !(await saveLocalFileNow())) return false;
   }
-  if (_fileHome()) _homeAuth.setHome(null);   // sheet 期间可能已被别的入口换家（原代码同样只清引用）
+  if (_fileHome()) { _homeAuth.setHome(null); _dropLuggage(); }   // sheet 期间可能已被别的入口换家（原代码同样只清引用）
   updateSaveStatus();
   return true;
 }
@@ -380,7 +398,7 @@ function adoptAsExisting(loaded: LoadedDoc, name: string) {
   _adoptCommon(loaded, name, {});
 }
 function _adoptCommon(loaded: LoadedDoc, name: string, opts: { create?: boolean }) {
-  if (_fileHome()) _homeAuth.setHome(null);   // 同步入口无法弹确认——调用方（import-image 的 .ora 分支）已过 leaveLocalFile 门
+  if (_fileHome()) { _homeAuth.setHome(null); _dropLuggage(); }   // 同步入口无法弹确认——调用方（import-image 的 .ora 分支）已过 leaveLocalFile 门
   adoptModel(loaded);
   _setActive(name); _isLazyBlankSession = false; _recomputePhase();
   es.adopted(toFull(name), opts);
@@ -816,7 +834,7 @@ async function saveAs(newName: string): Promise<void> {
   const { bytes, peek } = await _encodeCurrentOraWithPeek();
   // 另存为=写**新身份** → mode:"new"（撞名不静默覆盖；topbar 已 nameOccupied 预检，这里 store 层再兜底红线）。
   await _store.file(toFull(newName), { isZip: true, mode: "new" }).save(bytes, { tryPush: true, hint: peek ? { peek } : undefined });
-  if (_fileHome()) _homeAuth.setHome(null);   // 收编：内容已进库（就是刚写的字节），不算丢弃，无需问
+  if (_fileHome()) { _homeAuth.setHome(null); _dropLuggage(); }   // 收编：内容已进库（就是刚写的字节），不算丢弃，无需问
   _setActive(newName); _isLazyBlankSession = false; _recomputePhase();
   es.adopted(toFull(newName));   // es 切到新名（内容即新名的；下轮 autosave 若跑=同内容 re-save，无害）。边界转全名。
   _esRebound();
@@ -1022,6 +1040,34 @@ export function initSession(ctx: AppContext) {
     if (es.isDirty() && !ctx.isMidOperation()) void es.flushLocal();
     return "done";
   }, { minIdleMs: AUTOSAVE_IDLE_MS });
+  // T-crash 盲快照（P2 2026-08-26，verdicts §2.2）：autosave 的「按家分发」T 腿——
+  //   图库家 → 上面的 es.flushLocal（store crash-shadow）；file 家 → 这里进 crash 库（transient 产者归后续）。
+  //   同 30s 空闲节律、同 isMidOperation 让路；serial 门 = 没新内容不重编码（fileDirty 到显式保存才清，
+  //   不能当「有没有新东西」的门用）。与保存**完全同一** encodeDocToOra 字节（mp4 sidecar passthrough 顺带）。
+  ctx.bgJobs.register("t-crash-snapshot", 6, () => {
+    const fh = _fileHome();
+    if (fh && _luggageTag && fileDirty() && _editSerial !== _snapSerial && !ctx.isMidOperation()) {
+      const serial = _editSerial;
+      void (async () => {
+        try {
+          const { bytes } = await _encodeCurrentOraWithPeek();
+          // encode 的 await 间隙可能换家/领养——对指纹再写，别把别的画写进这张牌。
+          if (docHome() === fh && _luggageTag) {
+            await crashStore.put(_luggageTag, bytes, { state: "crash", name: fh.fileName, at: Date.now(), homeKind: "file" });
+            _snapSerial = serial;
+          }
+        } catch (e) { reportError(new Error("[t-crash] snapshot failed (best-effort, load-bearing layers unaffected): " + String(e)), "log"); }
+      })();
+    }
+    return "done";
+  }, { minIdleMs: AUTOSAVE_IDLE_MS });
+  // 正常关闭即删（Blockbench 语义）：pagehide（非 bfcache 冻结）= 用户过完挽留门选择离开 =
+  //   明确决定（Alt+F4=不保存，spec §7.1 同源拍板）→ 快照焚。真 crash（进程被杀/断电）不触发
+  //   pagehide → 快照幸存 → 下次 boot 恢复横幅。pending-adoption 由库内拒删（redirect 起跳不误烧）。
+  window.addEventListener("pagehide", (e: PageTransitionEvent) => {
+    if (e.persisted) return;   // bfcache 冻结 ≠ 关闭
+    if (_luggageTag) crashStore.dropOnCleanClose(_luggageTag).catch(() => {});   // 牌不清（页面将死，无所谓）
+  });
   // （v409：无 desk 改动桥 —— desk 不标脏、不驱动落盘，只在顺路 encode 时被 _buildOraMeta 捞走。详 editor-state.ts ⚠）
 
   _recomputePhase();

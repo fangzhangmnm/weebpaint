@@ -24,8 +24,21 @@
 > 笔刷字节仍归 brush-io，P5 轮再议）。⑦ **SaveHub 打开侧**：「打开本地文件」恒显单按钮，FSA 优先静默落
 > file input（导入为新身份），AbortError 不降级重弹；保存侧派发已由 saveRoute+既有「导出与另存」hub 覆盖。
 > ⑧ **canvas-first boot**：404/崩溃断路/双实例锁 三条失败路落画布（boot-restore outcomes 改 blank-*）；
-> ⚠ 解释留痕：「上次就停在图库」（currentFile=""，用户离开时的有意状态）仍落图库——verdicts §2.4 的
-> 「永不 404 跳 gallery」按字面只约束失败路；若 user 要「首开也 canvas-first」再翻这半格。
+> ~~⚠ 首开半格待裁~~ → **v0.11.4 终案（user 2026-08-26 拍板「首次打开新画布，上次图库则图库」）**：
+> currentFile 三态（null=首次→lazyblank 新画布 / ""=上次图库→图库 / 名→恢复）；lazyblank=日期名
+> memory-only、es 不绑（空白永不落盘）、首笔 onChange 钩子自动安家（§1.2 Procreate 性）；
+> 失败三路同落 lazyblank 可画新画布；云关仍 plain blank（无 store 家可安，P2 transient 接手）。
+>
+> **落地回写③（v0.11.5 / 2026-08-26，edited by Claude Fable 5）**：P2 首 slice **T-crash 核心**落地：
+> CrashStore 契约 → `src/crash-store.ts`（本文 pin 形状 + 两处扩充：**`discard(tag)`**（恢复横幅「丢弃」
+> 按钮——用户显式决定可删 pending，自动清扫不可）；**`adopt` 返 `Blob | null`**（null=已被另一窗口领走，
+> 双领养第二个必须扑空而非 throw）。存储走 CrashKV port（原子性=port 的 take：get+delete 同事务）→
+> 契约 node 可测（test/crash-store.test.mjs），IDB 适配器进真机批；库名 `weebpaint-bd6cece69075d759.crash`）。
+> 接线：file 家行李牌（openLocalFile 现铸/离家即焚）+ 30s 空闲盲快照（bgJobs，serial 门防重编码，
+> 与保存同一 `_encodeCurrentOraWithPeek` 字节）+ 显式写回成功清旧帧 + pagehide(非 bfcache)=正常关闭即删
+> + boot 恢复横幅 `src/crash-banner.ts`（非模态浮卡；恢复=领养→uniqueNameFor 新身份→adoptAsNew=dirty
+> 到首次真保存；流产 put-back 防「点恢复中途取消=丢画」）。**P2 余**：transient 产者（云关 blank→transient
+> + settle 安家仪式）+ Editor-only 三键挽留 + pending-adoption 产者（P3 redirect 流）+ 夏音 v0.3 真机基准。
 
 ```ts
 // ─── doc 的家（P1 核心）────────────────────────────────────────────

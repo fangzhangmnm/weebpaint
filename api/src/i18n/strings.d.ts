@@ -3843,6 +3843,60 @@ export declare const S: {
         readonly ja: "空白のキャンバスのため、まだ保存する内容がありません";
         readonly tok: "supa sitelen li ala. ijo awen li lon ala.";
     };
+    readonly "cb.crashFound": {
+        readonly zh: "上次异常退出，有未保存的画：{name}";
+        readonly en: "Unsaved artwork from an abnormal exit: {name}";
+        readonly ja: "前回異常終了した際の未保存の作品があります：{name}";
+        readonly tok: "ilo li moli la sitelen {name} li awen ala. ";
+    };
+    readonly "cb.recover": {
+        readonly zh: "恢复";
+        readonly en: "Recover";
+        readonly ja: "復元";
+        readonly tok: "kama sin";
+    };
+    readonly "cb.discard": {
+        readonly zh: "丢弃";
+        readonly en: "Discard";
+        readonly ja: "破棄";
+        readonly tok: "weka";
+    };
+    readonly "cb.discarded": {
+        readonly zh: "已丢弃崩溃快照";
+        readonly en: "Crash snapshot discarded";
+        readonly ja: "クラッシュスナップショットを破棄しました";
+        readonly tok: "mi weka e ona";
+    };
+    readonly "cb.alreadyAdopted": {
+        readonly zh: "这份快照已在另一个窗口被恢复";
+        readonly en: "This snapshot was already recovered in another window";
+        readonly ja: "このスナップショットは別のウィンドウで既に復元されています";
+        readonly tok: "lupa ante li kama sin e ona";
+    };
+    readonly "cb.recoveredSuffix": {
+        readonly zh: "（恢复）";
+        readonly en: " (recovered)";
+        readonly ja: "（復元）";
+        readonly tok: " (kama sin)";
+    };
+    readonly "cb.recoveringBusy": {
+        readonly zh: "正在恢复 {name}…";
+        readonly en: "Recovering {name}…";
+        readonly ja: "{name} を復元しています…";
+        readonly tok: "mi kama sin e {name}…";
+    };
+    readonly "cb.recovered": {
+        readonly zh: "已恢复为新画：{name}（尚未保存，请检查后保存）";
+        readonly en: "Recovered as new artwork: {name} (not yet saved — review, then save)";
+        readonly ja: "新しい作品として復元しました：{name}（まだ保存されていません。確認して保存してください）";
+        readonly tok: "sitelen sin {name} li kama. ona li awen ala. o lukin o awen.";
+    };
+    readonly "cb.recoverFailed": {
+        readonly zh: "恢复失败：{err}（快照已放回，可重试）";
+        readonly en: "Recovery failed: {err} (snapshot put back; you can retry)";
+        readonly ja: "復元に失敗しました：{err}（スナップショットは戻したため再試行できます）";
+        readonly tok: "kama sin li pakala: {err}. ona li awen. o sin.";
+    };
     readonly "ss.notPushedNewer": {
         readonly zh: "未推送：这画由更新版本写成，你取消了覆盖（本地与云端都保持原样）";
         readonly en: "Not pushed: this artwork was written by a newer version and you cancelled the overwrite (local and cloud both left unchanged)";

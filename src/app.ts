@@ -66,7 +66,8 @@ import { initTimelapse } from "./timelapse-session.ts";
 import { initTimelapseUi } from "./timelapse-ui.ts";
 import { mountLeftDial } from "./ui/left-dial.ts";   // candidate 1 Step 2 · 左栏 dial（size/opacity/笔指示/popup）
 import { watch } from "../vendor/vue/vue.esm-browser.prod.js";   // 加密常驻指示 watch（currentBrush computed + 引擎桥已下沉 resolved-brush.ts）
-import { initRackBoot, bootRestoreSession } from "./boot.ts";   // 启动编排：笔架异步 boot + gallery-first 恢复
+import { initRackBoot, bootRestoreSession } from "./boot.ts";   // 启动编排：笔架异步 boot + 三态恢复（P1.5）
+import { initCrashBanner } from "./crash-banner.ts";            // T-crash 恢复横幅（P2）
 // Selection 切到 selection-ops.ts；smooth-config（SMOOTH/saveSmooth/resetSmooth）切到 smooth-dev-panel.ts
 // v132 (user：「所有 color adjustment 做成第一方默认安装的插件」)
 //   filters.js 只剩 Filter 契约 + registry + helper；
@@ -543,6 +544,8 @@ void prefsReady.then(() => {
 //   必须 await prefsReady：hydrate 前 currentFile 恒为 null → 会永远落图库、不再自动开上次的画。
 //   排在 fixup 之后（同一个 promise 的 then 按注册顺序跑）→ 开画时 desk/设置已就位。
 void prefsReady.then(() => bootRestoreSession(ctx)).catch((e) => reportError(new Error("[boot] restore failed: " + String(e)), "log"));
+// T-crash 恢复横幅（P2 2026-08-26）：扫 crash 库，有崩溃快照 → 非模态浮卡叠画布（不挡 boot、不 await）。
+initCrashBanner(ctx);
 // N3：启动时若在线+已登录，排空上次离线攒下的删除队列（fresh boot 不触发 online 事件，故此处补一刀）。
 if (navigator.onLine && isSignedIn()) _store.files.drainOfflineQueue().catch((e: unknown) => reportError(new Error("drainOfflineQueue: " + String(e)), "log"));
 

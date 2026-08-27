@@ -8,6 +8,7 @@ import "./edit-mode-transient.test.mjs";  // v0.9.22 连贴收口=commit 钉子�
 import "./local-file-session.test.mjs";   // v0.9.24 无地本地文件：WeebPaint 痕迹检测（原位 vs 导入 分流）
 import "./doc-home.test.mjs";             // P1 2026-08-26 一画一家：keeper 单持权 + (家×动作) 保存派发矩阵（verdicts §4-P1）
 import "./naming.test.mjs";               // P1 命名器官：yyyymmdd-hex4 / 下载分钟戳（verdicts §2.1 三粒度）
+import "./crash-store.test.mjs";          // P2 T-crash 库：pending 拒删/原子领养/单帧覆盖（verdicts §2.2 契约钉）
 import "./cloud-image-model.test.mjs";    // v0.9.29 云盘图片 picker：扩展名路由/thumb token/白底平铺/jpeg 编码接缝（spec 20260820）
 import "./brush-rack-migrate.test.mjs";
 import "./engine-registry.test.mjs";
