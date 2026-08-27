@@ -1,9 +1,8 @@
 // Session 管理：当前 session 名的读写面 + 缩略图渲染 + 导出下载 / 分享。
 //
-// **当前 session 名**：SSoT = `appState.currentFile`（**local-app-state** collection，v438 起 device-local——
-//   synced 会让远端设备驾驶本机驱逐守卫，见 app-state.ts 头注释）。
-//   ⚠ 不是 localStorage —— v406 起迁进 collection 了，别信任何还说 "localStorage 记当前 name" 的注释。
-//   默认 "未命名"。重名直接覆盖。
+// **当前 session 名**：SSoT = **resume-slate 器官**（P5 2026-08-27：device-kv per-gallery 回执条；
+//   载体史：localStorage(≤v405) → collection(v406，v438 转 device-local——synced 会让远端设备驾驶
+//   本机驱逐守卫，见 app-state.ts) → slate(P5，永不同步=毒化案结构化根治)）。
 //
 // **保存策略**（抄 AtlasMaker shareback TL;DR 第 2 条）：
 //   - Ctrl+S 主导（v409：按 save = 无条件 encode+推，让时间戳走字）
@@ -13,11 +12,11 @@
 //   实现在 session-state.ts + editor-session/。本文件只管"当前叫什么名"。
 //
 // 幽灵 current path 陷阱（feedback-phantom-current-path memory）——载体变了、教训没变：
-//   - boot load 失败时**不要**清 `appState.currentFile`（用户下次冷启动能重试）
+//   - boot load 失败时**不要**清回执条的 opened（用户下次冷启动能重试）
 //     → 见 boot.ts 的 `session.setName(null, { persist: false })`
-//   - 但内存里 _activeSessionName（session-state）用 safe default，避免 save 走 rename 路径
+//   - 但内存里活动名（session-state 的 home）用 safe default，避免 save 走 rename 路径
 //     把"加载失败的 path"当 oldName 删掉
-//   - **破坏性操作永远用「真正载入的路径」**，不用这里的 getCurrentSessionName()
+//   - **破坏性操作永远用「真正载入的路径」**，不用持久层里的名字
 
 import { t } from "./i18n/index.ts";
 import { renderNodesToBytes } from "./backend/doc-render.ts";
@@ -26,7 +25,7 @@ import { encodePngFromBytes } from "./backend/png-codec.ts";
 import { defringeAlphaZero } from "./backend/algorithms/defringe.ts";
 import { flattenToBg, parseExportBg } from "./backend/algorithms/flatten-bg.ts";
 import { canvasToBlob } from "./shell/image-io.ts";
-import { appState } from "./app-state.ts";   // active session name = appState.currentFile（synced-app-state，跨设备 resume）
+import { setOpened } from "./resume-slate.ts";   // active session 持久层（P5：device 回执条，永不同步）
 import type { PaintingView } from "./backend/workpiece/painting-view.ts";
 
 // navigator.canShare/share 的 files 形参在部分 lib.dom 里未覆盖 → 窄化扩展（不引入 any）。
@@ -40,23 +39,13 @@ type FileShareNavigator = Navigator & {
 // gallery-first: 空字符串 = 没活动 session（在 gallery）。
 // active session = appState.currentFile（local-app-state，device-local v438；非 null → boot 自动 open）。
 //   null/未设 → 返 ""（停 gallery，等用户选）。try/catch 兜 pre-init（collection 未 hydrate 时 setItem 抛）。
-// 三态（P1.5 2026-08-26 user 拍板「首次打开新画布，上次图库则图库」）：
-//   null = 从未绑定过（首次/清库）→ boot 落新画布（lazyblank，首笔自动安家）
-//   ""   = 上次离开时停在图库（有意状态）→ boot 恢复图库
-//   名   = 上次开着这张画 → boot 自动恢复它
-// ⚠ 迁移噪音（可接受，device-local）：旧 setter 把 "" 塌成 null 存——存量设备「上次在图库」
-//   会被读成「首次」落一次新画布，下次退图库即自愈。
-export function getCurrentSessionName(): string | null {
-  try { return appState.currentFile ?? null; }
-  catch { return null; }
-}
+// P5（2026-08-27）：持久层 = **resume-slate 器官**（device-kv，per-gallery 回执条）。
+//   三态（P1.5 拍板）改由 tagged union 表达：null=首次→新画布 / {kind:"gallery"}=上次图库 /
+//   {kind:"doc",path}=上次这张画。legacy 的 appState.currentFile/restoreAttempt 停写只读
+//   （boot 播种源，见 resume-slate.seedSlateFromLegacy）。
+//   崩溃环标记解除逻辑（开画成功清 restoreAttempt）在 slate.setOpened 内（同记录原子写）。
 export function setCurrentSessionName(name: string) {
-  try {
-    appState.currentFile = name;   // "" 原样存（=「在图库」的有意状态，别再塌成 null）
-    // 成功持久化非空活动身份 = app 活着且真拿住了一张画（本函数只在 es.open() 成功后/健康操作里被调）
-    // → 崩溃环断路标记解除（boot-restore.ts）：手动重开成功后，boot 自动开重新武装。
-    if (name) appState.restoreAttempt = null;
-  } catch {}
+  try { setOpened(name ? { kind: "doc", path: name } : { kind: "gallery" }); } catch {}
 }
 
 // （v409 删 saveSession / putSessionPkg / saveAsSession / saveCurrentSession —— 四个**零 importer** 的死符号。

@@ -9,11 +9,13 @@
 //   两条都是「失败路径上的事」，恰恰是最不容易被真机测到、也最容易被下一次重构悄悄改掉的部分。
 //
 // 端口全注入 → 这个模块对 app 一无所知，测试可以直接驱动它。
+import type { ResumeOpened } from "./resume-slate.ts";
 
 export interface RestorePorts {
-  /** 持久层记的「上次打开的是谁」。**三态**（P1.5 2026-08-26 user 拍板「首次打开新画布，上次图库则图库」）：
-   *  null=从未绑定（首次）→ 新画布；""=上次停在图库（有意）→ 图库；名 → 自动恢复它。 */
-  getWantedName(): string | null;
+  /** 回执条的 opened（P5 2026-08-27：typed union 取代 null/""/名 三态哨兵——resume-slate 器官）。
+   *  null=从未绑定（首次）→ 新画布；{kind:"gallery"}=上次停在图库（有意）→ 图库；
+   *  {kind:"doc",path} → 自动恢复它（P1.5 拍板语义原样）。 */
+  getResume(): ResumeOpened;
   /** 真正去开（store.file.open + adopt）。返回是否装入了字节。 */
   restore(name: string): Promise<boolean>;
   /** 只改内存里的活动名，**不动持久的 currentFile**（= session.setName(x, {persist:false})）。 */
@@ -25,12 +27,13 @@ export interface RestorePorts {
   updateSaveStatus(): void;
   onOpened(name: string): void;
   onNotFound(name: string): void;
-  // ── 崩溃环断路器（v0.10.9，纪律③）：跨崩溃记「正在开谁」的持久标记（appState.restoreAttempt）──
+  // ── 崩溃环断路器（v0.10.9，纪律③）：跨崩溃记「正在开谁」的持久标记（P5 起住 resume-slate，
+  //    与 opened 同记录）──
   /** 上次 boot 留下的 attempt 标记（优雅收场会清 null；非 null = 上次死在开它的半路）。 */
   getRestoreAttempt(): string | null;
+  /** ⚠ 契约：本写入必须**同步落盘**（slate 器官 = localStorage 单键写天然满足）——OOM 崩溃可比任何
+   *  防抖快。v0.10.9 的 flushMarker 端口因此退役（P5 2026-08-27）。 */
   setRestoreAttempt(name: string | null): void;
-  /** 标记必须在 restore 之前**落盘**——collection 冷写是 400ms 防抖，OOM 崩溃可比它快。 */
-  flushMarker(): Promise<void>;
   onCrashLoopSkipped(name: string): void;
   // ── 双实例互认（Web Locks，2026-08-21 双实例案）：wanted 是否被**别的窗口**持有 ──
   /** 无 Web Locks 支持时恒 false（整套降级为现状，行为不变）。 */
@@ -64,21 +67,22 @@ export async function restoreLastSession(p: RestorePorts): Promise<RestoreOutcom
     p.onCloudOff();
     return "blank-cloud-off";
   }
-  const wanted = p.getWantedName();
-  if (wanted == null) {
+  const resume = p.getResume();
+  if (resume == null) {
     // ★ 首次（从未绑定）→ 新画布（P1.5 拍板）。openFreshCanvas 自管 lazyblank 身份。
     p.setNameMemoryOnly(null);          // 幽灵路径纪律①：先降 safe default，身份由落点重立
     p.updateSaveStatus();
     await p.openFreshCanvas();
     return "fresh-first-boot";
   }
-  if (wanted === "") {
+  if (resume.kind === "gallery") {
     // ★ 上次离开时就停在图库（有意状态）→ 图库（这不是 404 fallback，canvas-first 不适用）。
     p.setNameMemoryOnly(null);
     p.updateSaveStatus();
     await p.openGallery();
     return "gallery-deliberate";
   }
+  const wanted = resume.path;
   // ★ 纪律④（双实例互认，2026-08-21）：wanted 正被**另一个活窗口**持有 ⇒ ① 不自动开
   //   （双 tab 同画编辑 = 本地字节互覆，入口拦住）；② 这也**不是崩溃**——上一实例还活着，
   //   restoreAttempt 标记只是还没到清点（慢加载/正编辑中）。所以本检查必须排在断路器判定
@@ -104,8 +108,7 @@ export async function restoreLastSession(p: RestorePorts): Promise<RestoreOutcom
     p.onCrashLoopSkipped(wanted);
     return "blank-crash-loop";
   }
-  p.setRestoreAttempt(wanted);
-  await p.flushMarker();
+  p.setRestoreAttempt(wanted);        // 同步落盘（端口契约）——写完即安全，restore 随后
   if (await p.restore(wanted)) {
     p.setRestoreAttempt(null);          // 优雅收场①：成功（setCurrentSessionName 也会清——幂等）
     p.onOpened(wanted);

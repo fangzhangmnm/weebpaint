@@ -8,7 +8,7 @@ function ports(over: Partial<RestorePorts> = {}) {
   const log: string[] = [];
   let memName: string | null = "PRE-EXISTING";      // 模拟「内存里还留着上一个身份」
   const p: RestorePorts = {
-    getWantedName: () => "X",
+    getResume: () => ({ kind: "doc", path: "X" }) as const,
     restore: async () => true,
     setNameMemoryOnly: (n) => { memName = n; log.push(`setNameMemoryOnly(${n})`); },
     openGallery: async () => { log.push("openGallery"); },
@@ -18,7 +18,6 @@ function ports(over: Partial<RestorePorts> = {}) {
     // 崩溃环断路器（纪律③）：默认无标记；marker 探针模拟持久层
     getRestoreAttempt: () => marker,
     setRestoreAttempt: (n) => { marker = n; log.push(`marker=${n}`); },
-    flushMarker: async () => { log.push("flushMarker"); },
     onCrashLoopSkipped: (n) => log.push(`crashLoopSkipped(${n})`),
     // 双实例互认（纪律④）：默认无别的窗口持锁（= 无 Web Locks 环境的降级值，行为同旧）
     isDocLockedElsewhere: async () => false,
@@ -41,16 +40,16 @@ test("有上次的画且能打开 → restored，不碰图库", async () => {
   assert(log.includes("opened(X)"), "报「已打开」");
 });
 
-test("★ 首次（currentFile 从未设过 = null）→ 新画布，不落图库（P1.5 user 拍板）", async () => {
-  const { p, log, mem } = ports({ getWantedName: () => null });
+test("★ 首次（opened=null 从未绑定）→ 新画布，不落图库（P1.5 user 拍板）", async () => {
+  const { p, log, mem } = ports({ getResume: () => null });
   eq(await restoreLastSession(p), "fresh-first-boot");
   eq(mem(), null, "内存名先降 safe default（身份由 openFreshCanvas 内部重立）");
   assert(log.includes("openFreshCanvas"), "落可画新画布");
   assert(!log.includes("openGallery"), "首次不进图库");
 });
 
-test("★ 上次停在图库（currentFile=\"\" 有意状态）→ 图库（不是 404 fallback，canvas-first 不适用）", async () => {
-  const { p, log, mem } = ports({ getWantedName: () => "" });
+test("★ 上次停在图库（opened={kind:gallery} 有意状态）→ 图库（不是 404 fallback，canvas-first 不适用）", async () => {
+  const { p, log, mem } = ports({ getResume: () => ({ kind: "gallery" }) as const });
   eq(await restoreLastSession(p), "gallery-deliberate");
   eq(mem(), null, "内存名必须是 safe default");
   assert(log.includes("openGallery"), "恢复图库（用户离开时的有意状态）");
@@ -65,13 +64,13 @@ test("★ 打开失败 → 内存名降回 null（幽灵路径纪律①）", asy
 });
 
 test("★ 打开失败 → 持久的 currentFile 必须还在（纪律②：失败常是瞬态的）", async () => {
-  // 真持久层探针：getWantedName 每次都从它读。失败流程里若有任何一处清了它，
-  //   第二次 getWantedName 就会变 null —— 而那意味着用户下次冷启动再也开不回这张画。
-  let persisted: string | null = "X";
+  // 真持久层探针：getResume 每次都从它读。失败流程里若有任何一处清了它，
+  //   第二次 getResume 就会变 null —— 而那意味着用户下次冷启动再也开不回这张画。
+  let persisted: { kind: "doc"; path: string } | null = { kind: "doc", path: "X" };
   let marker: string | null = null;
   const log: string[] = [];
   const p: RestorePorts = {
-    getWantedName: () => persisted,
+    getResume: () => persisted,
     restore: async () => false,                       // 取消密码框 / 离线只有云端副本 / 文件锁定
     setNameMemoryOnly: () => { log.push("mem"); },    // 只动内存 —— 绝不碰 persisted
     openGallery: async () => {},
@@ -80,7 +79,6 @@ test("★ 打开失败 → 持久的 currentFile 必须还在（纪律②：失�
     onNotFound: () => {},
     getRestoreAttempt: () => marker,
     setRestoreAttempt: (n) => { marker = n; },        // 断路标记有自己的槽 —— 同样绝不碰 persisted
-    flushMarker: async () => {},
     onCrashLoopSkipped: () => {},
     isDocLockedElsewhere: async () => false,
     onLockedElsewhere: () => {},
@@ -90,17 +88,17 @@ test("★ 打开失败 → 持久的 currentFile 必须还在（纪律②：失�
     openFreshCanvas: async () => {},
   };
   eq(await restoreLastSession(p), "blank-failed");
-  eq(persisted, "X", "★ 持久名还在");
-  eq(p.getWantedName(), "X", "★ 下次冷启动仍会尝试打开它（v406-v408 这里连它一起清了，v409 修）");
+  eq(persisted?.path, "X", "★ 持久名还在");
+  eq(p.getResume()?.kind === "doc" ? (p.getResume() as { path: string }).path : null, "X", "★ 下次冷启动仍会尝试打开它（v406-v408 这里连它一起清了，v409 修）");
   assert(log.includes("mem"), "内存名确实被降过（纪律①）");
 });
 
 test("失败路径的顺序：先降内存名、再刷徽章、再落画布、最后报错（别先报错后甩人）", async () => {
   const { p, log } = ports({ restore: async () => false });
   await restoreLastSession(p);
-  // 前三步 = 断路标记生命周期（纪律③）：写标记 → flush 落盘 → 优雅失败清标记；
+  // 前两步 = 断路标记生命周期（纪律③，P5 同步落盘）：写标记 → 优雅失败清标记；
   // 落点 = 画布（canvas-first，P1 2026-08-26：boot 永不 404 跳 gallery），其余顺序同旧约。
-  eq(log.join(" > "), "marker=X > flushMarker > marker=null > setNameMemoryOnly(null) > updateSaveStatus > openFreshCanvas > notFound(X)");
+  eq(log.join(" > "), "marker=X > marker=null > setNameMemoryOnly(null) > updateSaveStatus > openFreshCanvas > notFound(X)");
 });
 
 // ── 纪律③：崩溃环断路器（v0.10.9，「小内存设备开超大文件 OOM 锁死环」案）──────────────
@@ -118,12 +116,12 @@ test("★ 标记==想开的画 → 断路：跳过自动开、落画布、restor
   eq(marker(), "X", "标记保留——之后每次 boot 都跳，直到某张画成功打开（setCurrentSessionName 清）");
 });
 
-test("★ 正常路：restore 之前必须 先写标记、再 flush 落盘（OOM 比 400ms 防抖快）", async () => {
+test("★ 正常路：restore 之前必须先写标记（P5：setRestoreAttempt 端口契约=同步落盘，flushMarker 退役）", async () => {
   const { p, log } = ports();
   await restoreLastSession(p);
-  const iMark = log.indexOf("marker=X"), iFlush = log.indexOf("flushMarker"), iOpen = log.indexOf("opened(X)");
-  assert(iMark !== -1 && iFlush !== -1, "标记+flush 都发生了");
-  assert(iMark < iFlush && iFlush < iOpen, `顺序必须 标记→flush→restore（got: ${log.join(" > ")}）`);
+  const iMark = log.indexOf("marker=X"), iOpen = log.indexOf("opened(X)");
+  assert(iMark !== -1, "标记发生了");
+  assert(iMark < iOpen, `顺序必须 标记→restore（got: ${log.join(" > ")}）`);
 });
 
 test("成功 → 标记清回 null（下次冷启动照常自动开）", async () => {
@@ -208,17 +206,16 @@ test("★ 云关 → blank-cloud-off：restore/图库都不碰，落空白画布
 });
 
 test("★ 云关的自愈红线：持久 currentFile 与断路标记一个都不动（关→开下次冷启动照常恢复）", async () => {
-  let persisted: string | null = "X";
+  let persisted: { kind: "doc"; path: string } | null = { kind: "doc", path: "X" };
   const { p, log, marker } = ports({
     isCloudEnabled: () => false,
-    getWantedName: () => persisted,
+    getResume: () => persisted,
     getRestoreAttempt: () => "STALE-MARKER",   // 陈旧标记也原样保留——本门不消费断路器语义
   });
   eq(await restoreLastSession(p), "blank-cloud-off");
-  eq(persisted, "X", "★ 持久名原样");
+  eq(persisted?.path, "X", "★ 持久名原样");
   eq(marker(), "STALE-MARKER", "★ 断路标记原样（不写不清）");
-  assert(!log.some((l) => l.startsWith("marker=")), "标记 setter 没被碰过");
-  assert(!log.includes("flushMarker"), "flush 也不发生（没有任何持久写）");
+  assert(!log.some((l) => l.startsWith("marker=")), "标记 setter 没被碰过（没有任何持久写）");
 });
 
 test("云开 → 行为与旧约完全一致（默认端口即开，全套旧用例已覆盖；这里钉正常路一条）", async () => {

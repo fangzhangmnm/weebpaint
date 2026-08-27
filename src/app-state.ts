@@ -23,7 +23,7 @@ export const APP_STATE_DEFAULTS = {
   //     **设备 B 打开 Y 会同步过来，把设备 A 的 activeFileName() 翻成 Y，
   //     于是设备 A 不再保护自己真正打开的 X。** 远端设备的选择在驾驶本机的驱逐守卫。
   //   键名保持 "current-file" 不变（两个 collection 各有独立命名空间，不冲突）。
-  "current-file": null as string | null,      // 上次打开的文档名（非 null → boot 自动 open）（Cold，**device-local**）
+  "current-file": null as string | null,      // ⚠ LEGACY 只读（P5 2026-08-27：真相迁 resume-slate 回执条；本键=播种源，停写；清理另拍）
   "blender-panel-url": "" as string,          // Blender 同步远端 URL（2026-07-14 决策：全账号同步，tailscale 稳定端点）（Cold）
   // 图库密码验证器 sentinel（v0.4.11，真机 2.3）：{v,salt,iv,ct} | null。**跟账号走**（synced）——
   //   重装/换设备后仍知道「图库已有密码」，创建流程变输入校验。语义见 password-verifier.ts。
@@ -36,7 +36,7 @@ export const APP_STATE_DEFAULTS = {
   //   否则每次冷启动都重开同一张必死的画 = 锁死环，用户连图库都进不去。断路逻辑在
   //   boot-restore.ts；成功持久化活动身份时也清（session.ts setCurrentSessionName）——
   //   手动重开成功后 boot 自动开重新武装。**device-local**：崩的是这台设备，别跨设备传染。
-  "restore-attempt": null as string | null,
+  "restore-attempt": null as string | null,   // ⚠ LEGACY 只读（P5：迁 resume-slate，同上）
 } as const;
 export type AppStateKey = keyof typeof APP_STATE_DEFAULTS;
 

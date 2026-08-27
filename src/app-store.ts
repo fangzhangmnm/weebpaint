@@ -13,6 +13,7 @@ import { pack7z, unpack7z } from "./sevenzip.ts";
 import { getPassword } from "./crypto-state.ts";
 import { wirePreferences } from "./app-prefs.ts";
 import { wireAppState, appState } from "./app-state.ts";
+import { readSlate } from "./resume-slate.ts";   // activeFileName 守卫输入（P5：本机回执条真相）
 import { builtinBrushInitData } from "./brushes.ts";
 import { isDocPath, isImagePath, imageBasename } from "./gallery/cloud-image-model.ts";
 import { naturalCompare } from "./gallery/natural-order.ts";
@@ -70,8 +71,8 @@ const _createRealStore = (provider: _Prov, auth: _Auth): Store => createStore({
   autoCacheOpenedFile: true,
   signedIn: () => auth.isSignedIn(),   // 连接态 store 自持（网盘模型）：watchFolder/云列举不再由 app 每次传 ctx
   // 当前打开的 doc（全名）：cloud-gone 去抖 trash 绝不碰它（连 watchFolder 自动 reconcileFolder 也跳过，防 trash 掉开着的 clean 文件本地缓存）。
-  //   appState.currentFile = 活动 doc 裸名（退出置 null）；边界转全名。pre-init 抛 → null（不跳过，无害）。
-  activeFileName: () => { try { return appState.currentFile ? sessionFileName(appState.currentFile) : null; } catch { return null; } },
+  //   P5（2026-08-27）：读 resume-slate 回执条（device 本机真相，永不同步——v438 毒化案结构化根治）。
+  activeFileName: () => { try { const o = readSlate().opened; return o?.kind === "doc" ? sessionFileName(o.path) : null; } catch { return null; } },
 });
 
 const _asm = storeAbsent

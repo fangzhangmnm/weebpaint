@@ -347,3 +347,16 @@ store escalation ①（appfolder 根 collection）**作废**；「同帐多库�
   真状态；关 = 真不建 store 实例（超越现在的藏 UI）；cloud-enabled 播种进 registry
   （false → lastActive=null）后退役；
 - isAuthConfigured() 独立保留（容器能力事实，非偏好）。
+
+## 10. 落地台账
+- **Slice A（v0.11.10 / 2026-08-27）**：device-kv 器官（唯一 localStorage 入口，GUID 前缀，try/catch
+  降级纯内存）+ resume-slate 器官（回执条：opened union + restoreAttempt 同记录原子写、per-gallery、
+  legacy 幂等播种）；boot-restore 端口 typed 化（getResume；flushMarker 端口退役=同步落盘契约）；
+  session/app-store/boot 全接线；legacy appState.currentFile/restore-attempt 停写只读（播种源）。
+  测试：test/resume-slate.test.mjs + boot-restore 全量跟改。
+- **Slice B（待做）**：preferences/state 两门面 + registry（scope 列）+ 全 callsite 迁移
+  （device 组：single-finger-draw/stylus-smooth/color-theme/cloud-enabled[过渡态]；session 组：
+  show-fps；boot-snapshot 收编 device-kv）。
+- **Slice C（待做）**：per-doc 三项迁 desk（pixel-grid/long-press-pick/menu-tab，工厂默认）+
+  设置 sheet scope 分区 + 三枚 scope 图标登记 SVG Icons TODO。
+- **Slice D（待做）**：brush-rack 写路径收敛（gallery 层照旧 collection）。

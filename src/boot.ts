@@ -8,11 +8,11 @@
 import { t } from "./i18n/index.ts";
 import { reportError } from "./error-badge.ts";
 import { session } from "./session-state.ts";
-import { getCurrentSessionName } from "./session.ts";
+import { readSlate, setRestoreAttempt, seedSlateFromLegacy } from "./resume-slate.ts";
 import { restoreLastSession } from "./boot-restore.ts";
 import { isDocLockedElsewhere } from "./instance-locks.ts";
 import { isCloudEnabled } from "./cloud-capability.ts";
-import { appState, flushAppState } from "./app-state.ts";
+import { appState } from "./app-state.ts";   // P5：只读（回执条播种源）
 import type { AppContext } from "./app-context.ts";
 
 // 笔架 boot：collection.init（本地缓存 hydrate → 后台 reconcile 云端 + 新库 seed）→
@@ -34,27 +34,28 @@ export function initRackBoot(ctx: AppContext) {
   });
 }
 
-// Gallery-first 启动：尝试加载上次的 session（异步，不阻塞 UI 显示）。
-//   1) 无上次 session 名 → 停 gallery
-//   2) 有 → load → 成功 adopt + 进画布；失败 → 停 gallery
-//   3) **失败保留 currentFile 不清**（用户下次冷启动还能 retry）—— 见下面 `{ persist: false }`。
-// ⚠ 调用方必须先 `await prefsReady`（app.ts）：currentFile 在 collection hydrate 前恒为 null，
-//   早调 = 永远落图库、不再自动开上次的画。
+// 三态启动恢复（P1.5 拍板；P5 起持久层 = resume-slate 回执条）：
+//   首次→新画布 / 上次图库→图库 / 上次的画→自动恢复（失败保留 opened 不清，下次冷启动能 retry）。
+// ⚠ 调用方仍先 `await prefsReady`（app.ts）：**只为播种**（legacy collection 键 → 回执条，幂等一次）；
+//   播种期过后（存量设备都升上来）可拆此时序依赖——回执条本身是同步读。
 export async function bootRestoreSession(ctx: AppContext) {
   const { setGalleryOpen, updateSaveStatus, setStatus } = ctx;
+  // P5 播种（幂等）：legacy 的 appState.currentFile（三态字符串）+ restoreAttempt → 回执条。
+  //   此后 slate 是唯一真相；legacy 键停写只读（collection 里的值从此只出不进）。
+  try { seedSlateFromLegacy({ currentFile: appState.currentFile, restoreAttempt: appState.restoreAttempt }); }
+  catch (e) { reportError(new Error("[boot] slate seeding failed (fresh-boot fallback): " + String(e)), "log"); }
   // 编排本身在 boot-restore.ts（零 app 依赖 → 可测）。这里只接线。
   await restoreLastSession({
-    getWantedName: getCurrentSessionName,
+    getResume: () => readSlate().opened,
     restore: (name) => session.restore(name),
     setNameMemoryOnly: (name) => session.setName(name, { persist: false }),   // 幽灵路径纪律：不动持久的 currentFile
     openGallery: async () => { await setGalleryOpen(true); },
     updateSaveStatus,
     onOpened: (name) => setStatus(t("ss.opened", { name })),
     onNotFound: (name) => setStatus(t("mi.lastNotFound", { name })),
-    // 崩溃环断路器（纪律③，v0.10.9）：标记走 appState（库内 KV，device-local），落盘走 flushAppState。
-    getRestoreAttempt: () => appState.restoreAttempt,
-    setRestoreAttempt: (name) => { appState.restoreAttempt = name; },
-    flushMarker: () => flushAppState(),
+    // 崩溃环断路器（纪律③）：P5 起标记住回执条（同步单键写=天然落盘，flushMarker 舞蹈退役）。
+    getRestoreAttempt: () => readSlate().restoreAttempt,
+    setRestoreAttempt: (name) => setRestoreAttempt(name),
     onCrashLoopSkipped: (name) => setStatus(t("mi.restoreCrashLoop", { name }), true),
     // 双实例互认（2026-08-21）：boot 期少打扰——status 提示，不弹 sheet（openItem 入口才弹确认）。
     isDocLockedElsewhere: (name) => isDocLockedElsewhere(name),

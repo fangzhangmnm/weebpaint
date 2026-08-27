@@ -414,8 +414,7 @@ initDevConsole();
 // ---- 图库 全屏（v50 重做：无返回键、底栏 IDB 占用 + 清扫、加号 popup、云图标 popup） ----
 // 退出画布回图库（保存 + 切指针 + 关库）= session.exit()，定义在 session-state.ts。
 // gallery-first 设计：用 session.name == null 区分 gallery 状态。
-// appState.currentFile（synced-app-state）真实持久化 active session name（跨设备 resume；非 null → boot 自动 open）；
-// 空字符串 = "在 gallery 没绑定任何画作"，refresh 后停 gallery。
+// active session 持久层 = resume-slate 回执条（P5：device-kv per-gallery；typed 三态见 resume-slate.ts）。
 
 // 锚定 popup 定位 helper（positionPopup 核心 + anchorPopupToBtn/anchorPopupBelowToolbars wrapper）= anchored-popup.ts。
 // withBusy / showFullscreenBusy / hideFullscreenBusy = fullscreen-busy.ts。
@@ -540,8 +539,8 @@ void prefsReady.then(() => {
   reconcileBlenderUrlFromPrefs();   // ⑥ appState.blenderPanelUrl 真值刷进输入框（不写盘、不碰面板显隐）
 }).catch((e) => reportError(new Error("[boot] settings fixup failed: " + String(e)), "log"));
 
-// ⑦ Gallery-first 启动恢复（读 appState.currentFile：非 null → 自动开那张画；否则停图库）= boot.ts。
-//   必须 await prefsReady：hydrate 前 currentFile 恒为 null → 会永远落图库、不再自动开上次的画。
+// ⑦ 三态启动恢复（P5 起读 resume-slate 回执条：doc→自动开 / gallery→图库 / null→新画布）= boot.ts。
+//   仍 await prefsReady：只为 legacy→回执条播种（幂等一次）；播种期过后可拆。
 //   排在 fixup 之后（同一个 promise 的 then 按注册顺序跑）→ 开画时 desk/设置已就位。
 void prefsReady.then(() => bootRestoreSession(ctx)).catch((e) => reportError(new Error("[boot] restore failed: " + String(e)), "log"));
 // T-crash 恢复横幅（P2 2026-08-26）：扫 crash 库，有崩溃快照 → 非模态浮卡叠画布（不挡 boot、不 await）。
