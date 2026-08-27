@@ -333,3 +333,17 @@ store escalation ①（appfolder 根 collection）**作废**；「同帐多库�
 - scope 词表终版：`ora | device | gallery | session`（"account"、"synced" 双双退役）。
 - 建新库时从 device 层播种 gallery 层？——P3 细节，暂 park。
 - gallery-password-verifier 独立安全件、brush-rack 库资产器官，均不进两表（已拍不变）。
+
+### 9.8 第七轮（user 2026-08-27）：cloud-enabled 判死缓——P3 由 registry 取代
+
+**user 指出**：cloud-enabled 是 MSAL 宣发不可用时的 UI 护栏；本轮重构正把护栏变真机制——
+「关云」的真身 = **没挂 gallery**（Editor Only），与 P3 registry 的 attached/last-active（null 态
+即「关」）重复；UI toggle 不该从独立 pref 推，该从 store/attachment 真状态看。
+
+**裁定**：
+- P5 device state 表里 cloud-enabled **标过渡态**（P5 期照常工作——attach/detach 未生，它是唯一
+  能表达 detached 的载体）；
+- **P3 收编**：toggle 变动词「卸下图库/选择图库」；isCloudEnabled() 消费者全改读 attachment
+  真状态；关 = 真不建 store 实例（超越现在的藏 UI）；cloud-enabled 播种进 registry
+  （false → lastActive=null）后退役；
+- isAuthConfigured() 独立保留（容器能力事实，非偏好）。
