@@ -681,7 +681,7 @@ function makeGallery(host: GalleryHost) {
             const res = await _store.files.restoreTrash({
               trashKey: item.local ? item.local.trashKey : null,
               fromCloud: !!item.cloud,
-              cloudItemId: item.cloud ? item.cloud.id : null,
+              cloudRef: item.cloud ? item.cloud.id : null,
               targetName: sessionFileName(item.name),   // 边界转全名（恢复目标身份）
               encrypted: item.encrypted,                // 加密件：云端腿恢复落 encFileName（否则密文落明文路径打不开）
             });
@@ -697,7 +697,7 @@ function makeGallery(host: GalleryHost) {
         if (!(await host.confirm(t("gal.dlg.purgeTitle", { name: item.name }), t("gal.dlg.purgeMsg")))) return;
         await host.busy(t("gal.busy.purge", { name: item.name }), async () => {
           try {
-            await _store.files.purgeTrash({ trashKey: item.local ? item.local.trashKey : null, cloudItemId: item.cloud ? item.cloud.id : null });
+            await _store.files.purgeTrash({ trashKey: item.local ? item.local.trashKey : null, cloudRef: item.cloud ? item.cloud.id : null });
             host.status(t("gal.st.purged", { name: item.name }));
           } catch (e: unknown) { host.status(t("gal.st.purgeFail", { e: String((e as { message?: unknown })?.message || e) }), true); }
         });

@@ -205,15 +205,15 @@ export const openCloudImage = (path: string): Promise<Blob | null> =>
   store.file(path, { isZip: false, mode: "existing" }).open();
 // ⛔ listGallery（全树列举）已删 2026-07-12——**库唯一列举面 = store.watchFolder（订阅当前夹）**，app 包成 watchFolder。
 //   app 原则上不知道别的 folder 内容（内存只放当前夹）；名字碰撞由 store rename/saveAs 目标护栏内化检测（撞名抛 CloudNameCollisionError），不靠先 list 目标夹。
-// 回收站视图：store.listTrash 返**两端聚合**的 TrashItem[]（side/localKey/cloudItemId/encrypted/conflictLive）→ 映射成 gallery 的 TrashGItem。
-//   local/cloud 两腿据 localKey/cloudItemId 填（app 原有 both-side 模型此前从没被本地腿填充）。只元数据，无 blob。
+// 回收站视图：store.listTrash 返**两端聚合**的 TrashItem[]（side/localKey/cloudRef/encrypted/conflictLive）→ 映射成 gallery 的 TrashGItem。
+//   local/cloud 两腿据 localKey/cloudRef 填（app 原有 both-side 模型此前从没被本地腿填充；0.4.0 id→ref 行李牌语义改名）。只元数据，无 blob。
 export const listGalleryTrash = async () => (await store.files.listTrash()).map((it) => ({
   name: stripSessionExt(it.name),
   deletedAt: 0,
   encrypted: it.encrypted,
   conflictLive: it.conflictLive,
   local: it.localKey ? { name: stripSessionExt(it.name), trashKey: it.localKey, encrypted: it.encrypted } : null,
-  cloud: it.cloudItemId ? { path: it.name, id: it.cloudItemId } : null,
+  cloud: it.cloudRef ? { path: it.name, id: it.cloudRef } : null,
 }));
 
 // ---- brush-rack collection（逐 brush 一 item + 一条 .meta）：持久化 + 云同步唯一入口，红线在库内。----
