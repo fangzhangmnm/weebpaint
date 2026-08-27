@@ -179,3 +179,20 @@ VS Code 式两层（device + gallery override）或 PPSSPP+拷贝——但先争
   （v438 播种同手法，云端死键不删）；
 - store escalation 清单追加：①账号层 collection 能力（8.1）②local:true collection 移除（SRP）
   ——连同既有 wipeLocal，共三条归下个 pwa-cloud-store session。
+
+### 8.5 追问：「又有 Google Drive 又有 OneDrive 会不会被柴刀」（user 2026-08-27）
+
+会砍掉一半野心，剩下的一半站得住：
+
+- **被柴刀的**：「账号层 = 跟人走」的全称保证。GDrive 一来，一人两朵云 = 两个 appfolder/appDataFolder
+  = 两个账号层——「人」这一级的统一在 provider 边界上又裂开，和多 gallery 裂开 synced 是同构问题、
+  高一层复现。想缝合它的方案（指定某账号为「主设置家」、跨 provider 读设置）意味着双活 auth、
+  离线矩阵、跨云冲突——这个才该被柴刀，不做。
+- **站得住的**：账号层**明确定义为 per 云身份**——「每个云身份一套漫游设置」。先例 = VS Code
+  Settings Sync 本身就是 per 登录账号（换 GitHub/MS 账号登录就是另一套），用户理解无障碍。
+  cascade 不变：`当前 gallery 所属云账号的账号层 ?? 设备层 ?? 工厂默认`。
+- **实际锋面很窄**：家族已拍 personal-account-only；GDrive 是「将来」；主力场景 = 一人一 MSA
+  多文件夹——账号层恰好把这个主场景完全缝合（这就是它的全部使命）。混用双云的人得到的语义
+  = 「我的 Google 身份和 Microsoft 身份各有一套设置」，语义上反而自洽（api token 尤其如此：
+  token 存在哪朵云的私域里，就跟那个身份走）。
+- **柴刀防线**：账号层契约里写死「不跨 provider 聚合」——将来谁想加「主设置家」先过 ADR。
