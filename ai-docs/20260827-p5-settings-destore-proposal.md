@@ -51,18 +51,48 @@ interface SettingsHost<T extends Record<string, unknown>> {   // prefs/app-state
 5. **时序**：per-gallery settings（PPSSPP）只有 P3 多 gallery 后才真发力；P5 先行的意义 =
    为 attach/detach 铺好边界④。
 
-## 4. 待 user grill 的问题（回答后才动工）
+## 4. user 拍板台账（2026-08-27）
 
-1. **SSoT 归属**：同意「collection=持久层权威、struct=运行时工作副本、onChange 回灌」吗？
-2. **范围**：5 个 collection 全做，还是先 brush-rack + user-preference（app-state 的
-   current-file/restore-attempt 与 boot 纪律缠得深，可留 P3 一起动）？
-3. **时机**：P5 现在独立做，还是并进 P3（热插拔一起真机验）？
-4. per-gallery 化后，**离开 gallery 时未推完的 settings 改动**：drain 等推完 / 丢弃 / 留在缓存下次推？
+1. **SSoT 归属**：✅ 同意「collection=持久层权威、struct=运行时工作副本、onChange 回灌」。
+2. **范围**：方向=**全做，彻底无地**；但 user 叫停一刀切——「有些东西可能不应该用 collection，
+   而是走 localstorage 之类的？一个一个 grill 他们的 nature」→ 逐项性质裁决表见 §6。
+3. **时机**：✅ P5 先独立做。
+4. **离开 gallery 未推完的 settings**：✅ drain 等推完（user：「这个其实文件很小的」）。
+5. **wipeLocal**：✅ 可以加，但**强制 type consent，且 typing check 需要库来做**（store 侧强制，
+   app 只提供输入 UI 回调——店内 emptyTrash 的 danger-confirm 回调已是同形，升级为「回调返回
+   用户敲的确认词、库来比对」）。→ 归 store escalation（§5 更新）。
+
+## 6. 逐项 nature grill 表（②的展开；每项待 user 拍板）
+
+判性质的镜头：**彻底无地** = 设备本地/boot 关键的东西不许依赖 store 引擎（Editor Only 无 store 实例；
+file:// 连 localStorage 都可能 SecurityError → 一律 try/catch 降级纯内存，survey §5.3 姿态）。
+候选归宿三种：**localStorage**（设备本地、小、boot 关键、无地可用）/ **per-gallery collection**
+（跟库走，PPSSPP 语义，P3 后每库一套）/ **跨库难题**（跟人走但无地也要用 → localStorage 打底 +
+attach 时 collection 覆盖回灌）。
+
+| # | 项 | 现住 | nature 分析 | 建议归宿 |
+|---|---|---|---|---|
+| 1 | color-theme | local-pref collection | 设备视觉环境；**已有 localStorage boot 快照**（boot-snapshot），等于双写 | **localStorage 正宫化**（collection 副本退役） |
+| 2 | menu-tab | local-pref | ☰ 停留页，设备视觉习惯，微小 | **localStorage** |
+| 3 | cloud-enabled | local-pref | 「store 开关存在 store 里」= 自举怪味；无地必须可读 | **localStorage** |
+| 4 | current-file | local-app-state | boot 纪律核心输入；现状要 await prefsReady 才可读（boot 时序枷锁的来源） | **localStorage**（boot 立即可读，时序枷锁消失） |
+| 5 | restore-attempt | local-app-state | 崩溃环断路标记；**flushMarker 400ms 防抖舞蹈就是因为 collection 是防抖的**——localStorage 同步写天然解决 | **localStorage** |
+| 6 | lang | synced-pref | 跟人走；已有 localStorage boot 快照 | **localStorage 打底 + attach 覆盖**（跨设备 nicety 保留）？或纯 localStorage（放弃跨设备同步）？ |
+| 7 | 手感 prefs（long-press-pick / single-finger-draw / show-fps / pixel-grid / stylus-smooth-params） | synced-pref | 跟人走 vs 跟库走（PPSSPP）？无地也要用 | **localStorage 打底 + attach 覆盖**？还是 per-gallery？ |
+| 8 | gen-ai | synced-pref | 功能总开关，跟人走 | 同 #7 |
+| 9 | blender-panel-url | synced-app-state | 2026-07-14 决策「全账号同步（tailscale 稳定端点）」；但 BTP 无地也能用 | **localStorage 打底 + attach 覆盖**（保 2026-07-14 决策） |
+| 10 | current-directory | synced-app-state | 图库浏览态——**无库即无意义** | **per-gallery collection**（P3 归库；P5 期照旧+struct 化） |
+| 11 | gallery-password-verifier | synced-app-state | 加密图库 sentinel——库的属性 | **per-gallery collection**（同上） |
+| 12 | brush-rack | brush-rack collection | §2.3 拍板 per-gallery（PPSSPP）；Editor Only=文件家笔架（§2.8，可 park） | **per-gallery collection** + struct 化写路径收敛 |
+
+（synced-app-state 里躺着的 legacy current-file 死键照旧不动——v438 注释：等所有设备升级后另拍。）
 
 ## 5. 顺带登记（P7 还原出厂设置的 store escalation）
 
-P7（§2.10）需要 store 侧口子，归 pwa-cloud-store skill 逐条 escalate：
-- **wipeLocal / 本地缓存库销毁**：dispose({drain}) 已有（0.4.0），但删库本体（weebpaint.defaultStore
-  的 IDB）没有库 API——app 侧 indexedDB.deleteDatabase 别家的库 = 绕库红线，需库出口子。
+P7（§2.10）需要 store 侧口子，归 pwa-cloud-store skill 逐条 escalate（**user 2026-08-27 已预批方向**）：
+- **wipeLocal / 本地缓存库销毁**：✅ 可以加。硬条件（user 拍板）：**强制 type consent，且 typing
+  check 由库来做**——API 形状建议 `wipeLocal({ confirm })`，confirm 回调（app 出 in-app sheet 输入
+  UI）返回用户敲的确认词字符串，**库内比对**通过才动手（emptyTrash 的 danger-confirm 回调同形升级；
+  app 侧永远拿不到「跳过比对」的路径）。dispose({drain}) 已有（0.4.0），wipe = drain→dispose→删库本体。
 - **dirty 清单口径**：无痕扫前的「dirty 永不静默删」护栏——dirty facet（count/pushAll）已够用
   （count>0 → 先 pushAll / 显式确认），确认这个用法即可，无需新口。
