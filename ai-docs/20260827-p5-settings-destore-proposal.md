@@ -367,8 +367,12 @@ store escalation ①（appfolder 根 collection）**作废**；「同帐多库�
   device-kv**（user 追问「boot snapshot 还需要吗」→ lang 缓存结构上仍需（gallery 层异步 + t() eval
   期锁死 + reload 制），但裸 localStorage 身份取消：cache:boot-lang 键经 device-kv，legacy 键兜底读；
   全 app 裸 localStorage 清零）。
-- **Slice C UI 半边（待做）**：设置 sheet scope 分区（「这幅画/这台设备/你的账号(库)」人话标题 +
-  行尾 scope 微章 + 未登录折叠）+ 三枚 scope 图标登记 SVG Icons TODO。
+- **Slice C UI 半边（v0.11.14 / 2026-08-27）**：设置页 scope 分区落地——三段人话标题
+  「这幅画/这台设备/**这个图库**」（账号层撤回后第三段随终版模型改名）+ 9 枚行尾 scope 微章
+  （image=画/gallery=库/device=机·stopgap，hover 出一句人话 tooltip）+ view 页三件（棋盘/像素栅格/
+  主栅格）补画微章；重排：longPressPick→画区、cloudEnabled→设备区、lang+genAI→图库区。
+  **偏差记录**：「未登录折叠」推迟到 P6 Editor Only 语境（现 build 恒有库概念，折叠反而撒谎）。
+  图标：device 缺 → 烤「机」stopgap 顶位 + SVG Icons TODO.md 已登记（真图入库后重跑 extract+inline 自愈）。
 - **Slice D（v0.11.13 / 2026-08-27）**：brush-rack 读面收敛——审计结论：rack v2 的写路径**天生就是**
   拍板形状（collection=权威、onChange 回灌 shallowRef 镜像），本刀只堵 4 处绕镜像散读
   （_syncFromCollection 成为唯一直读点，头注释钉）。P5 存量工作至此只剩 Slice C UI 半边。

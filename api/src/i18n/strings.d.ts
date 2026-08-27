@@ -6886,6 +6886,42 @@ export declare const S: {
         readonly ja: "ローカル保存済み（クラウド機能オフ） · {name}";
         readonly tok: "awen lon ilo ni (poki sewi li pini) · {name}";
     };
+    readonly "menu.scopeDoc": {
+        readonly zh: "这幅画";
+        readonly en: "This artwork";
+        readonly ja: "この作品";
+        readonly tok: "sitelen ni";
+    };
+    readonly "menu.scopeDevice": {
+        readonly zh: "这台设备";
+        readonly en: "This device";
+        readonly ja: "このデバイス";
+        readonly tok: "ilo ni";
+    };
+    readonly "menu.scopeGallery": {
+        readonly zh: "这个图库";
+        readonly en: "This gallery";
+        readonly ja: "このギャラリー";
+        readonly tok: "poki sitelen ni";
+    };
+    readonly "menu.scopeDocTip": {
+        readonly zh: "跟这幅画走，保存在作品文件里";
+        readonly en: "Follows this artwork; saved inside the artwork file";
+        readonly ja: "この作品に紐づき、作品ファイル内に保存されます";
+        readonly tok: "ni li tawa sitelen ni. ona li awen lon lipu sitelen.";
+    };
+    readonly "menu.scopeDeviceTip": {
+        readonly zh: "跟这台设备走，不同步";
+        readonly en: "Follows this device; not synced";
+        readonly ja: "このデバイスに紐づき、同期されません";
+        readonly tok: "ni li tawa ilo ni taso.";
+    };
+    readonly "menu.scopeGalleryTip": {
+        readonly zh: "跟这个图库走（随云同步到你的其他设备）";
+        readonly en: "Follows this gallery (syncs to your other devices via the cloud)";
+        readonly ja: "このギャラリーに紐づき、クラウド経由で他のデバイスにも同期されます";
+        readonly tok: "ni li tawa poki sitelen ni. ona li tawa ilo ante sina kepeken poki sewi.";
+    };
     readonly "menu.cloudEnabled": {
         readonly zh: "启用云端功能";
         readonly en: "Enable cloud features";

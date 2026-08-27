@@ -379,6 +379,8 @@
   <!-- third-party -->
   <!-- blender — Blender sync:瘦长体 Bl + Adobe 式圆角方框(PT Sans Narrow Bold, l 带钩不与 i/1 混; 宽高比 0.96) -->
   <symbol id="blender" data-cat="third-party" data-src="trademark:Blender" data-note="Blender sync:瘦长体 Bl + Adobe 式圆角方框(PT Sans Narrow Bold, l 带钩不与 i/1 混; 宽高比 0.96)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="2.6" width="18.8" height="18.8" rx="4.2"/><path d="M12.88 9.07Q12.88 9.47 12.8 9.87Q12.71 10.27 12.52 10.62Q12.34 10.97 12.03 11.23Q11.73 11.5 11.31 11.64V11.73Q11.68 11.83 12.02 12.01Q12.35 12.2 12.6 12.52Q12.85 12.84 13 13.3Q13.15 13.76 13.15 14.38Q13.15 15.22 12.86 15.84Q12.57 16.45 12.08 16.84Q11.59 17.23 10.94 17.42Q10.28 17.61 9.55 17.61Q9.33 17.61 8.99 17.61Q8.65 17.61 8.25 17.58Q7.85 17.56 7.43 17.51Q7.01 17.47 6.65 17.37V6.62Q7.17 6.53 7.92 6.46Q8.68 6.39 9.42 6.39Q10.11 6.39 10.74 6.5Q11.37 6.61 11.85 6.9Q12.32 7.2 12.6 7.72Q12.88 8.24 12.88 9.07ZM9.6 15.91Q10.25 15.91 10.67 15.49Q11.09 15.07 11.09 14.26Q11.09 13.74 10.95 13.44Q10.81 13.13 10.58 12.97Q10.34 12.81 10.04 12.76Q9.74 12.71 9.41 12.71H8.61V15.81Q8.74 15.86 9.04 15.88Q9.35 15.91 9.6 15.91ZM9.07 11.17Q9.24 11.17 9.46 11.15Q9.69 11.12 9.83 11.09Q10.28 10.92 10.6 10.53Q10.92 10.14 10.92 9.52Q10.92 9.11 10.81 8.83Q10.7 8.55 10.51 8.39Q10.33 8.23 10.07 8.16Q9.81 8.09 9.52 8.09Q8.88 8.09 8.61 8.15V11.17Z M16.14 14.93Q16.14 15.47 16.25 15.71Q16.36 15.94 16.61 15.94Q16.75 15.94 16.89 15.91Q17.04 15.88 17.23 15.8L17.4 17.29Q17.21 17.42 16.76 17.53Q16.31 17.64 15.84 17.64Q15.06 17.64 14.67 17.25Q14.29 16.86 14.29 15.92V6.54H16.14Z" fill="currentColor" stroke="none"/></symbol>
+<!-- 本地 stopgap 补丁（assets/icons-local.svg，待真图标） -->
+  <symbol id="device" data-cat="stopgap" data-src="baked:DroidSansFallbackFull(Apache-2.0)/DejaVuSans-Bold(Bitstream-Vera)" data-note="P5 设置 scope 微章·这台设备(跟机器走的设置)。stopgap 字形；真图标=显示器/平板设备轮廓, 与 image(这幅画)/gallery(这个图库) 组成 scope 三件套, 12px 小尺寸可读优先" viewBox="0 0 24 24"><path d="M3.75 6.8H6.54V3.34H8.05V6.8H10.68V8.23H8.05V8.99L10.91 12.53L9.93 13.96L8.05 11.02V20.66H6.54V12.15Q5.64 14.71 4.05 16.59L3 15.54Q5.49 12.45 6.39 8.23H3.75ZM18.14 4.32V17.95Q18.14 18.7 18.74 18.7Q19.12 18.7 19.23 18.44Q19.34 18.18 19.42 16.74L21 17.2Q20.92 19.08 20.47 19.64Q20.02 20.21 18.59 20.21Q17.31 20.21 16.97 19.91Q16.63 19.61 16.63 18.4V5.82H13.17V12Q13.02 17.5 9.63 20.59L8.57 19.31Q11.66 16.59 11.66 10.42V4.32Z" fill="currentColor" stroke="none"/></symbol>
 </svg>
 <!-- ICON-SPRITE:END -->
 
@@ -1343,10 +1345,12 @@
       <div class="menu-page hidden" data-menu-page="view">
         <button class="menu-item menu-item-with-icon" id="menuCheckerboard" type="button" role="menuitemcheckbox" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#checkerboard-background"/></svg>
         <span class="menu-item-label" data-i18n="menu.checkerboard">透明背景显示棋盘</span>
+        <svg class="menu-scope-badge" viewBox="0 0 24 24" aria-hidden="true" data-i18n-title="menu.scopeDocTip"><use href="#image"/></svg>
         <span class="menu-item-state" data-state-for="checkerboard">关</span>
       </button>
         <button class="menu-item menu-item-with-icon" id="menuPixelGrid" type="button" role="menuitemcheckbox" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#pixel-grid"/></svg>
         <span class="menu-item-label" data-i18n="menu.pixelGrid">像素栅格（放大时）</span>
+        <svg class="menu-scope-badge" viewBox="0 0 24 24" aria-hidden="true" data-i18n-title="menu.scopeDocTip"><use href="#image"/></svg>
         <span class="menu-item-state" data-state-for="pixelGrid">开</span>
       </button>
         <!-- 主栅格与尺寸并一条（甲方 2026-08-21 拍板，样式参考「导出与另存」行=主按钮+扳手）：
@@ -1356,7 +1360,8 @@
           <button class="menu-item menu-item-main menu-item-with-icon" id="menuDocGrid" type="button" role="menuitemcheckbox" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#snap-grid"/></svg>
           <span class="menu-item-label" data-i18n="menu.docGrid">主栅格（对齐网格）</span>
           <span class="menu-item-sub" id="menuDocGridCellSub">16px</span>
-          <span class="menu-item-state" data-state-for="docGrid">关</span>
+          <svg class="menu-scope-badge" viewBox="0 0 24 24" aria-hidden="true" data-i18n-title="menu.scopeDocTip"><use href="#image"/></svg>
+        <span class="menu-item-state" data-state-for="docGrid">关</span>
         </button>
           <button class="menu-item-wrench" id="menuDocGridCell" type="button" data-i18n-title="menu.docGridCell" data-i18n-aria="menu.docGridCell"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#wrench"/></svg></button>
         </div>
@@ -1368,41 +1373,53 @@
       </button>
       </div>
       <div class="menu-page hidden" data-menu-page="settings">
+        <!-- P5 scope 分区（2026-08-27 拍板）：人话标题答「这设置跟谁走」；行尾微章 hover 出一句解释。
+             「这个图库」= 跟身份/库走（PPSSPP 终版模型，账号层已撤回）；无库语境（P6 Editor Only）该区折叠。 -->
+        <div class="menu-section-label" data-i18n="menu.scopeDoc">这幅画</div>
+        <button class="menu-item menu-item-with-icon" id="menuLongPressPick" type="button" role="menuitemcheckbox" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#eyedropper"/></svg>
+        <span class="menu-item-label" data-i18n="menu.longPressPick">单指长按吸色</span>
+        <svg class="menu-scope-badge" viewBox="0 0 24 24" aria-hidden="true" data-i18n-title="menu.scopeDocTip"><use href="#image"/></svg>
+        <span class="menu-item-state" data-state-for="longPressPick">关</span>
+      </button>
+        <div class="menu-section-label" data-i18n="menu.scopeDevice">这台设备</div>
         <!-- v0.9.26 PWA 安装入口（user 2026-08-20）：beforeinstallprompt 捕获后才显形（Chromium）；已安装/装态恒隐 -->
         <button class="menu-item menu-item-with-icon" id="menuInstallApp" type="button" role="menuitem" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#download"/></svg>
         <span class="menu-item-label" data-i18n="menu.installApp">安装 WeebPaint 到桌面</span>
       </button>
-        <button class="menu-item menu-item-with-icon" id="menuLongPressPick" type="button" role="menuitemcheckbox" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#eyedropper"/></svg>
-        <span class="menu-item-label" data-i18n="menu.longPressPick">单指长按吸色</span>
-        <span class="menu-item-state" data-state-for="longPressPick">关</span>
-      </button>
         <button class="menu-item menu-item-with-icon" id="menuSingleFingerDraw" type="button" role="menuitemcheckbox" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#finger"/></svg>
         <span class="menu-item-label" data-i18n="menu.singleFingerDraw">单指绘画</span>
+        <svg class="menu-scope-badge" viewBox="0 0 24 24" aria-hidden="true" data-i18n-title="menu.scopeDeviceTip"><use href="#device"/></svg>
         <span class="menu-item-state" data-state-for="singleFingerDraw">关</span>
       </button>
         <label class="menu-item menu-lang-row menu-item-with-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#theme"/></svg>
           <span class="menu-item-label" data-i18n="menu.theme">主题</span>
           <button class="menu-lang-select menu-inline-select" id="menuThemeBtn" type="button" aria-haspopup="true"><span id="menuThemeBtnLabel" data-i18n="theme.auto">跟随系统</span><svg class="menu-inline-caret" viewBox="0 0 8 8" aria-hidden="true"><path d="M1.4 2.8 L4 5.6 L6.6 2.8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <svg class="menu-scope-badge" viewBox="0 0 24 24" aria-hidden="true" data-i18n-title="menu.scopeDeviceTip"><use href="#device"/></svg>
         </label>
         <button id="menuTheme" type="button" hidden></button><!-- 旧 id stub：theme.ts renderTheme 查它，v0.6C 下拉化后留防崩 -->
-        <label class="menu-item menu-lang-row menu-item-with-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#globe-speech"/></svg>
-        <span class="menu-item-label" data-i18n="menu.language">语言</span>
-        <button class="menu-lang-select menu-inline-select" id="menuLanguageBtn" type="button" aria-haspopup="true"><span id="menuLanguageBtnLabel">中文</span><svg class="menu-inline-caret" viewBox="0 0 8 8" aria-hidden="true"><path d="M1.4 2.8 L4 5.6 L6.6 2.8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      </label>
-        <!-- v0.5.28 user：生成式 AI 总开关——控制未来 AI 相关 UI 显隐（body[data-gen-ai] 热切换 + .needs-gen-ai CSS 接缝，不进 boot） -->
-        <button class="menu-item menu-item-with-icon" id="menuGenAI" type="button" role="menuitemcheckbox" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ai-slop"/></svg>
-          <span class="menu-item-label" data-i18n="menu.genAI">启用生成式 AI 功能</span>
-          <span class="menu-item-state" data-state-for="genAI">关</span>
-        </button>
         <!-- 2026-08-21 云端功能开关 v1（接缝=cloud-capability.ts；纯 UI gating 零数据变更）：
              设备本地 pref，默认开；未配置 auth 时灰显强制关（settings-menu 派生 aria-disabled+title） -->
         <button class="menu-item menu-item-with-icon" id="menuCloudEnabled" type="button" role="menuitemcheckbox" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#cloud"/></svg>
           <span class="menu-item-label" data-i18n="menu.cloudEnabled">启用云端功能</span>
-          <span class="menu-item-state" data-state-for="cloudEnabled">开</span>
+          <svg class="menu-scope-badge" viewBox="0 0 24 24" aria-hidden="true" data-i18n-title="menu.scopeDeviceTip"><use href="#device"/></svg>
+        <span class="menu-item-state" data-state-for="cloudEnabled">开</span>
+        </button>
+        <div class="menu-section-label" data-i18n="menu.scopeGallery">这个图库</div>
+        <label class="menu-item menu-lang-row menu-item-with-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#globe-speech"/></svg>
+        <span class="menu-item-label" data-i18n="menu.language">语言</span>
+        <button class="menu-lang-select menu-inline-select" id="menuLanguageBtn" type="button" aria-haspopup="true"><span id="menuLanguageBtnLabel">中文</span><svg class="menu-inline-caret" viewBox="0 0 8 8" aria-hidden="true"><path d="M1.4 2.8 L4 5.6 L6.6 2.8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <svg class="menu-scope-badge" viewBox="0 0 24 24" aria-hidden="true" data-i18n-title="menu.scopeGalleryTip"><use href="#gallery"/></svg>
+      </label>
+        <!-- v0.5.28 user：生成式 AI 总开关——控制未来 AI 相关 UI 显隐（body[data-gen-ai] 热切换 + .needs-gen-ai CSS 接缝，不进 boot） -->
+        <button class="menu-item menu-item-with-icon" id="menuGenAI" type="button" role="menuitemcheckbox" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ai-slop"/></svg>
+          <span class="menu-item-label" data-i18n="menu.genAI">启用生成式 AI 功能</span>
+          <svg class="menu-scope-badge" viewBox="0 0 24 24" aria-hidden="true" data-i18n-title="menu.scopeGalleryTip"><use href="#gallery"/></svg>
+        <span class="menu-item-state" data-state-for="genAI">关</span>
         </button>
         <button class="menu-item menu-item-with-icon" id="menuShortcuts" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#shortcut"/></svg>
         <span class="menu-item-label" data-i18n="menu.shortcuts">快捷键</span>
       </button>
+
       </div>
       <div class="menu-page hidden" data-menu-page="plugins">
         <!-- 插件页：BTP 是插件（user）；将来 AI 模块等同住。tab 图标暂用 #blender（库出通用 plugin 图标后换） -->

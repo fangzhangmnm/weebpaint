@@ -1288,6 +1288,13 @@ export const S = {
   "save.signInLater":       { zh: "暂不", en: "Not now", ja: "今はしない", tok: "tenpo ni la mi wile ala" },
   "save.savedLocalNotSignedIn": { zh: "已存本地 · 未登录", en: "Saved locally · not signed in", ja: "ローカル保存済み · 未ログイン", tok: "awen lon ilo ni · sina lon ala poki sewi" },
   "save.cloudOff":          { zh: "已存本地（云端功能已关闭） · {name}", en: "Saved locally (cloud features are off) · {name}", ja: "ローカル保存済み（クラウド機能オフ） · {name}", tok: "awen lon ilo ni (poki sewi li pini) · {name}" },
+  // P5 scope 分区（2026-08-27）：设置按归属分组 + 行尾微章 tooltip
+  "menu.scopeDoc": { zh: "这幅画", en: "This artwork", ja: "この作品", tok: "sitelen ni" },
+  "menu.scopeDevice": { zh: "这台设备", en: "This device", ja: "このデバイス", tok: "ilo ni" },
+  "menu.scopeGallery": { zh: "这个图库", en: "This gallery", ja: "このギャラリー", tok: "poki sitelen ni" },
+  "menu.scopeDocTip": { zh: "跟这幅画走，保存在作品文件里", en: "Follows this artwork; saved inside the artwork file", ja: "この作品に紐づき、作品ファイル内に保存されます", tok: "ni li tawa sitelen ni. ona li awen lon lipu sitelen." },
+  "menu.scopeDeviceTip": { zh: "跟这台设备走，不同步", en: "Follows this device; not synced", ja: "このデバイスに紐づき、同期されません", tok: "ni li tawa ilo ni taso." },
+  "menu.scopeGalleryTip": { zh: "跟这个图库走（随云同步到你的其他设备）", en: "Follows this gallery (syncs to your other devices via the cloud)", ja: "このギャラリーに紐づき、クラウド経由で他のデバイスにも同期されます", tok: "ni li tawa poki sitelen ni. ona li tawa ilo ante sina kepeken poki sewi." },
   "menu.cloudEnabled":      { zh: "启用云端功能", en: "Enable cloud features", ja: "クラウド機能を有効化", tok: "o ken e poki sewi" },
   "menu.cloudUnavailableTitle": { zh: "此环境未配置云端，无法启用", en: "Cloud is not configured in this build", ja: "この環境ではクラウドが設定されていません", tok: "ilo ni li ken ala e poki sewi" },
   "status.cloudEnabled":    { zh: "云端功能：{s}", en: "Cloud features: {s}", ja: "クラウド機能：{s}", tok: "poki sewi: {s}" },

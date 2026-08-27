@@ -912,6 +912,9 @@ input[type=range] {
 }
 .menu-inline-caret { width: 8px; height: 8px; opacity: .6; flex: 0 0 auto; }
 .menu-item-state { color: var(--ink-soft); font-size: 12px; }
+/* P5 scope 分区（2026-08-27 拍板「人话标题+行尾微章」）：设置项按归属分组，微章答「这设置跟谁走」 */
+.menu-section-label { font-size: 11px; color: var(--ink-soft); padding: 10px 14px 2px; user-select: none; letter-spacing: .06em; opacity: .85; }
+.menu-scope-badge { width: 13px; height: 13px; flex: none; color: var(--ink-soft); opacity: .5; margin-left: 6px; }
 /* v0.6.14 版本号（menu/图库两处）：去「版本：」前缀后再压瘦——字号降一档 + 横向 92% 压缩省行宽 */
 .version-slim { display: inline-block; font-size: 10.5px; letter-spacing: -0.02em; transform: scaleX(0.92); transform-origin: right center; white-space: nowrap; }
 div.version-slim { transform-origin: left center; }   /* 图库菜单的 info 行左对齐，压缩锚点跟着靠左 */

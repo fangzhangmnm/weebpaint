@@ -47,9 +47,9 @@ def text_path(text, box, font='cjk'):
 
 # (id, 文字, 盒, 语义 note)
 SPECS = [
-    # 2026-08-21 图标收货：cut（剪刀 CCW145）/copy-picture（copy+画片，原登记名 copy-merged 甲方定名改之）
-    # 两枚真图入库（库仓 5976d20），stopgap 再度**清零**。历史见 git。
-    # 注意：收货同时 index.html 的 <use href="#copy-merged"> 已改 #copy-picture（id 随甲方定名走）。
+    # 2026-08-21 图标收货：cut/copy-picture 真图入库后 stopgap 曾清零（历史见 git）。
+    # 2026-08-27 P5 设置 scope 微章三件套：image(画)/gallery(库) 库里有，device(机) 缺 → stopgap 顶位。
+    ("device", "机", (3, 3, 18, 18), "P5 设置 scope 微章·这台设备(跟机器走的设置)。stopgap 字形；真图标=显示器/平板设备轮廓, 与 image(这幅画)/gallery(这个图库) 组成 scope 三件套, 12px 小尺寸可读优先"),
 ]
 syms = []
 for sid, text, box, note in SPECS:
