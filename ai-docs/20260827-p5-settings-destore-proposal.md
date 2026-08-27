@@ -196,3 +196,60 @@ VS Code 式两层（device + gallery override）或 PPSSPP+拷贝——但先争
   = 「我的 Google 身份和 Microsoft 身份各有一套设置」，语义上反而自洽（api token 尤其如此：
   token 存在哪朵云的私域里，就跟那个身份走）。
 - **柴刀防线**：账号层契约里写死「不跨 provider 聚合」——将来谁想加「主设置家」先过 ADR。
+
+## 9. 第三轮 grill（user 2026-08-27）：兄妹共用电脑模型 → 全面重判
+
+**user 输入**：①UI scope 分区方案同意；②per-doc 工厂默认「非常赞」；③store escalation ①②可打短
+handoff 给在跑的 store session；④问 wipeLocal 是什么为什么要；⑤柴刀定论=「两个账号就是两个身份」，
+且 local folder 与云在抽象层不可分（folder=另一朵云）→ **云没有特殊性**——哥哥妹妹同一台电脑、
+两个文件夹库、两套手感、两个身份；两库之间画不自动互通（对，拷贝即分叉）→ 顺势 park
+「**导出图库**」功能（它让 preference/state 之别有物理意义：导出带 preference 不带 state）；
+⑥问：scope ⊗ kind 能不能只是 **preference 和 state 两个对象**而不是 8 个；⑦「等等，device
+following 是否完全不需要？兄妹共用电脑的模型。重新帮我判断已拍板的东西」。
+
+### 9.1 重判（判据一句话：**换台机器该不该跟着走？换个人该不该跟着走？**）
+
+| 项 | 旧拍 | 兄妹模型重判 | 终判建议 |
+|---|---|---|---|
+| single-finger-draw | device 特例 | 像个人习惯，**但真 nature 是硬件耦合**（同一人 iPad 要开、台式机要关——跟人反而错）；VS Code 先例：machine-specific settings 被排除在 Settings Sync 外 | **device**（硬件耦合类） |
+| stylus-smooth-params | device | 同上，数位板/笔硬件调参 | **device** |
+| cloud-enabled | device state | 部署/环境开关，身份出现之前就要可读（自举） | **device** |
+| restore-attempt | device state | 崩溃是这台机器的事件，保护的是「下一个坐下的人」 | **device** |
+| color-theme | 跟设备 | 品味成分有，但环境耦合也真（OLED/暗房），且一键可切、兄妹互不伤 | **device 维持原拍**（若要跟人=账号层+boot 快照缓存，代价是登录前后闪变——不推荐） |
+| **current-file** | device→localStorage | ★兄妹暴击点：妹妹开机不该落进哥哥的画。但 v438 红线：它**绝不能云同步**（跨设备毒化驱逐守卫）。解 = **device 存、按 gallery 键控**：device-kv `currentFile:<galleryId>`——切到谁的库就恢复谁的画，零云同步 | **device state，per-gallery key**（P5 单库期=单键，P3 白送多键） |
+| menu-tab / pixel-grid / long-press-pick | per-doc | 不受兄妹模型影响（跟画走天然跟对了人） | **ora（desk）** |
+| lang / api token / blender-panel-url / 其余品味 prefs | synced/账号 | 兄妹模型正面强化：跟身份走 ✓（lang 的 boot 快照=登录前缓存，不是层） | **account** |
+| show-fps | session-only | 无 scope 议题 | **session** |
+
+**结论**：device scope 不消失，但收窄为「硬件/环境/本机事件耦合」四件半；「纯品味」全部 account。
+判据进 registry 纪律：新字段必答两问（换机？换人？）→ 四象限定 scope。
+
+### 9.2 两对象 API（⑥答：**能，且应该**）
+
+scope 是**每个 key 的属性**，不是对象边界——门面只有两个：
+
+```ts
+type Scope = "ora" | "device" | "account" | "gallery" | "session";
+// registry（DEFAULTS SSoT 扩一列 scope；kind 由「在哪个对象里」表达）：
+preferences: { "pixel-grid": {scope:"ora", def:true}, "single-finger-draw": {scope:"device", def:false},
+               "lang": {scope:"account", def:null}, ... }
+state:       { "current-file": {scope:"device", perGallery:true, def:null}, "restore-attempt": {scope:"device"},
+               "api-token": {scope:"account"}, "current-directory": {scope:"gallery"}, ... }
+// 读写：preferences.get(k) / state.set(k,v)——host 按 scope 路由引擎（desk / device-kv / account
+// collection / gallery collection / RAM）。UI scope 微章 = registry 一查即得。
+```
+
+**「synced」一词退役**：它命名的是机制不是 scope；scope 词表 = ora/device/account/gallery/session。
+gallery-password-verifier 独立安全件，不进这两个对象。
+
+### 9.3 parked 登记
+
+- **导出图库**（user 2026-08-27）：把库（画 + preference 资产）打包带走/导入——preference/state
+  之别的物理意义所在（导出带 preference 不带 state）。P3 后议。
+
+### 9.4 wipeLocal 是什么（④答）
+
+P7「还原出厂设置」（verdicts §2.10，user 2026-08-25 拍的工单）要清这台设备的一切本地痕迹，其中
+包括 **store 的本地缓存库**（weebpaint.defaultStore IDB）。app 自己 deleteDatabase 别家的库 = 绕库
+红线，所以需要库出口子；「强制 type consent 且比对在库内做」是 user 2026-08-27 本轮自己加的硬化
+（app 永远拿不到跳过比对的路径）。**不急**：P7 开工前 escalate 即可，不进本次 store handoff。
