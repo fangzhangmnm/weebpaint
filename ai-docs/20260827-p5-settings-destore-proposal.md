@@ -253,3 +253,26 @@ P7「还原出厂设置」（verdicts §2.10，user 2026-08-25 拍的工单）�
 包括 **store 的本地缓存库**（weebpaint.defaultStore IDB）。app 自己 deleteDatabase 别家的库 = 绕库
 红线，所以需要库出口子；「强制 type consent 且比对在库内做」是 user 2026-08-27 本轮自己加的硬化
 （app 永远拿不到跳过比对的路径）。**不急**：P7 开工前 escalate 即可，不进本次 store handoff。
+
+### 9.5 第四轮问答（user 2026-08-27）
+
+**Q1：preference 和 state 要不要合并成一个 settings？VS Code 怎么做的？**
+VS Code **不合并**，两套系统物理分离：
+- **Settings** = settings.json——用户**亲笔的声明式文档**（可手编、可 diff、.vscode/settings.json
+  可进 git），设置 UI 只展示它；带 scope（application/machine/window/resource——machine 级被
+  Settings Sync 排除，即我们的 device scope 先例）。
+- **State** = Memento/globalState/workspaceState——**机器写的暗库**（state.vscdb），不可手编、
+  不进设置 UI，在 Settings Sync 里是独立开关的另一类（"UI State"）。
+本质区别：settings 是**用户拥有的文档**，state 是**app 记的数据库**。
+建议照抄不合并（两个门面共享一套引擎），理由全是已拍事实的推论：①导出图库带 preference 不带
+state（user 自己给出的物理意义）②设置 UI 只列 preference ③还原粒度（还原设置 vs 还原出厂）
+④写入姿态不同（pref=稀疏用户动作；state=高频 app 写——current-file 每次换画、restore-attempt
+每次 boot，防抖/flush 策略不同）。命名可顺 VS Code 改叫 `settings` + `state`（纯改名）。
+
+**Q2：「毒化驱逐守卫」是什么意思？**（v438 案，app-state.ts 头注释有案底）
+store 的 reconcile/驱逐路径有一条 K1 红线守卫：**绝不动「本机当前打开的画」的本地副本**，
+它问 app「现在开着谁」= `activeFileName()` = 读 currentFile。当年 currentFile 住 **synced**
+collection：设备 B 打开 Y → 同步到设备 A → A 的守卫以为本机开着 Y，**不再保护 A 真正开着的 X**
+——X 的本地副本可能在编辑中被 reconcile 驱逐/覆写。「远端设备的选择在驾驶本机的安全守卫」=
+毒化。v438 修 = currentFile 迁 device-local；教训钉成红线：**安全守卫的输入必须是本机真相，
+永不可来自同步通道**——这就是 current-file 永不上云、只能 device（按 gallery 键控）的原因。
