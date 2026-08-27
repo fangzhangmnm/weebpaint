@@ -369,4 +369,6 @@ store escalation ①（appfolder 根 collection）**作废**；「同帐多库�
   全 app 裸 localStorage 清零）。
 - **Slice C UI 半边（待做）**：设置 sheet scope 分区（「这幅画/这台设备/你的账号(库)」人话标题 +
   行尾 scope 微章 + 未登录折叠）+ 三枚 scope 图标登记 SVG Icons TODO。
-- **Slice D（待做）**：brush-rack 写路径收敛（gallery 层照旧 collection）。
+- **Slice D（v0.11.13 / 2026-08-27）**：brush-rack 读面收敛——审计结论：rack v2 的写路径**天生就是**
+  拍板形状（collection=权威、onChange 回灌 shallowRef 镜像），本刀只堵 4 处绕镜像散读
+  （_syncFromCollection 成为唯一直读点，头注释钉）。P5 存量工作至此只剩 Slice C UI 半边。

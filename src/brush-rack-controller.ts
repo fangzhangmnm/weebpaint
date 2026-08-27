@@ -10,6 +10,9 @@
 // 反应式接线（v415 重做，消费方 currentBrush computed 靠此重算）：
 //   笔架内容的**唯一反应式来源 = _brushesRef / _metaRef 两个 shallowRef**，
 //   而它们的**唯一写入点 = collection.onChange**（本地写和云端写 store 一视同仁，见 collection.ts）。
+//   P5 Slice D（2026-08-27）：读面也收敛——**_syncFromCollection 是唯一直读 collection 的地方**，
+//   其余读一律走镜像（= user 拍板「collection=持久层权威、struct=运行时工作副本、onChange 回灌」，
+//   rack v2 天生就是这个形状，本刀只堵 4 处绕镜像的散读）。
 //   → 依赖关系就是数据本身，结构上不可能"忘了通知"。
 //
 //   v415 前是手动计数器 dialReactive.rackVersion：12 处 `rackVersion++` + 3 处 `void rackVersion` 建依赖。
@@ -280,7 +283,7 @@ export class BrushRackController {
     const base = t("name.brushBase").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const re = new RegExp(`^${base}\\s*(\\d+)$`);
     let max = 0;
-    for (const b of getAllBrushes(this.d.collection)) { const m = re.exec(b.name); if (m) max = Math.max(max, parseInt(m[1], 10)); }
+    for (const b of this._brushesRef.value) { const m = re.exec(b.name); if (m) max = Math.max(max, parseInt(m[1], 10)); }   // P5 Slice D：读镜像不直读 collection
     return t("name.newBrushN", { n: max + 1 });
   }
   // v232 (user：「新建笔从当前 active 笔拷贝，名字也从原名派生」)：「水彩」→「水彩 2」→「水彩 3」。
@@ -289,7 +292,7 @@ export class BrushRackController {
     const base = String(srcName || "").replace(/\s*\d+$/, "").trim() || t("name.brushBase");
     const re = new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*(\\d+)$`);
     let max = 1;
-    for (const b of getAllBrushes(this.d.collection)) {
+    for (const b of this._brushesRef.value) {   // P5 Slice D：读镜像
       const m = re.exec(b.name);
       if (m) max = Math.max(max, parseInt(m[1], 10));
     }
@@ -428,13 +431,13 @@ export class BrushRackController {
     });
     if (els.dumpCodeBtn) els.dumpCodeBtn.addEventListener("click", async () => {
       await shareOrDownloadJSON(new Blob([buildRackCode(this._view())], { type: "text/javascript" }), "builtin-brushes.js", t("rack.shareTitle"));
-      this.d.setStatus(t("br.codeExported", { n: getAllBrushes(this.d.collection).length }));
+      this.d.setStatus(t("br.codeExported", { n: this._brushesRef.value.length }));   // P5 Slice D：读镜像
     });
   }
 
   _onNewBrush() {
     const activeId = this.d.state.toolStates[this.getRackToolKey(this.ui.tool)]?.activeBrushId;
-    const all = getAllBrushes(this.d.collection);
+    const all = this._brushesRef.value;   // P5 Slice D：读镜像
     let source = activeId ? findBrush(this._view(), activeId) : null;
     if (!source) {
       const inFolder = (brushesByTool(this._view(), this.ui.tool) as Brush[]).filter((b) => (b.folder || DEFAULT_FOLDER) === this.ui.folder);
