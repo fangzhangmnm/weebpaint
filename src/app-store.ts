@@ -2,7 +2,7 @@
 //   只做 config 注入（provider / ui bundle / crypto codec / crypt / validateAdopt）+ auth 转发 + gallery 列举适配。
 //   app 只碰 store 两面（**file / collection**）+ editor-session。绝不裸碰 kv/IDB/graph/vendor。
 //   （localSettings/syncedSettings 那两面已于 2026-07-13 删除 —— 全部 KV 化进 collection。别照旧注释找。）
-import { createStore, createOneDriveProvider, isCached, isDirty } from "@internal/store";
+import { createStore, createOneDriveProvider, isCached, isDirty, requestStoragePersistence } from "@internal/store";
 import { detectStoreAbsent, createNullStore, createDormantAuth } from "./store-absent.ts";
 import type { Store } from "@internal/store";
 import { stripSessionExt, sessionFileName } from "./config.ts";
@@ -39,6 +39,9 @@ const _createRealStore = (provider: _Prov, auth: _Auth): Store => createStore({
   provider,
   ui: storeUI,
   appId: "weebpaint",   // 本 origin 内唯一命名空间（databaseId 默认 "defaultStore"）：IDB 库 weebpaint.defaultStore + localStorage weebpaint.defaultStore.* 键，与兄弟 PWA(JRP 等)隔离
+  // persist 三件套之②（store 0.6.0 表态制）：app 承诺在**挂图库手势时刻**调 requestStoragePersistence()
+  //   （P3 verdicts：persist 只在 attach gallery 时申请，Editor-only 首开不申请）；库 boot 只做 persisted() 纯查询。
+  persistence: "app-managed",
   // 薄命名（身份=全名）：**app 不再注入 fileName/encFileName**——库默认 fileName 恒等（身份即云端文件名）、
   //   encFileName 追加 .zip（加密容器外扩展名 ADR-0012）。app 在**边界**用 sessionFileName 把裸 session 名转成全名
   //   （X→X.ora）再传库（见 session-state 的 _file / editor-session 的 name；OUT 侧 itemToG 用 stripSessionExt 还原显示）。
@@ -100,7 +103,13 @@ wireAppState(store.collection("synced-app-state"), store.collection("local-app-s
 // ============ auth（转发）============
 export const isAuthConfigured = () => _auth.isAuthConfigured();
 export const initAuth = (...a: Parameters<typeof _auth.initAuth>) => _auth.initAuth(...a);
-export const signIn = (...a: Parameters<typeof _auth.signIn>) => _auth.signIn(...a);
+export const signIn = (...a: Parameters<typeof _auth.signIn>) => {
+  // persist 三件套之③（P3）：signIn = 现阶段唯一「挂图库」手势。在手势**入口**即调（popup 往返会耗尽
+  //   user activation，Firefox 的 persist 弹窗要活着的手势）；fire-and-forget——结果永不改变数据安全行为
+  //   （库契约：persist 是降概率层，真承重 = dirty 窗口短 + 正本不进 IDB）。Slice B 起移进 attachment.attach()。
+  if (!storeAbsent) requestStoragePersistence().catch(() => {});
+  return _auth.signIn(...a);
+};
 export const signOut = (...a: Parameters<typeof _auth.signOut>) => _auth.signOut(...a);
 export const isSignedIn = () => _auth.isSignedIn();
 export const getActiveAccount = () => _auth.getActiveAccount();

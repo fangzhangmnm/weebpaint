@@ -18,7 +18,7 @@ import { RACK_META_ID } from "../src/brushes.ts";
 const dumpKv = () => { const m = new Map(); return { get: (k) => (m.has(k) ? m.get(k) : null), set: (k, v) => m.set(k, String(v)), remove: (k) => m.delete(k), keys: () => [...m.keys()] }; };
 const STUB_UI = { busy: (_l, fn) => fn(), resolveConflict: async () => ({ choice: "cancel" }), reportError: () => {} };
 const mkCollection = () => createStore({
-  appId: "wp", provider: createMockProvider(), ui: STUB_UI, validateAdopt: () => true,
+  appId: "wp", persistence: "none", provider: createMockProvider(), ui: STUB_UI, validateAdopt: () => true,
   kv: dumpKv(), local: createMockLocal(), fileName: (n) => n,
   isOnline: () => false, signedIn: () => false, skipMigration: true,
 }).collection("brush-rack");

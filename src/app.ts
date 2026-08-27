@@ -74,7 +74,9 @@ import { initCrashBanner } from "./crash-banner.ts";            // T-crash 恢�
 //   每个调色器在 src/plugins/ 自成一文件，import 时自注册
 import "./plugins/index.ts";    // 触发 HSB / ColorBalance / Curves / SharpenBlur 自注册
 // candidate 2：导出格式 = 注册表插件（含第一方 ora/psd/png/jpg 自注册）
-import { isAuthConfigured, initAuth, isSignedIn, retrySilentSignIn, brushRackCollection, store as _store } from "./app-store.ts";   // cut-over：cloud/auth/graph 全走 lib
+import { isAuthConfigured, initAuth, isSignedIn, retrySilentSignIn, getActiveAccount, brushRackCollection, store as _store } from "./app-store.ts";   // cut-over：cloud/auth/graph 全走 lib
+import { galleryRegistry } from "./gallery-registry.ts";     // P3 名册器官（播种接线在 boot 收尾段）
+import { cloudPrefEnabled } from "./cloud-capability.ts";
 import { initPreferences, refreshPreferences, flushPreferences, seedDevicePrefsFromLegacy } from "./app-prefs.ts";   // boot 门 + 前台/online 拉云对齐 user-preference（lang/theme/手势）+ 导航前屏障
 import { hydrateSmoothFromPrefs } from "./smooth-config.ts";   // boot 门后合并 synced 平滑调参进 SMOOTH
 import { initAppState, appState, flushAppState } from "./app-state.ts";  // boot 门 + 前台/online 拉云对齐 app-state（current-dir/file/blenderUrl）+ 导航前屏障
@@ -477,6 +479,7 @@ updateCloudAuthUI();
 if (isAuthConfigured()) {
   initAuth().then(() => {
     updateCloudAuthUI();
+    _seedGalleryRegistry();                                   // P3 播种（幂等）：既有登录态 → legacy OneDrive 名册条目
     // gallery-first: boot 时 gallery 可能已经渲染过（auth 没好 → 只有本地）；
     // auth 完成后 if gallery 还开着 → 重渲染拿云端列表
     if (!els.galleryFull.classList.contains("hidden")) gallery.refresh();
@@ -484,11 +487,25 @@ if (isAuthConfigured()) {
     reportError(new Error("[auth] init failed: " + String(e)), "log");
   });
 }
+// P3 registry 播种（gallery-registry 器官保持纯净、不 import app 面——auth/pref 参数在此喂）。
+// 幂等靠 dedup 不靠标记：冷 boot 时 activeAccount 可能还没从缓存醒来，故 initAuth 后 + 每次 auth 变化都试。
+function _seedGalleryRegistry(): void {
+  try {
+    const acct = getActiveAccount() as { homeAccountId?: string; username?: string; name?: string } | null;
+    if (!acct?.homeAccountId) return;
+    galleryRegistry.seedLegacyOneDrive({
+      homeAccountId: acct.homeAccountId,
+      username: acct.username || acct.name || "",
+      cloudEnabled: cloudPrefEnabled(),                       // 关云用户 → lastActive=null（P5 §9.8 收编入口）
+    }).catch((e) => reportError(new Error("[gallery-registry] seed failed (soft): " + String(e)), "log"));
+  } catch (e) { reportError(new Error("[gallery-registry] seed failed (soft): " + String(e)), "log"); }
+}
 // auth 可观察 seam（候选1）：接缝 app-store 在**每个** auth 转变（登录回来/后台silent/登出/过期F2）fire wp:auth-changed（库 0.1.0 起不碰 window 事件，接缝订阅 onAuthChanged 转发）。
 // UI 订阅一次 → 按钮蓝/灰、save 图标、云列表 全自动同步，永不漂移、不再靠散落手 poke。
 window.addEventListener("wp:auth-changed", () => {
   updateCloudAuthUI();
   updateSaveStatus();                                       // 候选2：auth 变化影响 save 图标
+  _seedGalleryRegistry();                                   // P3 播种（幂等；登录回来/silent 恢复都会经这里）
   if (!els.galleryFull.classList.contains("hidden")) gallery.refresh();
 });
 // 在线 / 离线变化时刷新云端 UI（标签 / 按钮可见性）。
