@@ -8,7 +8,7 @@
 
 import { updateCloudAuthUI } from "./gallery/cloud-auth-ui.ts";
 import { els } from "./els.ts";
-import { syncedUserPreference, localUserPreference, PREF_DEFAULTS } from "./app-prefs.ts";   // 手势/视图开关=跨设备；menu-tab=设备本地
+import { preferences } from "./app-prefs.ts";   // P5 唯一门面：scope 由 registry 定（手势/视图/开关各归其层）
 import { desk } from "./workbench-state.ts";   // checkboard = per-doc desk（载入时经 wp:applyEditorState 应用到 board）
 import { applyTheme, themeLabel, THEMES, currentTheme } from "./theme.ts";
 import { t, lang, setLang, LANGS, langDisplayName, type Key } from "./i18n/index.ts";
@@ -62,7 +62,7 @@ function renderLongPressPick(on: boolean) {
 }
 function applyLongPressPick(on: boolean) {
   renderLongPressPick(on);
-  syncedUserPreference.setItem("long-press-pick", !!on);   // 跨设备偏好
+  preferences.set("long-press-pick", !!on);   // gallery 层（Slice C 迁 desk=跟画）
 }
 function renderSingleFingerDraw(on: boolean) {
   state.singleFingerDraw = !!on;
@@ -70,7 +70,7 @@ function renderSingleFingerDraw(on: boolean) {
 }
 function applySingleFingerDraw(on: boolean) {
   renderSingleFingerDraw(on);
-  syncedUserPreference.setItem("single-finger-draw", !!on);   // 跨设备偏好（默认关——不拦鼠标，见 pointer-route）
+  preferences.set("single-finger-draw", !!on);   // device 层（硬件耦合；默认关——不拦鼠标，见 pointer-route）
 }
 export function applyCheckerboard(on: boolean) {
   // v125: checkerboard per-doc，不再写 localStorage
@@ -88,7 +88,7 @@ function renderPixelGrid(on: boolean) {
 }
 function applyPixelGrid(on: boolean) {
   renderPixelGrid(on);
-  syncedUserPreference.setItem("pixel-grid", !!on);
+  preferences.set("pixel-grid", !!on);   // gallery 层（Slice C 迁 desk=跟画）
 }
 
 // v275 FPS 计：dev 性能读数（角落 overlay）；跨设备偏好（synced-user-preference），默认关。防煤气灯。
@@ -98,13 +98,13 @@ function renderFps(on: boolean) {
 }
 function applyFps(on: boolean) {
   renderFps(on);
-  syncedUserPreference.setItem("show-fps", !!on);
+  preferences.set("show-fps", !!on);   // session 层（不持久化，user 拍板）
 }
 
 // v0.5.28 生成式 AI 总开关：body[data-gen-ai] = 全 app 热切换钩子（未来 AI UI 挂 .needs-gen-ai 类即受控；
 //   JS 消费者直读 pref）。不进 boot——功能入口显隐，fixup 相回灌晚一拍无感知（boot 门只配 lang/theme 那类 eval 期锁死值）。
 export function genAiEnabled(): boolean {
-  return syncedUserPreference.getItem<boolean>("gen-ai", PREF_DEFAULTS["gen-ai"]);
+  return preferences.get("gen-ai");
 }
 function renderGenAI(on: boolean) {
   document.body.dataset.genAi = on ? "1" : "";
@@ -114,7 +114,7 @@ function renderGenAI(on: boolean) {
 }
 function applyGenAI(on: boolean) {
   renderGenAI(on);
-  syncedUserPreference.setItem("gen-ai", !!on);
+  preferences.set("gen-ai", !!on);
 }
 
 // ============ 云端功能开关 v1（2026-08-21 user 拍板；接缝 = cloud-capability.ts）============
@@ -176,15 +176,15 @@ function _renderShortcutsSheet() {
 //   **只 render 不写盘**（见上方纪律）——这是 P0-1 的修复核心：boot 路径永不 setItem。
 export function renderSettingsFromPrefs(): void {
   // v0.5.27：☰ 停留页回灌（设备本地 pref；无效值回 file）
-  const savedTab = localUserPreference.getItem<string>("menu-tab", PREF_DEFAULTS["menu-tab"]);
+  const savedTab = preferences.get("menu-tab");   // device 过渡态（Slice C 迁 desk=跟画）
   if (_menuTabs.some((b) => b.dataset.menuTab === savedTab)) { _menuTab = savedTab; _applyMenuTab(); }
 
-  renderPixelGrid(syncedUserPreference.getItem<boolean>("pixel-grid", PREF_DEFAULTS["pixel-grid"]));
-  renderFps(syncedUserPreference.getItem<boolean>("show-fps", PREF_DEFAULTS["show-fps"]));
+  renderPixelGrid(preferences.get("pixel-grid"));
+  renderFps(preferences.get("show-fps"));
   renderGenAI(genAiEnabled());
   renderCloudEnabled();   // 云端功能开关真值回灌（设备本地 pref；只 render 不写盘）
-  renderLongPressPick(syncedUserPreference.getItem<boolean>("long-press-pick", PREF_DEFAULTS["long-press-pick"]));
-  renderSingleFingerDraw(syncedUserPreference.getItem<boolean>("single-finger-draw", PREF_DEFAULTS["single-finger-draw"]));
+  renderLongPressPick(preferences.get("long-press-pick"));
+  renderSingleFingerDraw(preferences.get("single-finger-draw"));
 }
 
 export function setMenuOpen(open: boolean) {
@@ -223,7 +223,7 @@ export function initSettingsMenu(ctx: AppContext) {
     for (const b of _menuTabs) b.addEventListener("click", (e: Event) => {
       e.stopPropagation();
       _menuTab = b.dataset.menuTab!;
-      localUserPreference.setItem("menu-tab", _menuTab);   // v0.5.27：停留页持久化（设备本地 pref）
+      preferences.set("menu-tab", _menuTab);   // v0.5.27：停留页持久化（device 过渡态，Slice C 迁 desk）
       _applyMenuTab();
     });
     _applyMenuTab();

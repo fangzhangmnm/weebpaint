@@ -7,13 +7,15 @@
     <meta name="theme-color" content="#121110" media="(prefers-color-scheme: dark)" />
     <script>
       // Theme guard：在样式表生效前把 [data-theme] 落上去，避免 FOUC。
-      // 键 = weebpaint.boot.theme（src/boot-snapshot.ts 的快照；SSoT 是 IDB collection，但 IDB 异步、
-      //   pre-paint 读不到 → 必须有这份同步镜像。写入方 = theme.ts 的 applyTheme/对账）。
-      //   ⚠ v406-v408 这里读的是 `webpaint.theme`，而那个键在迁 collection 时没了写入方 →
-      //     guard 静默失效、夜间冷启动闪白。改键名时**务必**同步改 theme.ts，否则又是同样的哑巴回归。
+      // 键 = device-kv 的 pref:color-theme（P5 2026-08-27：theme SSoT=device-kv 单源——本 guard 与
+      //   theme.ts 运行时读**同一个键**，JSON 存储所以剥引号；旧 weebpaint.boot.theme 只作升级兜底读）。
+      //   ⚠ 改键名时**务必**同步改 device-kv.ts 的 PREFIX / app-prefs 的 _dk，否则 guard 静默失效、
+      //     夜间冷启动闪白（v406-v408 的 webpaint.theme 哑巴回归同款）。
       (function () {
         try {
-          var saved = localStorage.getItem("weebpaint.boot.theme");
+          var saved = localStorage.getItem("weebpaint-bd6cece69075d759:pref:color-theme")
+                   || localStorage.getItem("weebpaint.boot.theme");
+          if (saved) saved = saved.replace(/"/g, "");
           if (saved === "day" || saved === "night" || saved === "auto") {
             document.documentElement.setAttribute("data-theme", saved);
           }

@@ -2,7 +2,7 @@
 // created 2026-08-27 by Claude Fable 5.
 //
 // 纪律：**全 app 禁裸 localStorage**（user 拍板「零散的小字段不碰裸 localstorage/idb，只走抽象的记录」）
-//   ——device 层标量与小记录一律经本器官。例外：boot-snapshot.ts（pre-paint 极早期，Slice B 收编）。
+//   ——device 层标量与小记录一律经本器官。例外：boot-snapshot.ts（lang 的 eval 期快照缓存，独立纪律，见该文件头）。
 // 无地姿态：localStorage 在 file:// Safari / 隐私模式可抛 SecurityError → try/catch 降级**纯内存**
 //   （survey §5.3；本 session 内行为完整，只是不跨刷新——无地拍板接受）。
 // key 前缀带 GUID 命名空间（verdicts §2.9 同源：file:// 共桶防撞；纪律：永不碰非自己前缀的键）。

@@ -354,9 +354,13 @@ store escalation ①（appfolder 根 collection）**作废**；「同帐多库�
   legacy 幂等播种）；boot-restore 端口 typed 化（getResume；flushMarker 端口退役=同步落盘契约）；
   session/app-store/boot 全接线；legacy appState.currentFile/restore-attempt 停写只读（播种源）。
   测试：test/resume-slate.test.mjs + boot-restore 全量跟改。
-- **Slice B（待做）**：preferences/state 两门面 + registry（scope 列）+ 全 callsite 迁移
-  （device 组：single-finger-draw/stylus-smooth/color-theme/cloud-enabled[过渡态]；session 组：
-  show-fps；boot-snapshot 收编 device-kv）。
+- **Slice B（v0.11.11 / 2026-08-27）**：preferences 唯一门面 + PREF_REGISTRY（scope 列：device/
+  gallery/session）；device 组迁 device-kv（color-theme/single-finger-draw/stylus-smooth-params/
+  cloud-enabled[过渡]/menu-tab[过渡→C]）+ 幂等播种；show-fps=session（零持久化）；
+  **theme 单源化**：collection+boot 快照双源塌成 device-kv 一份，index.html guard 读同键（legacy
+  兜底读）；boot-snapshot 只剩 lang 键；localUserPreference/syncedUserPreference 两导出退役
+  （consumers 全部 preferences.get/set 化）。state 半边：appState struct 照旧（gallery 键为主，
+  P3 一并处理）。测试 = test/app-prefs.test.mjs。
 - **Slice C（待做）**：per-doc 三项迁 desk（pixel-grid/long-press-pick/menu-tab，工厂默认）+
   设置 sheet scope 分区 + 三枚 scope 图标登记 SVG Icons TODO。
 - **Slice D（待做）**：brush-rack 写路径收敛（gallery 层照旧 collection）。

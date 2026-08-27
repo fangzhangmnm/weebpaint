@@ -1,75 +1,102 @@
-// 职责（单一）：两个 user-preference collection（设备本地 / 跨设备）的**注入点 + DEFAULTS SSoT**。
+// app-prefs.ts —— **preferences 门面**（P5 Slice B，2026-08-27；设计 = ai-docs/20260827-p5-settings-destore-proposal.md §9）。
+// edited by Claude Fable 5.
 //
-// preference = 冷路径：app 各处**直读** collection——`syncedUserPreference.getItem("lang", PREF_DEFAULTS.lang)`。
-//   collection 托底内存镜像（同步读写、防抖持久化、init 后台对齐云端）。不写第二份数据结构、无中央 registry，靠 grep。
+// 六类分类学落地（preferences 半边）：**scope 是每个 key 的属性，门面只有一个**——
+//   consumers 一律 `preferences.get/set(key)`，按 registry 的 scope 路由引擎：
+//   · device  → device-kv（localStorage 同步读写；无地降级纯内存）——「跟机器走」（硬件/环境耦合）
+//   · gallery → collection（现 = synced-user-preference；P3 起 per-gallery）——「跟身份/库走」
+//   · session → RAM（不持久化，user 拍板 show-fps 专用档）
+//   · ora     → desk（per-doc；Slice C 迁入，不经本门面）
+// SSoT 拍板（§4/§7）：gallery 层 collection=持久层权威（LWW/防抖/reconcile 全归库）；device 层
+//   device-kv 即真相（同步读 → 「注入前读返 DEFAULTS」的时序枷锁对 device 键消失）。
+// cloud-enabled = 过渡态（§9.8：P3 由 registry attached-gallery 收编取代）。
 //
-// ⚠**刻意不 import app-store**：lang/theme 被极多 leaf 与 node 测在**模块 eval 期**读（i18n 的 t()、theme），
-//   若拖进 app-store 就把整个 store/crypto/msal 栈塞进每个用 t() 的模块 + i18n↔store-ui 成环。
-//   故 collection 由 app-store 建好 store 后**惰性注入**（wirePreferences）；注入前读返 DEFAULTS（boot 安全）。
-//   boot：`initPreferences()` 返 promise（内部先 hydrate 本地、快、离线 OK），app.ts 存成 `prefsReady`。
-//   v409 起**不再是 TLA 门**：lang/theme 走 localStorage boot 快照（src/boot-snapshot.ts）解决 eval 期/pre-paint,
-//   其余消费方各自 await prefsReady（app.ts 的 fixup 相）。（历史注释说的 "dynamic import app-main" 那个模块从未存在。）
-import type { Collection } from "./app-store.ts";   // B2：类型经接缝转口（type-only 构建期擦除，不成 i18n 运行时环——「不 import app-store」钉子的 why 只关运行时）
+// ⚠ 仍刻意不 import app-store（防成环，同旧版）：gallery collection 由 app-store 惰性注入
+//   （wirePreferences）；注入前 gallery 键读返 default（boot 安全）。
+import type { Collection } from "./app-store.ts";   // type-only（构建期擦除，无运行时环）
+import { deviceKvGetJson, deviceKvSetJson } from "./device-kv.ts";
 
-// ── DEFAULTS SSoT（唯一处；getItem 缺省从这里取，别处不 inline）───────────────────────────
-export const PREF_DEFAULTS = {
-  // 设备本地（local-user-preference）：跟设备环境/硬件走
-  "color-theme": "auto" as string,          // auto / day / night（主题 = 跟设备的日夜/环境）
-  "menu-tab": "file" as string,             // ☰ 停留页（v0.5.27；设备本地——同主题，视觉习惯不跨设备）
-  // 云端功能开关（2026-08-21 拍板，接缝=cloud-capability.ts）。**必须设备本地**：若进 synced
-  //   collection，别的设备一关就把这台也关了（还得靠云同步传播「关云」本身，自相矛盾）。
-  "cloud-enabled": true as boolean,
-  // 跨设备（synced-user-preference）：跟人/identity 走
-  "lang": null as string | null,            // 界面语言（null=跟系统）
-  "long-press-pick": true as boolean,       // 长按吸色手势（spec 表默认 true）
-  "single-finger-draw": false as boolean,   // 单指作画（默认关——保证不拦鼠标/误触）
-  "show-fps": false as boolean,             // FPS 计叠层
-  "pixel-grid": true as boolean,            // 像素栅格叠层
-  "stylus-smooth-params": {} as Record<string, number>,   // 手写笔平滑调参（hidden debug；对象存 SMOOTH 覆盖，默认{}=全用 SMOOTH_DEFAULTS）
-  "gen-ai": false as boolean,               // 生成式 AI 功能总开关（v0.5.28；控制未来 AI UI 显隐——热切换不进 boot）
+// ── registry SSoT（唯一处）：def + scope。新键必答两问（换台机器该跟吗？换个人该跟吗？）──
+export const PREF_REGISTRY = {
+  // device（跟机器走：硬件/环境耦合。兄妹共用电脑模型 §9.1 重判过）
+  "color-theme":          { scope: "device", def: "auto" as string },            // 环境耦合（OLED/暗房），一键可切
+  "single-finger-draw":   { scope: "device", def: false as boolean },            // 硬件耦合：同人 iPad 开/台式关（VS Code machine-scope 先例）
+  "stylus-smooth-params": { scope: "device", def: {} as Record<string, number> },// 数位板/笔硬件调参
+  "cloud-enabled":        { scope: "device", def: true as boolean },             // ⚠ 过渡态（§9.8：P3 registry 收编后退役）
+  "menu-tab":             { scope: "device", def: "file" as string },            // ⚠ 过渡态（user 拍板 per-doc；Slice C 迁 desk）
+  // gallery（跟身份/库走；P3 per-gallery，现 = synced collection）
+  "lang":                 { scope: "gallery", def: null as string | null },
+  "gen-ai":               { scope: "gallery", def: false as boolean },
+  "long-press-pick":      { scope: "gallery", def: true as boolean },            // ⚠ user 拍板跟文件；Slice C 迁 desk
+  "pixel-grid":           { scope: "gallery", def: true as boolean },            // ⚠ user 拍板必跟 ora；Slice C 迁 desk
+  // session（不持久化；「不持久化档不设」的唯一例外 = show-fps，user 明允）
+  "show-fps":             { scope: "session", def: false as boolean },
 } as const;
-export type PrefKey = keyof typeof PREF_DEFAULTS;
+export type PrefKey = keyof typeof PREF_REGISTRY;
+type PrefValue<K extends PrefKey> = (typeof PREF_REGISTRY)[K]["def"];
 
-// ── collection 注入 + 直读面 ────────────────────────────────────────────────────────────
-let _local: Collection | undefined;
-let _synced: Collection | undefined;
+// 兼容导出（少数测试/旧注释引用形状）：key → default 的平铺视图。
+export const PREF_DEFAULTS = Object.fromEntries(
+  Object.entries(PREF_REGISTRY).map(([k, v]) => [k, v.def]),
+) as { [K in PrefKey]: PrefValue<K> };
 
-// app-store 唯一调：建好 store 后把两个 collection 接进来（local-user-preference 走 {local:true}）。
+// ── 引擎 ────────────────────────────────────────────────────────────────
+let _local: Collection | undefined;    // legacy 无云 collection：P5 起零消费者（device 键播种源；store handoff ② 后随库退役）
+let _synced: Collection | undefined;   // gallery 层引擎（P3 起换成「当前 gallery 的 collection」——本门面是唯一改点）
+const _session = new Map<string, unknown>();
+const _dk = (k: string) => `pref:${k}`;
+
 export function wirePreferences(local: Collection, synced: Collection): void { _local = local; _synced = synced; }
 
-// boot 门：hydrate 两个 collection（各自 init 内部先 hydrate 本地再后台对齐云端）。快、离线 OK。
-//   **memoized**：init() 不可重入（seedInit / ready 翻转），而 preferencesReady() 需要同一个 promise。
 let _ready: Promise<void> | undefined;
 export function initPreferences(): Promise<void> {
   return (_ready ??= Promise.all([_local?.init() ?? Promise.resolve(), _synced?.init() ?? Promise.resolve()]).then(() => undefined));
 }
-// 冷路径写入方（setLang 等）用：collection 未 hydrate 时 setItem 会抛（collection.ts:253），
-//   而设置菜单一 boot 就可点。await 这个再写。未 init（测试/极早）→ 立即 resolve，setItem 照常抛（是想要的）。
 export function preferencesReady(): Promise<void> { return _ready ?? Promise.resolve(); }
-// 导航前屏障（v417）：两个 preference collection 的内存 env 立即落本地缓存。
-//   见下面 face().flushLocal 的注释——凡"写完就走"的路径都得先过这一关。
+/** 导航前屏障（gallery 层；device 层同步写无需 flush）：写完就 reload/关页的路径必须 await。 */
 export function flushPreferences(): Promise<void> {
   return Promise.all([_local?.flushLocal() ?? Promise.resolve(), _synced?.flushLocal() ?? Promise.resolve()]).then(() => undefined);
 }
-// 事件驱动（focus/visible/online）重拉云端 + resolve（per-key LWW）。app 在既有 foreground/online 钩子调。
+/** 前台/online 重拉云端（gallery 层 per-key LWW）。 */
 export function refreshPreferences(): Promise<void> {
   return Promise.all([_local?.reconcileWithRemote() ?? Promise.resolve(), _synced?.reconcileWithRemote() ?? Promise.resolve()]).then(() => undefined);
 }
 
-// 直读面：未注入前（boot 极早/测试）安全返 default / no-op。
-function face(get: () => Collection | undefined) {
-  return {
-    getItem<V = unknown>(id: PrefKey, def: V): V { const c = get(); return c ? c.getItem<V>(id, def) as V : def; },
-    setItem(id: PrefKey, value: unknown): void { get()?.setItem(id, value); },
-    onChange(cb: (changedIds: string[]) => void): () => void { return get()?.onChange(cb) ?? (() => undefined); },
-    // 导航前屏障：setItem 只改内存 + 排 400ms 防抖写（collection.ts:169-172）。
-    //   凡"写完就 reload / 就关页"的调用方**必须** await 这个，否则定时器随页面一起死、字节从没进 IDB。
-    //   （v417：语言切换无效的根因就是这个——setLang 写完立刻 location.reload()。theme 不 reload 所以没事。）
-    //   ok=false = 本地压根没写进去（配额满/IDB 被拒）→ 调用方该 surface，别当成功（v436）。
-    flushLocal(): Promise<{ ok: boolean; error?: unknown }> { return get()?.flushLocal() ?? Promise.resolve({ ok: true }); },
-  };
+// ── 唯一门面 ─────────────────────────────────────────────────────────────
+export const preferences = {
+  get<K extends PrefKey>(k: K): PrefValue<K> {
+    const { scope, def } = PREF_REGISTRY[k];
+    if (scope === "device") return deviceKvGetJson(_dk(k), def) as PrefValue<K>;
+    if (scope === "session") return (_session.has(k) ? _session.get(k) : def) as PrefValue<K>;
+    return _synced ? (_synced.getItem(k, def) as PrefValue<K>) : def;   // gallery：hydrate 前返 default（同旧约）
+  },
+  set<K extends PrefKey>(k: K, v: PrefValue<K>): void {
+    const { scope } = PREF_REGISTRY[k];
+    if (scope === "device") { deviceKvSetJson(_dk(k), v); return; }
+    if (scope === "session") { _session.set(k, v); return; }
+    _synced?.setItem(k, v);
+  },
+  /** gallery 层云端变更回灌钩（device/session 层无远端，不经此）。 */
+  onChange(cb: (changedIds: string[]) => void): () => void { return _synced?.onChange(cb) ?? (() => undefined); },
+};
+
+// ── 一次性播种（幂等；app.ts fixup 相调，collection hydrate 之后）───────────
+// device 键从 legacy collection 迁入：device-kv 没有值 && collection 里有非默认值 → 拷。
+// 旧居：color-theme/menu-tab/cloud-enabled 在 _local；single-finger-draw/stylus-smooth-params 在 _synced。
+const _LEGACY_HOME: Partial<Record<PrefKey, () => Collection | undefined>> = {
+  "color-theme": () => _local, "menu-tab": () => _local, "cloud-enabled": () => _local,
+  "single-finger-draw": () => _synced, "stylus-smooth-params": () => _synced,
+};
+export function seedDevicePrefsFromLegacy(): void {
+  for (const [k, home] of Object.entries(_LEGACY_HOME) as [PrefKey, () => Collection | undefined][]) {
+    try {
+      if (deviceKvGetJson<unknown>(_dk(k), undefined as unknown) !== undefined) continue;   // 已有 → 不覆盖
+      const c = home();
+      if (!c) continue;
+      const legacy = c.getItem<unknown>(k, undefined as unknown);
+      if (legacy !== undefined && JSON.stringify(legacy) !== JSON.stringify(PREF_REGISTRY[k].def)) {
+        deviceKvSetJson(_dk(k), legacy);
+      }
+    } catch { /* 播种失败=落默认，非数据事故（legacy 值仍在 collection 里） */ }
+  }
 }
-// 设备本地偏好（color-theme）。
-export const localUserPreference = face(() => _local);
-// 跨设备偏好（lang / 手势 / fps / pixel-grid）。
-export const syncedUserPreference = face(() => _synced);

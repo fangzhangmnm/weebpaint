@@ -10,6 +10,7 @@ import "./doc-home.test.mjs";             // P1 2026-08-26 一画一家：keeper
 import "./naming.test.mjs";               // P1 命名器官：yyyymmdd-hex4 / 下载分钟戳（verdicts §2.1 三粒度）
 import "./crash-store.test.mjs";          // P2 T-crash 库：pending 拒删/原子领养/单帧覆盖（verdicts §2.2 契约钉）
 import "./resume-slate.test.mjs";         // P5 回执条+device-kv：typed 三态/标记同记录/播种幂等/无地降级
+import "./app-prefs.test.mjs";            // P5 preferences 门面：scope 路由（device/gallery/session）+ 播种幂等
 import "./cloud-image-model.test.mjs";    // v0.9.29 云盘图片 picker：扩展名路由/thumb token/白底平铺/jpeg 编码接缝（spec 20260820）
 import "./brush-rack-migrate.test.mjs";
 import "./engine-registry.test.mjs";

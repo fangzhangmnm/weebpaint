@@ -12,7 +12,7 @@
 //   这台也被关，见 app-prefs.ts 注释）。默认 true。!isAuthConfigured()（容器不支持云）→ 恒 false，
 //   但**不写盘**：配置恢复后自愈回用户存值。
 
-import { localUserPreference, PREF_DEFAULTS } from "./app-prefs.ts";
+import { preferences } from "./app-prefs.ts";
 import { isAuthConfigured } from "./app-store.ts";
 
 /** 开关变更广播（window 事件；detail 无——消费方自己重读 isCloudEnabled()）。 */
@@ -20,7 +20,7 @@ export const CLOUD_CAPABILITY_EVENT = "wp:cloud-capability-changed";
 
 /** 用户存的 pref 原值（不含 isAuthConfigured 门）——设置页 toggle 显示「用户意愿」用。 */
 export function cloudPrefEnabled(): boolean {
-  return localUserPreference.getItem<boolean>("cloud-enabled", PREF_DEFAULTS["cloud-enabled"]);
+  return preferences.get("cloud-enabled");   // device 层（P5：同步读，boot 期即权威；§9.8 过渡态）
 }
 
 /** 云端功能有效开关：容器不支持云（未配置 auth）→ 恒 false；否则读设备本地 pref（默认 true）。 */
@@ -30,6 +30,6 @@ export function isCloudEnabled(): boolean {
 }
 
 export function setCloudEnabled(v: boolean): void {
-  localUserPreference.setItem("cloud-enabled", !!v);
+  preferences.set("cloud-enabled", !!v);
   try { window.dispatchEvent(new Event(CLOUD_CAPABILITY_EVENT)); } catch { /* node 测试环境无 window */ }
 }

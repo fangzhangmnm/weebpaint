@@ -75,7 +75,7 @@ import { initCrashBanner } from "./crash-banner.ts";            // T-crash 恢�
 import "./plugins/index.ts";    // 触发 HSB / ColorBalance / Curves / SharpenBlur 自注册
 // candidate 2：导出格式 = 注册表插件（含第一方 ora/psd/png/jpg 自注册）
 import { isAuthConfigured, initAuth, isSignedIn, retrySilentSignIn, brushRackCollection, store as _store } from "./app-store.ts";   // cut-over：cloud/auth/graph 全走 lib
-import { initPreferences, refreshPreferences, flushPreferences } from "./app-prefs.ts";   // boot 门 + 前台/online 拉云对齐 user-preference（lang/theme/手势）+ 导航前屏障
+import { initPreferences, refreshPreferences, flushPreferences, seedDevicePrefsFromLegacy } from "./app-prefs.ts";   // boot 门 + 前台/online 拉云对齐 user-preference（lang/theme/手势）+ 导航前屏障
 import { hydrateSmoothFromPrefs } from "./smooth-config.ts";   // boot 门后合并 synced 平滑调参进 SMOOTH
 import { initAppState, appState, flushAppState } from "./app-state.ts";  // boot 门 + 前台/online 拉云对齐 app-state（current-dir/file/blenderUrl）+ 导航前屏障
 import { initTileJobs } from "./tile-jobs.ts";
@@ -531,9 +531,10 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 //   若这里调了会 setItem 的路径（applyPixelGrid / gallery.setFolder），就等于「读完立刻回写」，
 //   会把 uat 盖成 now → per-item LWW 退化成「最后冷启动的设备赢」= v406-v408 的 P0-1。
 void prefsReady.then(() => {
-  hydrateSmoothFromPrefs();      // ① 手感热路径：synced 平滑调参合并进 SMOOTH（eval 期是 SMOOTH_DEFAULTS）
+  seedDevicePrefsFromLegacy();   // ⓪ P5 播种（幂等一次）：device 键从 legacy collection 迁 device-kv
+  hydrateSmoothFromPrefs();      // ① 手感热路径：平滑调参合并进 SMOOTH（P5 device 层；eval 期是 SMOOTH_DEFAULTS）
   renderSettingsFromPrefs();     // ② longPressPick / singleFingerDraw / pixel-grid / show-fps（不写盘）
-  reconcileThemeFromPrefs();     // ③ 刷 boot 快照；与快照不符则就地换（主题=css，无 reload）
+  reconcileThemeFromPrefs();     // ③ P5：播种后重读 device-kv，不符就地换（主题=css，无 reload；播种期后恒 no-op）
   reconcileLangFromPrefs();      // ④ 刷 boot 快照；与快照不符则 reload（lang 是 reload 制）—— 可能不返回
   try { gallery.hydrateFolder(appState.currentDirectory); } catch { /* 图库未挂/无夹 */ }   // ⑤ 不写盘变体
   reconcileBlenderUrlFromPrefs();   // ⑥ appState.blenderPanelUrl 真值刷进输入框（不写盘、不碰面板显隐）

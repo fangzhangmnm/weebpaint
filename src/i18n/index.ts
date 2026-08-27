@@ -6,7 +6,7 @@
 
 import { S, type Lang } from "./strings.ts";
 import { tokGlyphsCached, tokGlyphs, stripTokMarkup, ucsurActive, initTokFontGate } from "./ucsur.ts";
-import { syncedUserPreference, preferencesReady, PREF_DEFAULTS } from "../app-prefs.ts";   // 语言 = 跨设备偏好（synced-user-preference collection）
+import { preferences, preferencesReady, flushPreferences } from "../app-prefs.ts";   // 语言 = gallery 层偏好（跟身份走；P5 唯一门面）
 import { readBootSnapshot, writeBootSnapshot } from "../boot-snapshot.ts";   // eval 期读得到的 lang 快照（IDB 异步，见该文件）
 
 export type { Lang } from "./strings.ts";
@@ -34,7 +34,7 @@ const validLang = (v: unknown): Lang | null => (typeof v === "string" && LANGS.i
 
 // collection（SSoT）里的 lang。未设 / 未 hydrate → null（= 跟系统）。
 function langFromPrefs(): Lang | null {
-  return validLang(syncedUserPreference.getItem<Lang | null>("lang", PREF_DEFAULTS.lang as Lang | null));
+  return validLang(preferences.get("lang") as Lang | null);   // gallery 层（跟身份走）
 }
 // 解析优先级：collection（hydrate 后才有值）→ **LS 快照**（eval 期唯一读得到的）→ 跟系统。
 //   快照只在用户显式 setLang / 对账时写，所以"快照有值"≡"用户选过语言"，不会污染"跟系统"语义。
@@ -87,9 +87,9 @@ export function applyHtmlLang() { document.documentElement.lang = htmlLangFor(la
 export async function setLang(l: Lang): Promise<void> {
   if (!LANGS.includes(l) || l === lang()) return;   // 值没变就早退：别白盖 uat 触发无谓云同步
   await preferencesReady();                  // hydrate 前 setItem 会抛（collection.ts:253），而设置菜单一 boot 就可点
-  syncedUserPreference.setItem("lang", l);   // SSoT：synced-user-preference collection（跨设备）
+  preferences.set("lang", l);   // SSoT：gallery 层 collection（跟身份走；P3 per-gallery）
   writeBootSnapshot("lang", l);              // 先刷快照，再 reload —— 顺序不能反，否则 reload 后 eval 期读回旧值
-  await syncedUserPreference.flushLocal();   // ★ 导航前屏障：不等这一下，上面那行等于没写
+  await flushPreferences();   // ★ 导航前屏障：不等这一下，上面那行等于没写
   location.reload();     // reload 制
 }
 
