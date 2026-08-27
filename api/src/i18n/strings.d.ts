@@ -3837,6 +3837,12 @@ export declare const S: {
         readonly ja: "作品が開かれていないため保存できません";
         readonly tok: "sitelen li open ala la awen li ken ala";
     };
+    readonly "ss.blankNothingToSave": {
+        readonly zh: "空白画布，还没有需要保存的内容";
+        readonly en: "Blank canvas; nothing to save yet";
+        readonly ja: "空白のキャンバスのため、まだ保存する内容がありません";
+        readonly tok: "supa sitelen li ala. ijo awen li lon ala.";
+    };
     readonly "ss.notPushedNewer": {
         readonly zh: "未推送：这画由更新版本写成，你取消了覆盖（本地与云端都保持原样）";
         readonly en: "Not pushed: this artwork was written by a newer version and you cancelled the overwrite (local and cloud both left unchanged)";

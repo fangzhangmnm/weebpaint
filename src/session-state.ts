@@ -25,6 +25,7 @@ import type { EncryptedBlob } from "./app-store.ts";   // 密文 at-rest 字节�
 import { openInputSheet, openConfirmSheet, openChoiceSheet, lockSyncGate, settleSyncGate } from "./sheets.ts";
 import { readHandleFile, writeHandleBlob, handleMtime, hasWeebPaintTraces, type LocalFileHandle } from "./local-file-session.ts";
 import { claimHomeAuthority, docHome, fileDirty, saveRoute, SOLE_GALLERY_ID } from "./doc-home.ts";
+import { galleryDefaultName } from "./naming.ts";
 import { pathFolder } from "./gallery/gallery-path.ts";
 import { invalidateCachedThumb } from "./gallery/cloud-thumb-cache.ts";
 import { sessionFileName, sessionBareName, stripSessionExt } from "./config.ts";
@@ -488,9 +489,12 @@ async function saveNow(opts: { implicit?: boolean; commitPending?: boolean } = {
 //   没有它，保存瞬间 dirty 已翻 false、pushPending 还挂着 → 徽章闪「问号虚云」（unpushed 终态），语义不对。
 let _pushInFlight = false;
 async function saveAndPush() {
-  if (_fileHome()) { await saveLocalFileNow(); return; }   // file 家：Ctrl+S/save 按钮 = 写回本地文件（无云腿；= saveRoute 的 file-writeback）
+  if (_fileHome()) { await saveLocalFileNow(); return; }   // file 家：Ctrl+S/save 按钮 = 写回文件（无云腿；= saveRoute 的 file-writeback）
   const name = _activeName();
   if (!name) { setStatus(t("ss.noDocCannotSave"), true); return; }
+  // lazyblank 空白期（P1.5）：es 未绑、磁盘上无此身份——es.persist 的 !_name 门会静默 no-op，
+  //   不拦的话下面会照报「已同步 <名>」（煤气灯）。首笔安家后本守卫自动失效（旗自翻）。
+  if (_docIsBlankUnnamed()) { setStatus(t("ss.blankNothingToSave")); return; }
   _applyPendingForExplicitSave();   // Ctrl+S/save 按钮 = 显式保存：fill 预览 commit + transient apply（QA 2026-08-21）
   // 版本降级守卫：新版本文档未确认 → 只本地不推（saveNow 的 confirm 已挡本地覆盖，这里挡推）。
   if (_loadedDocIsNewer && !_loadedDocNewerConfirmed) {
@@ -790,6 +794,21 @@ async function _restoreSessionAttempt(name: string): Promise<boolean> {
   } catch (e) { reportError(new Error("[session] restore failed: " + String(e)), "log"); return false; }
 }
 
+// ---- lazyblank 新画布（P1.5 2026-08-26 user 拍板「首次打开新画布」）----
+// boot 的「可画新画布」落点（首次 / 恢复失败 / 崩溃断路 / 双实例锁 四条路，boot-restore.openFreshCanvas）。
+// 形状：日期默认名（禁「未命名」）**memory-only**（currentFile 不写——空画布不算「上次开着的画」，
+//   关掉重开还是新画布/图库照旧）；es **不绑**（空白永不落盘、不产生图库垃圾）；
+//   首笔 → es 适配器 onChange 钩子安家：es.adopted(create) + _setActive 持久化身份（Procreate 性，
+//   verdicts §1.2「涂鸦自动帮你进画布不需要 consent」）。空白期 Ctrl+S 由 saveAndPush 的
+//   blankNothingToSave 守卫诚实回话。
+function beginLazyBlank(): void {
+  setName(galleryDefaultName(), { persist: false });
+  _isLazyBlankSession = true; _recomputePhase();
+  _enc.encrypted = false;
+  _loadedDocIsNewer = false; _loadedDocNewerConfirmed = false; updateNewerBanner();
+  updateSaveStatus();
+}
+
 // 另存为：当前内容写新身份（旧的不动）+ 切到新名继续编辑。
 // 无地模式下另存为 = **收编入库**：无地 doc 获得 store 身份，本地文件留在原处不再跟踪。
 async function saveAs(newName: string): Promise<void> {
@@ -906,6 +925,7 @@ export const session = {
   // 无地走本地轨；残影墙期间（_esMuted）es 绝不标脏（防跨写，见无地节注释）。
   markEdited() { if (_fileHome()) { _markLocalDirty(); return; } if (es && !_esMuted) es.markDirty(); },
   setName, restore: restoreSession, saveAs,
+  beginLazyBlank,   // P1.5 boot「可画新画布」落点（boot-restore.openFreshCanvas 唯一调用方）
   refreshOpenDoc,   // 回线/回前台的显式快进（P1 2026-08-25）——app.ts 事件侧唯一入口，别再裸调 pullIfClean
   // 显式换文档挽留门（fill 预览三选；user 2026-08-21）——给 session 外的换内容入口复用
   //   （import-image 的 .ora 导入为新身份）。session 内的 openItem/newDoc/openLocalFile 已内联。
@@ -975,6 +995,13 @@ export function initSession(ctx: AppContext) {
           if (_loadingDoc) return;
           if (_fileHome()) { _markLocalDirty(); return; }   // 墙①：无地编辑走本地脏轨，es 永不标脏
           if (_esMuted) return;                            // 墙②：无地残影——es 身份未重绑前 canvas ≠ es._name，标脏=跨写
+          // P1.5 lazyblank 首笔安家（涂鸦自动进图库，verdicts §1.2）：真出现内容（bbox>0，
+          //   _docIsBlankUnnamed 自翻旗）→ 此刻才绑 es（首存 mode:"new"）+ 持久化身份
+          //   （currentFile 从此指它，boot 恢复得回来）。空白期 es 恒不绑 → 空白永不落盘。
+          if (_isLazyBlankSession && !_docIsBlankUnnamed()) {
+            const nm = _activeName();
+            if (nm) { es.adopted(toFull(nm), { create: true }); _esRebound(); _setActive(nm); }
+          }
           cb();
         };
         window.addEventListener("wp:histchange", h);

@@ -1,5 +1,6 @@
 export interface RestorePorts {
-    /** 持久层记的「上次打开的是谁」。空 → 停在图库。 */
+    /** 持久层记的「上次打开的是谁」。**三态**（P1.5 2026-08-26 user 拍板「首次打开新画布，上次图库则图库」）：
+     *  null=从未绑定（首次）→ 新画布；""=上次停在图库（有意）→ 图库；名 → 自动恢复它。 */
     getWantedName(): string | null;
     /** 真正去开（store.file.open + adopt）。返回是否装入了字节。 */
     restore(name: string): Promise<boolean>;
@@ -23,13 +24,16 @@ export interface RestorePorts {
     onLockedElsewhere(name: string): void;
     /** 关闭态恒 false（含容器未配置 auth）。 */
     isCloudEnabled(): boolean;
-    /** 空白画布落点（canvas-first，P1 2026-08-26）：云关 + 失败/断路/锁 四条路共用。停在 boot 的
-     *  空白画布（app.ts 出生即 backend.blank 2048²、无 session 绑定；gallery overlay 本就默认
-     *  hidden，所以多半是 no-op）——具体为什么没开，由各路自己的 on* 回调如实提示。
-     *  ⚠ 纯 UI 落点，零数据变更：currentFile/标记一个都不碰。 */
+    /** 云关落点（P1.5 起**只剩云关这一条路**用它）：plain 空白画布（无 store 家可安，无 session 绑定；
+     *  P2 transient 接手后升级）。⚠ 纯 UI 落点，零数据变更：currentFile/标记一个都不碰。 */
     openBlankCanvas(): Promise<void>;
     /** 云关落点的提示文案（为什么没自动开上次的画）——与 openBlankCanvas 分离：落点共用、文案各表。 */
     onCloudOff(): void;
+    /** 云开态的画布落点（P1.5）= **可画的新画布**（lazyblank：日期默认名、首笔自动安家进图库——
+     *  瑞士奶酪：云开态不许存在「能画但存不了」的画布）。首次 + 失败/断路/锁 四条路共用；
+     *  与 openBlankCanvas（云关 plain blank，无 store 家可安，P2 transient 接手）分开。
+     *  内部自管身份（memory-only 日期名），故这些路径先 setNameMemoryOnly(null) 再调它不冲突。 */
+    openFreshCanvas(): Promise<void>;
 }
-export type RestoreOutcome = "restored" | "gallery-no-name" | "blank-failed" | "blank-crash-loop" | "blank-locked-elsewhere" | "blank-cloud-off";
+export type RestoreOutcome = "restored" | "fresh-first-boot" | "gallery-deliberate" | "blank-failed" | "blank-crash-loop" | "blank-locked-elsewhere" | "blank-cloud-off";
 export declare function restoreLastSession(p: RestorePorts): Promise<RestoreOutcome>;

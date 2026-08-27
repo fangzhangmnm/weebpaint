@@ -40,13 +40,19 @@ type FileShareNavigator = Navigator & {
 // gallery-first: 空字符串 = 没活动 session（在 gallery）。
 // active session = appState.currentFile（local-app-state，device-local v438；非 null → boot 自动 open）。
 //   null/未设 → 返 ""（停 gallery，等用户选）。try/catch 兜 pre-init（collection 未 hydrate 时 setItem 抛）。
-export function getCurrentSessionName() {
-  try { return appState.currentFile ?? ""; }
-  catch { return ""; }
+// 三态（P1.5 2026-08-26 user 拍板「首次打开新画布，上次图库则图库」）：
+//   null = 从未绑定过（首次/清库）→ boot 落新画布（lazyblank，首笔自动安家）
+//   ""   = 上次离开时停在图库（有意状态）→ boot 恢复图库
+//   名   = 上次开着这张画 → boot 自动恢复它
+// ⚠ 迁移噪音（可接受，device-local）：旧 setter 把 "" 塌成 null 存——存量设备「上次在图库」
+//   会被读成「首次」落一次新画布，下次退图库即自愈。
+export function getCurrentSessionName(): string | null {
+  try { return appState.currentFile ?? null; }
+  catch { return null; }
 }
 export function setCurrentSessionName(name: string) {
   try {
-    appState.currentFile = name || null;
+    appState.currentFile = name;   // "" 原样存（=「在图库」的有意状态，别再塌成 null）
     // 成功持久化非空活动身份 = app 活着且真拿住了一张画（本函数只在 es.open() 成功后/健康操作里被调）
     // → 崩溃环断路标记解除（boot-restore.ts）：手动重开成功后，boot 自动开重新武装。
     if (name) appState.restoreAttempt = null;

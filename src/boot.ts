@@ -67,5 +67,7 @@ export async function bootRestoreSession(ctx: AppContext) {
     //   app 出生即 blank 画布）；为什么没开上次的画由各路 on* 回调的 status 各表。
     openBlankCanvas: async () => {},
     onCloudOff: () => setStatus(t("mi.bootCloudOff")),
+    // P1.5：云开态画布落点 = lazyblank 可画新画布（session 自管日期身份，首笔自动安家）。
+    openFreshCanvas: async () => { session.beginLazyBlank(); },
   });
 }

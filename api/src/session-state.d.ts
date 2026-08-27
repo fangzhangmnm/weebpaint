@@ -46,6 +46,7 @@ declare function openItem(item: GalleryItem): Promise<void>;
 declare function pushItem(item: GalleryItem): Promise<void>;
 declare function unloadItem(item: GalleryItem): Promise<void>;
 declare function restoreSession(name: string): Promise<boolean>;
+declare function beginLazyBlank(): void;
 declare function saveAs(newName: string): Promise<void>;
 declare function refreshOpenDoc(): Promise<void>;
 declare function setName(name: string | null, opts?: {
@@ -73,6 +74,7 @@ export declare const session: {
     setName: typeof setName;
     restore: typeof restoreSession;
     saveAs: typeof saveAs;
+    beginLazyBlank: typeof beginLazyBlank;
     refreshOpenDoc: typeof refreshOpenDoc;
     gateFillOnSwitch: typeof _gateFillOnSwitch;
     save: typeof saveNow;

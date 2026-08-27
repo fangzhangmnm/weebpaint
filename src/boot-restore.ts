@@ -11,7 +11,8 @@
 // 端口全注入 → 这个模块对 app 一无所知，测试可以直接驱动它。
 
 export interface RestorePorts {
-  /** 持久层记的「上次打开的是谁」。空 → 停在图库。 */
+  /** 持久层记的「上次打开的是谁」。**三态**（P1.5 2026-08-26 user 拍板「首次打开新画布，上次图库则图库」）：
+   *  null=从未绑定（首次）→ 新画布；""=上次停在图库（有意）→ 图库；名 → 自动恢复它。 */
   getWantedName(): string | null;
   /** 真正去开（store.file.open + adopt）。返回是否装入了字节。 */
   restore(name: string): Promise<boolean>;
@@ -38,16 +39,19 @@ export interface RestorePorts {
   // ── 云端功能开关（2026-08-21，cloud-capability 接缝）：关 = boot 不自动恢复 store 画 ──
   /** 关闭态恒 false（含容器未配置 auth）。 */
   isCloudEnabled(): boolean;
-  /** 空白画布落点（canvas-first，P1 2026-08-26）：云关 + 失败/断路/锁 四条路共用。停在 boot 的
-   *  空白画布（app.ts 出生即 backend.blank 2048²、无 session 绑定；gallery overlay 本就默认
-   *  hidden，所以多半是 no-op）——具体为什么没开，由各路自己的 on* 回调如实提示。
-   *  ⚠ 纯 UI 落点，零数据变更：currentFile/标记一个都不碰。 */
+  /** 云关落点（P1.5 起**只剩云关这一条路**用它）：plain 空白画布（无 store 家可安，无 session 绑定；
+   *  P2 transient 接手后升级）。⚠ 纯 UI 落点，零数据变更：currentFile/标记一个都不碰。 */
   openBlankCanvas(): Promise<void>;
   /** 云关落点的提示文案（为什么没自动开上次的画）——与 openBlankCanvas 分离：落点共用、文案各表。 */
   onCloudOff(): void;
+  /** 云开态的画布落点（P1.5）= **可画的新画布**（lazyblank：日期默认名、首笔自动安家进图库——
+   *  瑞士奶酪：云开态不许存在「能画但存不了」的画布）。首次 + 失败/断路/锁 四条路共用；
+   *  与 openBlankCanvas（云关 plain blank，无 store 家可安，P2 transient 接手）分开。
+   *  内部自管身份（memory-only 日期名），故这些路径先 setNameMemoryOnly(null) 再调它不冲突。 */
+  openFreshCanvas(): Promise<void>;
 }
 
-export type RestoreOutcome = "restored" | "gallery-no-name" | "blank-failed" | "blank-crash-loop" | "blank-locked-elsewhere" | "blank-cloud-off";
+export type RestoreOutcome = "restored" | "fresh-first-boot" | "gallery-deliberate" | "blank-failed" | "blank-crash-loop" | "blank-locked-elsewhere" | "blank-cloud-off";
 
 export async function restoreLastSession(p: RestorePorts): Promise<RestoreOutcome> {
   // ★ 云端功能关（2026-08-21）：不自动恢复、也不落图库（gating ①把图库藏了）→ 空白画布。
@@ -61,11 +65,19 @@ export async function restoreLastSession(p: RestorePorts): Promise<RestoreOutcom
     return "blank-cloud-off";
   }
   const wanted = p.getWantedName();
-  if (!wanted) {
-    p.setNameMemoryOnly(null);          // 没有上次的画 → 内存名也得是 safe default
+  if (wanted == null) {
+    // ★ 首次（从未绑定）→ 新画布（P1.5 拍板）。openFreshCanvas 自管 lazyblank 身份。
+    p.setNameMemoryOnly(null);          // 幽灵路径纪律①：先降 safe default，身份由落点重立
+    p.updateSaveStatus();
+    await p.openFreshCanvas();
+    return "fresh-first-boot";
+  }
+  if (wanted === "") {
+    // ★ 上次离开时就停在图库（有意状态）→ 图库（这不是 404 fallback，canvas-first 不适用）。
+    p.setNameMemoryOnly(null);
     p.updateSaveStatus();
     await p.openGallery();
-    return "gallery-no-name";
+    return "gallery-deliberate";
   }
   // ★ 纪律④（双实例互认，2026-08-21）：wanted 正被**另一个活窗口**持有 ⇒ ① 不自动开
   //   （双 tab 同画编辑 = 本地字节互覆，入口拦住）；② 这也**不是崩溃**——上一实例还活着，
@@ -76,19 +88,19 @@ export async function restoreLastSession(p: RestorePorts): Promise<RestoreOutcom
   if (await p.isDocLockedElsewhere(wanted)) {
     p.setNameMemoryOnly(null);
     p.updateSaveStatus();
-    await p.openBlankCanvas();          // canvas-first：不跳 gallery，status 说清「在另一窗口」
+    await p.openFreshCanvas();          // canvas-first：不跳 gallery，落可画新画布，status 说清「在另一窗口」
     p.onLockedElsewhere(wanted);
     return "blank-locked-elsewhere";
   }
   // ★ 纪律③（崩溃环断路，v0.10.9）：标记 == 想开的画 ⇒ 上次 boot 死在开它的半路（小内存设备
   //   开超大文件 OOM 被杀等——tab 直接死，永远走不到下面的「优雅失败」分支）。若无此闸，
   //   currentFile 有意不清（纪律②）+ 无条件自动开 = 每次冷启动重开必死的画，用户连图库都进不去。
-  //   跳过自动开、停图库；标记**保留**（之后每次 boot 都跳），直到任意画成功打开
+  //   跳过自动开、落可画新画布（canvas-first）；标记**保留**（之后每次 boot 都跳），直到任意画成功打开
   //   （setCurrentSessionName 清标记）或下次自动开换了目标（下面 setRestoreAttempt 覆写）。
   if (p.getRestoreAttempt() === wanted) {
     p.setNameMemoryOnly(null);
     p.updateSaveStatus();
-    await p.openBlankCanvas();          // canvas-first：断路落画布，status 说清为什么没自动开
+    await p.openFreshCanvas();          // canvas-first：断路落可画新画布，status 说清为什么没自动开
     p.onCrashLoopSkipped(wanted);
     return "blank-crash-loop";
   }
@@ -105,7 +117,7 @@ export async function restoreLastSession(p: RestorePorts): Promise<RestoreOutcom
   p.setRestoreAttempt(null);
   p.setNameMemoryOnly(null);
   p.updateSaveStatus();
-  await p.openBlankCanvas();            // canvas-first（verdicts §2.4）：404 不跳 gallery，status 如实报
+  await p.openFreshCanvas();            // canvas-first（verdicts §2.4）：404 不跳 gallery，落可画新画布，status 如实报
   p.onNotFound(wanted);
   return "blank-failed";
 }

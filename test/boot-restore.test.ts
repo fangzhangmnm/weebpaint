@@ -27,6 +27,7 @@ function ports(over: Partial<RestorePorts> = {}) {
     isCloudEnabled: () => true,
     openBlankCanvas: async () => { log.push("openBlankCanvas"); },
     onCloudOff: () => log.push("cloudOff"),
+    openFreshCanvas: async () => { log.push("openFreshCanvas"); },
     ...over,
   };
   let marker: string | null = over.getRestoreAttempt ? over.getRestoreAttempt() : null;
@@ -40,11 +41,20 @@ test("有上次的画且能打开 → restored，不碰图库", async () => {
   assert(log.includes("opened(X)"), "报「已打开」");
 });
 
-test("没有上次的画 → 停图库，且内存名降回 null（别留着上一个身份）", async () => {
+test("★ 首次（currentFile 从未设过 = null）→ 新画布，不落图库（P1.5 user 拍板）", async () => {
   const { p, log, mem } = ports({ getWantedName: () => null });
-  eq(await restoreLastSession(p), "gallery-no-name");
+  eq(await restoreLastSession(p), "fresh-first-boot");
+  eq(mem(), null, "内存名先降 safe default（身份由 openFreshCanvas 内部重立）");
+  assert(log.includes("openFreshCanvas"), "落可画新画布");
+  assert(!log.includes("openGallery"), "首次不进图库");
+});
+
+test("★ 上次停在图库（currentFile=\"\" 有意状态）→ 图库（不是 404 fallback，canvas-first 不适用）", async () => {
+  const { p, log, mem } = ports({ getWantedName: () => "" });
+  eq(await restoreLastSession(p), "gallery-deliberate");
   eq(mem(), null, "内存名必须是 safe default");
-  assert(log.includes("openGallery"), "停在图库");
+  assert(log.includes("openGallery"), "恢复图库（用户离开时的有意状态）");
+  assert(!log.includes("openFreshCanvas"), "不落新画布");
 });
 
 test("★ 打开失败 → 内存名降回 null（幽灵路径纪律①）", async () => {
@@ -77,6 +87,7 @@ test("★ 打开失败 → 持久的 currentFile 必须还在（纪律②：失�
     isCloudEnabled: () => true,
     openBlankCanvas: async () => {},
     onCloudOff: () => {},
+    openFreshCanvas: async () => {},
   };
   eq(await restoreLastSession(p), "blank-failed");
   eq(persisted, "X", "★ 持久名还在");
@@ -89,7 +100,7 @@ test("失败路径的顺序：先降内存名、再刷徽章、再落画布、�
   await restoreLastSession(p);
   // 前三步 = 断路标记生命周期（纪律③）：写标记 → flush 落盘 → 优雅失败清标记；
   // 落点 = 画布（canvas-first，P1 2026-08-26：boot 永不 404 跳 gallery），其余顺序同旧约。
-  eq(log.join(" > "), "marker=X > flushMarker > marker=null > setNameMemoryOnly(null) > updateSaveStatus > openBlankCanvas > notFound(X)");
+  eq(log.join(" > "), "marker=X > flushMarker > marker=null > setNameMemoryOnly(null) > updateSaveStatus > openFreshCanvas > notFound(X)");
 });
 
 // ── 纪律③：崩溃环断路器（v0.10.9，「小内存设备开超大文件 OOM 锁死环」案）──────────────
@@ -102,7 +113,7 @@ test("★ 标记==想开的画 → 断路：跳过自动开、落画布、restor
   });
   eq(await restoreLastSession(p), "blank-crash-loop");
   eq(restoreCalled, false, "★ 断路的意义就是不再碰那张必死的画");
-  assert(log.includes("openBlankCanvas"), "落画布（canvas-first；用户至少能进 app 了）");
+  assert(log.includes("openFreshCanvas"), "落可画新画布（canvas-first；用户至少能进 app 了）");
   assert(log.includes("crashLoopSkipped(X)"), "如实告知为什么没自动开");
   eq(marker(), "X", "标记保留——之后每次 boot 都跳，直到某张画成功打开（setCurrentSessionName 清）");
 });
@@ -145,7 +156,7 @@ test("★ 活锁在场 → 不自动开：落画布、restore 不被调、如实
   eq(await restoreLastSession(p), "blank-locked-elsewhere");
   eq(restoreCalled, false, "★ 同画双开=本地字节互覆，入口就得拦住");
   eq(mem(), null, "内存名降回 safe default（幽灵路径纪律①同款）");
-  assert(log.includes("openBlankCanvas"), "落画布（canvas-first）");
+  assert(log.includes("openFreshCanvas"), "落可画新画布（canvas-first）");
   assert(log.includes("lockedElsewhere(X)"), "如实告知正在另一个窗口");
   assert(!log.some((l) => l.startsWith("crashLoopSkipped")), "不是崩溃，不报 crashLoop");
 });
@@ -191,7 +202,8 @@ test("★ 云关 → blank-cloud-off：restore/图库都不碰，落空白画布
   eq(await restoreLastSession(p), "blank-cloud-off");
   eq(restoreCalled, false, "★ 关闭态压根不去开 store 画");
   assert(!log.includes("openGallery"), "不落图库（gating ①把图库藏了，落过去=死路）");
-  assert(log.includes("openBlankCanvas"), "落空白画布路径");
+  assert(log.includes("openBlankCanvas"), "落 plain 空白画布路径（云关无 store 家可安，非 lazyblank）");
+  assert(!log.includes("openFreshCanvas"), "云关不走 lazyblank（无 store 家可安）");
   eq(mem(), null, "内存名降回 safe default（幽灵路径纪律①同款）");
 });
 
@@ -212,5 +224,5 @@ test("★ 云关的自愈红线：持久 currentFile 与断路标记一个都不
 test("云开 → 行为与旧约完全一致（默认端口即开，全套旧用例已覆盖；这里钉正常路一条）", async () => {
   const { p, log } = ports();
   eq(await restoreLastSession(p), "restored");
-  assert(!log.includes("openBlankCanvas"), "开=不走空白画布门");
+  assert(!log.includes("openBlankCanvas") && !log.includes("openFreshCanvas"), "成功恢复=不走任何空白/新画布门");
 });
