@@ -276,3 +276,34 @@ collection：设备 B 打开 Y → 同步到设备 A → A 的守卫以为本机
 ——X 的本地副本可能在编辑中被 reconcile 驱逐/覆写。「远端设备的选择在驾驶本机的安全守卫」=
 毒化。v438 修 = currentFile 迁 device-local；教训钉成红线：**安全守卫的输入必须是本机真相，
 永不可来自同步通道**——这就是 current-file 永不上云、只能 device（按 gallery 键控）的原因。
+
+### 9.6 第五轮（user 2026-08-27）：不合并已拍（命名=preferences/state）；opened-file 特例的雅解
+
+**问题**：current-file 是 state 表里唯一的畸形格——①三态字符串哨兵（null/""/名）stringly-typed
+②scope 是「device×gallery」破坏干净的 scope 格 ③restore-attempt 与它强耦合（恢复它的过程态）
+④它是三套纪律的输入（boot 三态/崩溃环/驱逐守卫）。塞进 KV 表怎么摆都是屎山。
+
+**解：升格为独立器官 `resume-slate`（每库一张回执条）**——它本来就不是「设置」，是设备的书签：
+
+```ts
+// device-kv 单键单记录：resume:<galleryId> → ResumeSlate（原子写；localStorage 同步写=天然原子）
+interface ResumeSlate {
+  /** 上次离开时开着什么。tagged union 杀掉 null/"" 哨兵（P1 DocHome 联合类型同手法）：*/
+  opened:
+    | { kind: "doc"; path: string }   // 上次开着这张画 → boot 恢复它
+    | { kind: "gallery" }             // 上次有意停在图库 → boot 回图库
+    | null;                           // 首次/从未 → boot 新画布
+  /** 崩溃环断路标记——语义上就是「恢复 opened 的在途态」，同记录同原子写：
+   *  flushMarker 400ms 防抖舞蹈永久消失（同步单键写）。 */
+  restoreAttempt: string | null;
+  // 将来扩展位：{ kind: "file"; ... }（P3 registry 能持久化句柄后，双击文件的恢复）
+}
+```
+
+**一石五鸟**：①三态哨兵 → 真联合类型（boot-restore 纯模块拿 typed 输入，"" 魔法值退役）
+②per-gallery 天然（兄妹各自的库各自的回执条；P3 多库白送，P5 单库期就一条记录）
+③restore-attempt 并入同记录（原子性白送，写标记+写目标一次落盘）④preferences/state 两张表
+保持纯净 scope 格（无 device×gallery 例外）⑤驱逐守卫 activeFileName 读本机 slate=本机真相
+（v438 红线结构化）。器官地位与 crash-store/checkpoint-ring 同类（boot 关键的结构化小件，
+不是散字段——符合「零散小字段走两表、结构化件立器官」的分界）。
+写入口收敛：setCurrentSessionName → slate.setOpened()（唯一写点不变）。迁移=一次性播种。
