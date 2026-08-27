@@ -307,3 +307,29 @@ interface ResumeSlate {
 （v438 红线结构化）。器官地位与 crash-store/checkpoint-ring 同类（boot 关键的结构化小件，
 不是散字段——符合「零散小字段走两表、结构化件立器官」的分界）。
 写入口收敛：setCurrentSessionName → slate.setOpened()（唯一写点不变）。迁移=一次性播种。
+
+### 9.7 第六轮（user 2026-08-27）：账号层撤回——PPSSPP 回归，终版模型
+
+**user 问「为什么还有账号层」→ 骑士认账撤回**：账号层（appfolder 根）建立在「云有特殊性」上，
+而 user 已裁「folder 与云在抽象层不可分、云没有特殊性」——本地文件夹库没有 appfolder 根，
+账号层只对云库存在 = 亲手制造云特殊性，自相矛盾。兄妹模型的真结论：**身份载体 = gallery 本身**
+（哥哥的文件夹=哥哥的身份=哥哥的手感）——即 verdicts §2.3 原始 PPSSPP 拍板，全票回归。
+store escalation ①（appfolder 根 collection）**作废**；「同帐多库同手感」由 手感拷贝 affordance /
+导出图库（parked）/ 建库播种（P3 细节）承接。
+
+**终版模型（P5 定稿）**：
+
+| 层 | 载体 | preferences | state |
+|---|---|---|---|
+| ora（跟画） | desk（.ora 内） | pixel-grid、long-press-pick、menu-tab | （既有 desk 态） |
+| gallery（跟身份/库） | 库内 collections（LWW；detach drain） | lang、gen-ai、手感类 | api-token、blender-panel-url、current-directory |
+| device（跟机器） | device-kv 器官（localStorage，try/catch 降级） | single-finger-draw、stylus-smooth-params、color-theme | cloud-enabled |
+| session（不持久） | RAM | — | show-fps |
+| 独立器官 | — | — | resume-slate（opened+restoreAttempt，per-gallery）、crash-store、checkpoint-ring |
+
+- **cascade（gallery 缺席 fallback）**：gallery 层项的读写 = `gallery ?? device ?? 工厂默认`——
+  无地/Editor Only 时写落 device 层（无地用户的 lang 也有家）；attach 后 gallery 层覆盖。
+  这就是 VS Code 的 workspace??user 形状，但 upper 层是 gallery 不是账号。
+- scope 词表终版：`ora | device | gallery | session`（"account"、"synced" 双双退役）。
+- 建新库时从 device 层播种 gallery 层？——P3 细节，暂 park。
+- gallery-password-verifier 独立安全件、brush-rack 库资产器官，均不进两表（已拍不变）。
