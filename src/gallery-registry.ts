@@ -55,6 +55,10 @@ export interface GalleryRegistry {
 
 const mintId = () => "g" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const oneDriveLabel = (username: string) => "OneDrive · " + (username || "账号");
+// legacy 连续性（P3 Slice C 拍定）：认领 "defaultStore" 命名空间的那个条目，id 同时取 **"default"**
+//   （= SOLE_GALLERY_ID）——锁名 `default:名`、回执条键 `resume:default` 与 P3 前逐字节相同，零迁移。
+const LEGACY_ID = "default";
+const LEGACY_DB = "defaultStore";
 
 export function createGalleryRegistry(kv: RegistryKV): GalleryRegistry {
   const findSame = async (entries: GalleryEntry[], handle: DirHandleLike) => {
@@ -87,9 +91,9 @@ export function createGalleryRegistry(kv: RegistryKV): GalleryRegistry {
         await kv.put(fresh);
         return fresh;
       }
-      const id = mintId();
-      const legacyFree = !entries.some((e) => e.dbId === "defaultStore");
-      const e: GalleryEntry = { id, kind: "onedrive", label: oneDriveLabel(username), dbId: legacyFree ? "defaultStore" : `gallery-${id}`, homeAccountId, lastActive: null, createdAt: Date.now() };
+      const legacyFree = !entries.some((e) => e.dbId === LEGACY_DB);
+      const id = legacyFree ? LEGACY_ID : mintId();
+      const e: GalleryEntry = { id, kind: "onedrive", label: oneDriveLabel(username), dbId: legacyFree ? LEGACY_DB : `gallery-${id}`, homeAccountId, lastActive: null, createdAt: Date.now() };
       await kv.put(e);
       return e;
     },
@@ -114,11 +118,11 @@ export function createGalleryRegistry(kv: RegistryKV): GalleryRegistry {
       if (!p.homeAccountId) return;
       const entries = await kv.list();
       if (entries.some((e) => e.kind === "onedrive" && e.homeAccountId === p.homeAccountId)) return;   // 幂等：见过就不再播
-      const id = mintId();
-      const legacyFree = !entries.some((e) => e.dbId === "defaultStore");
+      const legacyFree = !entries.some((e) => e.dbId === LEGACY_DB);
+      const id = legacyFree ? LEGACY_ID : mintId();
       await kv.put({
         id, kind: "onedrive", label: oneDriveLabel(p.username), homeAccountId: p.homeAccountId,
-        dbId: legacyFree ? "defaultStore" : `gallery-${id}`,   // 既有用户的数据物理在 defaultStore——条目认领它，零迁移
+        dbId: legacyFree ? LEGACY_DB : `gallery-${id}`,   // 既有用户的数据物理在 defaultStore——条目认领它（id 同取 "default"），零迁移
         lastActive: p.cloudEnabled ? Date.now() : null,        // 关云用户 → null（= 无激活库；P5 §9.8）
         createdAt: Date.now(),
       });

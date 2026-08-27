@@ -1,4 +1,3 @@
-export declare function setLockGalleryId(id: string | null): void;
 /** 长持 name 的 doc 锁（fire-and-forget；同名重入 no-op=续持）。拿不到（别的窗口持有）就不持。 */
 export declare function holdDocLock(name: string): void;
 /** 释放当前 doc 锁（退图库/无地接管/换 doc 前）。无锁时 no-op。 */

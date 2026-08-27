@@ -13,6 +13,7 @@ export declare function _swapStoreForGallery(next: Store | null): Promise<void>;
 export declare function _currentFullStore(): Store;
 /** persist 三件套③执行体（手势时刻调；fire-and-forget，结果永不改变数据安全行为）。值级 import 收拢本接缝。 */
 export declare function requestGalleryPersist(): void;
+export declare function _takeBootStore(): Store | null;
 /** 为 registry 条目建新 store 实例（不换当前——换是 _swapStoreForGallery 的事）。 */
 export declare function _buildStoreForGalleryEntry(entry: {
     kind: "onedrive" | "folder";

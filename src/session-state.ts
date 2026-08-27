@@ -24,7 +24,8 @@ import { isSignedIn, store as _store } from "./app-store.ts";
 import type { EncryptedBlob } from "./app-store.ts";   // 密文 at-rest 字节（branded）；B2：类型经接缝转口
 import { openInputSheet, openConfirmSheet, openChoiceSheet, lockSyncGate, settleSyncGate } from "./sheets.ts";
 import { readHandleFile, writeHandleBlob, handleMtime, hasWeebPaintTraces, supportsSaveFilePicker, pickSaveOraFile, type LocalFileHandle } from "./local-file-session.ts";
-import { claimHomeAuthority, docHome, fileDirty, saveRoute, SOLE_GALLERY_ID } from "./doc-home.ts";
+import { claimHomeAuthority, docHome, fileDirty, saveRoute } from "./doc-home.ts";
+import { activeGalleryId } from "./active-gallery.ts";   // P3：安家铸户口用当前挂载库 id（legacy="default" 零迁移）
 import { galleryDefaultName } from "./naming.ts";
 import { crashStore, mintLuggageTag, type LuggageTag } from "./crash-store.ts";
 import { pathFolder } from "./gallery/gallery-path.ts";
@@ -79,7 +80,7 @@ let gallery: AppContext["gallery"];
 const _homeAuth = claimHomeAuthority();
 // 幽灵 path 保护：boot 成功/主动 open/new/save-as 才升级真名。初始占位「未命名」沿旧制直赋
 //   （不走 _setActive：module load 期不许持 Web Lock / 碰持久层）。
-_homeAuth.setHome({ kind: "gallery", galleryId: SOLE_GALLERY_ID, path: t("nd.untitled") });
+_homeAuth.setHome({ kind: "gallery", galleryId: activeGalleryId(), path: t("nd.untitled") });
 /** gallery 家的库裸名；非 gallery 家（file/transient/无 doc）= null（旧 _activeSessionName 语义原样）。 */
 function _activeName(): string | null { const h = docHome(); return h?.kind === "gallery" ? h.path : null; }
 /** file 家快照；非 file 家 = null（旧 _localFile 语义原样，dirty 拆去 keeper 的 fileDirty()）。 */
@@ -105,7 +106,7 @@ const toFull = (name: string) => sessionFileName(name);
 //   `a:b` 与 `a_b` 会永久失配（详见 config.ts 的长注释）。
 function _setActive(name: string | null): void {
   const bare = name == null ? null : sessionBareName(name);
-  _homeAuth.setHome(bare == null ? null : { kind: "gallery", galleryId: SOLE_GALLERY_ID, path: bare });
+  _homeAuth.setHome(bare == null ? null : { kind: "gallery", galleryId: activeGalleryId(), path: bare });
   setCurrentSessionName(bare ?? "");
   // 双实例互认（2026-08-21）：身份唯一写入口 = 锁收口点。持有 doc ⇔ 长持它的 Web Lock
   //   （open/restore/newDoc/saveAs/adopt/rename 全从这收口；null=退图库/无地接管 → 释放。
@@ -1059,7 +1060,7 @@ function setName(name: string | null, opts: { persist?: boolean } = {}) {
   // 同样归一化（v437）：这条路是 gallery 移动文件后同步活动名的，不归一就会把用户敲的
   //   原始名塞回来，重新制造 `item.name === session.home.path` 的失配。
   const bare = name == null ? null : sessionBareName(name);
-  _homeAuth.setHome(bare == null ? null : { kind: "gallery", galleryId: SOLE_GALLERY_ID, path: bare });
+  _homeAuth.setHome(bare == null ? null : { kind: "gallery", galleryId: activeGalleryId(), path: bare });
   if (opts.persist !== false) setCurrentSessionName(bare ?? "");
   // 双实例互认：同 _setActive——换身份=换锁（gallery 移动文件同步活动名也算换身份）。
   if (bare != null) holdDocLock(bare); else releaseDocLock();

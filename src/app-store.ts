@@ -131,6 +131,14 @@ export function _currentFullStore(): Store { return _storeFull; }
 export function requestGalleryPersist(): void {
   if (!storeAbsent) requestStoragePersistence().catch(() => { /* 降概率层，静默 */ });
 }
+// boot 预建实例的一次性移交（P3 Slice C）：boot 时 registry 说了算——legacy OneDrive 条目领养它、
+//   其余情形（folder / 非 legacy）规矩 dispose 后另建。取过一次或 absent 模式 = null。
+let _bootStoreTaken = false;
+export function _takeBootStore(): Store | null {
+  if (_bootStoreTaken || storeAbsent) return null;
+  _bootStoreTaken = true;
+  return _storeFull;
+}
 /** 为 registry 条目建新 store 实例（不换当前——换是 _swapStoreForGallery 的事）。 */
 export function _buildStoreForGalleryEntry(entry: { kind: "onedrive" | "folder"; dbId: string; handle?: unknown }): Store {
   if (storeAbsent) throw new Error("store-absent mode: cannot build gallery store");

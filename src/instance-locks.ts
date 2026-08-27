@@ -20,14 +20,12 @@
 //   （reportError "log" + 当作没锁），绝不让锁故障挡住开画。
 
 import { reportError } from "./error-badge.ts";
-import { SOLE_GALLERY_ID } from "./doc-home.ts";
+import { activeGalleryId } from "./active-gallery.ts";
 
 const LOCK_PREFIX = "weebpaint-doc:";
-// P3：锁名 = gallery-id:相对path（verdicts §2.5——防跨 gallery 假阳性互锁）。当前 gallery id 由
-//   attachment 器官经 setLockGalleryId 喂（挂库/卸库时）；未挂/legacy 期 = SOLE_GALLERY_ID。
-let _galleryId: string = SOLE_GALLERY_ID;
-export function setLockGalleryId(id: string | null): void { _galleryId = id ?? SOLE_GALLERY_ID; }
-const _key = (name: string, galleryId: string = _galleryId) => `${LOCK_PREFIX}${galleryId}:${name}`;
+// P3：锁名 = gallery-id:相对path（verdicts §2.5——防跨 gallery 假阳性互锁）。当前 gallery id 的
+//   唯一真相 = active-gallery.ts（attachment 器官是唯一写手）；未挂/legacy = SOLE_GALLERY_ID（零迁移）。
+const _key = (name: string, galleryId: string = activeGalleryId()) => `${LOCK_PREFIX}${galleryId}:${name}`;
 
 // 当前长持的锁：release() = resolve 掉喂给 lock manager 的 pending promise → 浏览器收回锁。
 let _current: { name: string; release: () => void } | null = null;

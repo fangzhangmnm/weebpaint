@@ -10,7 +10,7 @@ import type { SwappableStore } from "./gallery-attachment.ts";
 import type { GalleryEntry } from "./gallery-registry.ts";
 import { galleryRegistry } from "./gallery-registry.ts";
 import { storeAbsent, _swapStoreForGallery, _buildStoreForGalleryEntry, requestGalleryPersist } from "./app-store.ts";
-import { setLockGalleryId } from "./instance-locks.ts";
+import { setActiveGalleryId } from "./active-gallery.ts";
 import type { Store } from "@internal/store";
 
 let _hasOpenGalleryDoc: () => boolean = () => true;   // 未接线默认保守（拒卸）
@@ -23,5 +23,5 @@ export const galleryAttachment = createGalleryAttachment({
   registry: galleryRegistry,
   hasOpenGalleryDoc: () => _hasOpenGalleryDoc(),
   requestPersist: requestGalleryPersist,
-  setLockGalleryId,
+  setActiveGalleryId,
 });

@@ -76,7 +76,8 @@ import "./plugins/index.ts";    // 触发 HSB / ColorBalance / Curves / SharpenB
 // candidate 2：导出格式 = 注册表插件（含第一方 ora/psd/png/jpg 自注册）
 import { isAuthConfigured, initAuth, isSignedIn, retrySilentSignIn, getActiveAccount, brushRackCollection, store as _store } from "./app-store.ts";   // cut-over：cloud/auth/graph 全走 lib
 import { galleryRegistry } from "./gallery-registry.ts";     // P3 名册器官（播种接线在 boot 收尾段）
-import { setAttachmentGate } from "./gallery-attachment-host.ts";   // P3 挂载器官（收口开画 gate + 笔架重挂接线在 rack 构造后）
+import { setAttachmentGate, galleryAttachment } from "./gallery-attachment-host.ts";   // P3 挂载器官（收口开画 gate + 笔架重挂接线在 rack 构造后）
+import { bootAttachFromRegistry } from "./gallery-connect.ts";      // P3 boot 静默重挂（prefsReady 链头）
 import { docHome } from "./doc-home.ts";
 import { cloudPrefEnabled } from "./cloud-capability.ts";
 import { initPreferences, refreshPreferences, flushPreferences, seedDevicePrefsFromLegacy } from "./app-prefs.ts";   // boot 门 + 前台/online 拉云对齐 user-preference（lang/theme/手势）+ 导航前屏障
@@ -102,7 +103,12 @@ const pullSettingsAndState = (): void => { void refreshPreferences(); void appSt
 //     → 门没必要了，拆掉。app-store 已在 imports 期 eval → 4 个 collection 建好并 wire；此处只**发起** init。
 // 其余 6 个消费方（currentFile/currentDirectory/4 个开关/stylus/blenderUrl）没有快照，hydrate 前只能读到
 //   DEFAULTS → 它们**各自 await prefsReady**，统一在下面的「fixup 相」灌真值。别在 fixup 之外读这些 pref。
-const prefsReady: Promise<unknown> = Promise.all([initPreferences(), initAppState()]);
+// P3 boot 链：先按 registry 重挂当前库（legacy 领养预建实例 / folder 换店；失败回落无库模式），
+//   再跑 init 门（换店路径里 swap 已重跑过，memo 直接返回）。fixup 相 / bootRestoreSession 都排在链后 →
+//   开画/灌设置时店已定、active-gallery id 已就位（回执条/锁名读对库）。
+const prefsReady: Promise<unknown> = bootAttachFromRegistry()
+  .catch((e) => reportError(new Error("[boot] gallery attach failed (soft, legacy path): " + String(e)), "log"))
+  .then(() => Promise.all([initPreferences(), initAppState()]));
 
 // ---- 启动 ----
 // 加密（ADR-0012）：密码弹窗接线 —— crypto-state 无 DOM，composition root 把 in-app
@@ -514,6 +520,9 @@ window.addEventListener("wp:auth-changed", () => {
   updateCloudAuthUI();
   updateSaveStatus();                                       // 候选2：auth 变化影响 save 图标
   _seedGalleryRegistry();                                   // P3 播种（幂等；登录回来/silent 恢复都会经这里）
+  // P3 离线态翻牌：OneDrive 库的 online = 登录态（token 掉=离线不算 logoff；重新登上=接通）。
+  const att = galleryAttachment.state();
+  if (att.kind === "attached" && att.entry.kind === "onedrive") galleryAttachment.setOnline(isSignedIn());
   if (!els.galleryFull.classList.contains("hidden")) gallery.refresh();
 });
 // 在线 / 离线变化时刷新云端 UI（标签 / 按钮可见性）。

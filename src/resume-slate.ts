@@ -10,7 +10,7 @@
 // 存储 = device-kv 单键单记录（localStorage 同步写 = 天然原子）；无地降级随 device-kv（纯内存）。
 
 import { deviceKvGetJson, deviceKvSetJson } from "./device-kv.ts";
-import { SOLE_GALLERY_ID } from "./doc-home.ts";
+import { activeGalleryId } from "./active-gallery.ts";   // P3：默认键 = 当前挂载库（legacy 库 id="default"，键逐字节延续零迁移）
 
 /** 上次离开时开着什么（boot 三态的 typed 形；P1.5 user 拍板「首次新画布，上次图库则图库」）。 */
 export type ResumeOpened =
@@ -29,7 +29,7 @@ export interface ResumeSlate {
 const EMPTY: ResumeSlate = { opened: null, restoreAttempt: null };
 const _key = (galleryId: string) => `resume:${galleryId}`;
 
-export function readSlate(galleryId: string = SOLE_GALLERY_ID): ResumeSlate {
+export function readSlate(galleryId: string = activeGalleryId()): ResumeSlate {
   const raw = deviceKvGetJson<ResumeSlate | null>(_key(galleryId), null);
   return raw && typeof raw === "object" ? { opened: raw.opened ?? null, restoreAttempt: raw.restoreAttempt ?? null } : { ...EMPTY };
 }
@@ -39,20 +39,20 @@ function _write(slate: ResumeSlate, galleryId: string): void {
 
 /** 唯一写点①：活动身份持久化（原 setCurrentSessionName 的持久层）。
  *  开画成功 = app 活着且真拿住画 → 崩溃环标记一并解除（原 appState.restoreAttempt=null 语义）。 */
-export function setOpened(opened: ResumeOpened, galleryId: string = SOLE_GALLERY_ID): void {
+export function setOpened(opened: ResumeOpened, galleryId: string = activeGalleryId()): void {
   const cur = readSlate(galleryId);
   _write({ opened, restoreAttempt: opened?.kind === "doc" ? null : cur.restoreAttempt }, galleryId);
 }
 
 /** 唯一写点②：崩溃环标记（boot-restore 纪律③）。同步落盘——无需 flush。 */
-export function setRestoreAttempt(name: string | null, galleryId: string = SOLE_GALLERY_ID): void {
+export function setRestoreAttempt(name: string | null, galleryId: string = activeGalleryId()): void {
   const cur = readSlate(galleryId);
   _write({ ...cur, restoreAttempt: name }, galleryId);
 }
 
 /** 一次性播种（幂等）：从 legacy 双态迁入——currentFile 三态字符串（null=首次/""=图库/名=画）+
  *  restoreAttempt。已有回执条（含播种过的空条）→ 不覆盖。boot 在 collection hydrate 后调一次。 */
-export function seedSlateFromLegacy(legacy: { currentFile: string | null; restoreAttempt: string | null }, galleryId: string = SOLE_GALLERY_ID): void {
+export function seedSlateFromLegacy(legacy: { currentFile: string | null; restoreAttempt: string | null }, galleryId: string = activeGalleryId()): void {
   if (deviceKvGetJson<ResumeSlate | null>(_key(galleryId), null) != null) return;   // 已有条 → 不动
   const opened: ResumeOpened = legacy.currentFile == null ? null
     : legacy.currentFile === "" ? { kind: "gallery" }

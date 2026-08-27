@@ -33,13 +33,17 @@ export interface AttachmentDeps {
   registry: Pick<GalleryRegistry, "touch" | "relabel" | "clearLastActive">;
   hasOpenGalleryDoc: () => boolean;                             // 收口开画 gate（session.name gate 同源；host 晚绑，未绑=恒 true 保守拒卸）
   requestPersist: () => void;                                   // persist 三件套③：attach 手势时刻申请（fire-and-forget）
-  setLockGalleryId: (id: string | null) => void;                // 锁名 gallery scope（instance-locks）
+  setActiveGalleryId: (id: string | null) => void;              // 「当前库 id」唯一真相（active-gallery.ts：锁名/回执条/安家铸户口共用）
 }
 
 export interface GalleryAttachment {
   state(): AttachmentState;
-  /** 挂库（必须 detached；UI 保证手势上下文）。五步逆序：建实例→换入→锁域→touch/relabel。 */
-  attach(entry: GalleryEntry): Promise<void>;
+  /** 挂库（必须 detached；UI 保证手势上下文）。五步逆序：建实例→换入→锁域→touch/relabel。
+   *  opts.online：folder=权限已 granted / onedrive=isSignedIn（调用方查好传入；缺省 true）。 */
+  attach(entry: GalleryEntry, opts?: { online?: boolean }): Promise<void>;
+  /** boot 领养预建实例（legacy 路径：module 预建的 defaultStore 店就是该条目的店）——不换店不重灌，
+   *  只接管：登记 _current、设 active id、touch。必须 detached 时调（boot 一次）。 */
+  bootAdopt(entry: GalleryEntry, store: SwappableStore, opts?: { online?: boolean }): void;
   /** 卸库（绿灯门）。拒卸返账（doc-open / dirty），不销毁任何东西。detached 时幂等 ok。 */
   detach(): Promise<DetachResult>;
   /** 显式逃生（用户过了警告 sheet 才走到这）：不 drain、dirty 留缓存。 */
@@ -60,7 +64,7 @@ export function createGalleryAttachment(deps: AttachmentDeps): GalleryAttachment
     _current = null;
     if (old) await old.dispose({ drain });
     await deps.swap(null);                 // null-store = 无库模式（Editor Only）
-    deps.setLockGalleryId(null);
+    deps.setActiveGalleryId(null);
     await deps.registry.clearLastActive(); // boot 从此进无库模式（lastActive 全清）
     _state = { kind: "detached" };
     _notify();
@@ -68,17 +72,25 @@ export function createGalleryAttachment(deps: AttachmentDeps): GalleryAttachment
 
   return {
     state: () => _state,
-    async attach(entry) {
+    async attach(entry, opts) {
       if (deps.storeAbsent) throw new Error("store-absent mode: attach unavailable");
       if (_state.kind === "attached") throw new Error("attach while attached — detach first (green-gate)");
       deps.requestPersist();                          // 手势入口即调（popup/权限往返会耗尽 activation）
       const next = deps.buildStore(entry);
       _current = next;
       await deps.swap(next);
-      deps.setLockGalleryId(entry.id);
+      deps.setActiveGalleryId(entry.id);
       await deps.registry.touch(entry.id);
       if (entry.kind === "folder" && entry.handle?.name) await deps.registry.relabel(entry.id, entry.handle.name);   // 标签尽力自愈
-      _state = { kind: "attached", entry, online: true };
+      _state = { kind: "attached", entry, online: opts?.online ?? true };
+      _notify();
+    },
+    bootAdopt(entry, store, opts) {
+      if (_state.kind === "attached") throw new Error("bootAdopt while attached");
+      _current = store;
+      deps.setActiveGalleryId(entry.id);
+      void deps.registry.touch(entry.id);             // fire-and-forget（LWW 便利值）
+      _state = { kind: "attached", entry, online: opts?.online ?? true };
       _notify();
     },
     async detach() {

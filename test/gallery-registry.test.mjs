@@ -46,6 +46,7 @@ describe("gallery-registry · mintOneDrive / seedLegacyOneDrive（defaultStore �
     const r = createGalleryRegistry(mapKV());
     const a = await r.mintOneDrive("acct-A", "a@example.com");
     eq(a.dbId, "defaultStore");
+    eq(a.id, "default");                               // legacy 连续性：锁名/回执条键逐字节延续（Slice C 拍定）
     eq(a.label, "OneDrive · a@example.com");
     const b = await r.mintOneDrive("acct-B", "b@example.com");
     eq(b.dbId, `gallery-${b.id}`);                     // legacy 名额已被 A 认领
