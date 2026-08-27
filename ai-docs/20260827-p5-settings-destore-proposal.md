@@ -87,6 +87,36 @@ attach 时 collection 覆盖回灌）。
 
 （synced-app-state 里躺着的 legacy current-file 死键照旧不动——v438 注释：等所有设备升级后另拍。）
 
+## 7. 第二轮 grill 台账（user 2026-08-27，逐项裁决 + 未决分叉）
+
+**分类学（user 提出）**：scope × kind 六类 = {跟 ora, localDevice, synced} ⊗ {preference, state}。
+存储引擎仍只三种（desk / localStorage / collections），kind 轴 = 命名与分组纪律（还原出厂、
+设置 UI 按 kind 分面）。**零散小字段禁裸 localStorage/IDB**——一律走抽象记录（灾难备份类大件
+crash-store/checkpoint-ring 不在此列）。
+
+**逐项已裁**：
+- 跟 ora（desk）：pixel-grid（必跟 ora）、long-press-pick（跟文件）、menu-tab（编辑器语境=per doc）
+- localDevice preference（localStorage）：single-finger-draw（「唯一 local device preference 特例」
+  ——后追加 stylus-smooth-params、color-theme 同类）、color-theme（跟设备）
+- localDevice state（localStorage）：cloud-enabled、current-file、restore-attempt、
+  show-fps（debug 用，甚至可不持久化→session-only）
+- synced preference（collection）：language
+- synced state（collection）：api token（未来 AI；「synced 可能会有大胖东西以后，api 安全问题
+  遇到了再设计」）、blender-panel-url（与 api 同类）
+- gallery state（库内 collection）：current-directory；部分原 synced state 实为 gallery state
+- **gallery-password-verifier = 独立功能件**：不是 preference 也不是 state（安全件，归 gallery）
+- 「不持久化档」不设（会乱心智模型）；show-fps 例外可 session-only
+
+**已裁机制**：
+- localDevice 走 **localStorage**（user 问 localStorage 还是 IDB → 本文 §8 论证选 localStorage）
+- 权威性：synced 内部 = collection 既有 LWW（uat 新者胜）——即 user 说的「本地权威但云更新可覆盖」
+- store 的 local:true collection（无云版）在 localDevice 迁出后失去消费者 → **escalate 移除**
+  （user：「这样才单一职责」）——进 store escalation 清单
+
+**未决分叉（§8 分析）**：多 gallery 打断「synced=跟人走」保证——「local 同设备跨云端，synced
+跨设备但同文件夹」；PPSSPP（一库一套+手感拷贝）vs VS Code 分层 vs 其他；无地（无 gallery）怎么办；
+心智模型如何在 UI/UX 透明。
+
 ## 5. 顺带登记（P7 还原出厂设置的 store escalation）
 
 P7（§2.10）需要 store 侧口子，归 pwa-cloud-store skill 逐条 escalate（**user 2026-08-27 已预批方向**）：
@@ -96,3 +126,56 @@ P7（§2.10）需要 store 侧口子，归 pwa-cloud-store skill 逐条 escalate
   app 侧永远拿不到「跳过比对」的路径）。dispose({drain}) 已有（0.4.0），wipe = drain→dispose→删库本体。
 - **dirty 清单口径**：无痕扫前的「dirty 永不静默删」护栏——dirty facet（count/pushAll）已够用
   （count>0 → 先 pushAll / 显式确认），确认这个用法即可，无需新口。
+
+## 8. 骑士分析：三个硬问题的解法提案（待 user 裁）
+
+### 8.1 「多 gallery 打断 synced 保证”的根治 = 引入**账号层**（out-of-box 提案）
+
+问题本质：**「synced」一直被当成「跟人走」，但实现载体是「某一个 gallery 的 collection」——
+多 gallery 后这两件事分家了**（跨设备但同文件夹 ≠ 跟人）。VS Code 的答案（User/Workspace 分层）
+和 PPSSPP 的答案（每库一套+拷贝）都是在「没有账号通道」前提下的凑合。
+
+但我们**有**账号通道：同一 MSA 的所有 OneDrive gallery 共享同一个 appfolder——
+**appfolder 根（gallery 文件夹之外）放一份账号级 settings collection**，就是天然的「跟人走」载体：
+
+- language / api token / blender-panel-url / 手感类 synced preference → **账号层**：
+  跨设备 ✓ 跨库 ✓（同帐同手感——正面回应「同一账户不同手感不好」）；
+- 换账号 = 换人 = 换手感（语义自然）；打开别人分享的库不会劫持你的手感（库里根本不放这些）；
+- **gallery 层只放真正跟库走的**：current-directory、brush-rack（库的资产，配拷贝 affordance）、
+  gallery-password-verifier（独立安全件）——「打开不同 preference 的云库怎么办」问题**消解**：
+  云库不携带通用 preference；
+- **无地/Editor Only/本地文件夹库**：无账号层 → 落 device 层（localStorage）→ 落工厂默认。
+  cascade 读序 = 账号 ?? 设备 ?? 默认（只两层真实层；boot 快照只是缓存不是层）。
+
+**代价/前置**：store 需要「gallery 外（appfolder 根）的 collection」能力 → **store escalation**
+（现契约 collection 挂在 store 实例=库上；能不能挂账号根待库轮设计）。若库轮否决，fallback =
+VS Code 式两层（device + gallery override）或 PPSSPP+拷贝——但先争取账号层，它最贴心智模型。
+
+### 8.2 localDevice 走 localStorage（不是 IDB）的论证
+
+- restore-attempt 这类崩溃标记要**同步写**（现状 collection 防抖 → flushMarker 舞蹈；IDB 也是异步）；
+- current-file boot 要**同步读**（prefsReady 时序枷锁直接消失）；
+- 量级 = 十来个小字段，5MB 上限无压力；
+- 无地姿态：try/catch 降级纯内存（survey §5.3），封在一个 device-kv 器官里，**app 侧禁裸碰**。
+
+### 8.3 心智模型的 UI/UX 透明化（user 问「有什么好办法」）
+
+- 设置 sheet 按 scope **分区 + 人话标题**：「这幅画」「这台设备」「你的账号」（「这个图库」区
+  只有库资产类：笔刷等）——不用 preference/state 这种词，kind 轴只影响开发侧分组与还原出厂粒度；
+- 每项行尾一个 scope 微章（画/设备/云人形图标），长按/hover 出一句人话（「跟这幅画走，保存在
+  .ora 里」）；
+- 图标库登记三枚 scope 小图标（doc/device/account）→ SVG Icons TODO.md；
+- Editor Only / 未登录：账号区整段折叠成一行「登录后这些设置会跟着你」——**scope 模型用缺席
+  自解释**；
+- 手感拷贝 affordance（PPSSPP 需求的残余价值）：brush-rack 库资产侧给「拷到这个库/从库拷来」，
+  通用 preference 因为进了账号层**不再需要拷**。
+
+### 8.4 连带小裁决（提请注意）
+
+- **per-doc 项的「新画默认」**：pixel-grid/long-press-pick 迁 desk 后，新画从工厂默认起
+  （pixel-grid=开、long-press=开）——**不做**「设为新画默认」种子机制 v1（观察是否烦再说）；
+- show-fps：session-only 运行时旗（不持久化，user 已允）；
+- current-file 迁 localStorage 时保三态语义（null/""/名）+ 从 collection 一次性播种
+  （v438 播种同手法，云端死键不删）；
+- store escalation 清单追加：①账号层 collection 能力（8.1）②local:true collection 移除（SRP）
+  ——连同既有 wipeLocal，共三条归下个 pwa-cloud-store session。
