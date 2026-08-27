@@ -45,7 +45,10 @@ let _synced: Collection | undefined;   // gallery 层引擎（P3 起换成「当
 const _session = new Map<string, unknown>();
 const _dk = (k: string) => `pref:${k}`;
 
-export function wirePreferences(local: Collection, synced: Collection): void { _local = local; _synced = synced; }
+export function wirePreferences(local: Collection, synced: Collection): void {
+  _local = local; _synced = synced;
+  _ready = undefined;   // P3 热插拔：换库重灌 → 重置 ready 门（下一次 initPreferences 对新 collection 重跑 init）
+}
 
 let _ready: Promise<void> | undefined;
 export function initPreferences(): Promise<void> {

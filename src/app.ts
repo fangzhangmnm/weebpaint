@@ -76,6 +76,8 @@ import "./plugins/index.ts";    // 触发 HSB / ColorBalance / Curves / SharpenB
 // candidate 2：导出格式 = 注册表插件（含第一方 ora/psd/png/jpg 自注册）
 import { isAuthConfigured, initAuth, isSignedIn, retrySilentSignIn, getActiveAccount, brushRackCollection, store as _store } from "./app-store.ts";   // cut-over：cloud/auth/graph 全走 lib
 import { galleryRegistry } from "./gallery-registry.ts";     // P3 名册器官（播种接线在 boot 收尾段）
+import { setAttachmentGate } from "./gallery-attachment-host.ts";   // P3 挂载器官（收口开画 gate + 笔架重挂接线在 rack 构造后）
+import { docHome } from "./doc-home.ts";
 import { cloudPrefEnabled } from "./cloud-capability.ts";
 import { initPreferences, refreshPreferences, flushPreferences, seedDevicePrefsFromLegacy } from "./app-prefs.ts";   // boot 门 + 前台/online 拉云对齐 user-preference（lang/theme/手势）+ 导航前屏障
 import { hydrateSmoothFromPrefs } from "./smooth-config.ts";   // boot 门后合并 synced 平滑调参进 SMOOTH
@@ -170,6 +172,12 @@ const rack = new BrushRackController({
   setStatus, confirm: openConfirmSheet,
   openExclusive, closeExclusive, registerPanel,
   isSignedIn, isOnline: () => navigator.onLine !== false,
+});
+// P3 热插拔接线：换库 → 笔架重挂新 collection（brushRackCollection 是 live binding，事件时刻已指新库）；
+//   收口开画 gate = doc 的家是 gallery 就拒卸（挂载器官未接线时默认保守拒卸）。
+setAttachmentGate(() => docHome()?.kind === "gallery");
+window.addEventListener("wp:gallery-changed", () => {
+  rack.rebind(brushRackCollection).catch((e) => reportError(new Error("[brush-rack] rebind after gallery swap failed: " + String(e)), "error"));
 });
 
 // dial 写入（setSize/setOpacity 写 dial SSoT + LS）+ 当前 dial + 键盘 [ ] 调粗 = dial-controls.ts。

@@ -116,6 +116,12 @@ export function createNullStore(): Store {
       async newFolder(_p: string) { /* no-op */ },
       async deleteFolder(_p: string) { /* no-op */ },
       async drainOfflineQueue() { /* no-op */ },
+      // P3（store 0.6.0 形状跟进）：persist 感知纯查询 + dirty 标量面（绿灯门口径；无库=永远全绿）。
+      async persistence() { return { supported: false, persisted: false }; },
+      dirty: {
+        async count() { return 0; },
+        async pushAll() { return { pushed: 0, failed: [] as string[] }; },
+      },
       async listTrash() { return []; },
       async listBackup() { return []; },
       async restoreTrash(_n: string) { return { status: "noop" }; },

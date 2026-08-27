@@ -169,6 +169,15 @@ export class BrushRackController {
   // 事件驱动重拉云端（刷新按钮 / 前台）。
   reconcileWithRemote() { return this.d.collection.reconcileWithRemote(); }   // 返 ReconcileResult：调用方须读 status（v436）
 
+  /** P3 热插拔：换库后重挂新 collection（app.ts 在 wp:gallery-changed 里调，传新的 brushRackCollection）。
+   *  旧 collection 已随旧 store dispose——旧 onChange 订阅从此永不 fire，随它 GC；镜像/自愈/初值全按新库重走。 */
+  async rebind(collection: Collection): Promise<void> {
+    this.d.collection = collection;
+    this._stopHeal();
+    this._loadPromise = this._load();   // 重跑 load 管线（init→订阅→灌镜像→空库自愈→applyToolState），写路径 await load() 的门继续成立
+    await this._loadPromise;
+  }
+
   // ---- 活动预设 ↔ tool dial 绑定 ----
   // shapeBrush alias 到 brush（ADR-0005）：形状笔共享笔架 + 共享当前笔/dial，零自有 toolState 持久化
   // v0.7.26 选区笔走笔架（user：「笔架不是有滤镜笔画画笔橡皮笔吗，加一个选区笔就行了」）：

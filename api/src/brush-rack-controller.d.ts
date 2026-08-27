@@ -77,6 +77,9 @@ export declare class BrushRackController {
      *  放在 load()（数据层）而非 init()（要 DOM）：绑定与 UI 无关，且这样才能 node 测。 */
     subscribeToCollection(): void;
     reconcileWithRemote(): Promise<import("@internal/store").ReconcileResult>;
+    /** P3 热插拔：换库后重挂新 collection（app.ts 在 wp:gallery-changed 里调，传新的 brushRackCollection）。
+     *  旧 collection 已随旧 store dispose——旧 onChange 订阅从此永不 fire，随它 GC；镜像/自愈/初值全按新库重走。 */
+    rebind(collection: Collection): Promise<void>;
     getRackToolKey(tool: string): string;
     defaultToolStateFor(tool: string): {
         size: number;

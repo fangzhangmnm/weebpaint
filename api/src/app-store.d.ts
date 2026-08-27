@@ -1,10 +1,24 @@
-import type { Store } from "@internal/store";
+import type { Store, Collection as _Coll } from "@internal/store";
 export declare const storeAbsent: boolean;
 export declare const provider: import("@internal/store").CloudProvider | null;
 declare const _auth: import("@internal/store").OneDriveAuth;
 export type AppStorePort = Pick<Store, "file" | "files" | "collection" | "encryption">;
-export declare const store: AppStorePort;
+export declare let store: AppStorePort;
 export type { Collection, EncryptedBlob } from "@internal/store";
+export declare let brushRackCollection: _Coll;
+/** 换当前 store 实例（next=null → null-store = 无库模式）。重灌 4+1 collections、重跑 init 门、
+ *  广播 wp:gallery-changed（笔架等持句柄消费者在 app.ts 监听重挂）。旧实例的 dispose 由调用方（attachment 器官）负责。 */
+export declare function _swapStoreForGallery(next: Store | null): Promise<void>;
+/** attachment 器官取全 Store（dispose/files.dirty 面）。app 层其余一律走 AppStorePort。 */
+export declare function _currentFullStore(): Store;
+/** persist 三件套③执行体（手势时刻调；fire-and-forget，结果永不改变数据安全行为）。值级 import 收拢本接缝。 */
+export declare function requestGalleryPersist(): void;
+/** 为 registry 条目建新 store 实例（不换当前——换是 _swapStoreForGallery 的事）。 */
+export declare function _buildStoreForGalleryEntry(entry: {
+    kind: "onedrive" | "folder";
+    dbId: string;
+    handle?: unknown;
+}): Store;
 export declare const isAuthConfigured: () => boolean;
 export declare const initAuth: () => Promise<import("@internal/store").AuthState>;
 export declare const signIn: () => Promise<unknown>;
@@ -75,4 +89,3 @@ export declare const listGalleryTrash: () => Promise<{
         id: string;
     } | null;
 }[]>;
-export declare const brushRackCollection: import("@internal/store").Collection;

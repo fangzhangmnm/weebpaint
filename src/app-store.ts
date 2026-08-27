@@ -2,17 +2,17 @@
 //   只做 config 注入（provider / ui bundle / crypto codec / crypt / validateAdopt）+ auth 转发 + gallery 列举适配。
 //   app 只碰 store 两面（**file / collection**）+ editor-session。绝不裸碰 kv/IDB/graph/vendor。
 //   （localSettings/syncedSettings 那两面已于 2026-07-13 删除 —— 全部 KV 化进 collection。别照旧注释找。）
-import { createStore, createOneDriveProvider, isCached, isDirty, requestStoragePersistence } from "@internal/store";
+import { createStore, createOneDriveProvider, createFolderProvider, isCached, isDirty, requestStoragePersistence } from "@internal/store";
 import { detectStoreAbsent, createNullStore, createDormantAuth } from "./store-absent.ts";
-import type { Store } from "@internal/store";
+import type { Store, Collection as _Coll } from "@internal/store";
 import { stripSessionExt, sessionFileName } from "./config.ts";
 import { storeUI } from "./store-ui.ts";
 import { CLIENT_ID, SCOPES, AUTHORITY } from "./config.ts";
 import { zipReadEntry, zipPack, zipUnpack } from "./backend/zip.ts";
 import { pack7z, unpack7z } from "./sevenzip.ts";
 import { getPassword } from "./crypto-state.ts";
-import { wirePreferences } from "./app-prefs.ts";
-import { wireAppState, appState } from "./app-state.ts";
+import { wirePreferences, initPreferences } from "./app-prefs.ts";
+import { wireAppState, initAppState, appState } from "./app-state.ts";
 import { readSlate } from "./resume-slate.ts";   // activeFileName 守卫输入（P5：本机回执条真相）
 import { builtinBrushInitData } from "./brushes.ts";
 import { isDocPath, isImagePath, imageBasename } from "./gallery/cloud-image-model.ts";
@@ -28,15 +28,17 @@ type _Prov = ReturnType<typeof createOneDriveProvider>["provider"];
 type _Auth = ReturnType<typeof createOneDriveProvider>["auth"];
 function _assembleReal(): { provider: _Prov | null; auth: _Auth; store: Store } {
   const od = createOneDriveProvider({ clientId: CLIENT_ID, scopes: SCOPES, authority: AUTHORITY, msalUrl: "./vendor/msal/msal-browser.min.js" });
-  return { provider: od.provider, auth: od.auth, store: _createRealStore(od.provider, od.auth) };
+  return { provider: od.provider, auth: od.auth, store: _createRealStore(od.provider, () => od.auth.isSignedIn()) };
 }
 
 // 加密 codec 注入（不注入 = 加密 dormant）。
 const cryptoCodec = { zipPack, zipUnpack, pack7z, unpack7z };
 
 // 唯一 store（薄库）。app 建它（含 ui bundle）；migration 内部自跑（createStore 隐形，app 不 await）。
-const _createRealStore = (provider: _Prov, auth: _Auth): Store => createStore({
+// P3：databaseId 参数化（registry 条目的 dbId；缺省 = 库默认 "defaultStore" = legacy OneDrive 库）。
+const _createRealStore = (provider: _Prov, signedIn: () => boolean, databaseId?: string): Store => createStore({
   provider,
+  ...(databaseId ? { databaseId } : {}),
   ui: storeUI,
   appId: "weebpaint",   // 本 origin 内唯一命名空间（databaseId 默认 "defaultStore"）：IDB 库 weebpaint.defaultStore + localStorage weebpaint.defaultStore.* 键，与兄弟 PWA(JRP 等)隔离
   // persist 三件套之②（store 0.6.0 表态制）：app 承诺在**挂图库手势时刻**调 requestStoragePersistence()
@@ -72,7 +74,7 @@ const _createRealStore = (provider: _Prov, auth: _Auth): Store => createStore({
     return false;
   },
   autoCacheOpenedFile: true,
-  signedIn: () => auth.isSignedIn(),   // 连接态 store 自持（网盘模型）：watchFolder/云列举不再由 app 每次传 ctx
+  signedIn,   // 连接态 store 自持（网盘模型）：OneDrive = auth.isSignedIn；folder gallery = 恒 true（本地即在线，权限掉→provider 失败呈离线）
   // 当前打开的 doc（全名）：cloud-gone 去抖 trash 绝不碰它（连 watchFolder 自动 reconcileFolder 也跳过，防 trash 掉开着的 clean 文件本地缓存）。
   //   P5（2026-08-27）：读 resume-slate 回执条（device 本机真相，永不同步——v438 毒化案结构化根治）。
   activeFileName: () => { try { const o = readSlate().opened; return o?.kind === "doc" ? sessionFileName(o.path) : null; } catch { return null; } },
@@ -91,14 +93,55 @@ const _auth = _asm.auth;
 // epoch-handoff §B2 的怀疑成立）。收敛形 = **派生窄 Port**（Pick 自库类型 SSoT，零镜像零 drift）：
 // 面收窄在此单点声明；app 若碰四面之外的成员 = 编译错。类型 import 也收拢本接缝（下方 re-export）。
 export type AppStorePort = Pick<Store, "file" | "files" | "collection" | "encryption">;
-export const store: AppStorePort = _asm.store;
+// P3 热插拔：store 是 **live binding**（export let，全仓实测零模块级捕获——消费方都在调用点访问 store.xxx）。
+//   换库 = _swapStoreForGallery 重指 + 重灌 collections + 广播 wp:gallery-changed；旧实例已 dispose，
+//   谁还攥着旧 collection 句柄谁就吃 StoreDisposedError（响亮死是契约，不是失败）。
+let _storeFull: Store = _asm.store;            // 全 Store（含 dispose）——只有 attachment 器官经 seam 摸它
+export let store: AppStorePort = _storeFull;
 export type { Collection, EncryptedBlob } from "@internal/store";   // app 侧仅剩的两个库类型，经接缝转口
 
 // ============ 设置/状态 collection（4 个）注入 ============
 // app-prefs/app-state **不 import 本文件**（防 i18n→app-store→store-ui→i18n 成环）；由此处建好 store 后惰性注入。
 //   synced 变体上云 + scaffold；{local:true} 变体 local-only（设备本地、不碰云）。boot 门 await init* 后才读写。
-wirePreferences(store.collection("local-user-preference", { local: true }), store.collection("synced-user-preference"));
-wireAppState(store.collection("synced-app-state"), store.collection("local-app-state", { local: true }));
+//   P3：抽成 _wireCollections（换库重灌复用；wirePreferences 重调会自动重置 ready 门）。
+// ---- brush-rack collection（逐 brush 一 item + 一条 .meta）：持久化 + 云同步唯一入口，红线在库内。----
+//   getInitData（brushes.ts 域构造）：仅当这份 collection 的 json 不存在（新库）时 fetch builtin-brushes.json。
+//   P3 起 live binding（换库重灌；app.ts 在 wp:gallery-changed 里 brushRack.rebind(brushRackCollection)）。
+export let brushRackCollection: _Coll;
+function _wireCollections(): void {
+  wirePreferences(store.collection("local-user-preference", { local: true }), store.collection("synced-user-preference"));
+  wireAppState(store.collection("synced-app-state"), store.collection("local-app-state", { local: true }));
+  brushRackCollection = store.collection("brush-rack", { getInitData: builtinBrushInitData });
+}
+_wireCollections();   // boot 装配（此后每次换库经 _swapStoreForGallery 重灌）
+
+// ============ P3 热插拔 seam（只准 gallery-attachment-host 调）============
+/** 换当前 store 实例（next=null → null-store = 无库模式）。重灌 4+1 collections、重跑 init 门、
+ *  广播 wp:gallery-changed（笔架等持句柄消费者在 app.ts 监听重挂）。旧实例的 dispose 由调用方（attachment 器官）负责。 */
+export async function _swapStoreForGallery(next: Store | null): Promise<void> {
+  _storeFull = next ?? createNullStore();
+  store = _storeFull;
+  _wireCollections();
+  await Promise.all([initPreferences(), initAppState()]);   // wirePreferences 重调已重置 ready 门（app-prefs 不 import 本文件，无环）
+  try { window.dispatchEvent(new Event("wp:gallery-changed")); } catch { /* node 测试环境无 window */ }
+}
+/** attachment 器官取全 Store（dispose/files.dirty 面）。app 层其余一律走 AppStorePort。 */
+export function _currentFullStore(): Store { return _storeFull; }
+/** persist 三件套③执行体（手势时刻调；fire-and-forget，结果永不改变数据安全行为）。值级 import 收拢本接缝。 */
+export function requestGalleryPersist(): void {
+  if (!storeAbsent) requestStoragePersistence().catch(() => { /* 降概率层，静默 */ });
+}
+/** 为 registry 条目建新 store 实例（不换当前——换是 _swapStoreForGallery 的事）。 */
+export function _buildStoreForGalleryEntry(entry: { kind: "onedrive" | "folder"; dbId: string; handle?: unknown }): Store {
+  if (storeAbsent) throw new Error("store-absent mode: cannot build gallery store");
+  if (entry.kind === "folder") {
+    if (!entry.handle) throw new Error("folder gallery entry has no handle");
+    const prov = createFolderProvider(entry.handle as Parameters<typeof createFolderProvider>[0]) as unknown as _Prov;
+    return _createRealStore(prov, () => true, entry.dbId);   // folder=本地即在线；权限掉→provider 失败呈离线态（P3 verdicts §1.7）
+  }
+  if (!provider) throw new Error("onedrive provider unavailable");
+  return _createRealStore(provider, () => _auth.isSignedIn(), entry.dbId === "defaultStore" ? undefined : entry.dbId);
+}
 
 // ============ auth（转发）============
 export const isAuthConfigured = () => _auth.isAuthConfigured();
@@ -226,8 +269,3 @@ export const listGalleryTrash = async () => (await store.files.listTrash()).map(
   cloud: it.cloudRef ? { path: it.name, id: it.cloudRef } : null,
 }));
 
-// ---- brush-rack collection（逐 brush 一 item + 一条 .meta）：持久化 + 云同步唯一入口，红线在库内。----
-//   getInitData（brushes.ts 域构造）：仅当这份 collection 的 json 不存在（新库）时 fetch builtin-brushes.json
-//   映射成 [{id,value}…, {.meta}] 填初始值（uat=1，任何真实编辑 / 别设备真数据必胜）。
-//   dirty / 冲突 / 墓碑 全归 collection；app 侧 brush-rack-controller 只做编排（无 rackStore/setRackDirty）。
-export const brushRackCollection = store.collection("brush-rack", { getInitData: builtinBrushInitData });
