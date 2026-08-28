@@ -542,6 +542,10 @@
       <button class="menu-item menu-item-with-icon" id="galleryMenuLock" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#unlock"/></svg>
         <span class="menu-item-label" data-i18n="gal.menu.unlock">解锁加密作品…</span>
       </button>
+      <!-- #18 全库备份（2026-08-28）：整库文件打成一个 zip 下载；只读，不动库。逻辑 = src/gallery/library-backup.ts -->
+      <button class="menu-item menu-item-with-icon" id="galleryMenuBackup" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#download"/></svg>
+        <span class="menu-item-label" data-i18n="bk.menuItem">下载全库备份…</span>
+      </button>
     </div>
 
     <!-- 加号 popup：新建 / 从图片 / 从剪切板 -->

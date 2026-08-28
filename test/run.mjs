@@ -12,6 +12,7 @@ import "./crash-store.test.mjs";          // P2 T-crash 库：pending 拒删/原
 import "./resume-slate.test.mjs";
 import "./device-rack-slot.test.mjs";         // A2 终案：无库笔架 device 槽（reload 不丢/防抖/降级诚实）
 import "./gallery-registry.test.mjs";     // P3 名册：铸 id/isSameEntry 查重/defaultStore 认领零迁移/播种幂等
+import "./library-backup.test.mjs";       // #18 全库备份内核：订阅→一次性快照/递归清单/字节预算/只读编排回执
 import "./gallery-attachment.test.mjs";   // P3 挂载：五步 detach 契约/绿灯门/逃生 force/手势 persist/锁域
 import "./app-prefs.test.mjs";            // P5 preferences 门面：scope 路由（device/gallery/session）+ 播种幂等
 import "./cloud-image-model.test.mjs";    // v0.9.29 云盘图片 picker：扩展名路由/thumb token/白底平铺/jpeg 编码接缝（spec 20260820）

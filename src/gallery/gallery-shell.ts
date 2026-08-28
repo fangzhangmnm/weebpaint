@@ -1,5 +1,7 @@
 // 职责（单一）：图库全屏外壳 —— 开/关图库 + chrome（视图按钮可见性）+ 新建作品 sheet +
 //   IDB 占用/配额 + 加号·云·菜单 popup 按钮接线 + 名字唯一化。
+//   （2026-08-28 by Claude Opus 5 (subagent)：菜单多一颗「下载全库备份…」——**只装端口**，
+//    逻辑全在 ./library-backup.ts，本壳不长第二套业务。）
 //
 // 从 app.js god-file 切出「图库这层壳怎么开关、壳上那几个 popup 按钮怎么接、新建作品走哪条
 //   sheet」那一轴。<Gallery> 深模块本身（src/gallery/gallery.ts）仍由 app.js mountGallery 组装并经
@@ -21,7 +23,10 @@ import { session } from "../session-state.ts";
 import { isCloudEnabled } from "../cloud-capability.ts";
 import { reportError } from "../error-badge.ts";
 import { els } from "../els.ts";
-import { readImageFromClipboard } from "../session.ts";
+import { readImageFromClipboard, triggerDownload } from "../session.ts";
+import { showFullscreenBusy } from "../fullscreen-busy.ts";   // #18 备份进度：withBusy 期间换文案（leaf singleton）
+import { zipPack } from "../backend/zip.ts";                  // #18 备份包（STORE 不压缩；ora/png 本就是压缩流）
+import { snapshotFolderOnce, walkLibrary, runLibraryBackup, BACKUP_BUDGET_BYTES } from "./library-backup.ts";
 import { uniqueBareName } from "./gallery-model.ts";   // 撞名后缀兜底（纯·已 pin）；占用检查按库身份（全名 X.ora）查
 import { galleryDefaultName } from "../naming.ts";     // P1 命名器官：yyyymmdd-hex4（v217 惯例）+ 禁「未命名」
 import { humanSize } from "./gallery-view-model.ts";   // 展示格式化（纯·KiB/MiB）；此前本模块私有一份逐字节拷贝，2026-08-21 收敛
@@ -188,6 +193,49 @@ export async function uniqueNameFor(stem: string) {
   return uniqueBareName(stem, (n) => requireStore().files.nameOccupied(n));   // gallery 命名专用（无库铸户口不可达）
 }
 
+// ---- #18 全库备份（2026-08-28）：逻辑内核 = ./library-backup.ts（纯·可测），这里只装端口 + 说人话。----
+//   路线：store 的唯一列举面是 watchFolder（订阅当前夹）→ 逐夹一次性快照 + 递归拿全库清单。
+//   **只读**：每件只走 getEncryptedBlob()（加密件给密文原样，明文永不落备份包）→ 回落 open()。
+//   进图库即有库（setGalleryOpen 的 isCloudEnabled 闸 = hasLiveStore），故此路径 requireStore() 合法。
+//   ⚠ 诚实交代一个副作用：store 配了 autoCacheOpenedFile → 备份读纯云端件会顺手把它留成本地副本
+//     （residency 变了，内容/同步态没变）。这是「备份要包含纯云端件」的固有代价——不读就备不到它。
+async function runFullLibraryBackup(): Promise<void> {
+  if (!(await openConfirmSheet(t("bk.title"), t("bk.msg", { size: humanSize(BACKUP_BUDGET_BYTES) })))) return;
+  const now = new Date();
+  try {
+    await withBusy(t("bk.scanning"), async () => {
+      const manifest = await walkLibrary(
+        (folder) => snapshotFolderOnce((f, cb) => requireStore().files.watchFolder(f, cb), folder),
+        { onFolder: (_f, n) => showFullscreenBusy(t("bk.scanningFolders", { n })) },
+      );
+      if (!manifest.files.length) { setStatus(t("bk.empty"), true); return; }
+      const report = await runLibraryBackup(manifest.files, {
+        readBytes: async (path) => {
+          const f = requireStore().file(path, { isZip: true, mode: "existing" });
+          return (await f.getEncryptedBlob()) ?? (await f.open());   // 加密件原样搬密文；明文件 null → 明文 open
+        },
+        pack: (entries) => zipPack(entries, { lastModDate: now }),
+        deliver: (blob, filename) => triggerDownload(blob, filename),
+        onProgress: (done, total) => showFullscreenBusy(t("bk.packing", { done: done + 1, total })),
+        onError: (path, e) => reportError(new Error(`[library-backup] read failed for ${path}: ` + String(e)), "log"),
+      }, { now });
+      // 诚实回执：拿到多少说多少；取不到的 / 列不全的单独成清单，绝不静默跳过。
+      const good: string[] = [];
+      if (report.archiveName) good.push(t("bk.done", { name: report.archiveName, n: report.zipped }));
+      if (report.spilled) good.push(t("bk.spilled", { n: report.spilled }));
+      const problems: string[] = [];
+      if (report.failed.length) problems.push(t("bk.failedN", { n: report.failed.length }));
+      if (manifest.partialFolders.length) problems.push(t("bk.partialN", { n: manifest.partialFolders.length }));
+      if (manifest.truncated) problems.push(t("bk.truncated", { n: manifest.foldersVisited }));
+      setStatus([...good, ...problems].join(" · "), true);
+      // 备份不完整 = 数据安全级别的事实 → 顶层 banner，不只状态行（用户可见文案走 i18n SSoT）。
+      if (problems.length) reportError(new Error(problems.join(" · ")), "warning");
+    });
+  } catch (e) {
+    reportError(new Error(t("bk.failed", { err: errMsg(e) })), "error");
+  }
+}
+
 export function initGalleryShell(ctx: AppContext) {
   editMode = ctx.editMode;
   board = ctx.board;
@@ -282,6 +330,12 @@ export function initGalleryShell(ctx: AppContext) {
     }
     const pw = await promptPassword({ title: t("gs.unlockTitle"), message: t("gs.unlockNoLocalMsg") });
     if (pw != null) { setPassword(pw); setStatus(t("gs.pwRecorded")); gallery.refresh(); }
+  });
+
+  // #18 全库备份（2026-08-28）：只读，整库打一个 zip；库太大改逐件下载。逻辑 = ./library-backup.ts
+  els.galleryMenuBackup?.addEventListener("click", () => {
+    els.galleryMenuPopup.classList.add("hidden");
+    void runFullLibraryBackup();
   });
 
   // 加号 → 新建：弹 sheet 选名字 + 分辨率
