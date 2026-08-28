@@ -21,6 +21,7 @@ import { ORA_FORMAT_VERSION } from "./backend/ora-stack-xml.ts";
 import { flattenViewLeaves } from "./backend/workpiece/painting-view.ts";
 import { tLatin } from "./i18n/index.ts";
 import { isSignedIn, requireStore, galleryBackend } from "./app-store.ts";
+import { appEncryption } from "./encryption.ts";
 import type { EncryptedBlob } from "./app-store.ts";   // 密文 at-rest 字节（branded）；B2：类型经接缝转口
 import { openInputSheet, openConfirmSheet, openChoiceSheet, lockSyncGate, settleSyncGate } from "./sheets.ts";
 import { readHandleFile, writeHandleBlob, handleMtime, hasWeebPaintTraces, supportsSaveFilePicker, pickSaveOraFile, type LocalFileHandle } from "./local-file-session.ts";
@@ -252,10 +253,8 @@ function _esRebound() { _esMuted = false; }
 async function openLocalFile(handle: LocalFileHandle): Promise<File | null> {
   const file = await readHandleFile(handle);
   // 加密容器：原位模式 v1 不吃密文（解锁/记忆密码/落库语义全在导入路径）→ 交还导入。
-  //   kind:none 探不了加密（encryption 面挂在 store 实例上；独立出口 = store escalation 已登记）——
-  //   加密件会在下面 decode 响亮失败，与旧 null-store「谎报不加密」同终点但不再靠替身撒谎。
-  const _be = galleryBackend();
-  if (_be.kind === "live" && await _be.store.encryption.isEncryptedBlob(file)) return file;
+  //   加密器官无库也活着（@internal/encryption 0.1.0 立户闭环：kind:none 分叉床垫拆除）。
+  if (await appEncryption.isEncryptedBlob(file)) return file;
   const loaded = await decodeOraToPainting(file) as LoadedDoc;
   if (!hasWeebPaintTraces(loaded)) return file;   // 外来 ora（Krita 等）→ 导入为新 doc，绝不原位覆写别人的文件
   if (!(await _gateFillOnSwitch())) return null; // 挽留门：fill 预览挂着 → 应用/丢弃/取消（user 2026-08-21）
@@ -559,7 +558,7 @@ async function _readCheckpointEntry(id: string): Promise<{ blob: Blob; at: numbe
     if (!name) return null;                              // 加密档只可能是 gallery 家（file 家原位=明文件）
     const pw = getPassword(name);
     if (!pw) return null;                                // 锁定 → 调用方提示「需要密码」
-    const plain = await requireStore().encryption.tryDecryptEncryptedBlob(rec.bytes, pw);   // 加密档只可能是 gallery 家（上行注释）→ 必有库
+    const plain = await appEncryption.tryDecryptEncryptedBlob(rec.bytes, pw);
     return plain ? { blob: plain, at: rec.at } : null;
   } catch (e) { reportError(new Error("[checkpoint] read failed: " + String(e)), "log"); return null; }
 }
@@ -838,6 +837,32 @@ async function newDoc({ name, w, h, layer0Name, layer0Pixels }: { name: string; 
   });
 }
 
+/** 无库「新建」（#22 打扫屋子 2026-08-28）：transient 家新画布（选定尺寸；不上户口不落盘——
+ *  doodle consent transient 拍板；T-crash 盲快照 + 三键挽留照常护；es 在无库本就 inert 不换绑）。 */
+async function newTransientDoc({ w, h }: { w: number; h: number }): Promise<boolean> {
+  if (!(await _gateFillOnSwitch())) return false;
+  if (!(await leaveLocalDoc())) return false;   // 当前 transient/file 家脏 → 三键挽留；取消 = 不新建
+  _loadedDocIsNewer = false; _loadedDocNewerConfirmed = false; updateNewerBanner();
+  return await withBusy(t("ss.creatingDocBusy", { name: t("nd.untitled") }), async () => {
+    timelapseDetach();
+    input.clearHistory();
+    wp2.load({
+      width: w, height: h,
+      nodes: [{ name: `${tLatin("doc.layerName")} 1`, visible: true, opacity: 1, mode: "source-over", clippingMask: false, lockAlpha: false, pixels: null }],
+    });
+    doc.clearSelectionOnLoad();
+    els.canvasSizeLabel.textContent = `${w}×${h}`;
+    beginTransientBlank();
+    board.invalidateAll(); board.fitToScreen(); renderLayersPanel();
+    resetEditorState();
+    applyEditorStateToUI();
+    timelapseAdopt({});
+    updateSaveStatus();
+    setGalleryOpen(false);
+    return true;
+  });
+}
+
 // pullCloudPath 已删（v415）：零调用者。打开云端项走 openItem —— es.open → store.file.open，
 //   本地没有就自动拉云落本地，同一条路径同时覆盖本地项和纯云端项，不需要第二个平行入口。
 
@@ -1091,6 +1116,7 @@ export const session = {
   setName, restore: restoreSession, saveAs,
   beginLazyBlank,   // P1.5 boot「可画新画布」落点（boot-restore.openFreshCanvas 唯一调用方）
   beginTransientBlank,   // P2 云关 boot 落点（boot-restore.openBlankCanvas 唯一调用方）：transient 家新画布
+  newTransientDoc,       // #22 无库「新建」（gallery-shell newDocConfirm 无库分支）：选尺寸的 transient 画布
   refreshOpenDoc,   // 回线/回前台的显式快进（P1 2026-08-25）——app.ts 事件侧唯一入口，别再裸调 pullIfClean
   // 显式换文档挽留门（fill 预览三选；user 2026-08-21）——给 session 外的换内容入口复用
   //   （import-image 的 .ora 导入为新身份）。session 内的 openItem/newDoc/openLocalFile 已内联。

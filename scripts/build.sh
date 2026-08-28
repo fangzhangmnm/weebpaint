@@ -91,6 +91,13 @@ if [ -n "$AMBIENT_HITS" ]; then
   echo "$AMBIENT_HITS" >&2
   exit 1
 fi
+ENC_SEAM_HITS=$(grep -rnE "(from|import)[[:space:]]*\(?[[:space:]]*['\"]@internal/encryption['\"]" src --include='*.ts' 2>/dev/null \
+  | grep -v "^src/encryption.ts" | grep -v "import type" || true)
+if [ -n "$ENC_SEAM_HITS" ]; then
+  echo "[build] ✗ app 层出现 @internal/encryption 值级 import（唯一接缝 = src/encryption.ts 的 appEncryption 器官）：" >&2
+  echo "$ENC_SEAM_HITS" >&2
+  exit 1
+fi
 REVIVAL_HITS=$(grep -rnE "createNullStore\(|createDormantAuth\(|import[^\n]*\{[^}]*(createNullStore|createDormantAuth)" src test --include='*.ts' --include='*.mjs' 2>/dev/null || true)
 if [ -n "$REVIVAL_HITS" ]; then
   echo "[build] ✗ null-store/dormant 替身复活（2026-08-27 物理退役；缺席=kind:none，消费点自己表态）：" >&2

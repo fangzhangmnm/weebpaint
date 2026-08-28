@@ -56,6 +56,12 @@ declare function newDoc({ name, w, h, layer0Name, layer0Pixels }: {
     layer0Name?: string;
     layer0Pixels?: Uint8ClampedArray;
 }): Promise<boolean>;
+/** 无库「新建」（#22 打扫屋子 2026-08-28）：transient 家新画布（选定尺寸；不上户口不落盘——
+ *  doodle consent transient 拍板；T-crash 盲快照 + 三键挽留照常护；es 在无库本就 inert 不换绑）。 */
+declare function newTransientDoc({ w, h }: {
+    w: number;
+    h: number;
+}): Promise<boolean>;
 declare function openItem(item: GalleryItem): Promise<void>;
 declare function pushItem(item: GalleryItem): Promise<void>;
 declare function unloadItem(item: GalleryItem): Promise<void>;
@@ -90,6 +96,7 @@ export declare const session: {
     saveAs: typeof saveAs;
     beginLazyBlank: typeof beginLazyBlank;
     beginTransientBlank: typeof beginTransientBlank;
+    newTransientDoc: typeof newTransientDoc;
     refreshOpenDoc: typeof refreshOpenDoc;
     gateFillOnSwitch: typeof _gateFillOnSwitch;
     save: typeof saveNow;

@@ -3,6 +3,7 @@
 // （busy 遮罩 z 高于 sheet，盖住密码框 = 无限转圈死锁；sheets 护栏也会 throw）。
 
 import { t } from "./i18n/index.ts";
+import { appEncryption } from "./encryption.ts";
 import { requireStore } from "./app-store.ts";
 import { sessionFileName } from "./config.ts";   // 边界：裸 item.name → 库全名（薄库身份=X.ora）
 import { SUFFIX_BYTES, THUMB_PATH } from "./gallery/cloud-thumbs.ts";
@@ -58,7 +59,7 @@ export async function ensureUnlocked(name: string): Promise<boolean> {
 export async function unlockImportedContainer(blob: Blob): Promise<{ pw: string; plain: Blob } | null> {
   const cur = getPassword(null);
   if (cur) {
-    const plain = await requireStore().encryption.tryDecryptEncryptedBlob(blob, cur);
+    const plain = await appEncryption.tryDecryptEncryptedBlob(blob, cur);
     if (plain) return { pw: cur, plain };
   }
   for (let attempt = 0; ; attempt++) {
@@ -67,7 +68,7 @@ export async function unlockImportedContainer(blob: Blob): Promise<{ pw: string;
       message: attempt > 0 ? t("enc.wrongRetry") : t("enc.importPrompt"),
     });
     if (pw == null) return null;
-    const plain = await requireStore().encryption.tryDecryptEncryptedBlob(blob, pw);
+    const plain = await appEncryption.tryDecryptEncryptedBlob(blob, pw);
     if (plain) return { pw, plain };
   }
 }

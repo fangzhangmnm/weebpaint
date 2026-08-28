@@ -27,6 +27,7 @@ import {
   watchFolder, listGalleryTrash, openCloudImage,
 } from "../app-store.ts";
 import type { CloudImageItem } from "../app-store.ts";
+import { appEncryption } from "../encryption.ts";
 import { getOrFetchCloudThumb, invalidateCachedThumb, onThumbInvalidated } from "./cloud-thumb-cache.ts";
 import { getOrFetchImageThumb } from "./image-thumbs.ts";
 import { imageThumbToken, imageTwinBareName, mimeForImageName } from "./cloud-image-model.ts";
@@ -180,7 +181,7 @@ const ThumbCell = defineComponent({
         .then(({ blob }: { blob: Blob }) => {
           if (seq !== fetchSeq) return;
           showCloud.value = false;
-          if (requireStore().encryption.isEncryptedPeekBlob(blob)) { cloudEncBlob = blob; return tryDecrypt(); }
+          if (appEncryption.isEncryptedPeekBlob(blob)) { cloudEncBlob = blob; return tryDecrypt(); }
           setBlob(blob);
         })
         .catch((err: unknown) => reportError(new Error("[gallery] thumb: " + String(err)), "log"));

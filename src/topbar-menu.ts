@@ -38,6 +38,7 @@ import { reportError } from "./error-badge.ts";
 import { decodeOraToPainting } from "./backend/ora.ts";
 import { t } from "./i18n/index.ts";
 import { openGalleryConnectFlow } from "./gallery/gallery-manage-ui.ts";   // P3 无库单入口
+import { runFactoryReset } from "./factory-reset.ts";   // P7 还原出厂（0828 收货 store 0.7.0 深清口子）
 import type { ViewLeaf } from "./backend/workpiece/painting-view.ts";
 
 import type { AppContext } from "./app-context.ts";
@@ -384,13 +385,18 @@ export function initTopbarMenu(ctx: AppContext) {
     }
   });
 
+  // P7 还原出厂设置（factory-reset.ts 主流程；前置=无开画+无挂库，各走正门收口）
+  document.getElementById("menuFactoryReset")?.addEventListener("click", () => {
+    els.menuPanel?.classList.add("hidden");
+    void runFactoryReset(setStatus);
+  });
   els.menuResetBrushRack.addEventListener("click", async () => {
     els.menuPanel?.classList.add("hidden");
-    const ok = await openConfirmSheet(
-      t("tm.resetRackTitle"),
-      t("tm.resetRackBody"),
-    );
-    if (!ok) return;
+    // 打字 consent（0825 §2.10「还原笔刷同款护栏」；破坏性动作不给一键直达）
+    const phrase = t("br.resetPhrase");
+    const typed = await openInputSheet(t("tm.resetRackTitle"), "", { placeholder: phrase, message: t("br.resetConsentPrompt", { phrase }) });
+    if (typed == null) return;
+    if (typed.trim() !== phrase) { setStatus(t("fr.mismatch"), true); return; }
     // 非破坏性：内置笔 setItem 覆盖同 id + .meta 提前；collection 自持久化/同步。
     // 报**还原了几支内置笔**，不是笔架总数（旧版报总数 = 把用户自建笔也算进「已重置」，是谎报）。
     const n = await rack.restoreBuiltins();

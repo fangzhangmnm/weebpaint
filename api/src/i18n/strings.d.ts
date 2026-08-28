@@ -5319,6 +5319,90 @@ export declare const S: {
         readonly ja: "「{label}」を一覧から削除しますか？";
         readonly tok: "o weka e \"{label}\" tan lipu?";
     };
+    readonly "fr.menuItem": {
+        readonly zh: "还原出厂设置…";
+        readonly en: "Factory reset…";
+        readonly ja: "出荷時設定にリセット…";
+        readonly tok: "o sin e ilo ni…";
+    };
+    readonly "fr.introTitle": {
+        readonly zh: "还原出厂设置";
+        readonly en: "Factory reset";
+        readonly ja: "出荷時設定にリセット";
+        readonly tok: "o sin e ilo ni";
+    };
+    readonly "fr.introMsg": {
+        readonly zh: "删除这台设备上的全部本地数据：图库缓存、设置、崩溃快照、恢复档。云端与磁盘上的作品文件不受影响。";
+        readonly en: "Deletes all local data on this device: gallery caches, settings, crash snapshots, revert history. Files in the cloud or on disk are untouched.";
+        readonly ja: "この端末のローカルデータ（ギャラリーキャッシュ・設定・クラッシュスナップショット・復元履歴）をすべて削除します。クラウドやディスク上の作品ファイルは影響を受けません。";
+        readonly tok: "ni li weka e sona ale lon ilo ni. sitelen lon poki sewi anu lon lipu ilo li awen pona.";
+    };
+    readonly "fr.needClose": {
+        readonly zh: "先关闭当前画作，再还原出厂设置";
+        readonly en: "Close the current artwork before a factory reset";
+        readonly ja: "先に現在の作品を閉じてください";
+        readonly tok: "o pini e sitelen ni. o sin e ilo kepeken ni la";
+    };
+    readonly "fr.needDetach": {
+        readonly zh: "先在图库页卸下图库（那里有备份逃生口），再还原出厂设置";
+        readonly en: "Detach the gallery first (the gallery page has the backup escape hatch)";
+        readonly ja: "先にギャラリーページでギャラリーを取り外してください（バックアップ手段があります）";
+        readonly tok: "o weka e poki sitelen lon lipu poki. o sin e ilo kepeken ni la";
+    };
+    readonly "fr.consentPhrase": {
+        readonly zh: "删除全部本地数据";
+        readonly en: "DELETE ALL LOCAL DATA";
+        readonly ja: "ローカルデータをすべて削除";
+        readonly tok: "o weka e sona ale";
+    };
+    readonly "fr.consentPrompt": {
+        readonly zh: "输入「{phrase}」以确认（逐字）";
+        readonly en: "Type \"{phrase}\" to confirm (exactly)";
+        readonly ja: "「{phrase}」と入力して確認（一字一句）";
+        readonly tok: "o sitelen e \"{phrase}\" tawa ken";
+    };
+    readonly "fr.mismatch": {
+        readonly zh: "输入不匹配，已取消";
+        readonly en: "Input didn't match — cancelled";
+        readonly ja: "入力が一致しません。キャンセルしました";
+        readonly tok: "sitelen li sama ala. mi pini";
+    };
+    readonly "fr.blocked": {
+        readonly zh: "有 {n} 个库被其他标签页占用——关闭其他 WeebPaint 标签页后重试";
+        readonly en: "{n} database(s) are held open by another tab — close other WeebPaint tabs and retry";
+        readonly ja: "{n} 個のデータベースが他のタブに使用されています。他の WeebPaint タブを閉じて再試行してください";
+        readonly tok: "lupa ante li kepeken e poki {n}. o pini e lupa ante. o sin e ni";
+    };
+    readonly "fr.doneClean": {
+        readonly zh: "已清空并验证归零（删除 {db} 个库 / {ls} 个键）。即将重新加载。";
+        readonly en: "Wiped and verified zero residue ({db} databases / {ls} keys removed). Reloading.";
+        readonly ja: "削除してゼロを確認しました（データベース {db} 件 / キー {ls} 件）。再読み込みします。";
+        readonly tok: "mi weka e ale ({db} poki / {ls} nimi). mi open sin.";
+    };
+    readonly "fr.residue": {
+        readonly zh: "清理完成但扫到残留（库 {db} / 键 {ls}）——重新加载后可重跑一次";
+        readonly en: "Wiped, but residue remains ({db} databases / {ls} keys) — reload and run again";
+        readonly ja: "削除しましたが残留があります（データベース {db} / キー {ls}）。再読み込み後にもう一度実行してください";
+        readonly tok: "ijo lili li awen ({db} poki / {ls} nimi). o open sin. o sin e ni";
+    };
+    readonly "br.resetPhrase": {
+        readonly zh: "还原笔刷";
+        readonly en: "RESET BRUSHES";
+        readonly ja: "ブラシをリセット";
+        readonly tok: "o sin e ilo sitelen";
+    };
+    readonly "br.resetConsentPrompt": {
+        readonly zh: "这会用内置笔刷覆盖同名笔刷。输入「{phrase}」以确认。";
+        readonly en: "This overwrites same-named brushes with the built-ins. Type \"{phrase}\" to confirm.";
+        readonly ja: "同名のブラシを内蔵ブラシで上書きします。「{phrase}」と入力して確認してください。";
+        readonly tok: "ni li ante e ilo sitelen sama. o sitelen e \"{phrase}\" tawa ken.";
+    };
+    readonly "gs.createdTransient": {
+        readonly zh: "已新建画布 {w}×{h}（未保存·无家——保存时选择去处）";
+        readonly en: "New canvas {w}×{h} (unsaved, no home — choose where to save it later)";
+        readonly ja: "新しいキャンバス {w}×{h}（未保存・保存時に保存先を選択）";
+        readonly tok: "sitelen sin {w}×{h} (awen ala — o awen e ona kepeken tomo la)";
+    };
     readonly "gm.forgetMsg": {
         readonly zh: "只从这台设备的名册移除，不动图库本身的文件。";
         readonly en: "Removes it from this device's list only; gallery files are untouched.";

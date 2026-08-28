@@ -3,7 +3,7 @@ import type { Store, Collection as _Coll } from "@internal/store";
 export declare const storeAbsent: boolean;
 type _Auth = ReturnType<typeof createOneDriveProvider>["auth"];
 export declare const provider: import("@internal/store").CloudProvider | null;
-export type AppStorePort = Pick<Store, "file" | "files" | "collection" | "encryption">;
+export type AppStorePort = Pick<Store, "file" | "files" | "collection">;
 export type GalleryBackend = {
     kind: "live";
     store: AppStorePort;
@@ -16,6 +16,7 @@ export declare function requireStore(): AppStorePort;
  *  P3 sunset：isCloudEnabled 的真相源。 */
 export declare function hasLiveStore(): boolean;
 export type { Collection, EncryptedBlob } from "@internal/store";
+export { wipeAppNamespace, scanAppNamespace } from "@internal/store";
 export declare let brushRackCollection: _Coll;
 export declare function _seedNextRackInitData(items: {
     id: string;

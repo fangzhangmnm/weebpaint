@@ -1,7 +1,6 @@
 import type { Collection } from "./app-store.ts";
 export declare const APP_STATE_DEFAULTS: {
     readonly "current-directory": string;
-    readonly "current-file": string | null;
     readonly "blender-panel-url": string;
     readonly "gallery-password-verifier": {
         v: 1;
@@ -9,15 +8,13 @@ export declare const APP_STATE_DEFAULTS: {
         iv: string;
         ct: string;
     } | null;
-    readonly "restore-attempt": string | null;
 };
 export type AppStateKey = keyof typeof APP_STATE_DEFAULTS;
-export declare function wireAppState(synced: Collection | undefined, local: Collection | undefined): void;
+export declare function wireAppState(synced: Collection | undefined): void;
 export declare function initAppState(): Promise<void>;
 export declare function flushAppState(): Promise<void>;
 export declare const appState: {
     currentDirectory: string;
-    currentFile: string | null;
     blenderPanelUrl: string;
     get galleryPasswordVerifier(): {
         v: 1;
@@ -31,7 +28,6 @@ export declare const appState: {
         iv: string;
         ct: string;
     } | null);
-    restoreAttempt: string | null;
     pushHotToPersistent(): void;
     pullFromPersistent(): Promise<void>;
 };

@@ -25,7 +25,7 @@ import { readImageFromClipboard } from "../session.ts";
 import { uniqueBareName } from "./gallery-model.ts";   // 撞名后缀兜底（纯·已 pin）；占用检查按库身份（全名 X.ora）查
 import { galleryDefaultName } from "../naming.ts";     // P1 命名器官：yyyymmdd-hex4（v217 惯例）+ 禁「未命名」
 import { humanSize } from "./gallery-view-model.ts";   // 展示格式化（纯·KiB/MiB）；此前本模块私有一份逐字节拷贝，2026-08-21 收敛
-import { isSignedIn, requireStore } from "../app-store.ts";
+import { isSignedIn, requireStore, galleryBackend } from "../app-store.ts";
 import { anchorPopupToBtn } from "../anchored-popup.ts";
 import { wireInlineSelect } from "../inline-select.ts";
 import { applyTheme, themeLabel, THEMES, currentTheme } from "../theme.ts";
@@ -85,8 +85,12 @@ export async function setGalleryOpen(open: boolean) {
 // 新建作品 sheet
 // v217 惯例 yyyymmdd-hex4 → P1 2026-08-26 提拔进命名器官（src/naming.ts），此处只消费。
 export function openNewDocSheet() {
+  // #22（2026-08-28）：无库新建 = transient 画布——不上户口，名字行藏（诚实：transient 没有名字身份）。
+  const noGallery = galleryBackend().kind === "none";
+  const nameRow = els.newDocName.closest("label") as HTMLElement | null;
+  if (nameRow) nameRow.style.display = noGallery ? "none" : "";
   const base = galleryDefaultName();
-  const folder = gallery.getFolder();
+  const folder = noGallery ? "" : gallery.getFolder();
   els.newDocName.value = folder ? `${folder}/${base}` : base;
   _selectPreset(DEFAULT_PRESET);
   els.newDocCustomRow.style.display = "none";
@@ -347,6 +351,13 @@ export function initGalleryShell(ctx: AppContext) {
     } else {
       w = Math.max(16, Math.min(8192, parseInt(els.newDocW.value, 10) || 2048));
       h = Math.max(16, Math.min(8192, parseInt(els.newDocH.value, 10) || 2048));
+    }
+    // #22：无库 → transient 画布（不上户口不落盘；返回值同样必须看——三键挽留取消=什么都没建）。
+    if (galleryBackend().kind === "none") {
+      closeNewDocSheet();
+      if (!(await session.newTransientDoc({ w, h }))) return;
+      setStatus(t("gs.createdTransient", { w: String(w), h: String(h) }));
+      return;
     }
     const name = await uniqueNameFor(nameRaw);
     closeNewDocSheet();

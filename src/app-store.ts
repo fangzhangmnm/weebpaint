@@ -9,8 +9,8 @@ import type { Store, Collection as _Coll } from "@internal/store";
 import { stripSessionExt, sessionFileName } from "./config.ts";
 import { storeUI } from "./store-ui.ts";
 import { CLIENT_ID, SCOPES, AUTHORITY } from "./config.ts";
-import { zipReadEntry, zipPack, zipUnpack } from "./backend/zip.ts";
-import { pack7z, unpack7z } from "./sevenzip.ts";
+import { zipReadEntry } from "./backend/zip.ts";
+import { appEncryption } from "./encryption.ts";   // 加密器官（store 收同一实例；app 侧消费直连它，不经 store）
 import { getPassword } from "./crypto-state.ts";
 import { wirePreferences, initPreferences, setGalleryLayerLive } from "./app-prefs.ts";
 import { wireAppState, initAppState, appState } from "./app-state.ts";
@@ -35,9 +35,6 @@ function _assembleReal(): { provider: _Prov | null; auth: _Auth } {
   return { provider: od.provider, auth: od.auth };
 }
 
-// 加密 codec 注入（不注入 = 加密 dormant）。
-const cryptoCodec = { zipPack, zipUnpack, pack7z, unpack7z };
-
 // 唯一 store（薄库）。app 建它（含 ui bundle）；migration 内部自跑（createStore 隐形，app 不 await）。
 // P3：databaseId 参数化（registry 条目的 dbId；缺省 = 库默认 "defaultStore" = legacy OneDrive 库）。
 const _createRealStore = (provider: _Prov, signedIn: () => boolean, databaseId?: string): Store => createStore({
@@ -53,7 +50,7 @@ const _createRealStore = (provider: _Prov, signedIn: () => boolean, databaseId?:
   //   （X→X.ora）再传库（见 session-state 的 _file / editor-session 的 name；OUT 侧 itemToG 用 stripSessionExt 还原显示）。
   //   加密件云端 = X.ora.zip（追加，无损可逆），由库据字节加密态自动翻转，app 只管明文全名。
   //   身份从出生即全名——无迁移（无用户/无后向兼容，2026-07-13 清 tax；migration 框架留库内待将来）。
-  crypto: cryptoCodec,
+  encryption: appEncryption,   // EncryptionPort（0.7.0 必填表态；app 与 store 共用同一实例）
   crypt: {
     ext: "ora",
     makePeek: async (blob) => { try { return await zipReadEntry(blob, "Thumbnails/thumbnail.png"); } catch { return null; } },  // ora 内容知识只此一行
@@ -93,9 +90,10 @@ export const provider = _asm.provider;
 const _auth: _Auth | null = _asm.auth;
 
 // ============ B2 窄接口（C7 裁定落地，2026-08-10；2026-08-27 ambient 退役改造）============
-// app 消费的 store 面**只有四个**：file / files / collection / encryption（全仓实测，其余 grep 命中皆旧注释）。
+// app 消费的 store 面**只有三个**：file / files / collection（encryption 面已随 @internal/encryption 立户退役
+//   2026-08-28——加密消费直连 src/encryption.ts 器官，无库也活着）。
 // 收敛形 = **派生窄 Port**（Pick 自库类型 SSoT，零镜像零 drift）；类型 import 也收拢本接缝（下方 re-export）。
-export type AppStorePort = Pick<Store, "file" | "files" | "collection" | "encryption">;
+export type AppStorePort = Pick<Store, "file" | "files" | "collection">;
 // ambient store 退役（2026-08-27 user 拍板「依赖整理好」）：不再有 take-as-granted 的全局 store 出口。
 //   消费点二选一表态（build.sh lint 守）：
 //   · requireStore()   —— 「此路径结构上必有库」（gallery UI / gallery 家保存）。无库被调 = 响亮 throw（bug surfaced）。
@@ -116,6 +114,7 @@ export function requireStore(): AppStorePort {
  *  P3 sunset：isCloudEnabled 的真相源。 */
 export function hasLiveStore(): boolean { return _storeFull != null; }
 export type { Collection, EncryptedBlob } from "@internal/store";   // app 侧仅剩的两个库类型，经接缝转口
+export { wipeAppNamespace, scanAppNamespace } from "@internal/store";   // P7 深清口子（0.7.0）——maintenance 面经接缝转口（factory-reset.ts 消费）
 
 // ============ 设置/状态 collection（synced×2 + brush-rack）注入 ============
 // app-prefs/app-state **不 import 本文件**（防 i18n→app-store→store-ui→i18n 成环）；由此处建好 store 后惰性注入。

@@ -9,6 +9,7 @@
 import { describe, it, assert, eq } from "./runner.mjs";
 import { createStore } from "@internal/store";
 import { createMockProvider, createMockLocal } from "@internal/store/testing";
+import { createMockEncryption } from "@internal/store/testing";
 import { BrushRackController } from "../src/brush-rack-controller.ts";
 import { RACK_META_ID } from "../src/brushes.ts";
 
@@ -17,7 +18,7 @@ import { RACK_META_ID } from "../src/brushes.ts";
 //   离线态（isOnline/signedIn=false）→ 纯本地，绑定语义与原测试等价。
 const dumpKv = () => { const m = new Map(); return { get: (k) => (m.has(k) ? m.get(k) : null), set: (k, v) => m.set(k, String(v)), remove: (k) => m.delete(k), keys: () => [...m.keys()] }; };
 const STUB_UI = { busy: (_l, fn) => fn(), resolveConflict: async () => ({ choice: "cancel" }), reportError: () => {} };
-const mkCollection = () => createStore({
+const mkCollection = () => createStore({ encryption: createMockEncryption(),
   appId: "wp", persistence: "none", provider: createMockProvider(), ui: STUB_UI, validateAdopt: () => true,
   kv: dumpKv(), local: createMockLocal(), fileName: (n) => n,
   isOnline: () => false, signedIn: () => false, skipMigration: true,

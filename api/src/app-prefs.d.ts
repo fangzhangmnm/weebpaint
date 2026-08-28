@@ -12,10 +12,6 @@ export declare const PREF_REGISTRY: {
         readonly scope: "device";
         readonly def: Record<string, number>;
     };
-    readonly "cloud-enabled": {
-        readonly scope: "device";
-        readonly def: boolean;
-    };
     readonly lang: {
         readonly scope: "gallery";
         readonly def: string | null;
@@ -32,7 +28,7 @@ export declare const PREF_REGISTRY: {
 export type PrefKey = keyof typeof PREF_REGISTRY;
 type PrefValue<K extends PrefKey> = (typeof PREF_REGISTRY)[K]["def"];
 export declare const PREF_DEFAULTS: { [K in PrefKey]: PrefValue<K>; };
-export declare function wirePreferences(local: Collection | undefined, synced: Collection | undefined): void;
+export declare function wirePreferences(synced: Collection | undefined): void;
 export declare function setGalleryLayerLive(v: boolean): void;
 export declare function initPreferences(): Promise<void>;
 export declare function preferencesReady(): Promise<void>;
@@ -46,5 +42,4 @@ export declare const preferences: {
     /** gallery 层云端变更回灌钩（device/session 层无远端，不经此）。 */
     onChange(cb: (changedIds: string[]) => void): () => void;
 };
-export declare function seedDevicePrefsFromLegacy(): void;
 export {};

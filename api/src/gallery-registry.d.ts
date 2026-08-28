@@ -31,12 +31,10 @@ export interface GalleryRegistry {
     relabel(id: string, label: string): Promise<void>;
     forget(id: string): Promise<void>;
     lastActive(): Promise<GalleryEntry | null>;
-    /** 播种（幂等，靠 dedup 不靠标记；每次 auth 变化调都安全）：既有登录态 → legacy OneDrive 条目；
-     *  cloud-enabled=false → lastActive=null（P5 §9.8 判死缓的收编入口）。 */
+    /** 播种（幂等，靠 dedup 不靠标记；每次 auth 变化调都安全）：既有登录态 → legacy OneDrive 条目即激活。 */
     seedLegacyOneDrive(p: {
         homeAccountId: string;
         username: string;
-        cloudEnabled: boolean;
     }): Promise<void>;
 }
 export declare function createGalleryRegistry(kv: RegistryKV): GalleryRegistry;

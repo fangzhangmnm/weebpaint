@@ -1449,6 +1449,10 @@
         <button class="menu-item menu-danger menu-item-with-icon" id="menuResetBrushRack" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#refresh"/></svg>
         <span class="menu-item-label" data-i18n="menu.resetRack">还原内置笔刷…</span>
       </button>
+        <!-- P7 还原出厂设置（2026-08-28 收货 store 0.7.0 深清口子；打字 consent + 无痕扫在 factory-reset.ts） -->
+        <button class="menu-item menu-danger menu-item-with-icon" id="menuFactoryReset" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#trash-can"/></svg>
+        <span class="menu-item-label" data-i18n="fr.menuItem">还原出厂设置…</span>
+      </button>
       </div>
       <!-- 隐藏 stub / 兜底 id（防 getElementById 崩；不属任何 tab） -->
       <button id="adjustCropToSelection" type="button" hidden></button>
@@ -1528,6 +1532,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-2dd74064283d.mjs"></script>
+    <script type="module" src="./dist/weebpaint-767ef6a172cc.mjs"></script>
   </body>
 </html>
