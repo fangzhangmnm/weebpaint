@@ -1,7 +1,7 @@
 <!doctype html>
 <!-- itch iframe 测试夹具（P6；0825 verdicts §2.9「iframe 测试夹具进工单」）。
      created 2026-08-27 by Claude Fable 5.
-     用法：先 `bash scripts/build-single.sh`，再本目录起个静态服务（如 `python3 -m http.server`），
+     用法：先 `bash scripts/build-standalone.sh`，再本目录起个静态服务（如 `python3 -m http.server`），
      开 http://localhost:8000/tools/itch-iframe-fixture.html。
      近似 itch 的 iframe 沙箱（allow-scripts + allow-same-origin? itch 实际给的是同源 iframe 于
      html.itch.zone 子域 + 无 clipboard allow）。本夹具验的是：iframe 内 boot 不炸、paste 降级链、
@@ -9,5 +9,5 @@
 <meta charset="utf-8" />
 <title>WeebPaint itch iframe fixture</title>
 <style>body{margin:0;background:#222;color:#ccc;font:13px system-ui} .bar{padding:6px 10px} iframe{display:block;width:100vw;height:calc(100vh - 30px);border:0}</style>
-<div class="bar">itch iframe 夹具 —— 装载 ../dist/weebpaint-single.html（allow 列表模拟 itch：无 clipboard-write）</div>
-<iframe src="../dist/weebpaint-single.html" allow="fullscreen; gamepad"></iframe>
+<div class="bar">itch iframe 夹具 —— 装载 ../dist/weebpaint-standalone.html（allow 列表模拟 itch：无 clipboard-write）</div>
+<iframe src="../dist/weebpaint-standalone.html" allow="fullscreen; gamepad"></iframe>

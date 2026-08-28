@@ -10,7 +10,7 @@
 //
 // 设计定稿：ai-docs/20260729-crop-template-mode.md（裁剪模板模式）。
 
-import { embeddedText } from "./single-file.ts";   // P6 单文件内嵌读口
+import { embeddedText } from "./standalone-html.ts";   // P6 单文件内嵌读口
 import { t, type Key } from "./i18n/index.ts";
 import { reportError } from "./error-badge.ts";
 

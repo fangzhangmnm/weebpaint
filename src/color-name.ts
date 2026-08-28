@@ -16,7 +16,7 @@
 //   （**保持源序**——retro palette 的编号序就是身份）；色温出单条候选；普通查询 =
 //   前缀命中优先、子串命中殿后（有限 limit 时子串保底一半槽位）。
 
-import { embeddedText } from "./single-file.ts";   // P6 单文件内嵌读口
+import { embeddedText } from "./standalone-html.ts";   // P6 单文件内嵌读口
 import { lang } from "./i18n/index.ts";
 import { reportError } from "./error-badge.ts";
 import { srgbToOklab } from "./common/color-dist.ts";

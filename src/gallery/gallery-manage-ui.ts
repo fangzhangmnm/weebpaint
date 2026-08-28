@@ -181,7 +181,7 @@ async function connectFlow(): Promise<void> {
     ...(canPickFolderGallery() ? [{ label: t("gm.srcFolder"), value: "folder" as const, onPick: () => { mintP = mintFolderByPicker(); } }] : []),
   ]);
   if (src === "od" && fileProto) {
-    const fn = (() => { try { return decodeURIComponent(location.pathname.split("/").pop() || "weebpaint-single.html"); } catch { return "weebpaint-single.html"; } })();
+    const fn = (() => { try { return decodeURIComponent(location.pathname.split("/").pop() || "weebpaint-standalone.html"); } catch { return "weebpaint-standalone.html"; } })();
     await openConfirmSheet(t("gm.connectTitle"), t("gm.fileProtoCloudHelp", { file: fn }));
     return;
   }

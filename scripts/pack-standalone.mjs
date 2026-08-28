@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// pack-single.mjs —— P6 单文件 html 打包器（0825 verdicts §2.9 / survey §5.3）。
+// pack-standalone.mjs —— P6 单文件 html 打包器（0825 verdicts §2.9 / survey §5.3）。
 // created 2026-08-27 by Claude Fable 5.
 //
 // 输入 = 常规 build 产物（同一个全量 bundle——「html build = 全量 build 运行时 gate」拍板，不做阉割 build）；
-// 输出 = dist/weebpaint-single.html：自包含（css/字体/zip-js/bundle 内联；7z/msal/三份 json 灌
-//   window.__WEEBPAINT_EMBED__，运行时接缝 = src/single-file.ts）。**gitignored**——生成物不进仓不进
-//   pages 部署；itch 上传 / 双击分发前本地跑 `bash scripts/build-single.sh`。
+// 输出 = dist/weebpaint-standalone.html：自包含（css/字体/zip-js/bundle 内联；7z/msal/三份 json 灌
+//   window.__WEEBPAINT_EMBED__，运行时接缝 = src/standalone-html.ts）。**gitignored**——生成物不进仓不进
+//   pages 部署；itch 上传 / 双击分发前本地跑 `bash scripts/build-standalone.sh`。
 // 安全细节：内联 JS 里的 "</script" 一律替换为 "<\/script"（字符串/正则语义不变，HTML 解析不再早收）；
 //   JSON 里 "</" 同理。自检：不残留任何外链 src/href、体积上限、必含 EMBED 标记——违约非零退出。
 
@@ -60,9 +60,9 @@ html = html.replace(/^\s*<link rel="(manifest|icon|apple-touch-icon)"[^>]*\/>\s*
 const leftovers = [...html.matchAll(/(?:src|href)="\.\/[^"]+"/g)].map((m) => m[0]);
 if (leftovers.length) die("残留外链引用：" + leftovers.join(" "));
 if (!html.includes("__WEEBPAINT_EMBED__")) die("EMBED 段缺失");
-const out = resolve(root, "dist/weebpaint-single.html");
+const out = resolve(root, "dist/weebpaint-standalone.html");
 writeFileSync(out, html);
 const mb = statSync(out).size / 1024 / 1024;
 if (mb > 25) die(`体积超限 ${mb.toFixed(1)}MB > 25MB（TiddlyWiki 经验 ~20MB 起明显变慢）`);
-console.log(`[pack-single] ✓ dist/weebpaint-single.html（${version}，${mb.toFixed(2)} MB）`);
+console.log(`[pack-single] ✓ dist/weebpaint-standalone.html（${version}，${mb.toFixed(2)} MB）`);
 console.log("[pack-single] 验法：双击 file:// 开（Chromium/Firefox）；itch 上传该文件；夹具 = tools/itch-iframe-fixture.html");

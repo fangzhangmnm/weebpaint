@@ -8,7 +8,7 @@
 // HOST-SEAM：crypto-container（store 底座）调 pack7z/unpack7z；浏览器走默认 loader，
 //   node 测试经 setSevenZipLoader 注入 node 版（require + fs），不碰浏览器路径。
 
-import { embeddedBlobUrl, embeddedBytes } from "./single-file.ts";   // P6 单文件内嵌读口
+import { embeddedBlobUrl, embeddedBytes } from "./standalone-html.ts";   // P6 单文件内嵌读口
 import type { SevenZipModuleFactory } from "../vendor/7z-wasm/index.d.ts";
 
 interface SevenZipConfig {

@@ -1,9 +1,9 @@
 // P6 单文件 headless smoke（Chromium file://）：boot 不炸、EMBED 生效、版本水印、SW 没注册。
-// created 2026-08-27 by Claude Fable 5. 用法：bash scripts/build-single.sh && node tools/single-smoke.mjs（playwright 档，不进 npm test 硬线）
+// created 2026-08-27 by Claude Fable 5. 用法：bash scripts/build-standalone.sh && node tools/standalone-smoke.mjs（playwright 档，不进 npm test 硬线）
 import { chromium } from "playwright";
 import { resolve } from "node:path";
 
-const file = "file://" + resolve("dist/weebpaint-single.html");
+const file = "file://" + resolve("dist/weebpaint-standalone.html");
 const browser = await chromium.launch();
 const page = await browser.newPage();
 const errors = [];

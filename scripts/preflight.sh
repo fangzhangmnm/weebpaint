@@ -26,7 +26,7 @@ step "unit: weebpaint (npm test)"    npm test
 step "unit: store (npm test)"        bash -c "cd \"$STORE_DIR\" && npm test"
 step "gl-smoke"                      npm run smoke
 step "build (dist)"                  bash scripts/build.sh
-step "build-single"                  bash scripts/build-single.sh
+step "build-standalone"                  bash scripts/build-standalone.sh
 step "F3 bundle"                     bash -c "tools/esbuild/esbuild tools/preflight/f3-idb-guard.entry.ts --bundle --format=iife --outfile=tmp/preflight-f3.js && printf '%s' '<!doctype html><script src=\"/tmp/preflight-f3.js\"></script>' > tmp/preflight-f3.html"
 
 for r in $(seq 1 "$ROUNDS"); do
@@ -35,7 +35,7 @@ for r in $(seq 1 "$ROUNDS"); do
   step "F2 reload-survival (round $r)" node tools/preflight/f2-reload-survival.mjs
   step "F3 idb-guard (round $r)"     node tools/preflight/f3-idb-guard.mjs
   step "F4 factory-reset (round $r)" node tools/preflight/f4-factory-reset.mjs
-  step "F6 single-html (round $r)"   node tools/single-smoke.mjs
+  step "F6 standalone-html (round $r)"   node tools/standalone-smoke.mjs
   step "F7 export (round $r)"        node tools/preflight/f7-export.mjs
 done
 

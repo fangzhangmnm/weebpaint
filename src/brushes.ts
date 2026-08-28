@@ -22,7 +22,7 @@
 //   shape / coeffs / pressureGamma / compositeMode /
 //   spacing / pixelMode / taper / hardness / 椭圆参数 / smooth
 
-import { embeddedText } from "./single-file.ts";   // P6 单文件内嵌读口
+import { embeddedText } from "./standalone-html.ts";   // P6 单文件内嵌读口
 import { t } from "./i18n/index.ts";
 import type { Brush, BrushRackData } from "./brush-types.ts";
 import { reportError } from "./error-badge.ts";

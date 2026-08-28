@@ -6,7 +6,7 @@ import { createStore, createOneDriveProvider, createFolderProvider, isCached, is
 import { detectStoreAbsent } from "./store-absent.ts";
 import { createDeviceRackSlot } from "./device-rack-slot.ts";   // A2 终案：无库笔架器官（reload 不丢）
 import type { RackPersistence } from "./brush-rack-controller.ts";   // 脑定义 port（type-only 无环）
-import { embeddedBlobUrl } from "./single-file.ts";   // P6 单文件内嵌读口（msal 逃生舱）
+import { embeddedBlobUrl } from "./standalone-html.ts";   // P6 单文件内嵌读口（msal 逃生舱）
 import type { Store, Collection as _Coll } from "@internal/store";
 import { stripSessionExt, sessionFileName } from "./config.ts";
 import { storeUI } from "./store-ui.ts";
