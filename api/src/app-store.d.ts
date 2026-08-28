@@ -18,6 +18,7 @@ export declare function requireStore(): AppStorePort;
 export declare function hasLiveStore(): boolean;
 export type { Collection, EncryptedBlob } from "@internal/store";
 export { wipeAppNamespace, scanAppNamespace } from "@internal/store";
+export { isCached as isCachedSyncState } from "@internal/store";
 export declare let brushRackCollection: RackPersistence;
 export declare function _seedNextRackInitData(items: {
     id: string;

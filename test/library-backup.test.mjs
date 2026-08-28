@@ -267,3 +267,24 @@ describe("library-backup · 命名", () => {
     assert(!spillName("a/b.ora").includes("/"), "溢出名无斜杠");
   });
 });
+
+describe("library-backup · 透明账（0828 user：溢出必须说明是哪些；包内自带 manifest）", () => {
+  it("spilledNames/zippedNames 全名单；renderManifest 进包但不计入 zipped", async () => {
+    const mk = (n) => new Blob([new Uint8Array(n)]);
+    const delivered = [];
+    const r = await runLibraryBackup(
+      [{ path: "a.ora" }, { path: "big.ora" }, { path: "b.ora" }],
+      {
+        readBytes: async (p) => (p === "big.ora" ? mk(100) : mk(10)),
+        pack: async (entries) => { delivered.push(["zip", entries.map((e) => e.path)]); return mk(1); },
+        deliver: (_b, name) => { delivered.push(["file", name]); },
+      },
+      { budget: 50, renderManifest: (m) => `Z:${m.zipped.join()};S:${m.spilled.join()};F:${m.failed.join()}` },
+    );
+    eq(r.zipped, 1, "zipped 不含 manifest 自己（单向阀：超出点起后续全逐件）");
+    eq(r.zippedNames.join(","), "a.ora");
+    eq(r.spilledNames.join(","), "big.ora,b.ora", "★溢出名单逐件可见（不是驱逐：已逐件下载交付）");
+    const zipEntries = delivered.find((d) => d[0] === "zip")[1];
+    assert(zipEntries.includes("backup-manifest.txt"), "manifest 在包内");
+  });
+});

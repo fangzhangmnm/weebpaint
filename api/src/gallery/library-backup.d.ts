@@ -4,6 +4,7 @@ export declare const BACKUP_BUDGET_BYTES: number;
 export interface BackupFileRef {
     path: string;
     size?: number;
+    syncState?: string;
 }
 /** watchFolder 快照的**结构型**端口（刻意不 import 库类型：本模块零 store 依赖）。 */
 export interface WatchSnapshot {
@@ -11,6 +12,7 @@ export interface WatchSnapshot {
     items: {
         path: string;
         size?: number;
+        syncState?: string;
     }[];
     folders: string[];
     complete: boolean;
@@ -74,7 +76,9 @@ export interface BackupPorts {
 export interface BackupReport {
     total: number;
     zipped: number;
+    zippedNames: string[];
     spilled: number;
+    spilledNames: string[];
     failed: string[];
     bytes: number;
     archiveName: string | null;
@@ -84,4 +88,9 @@ export interface BackupReport {
 export declare function runLibraryBackup(files: BackupFileRef[], ports: BackupPorts, opts?: {
     budget?: number;
     now?: Date;
+    renderManifest?: (r: {
+        zipped: string[];
+        spilled: string[];
+        failed: string[];
+    }) => string;
 }): Promise<BackupReport>;

@@ -22,12 +22,12 @@ import { downloadStamp } from "../naming.ts";
 export const BACKUP_BUDGET_BYTES = 512 * 1024 * 1024;
 
 /** 清单里的一件（size 只是列举给的估值，可能缺；真预算用读到的字节算）。 */
-export interface BackupFileRef { path: string; size?: number }
+export interface BackupFileRef { path: string; size?: number; syncState?: string }   // syncState 原样透传（宿主判「备份前是否已缓存」→ 配额归还）
 
 /** watchFolder 快照的**结构型**端口（刻意不 import 库类型：本模块零 store 依赖）。 */
 export interface WatchSnapshot {
   path: string;
-  items: { path: string; size?: number }[];
+  items: { path: string; size?: number; syncState?: string }[];
   folders: string[];
   complete: boolean;
   stale?: true;
@@ -44,7 +44,7 @@ export interface FolderProbe {
 
 const toProbe = (folder: string, snap: WatchSnapshot | null): FolderProbe => ({
   path: folder,
-  files: (snap?.items ?? []).map((it) => ({ path: it.path, size: it.size })),
+  files: (snap?.items ?? []).map((it) => ({ path: it.path, size: it.size, syncState: it.syncState })),
   folders: snap?.folders ?? [],
   authoritative: snap?.complete === true && snap.stale !== true,
 });
@@ -174,7 +174,9 @@ export interface BackupPorts {
 export interface BackupReport {
   total: number;                 // 清单件数
   zipped: number;                // 进了备份包的件数
+  zippedNames: string[];         // 进包名单（透明账：manifest/回执用）
   spilled: number;               // 溢出后逐件下载的件数
+  spilledNames: string[];        // 溢出名单（0828 user：溢出必须对用户透明并说明是哪些——注意这不是驱逐，一件不丢，只是改逐件下载）
   failed: string[];              // 取不到字节的（**诚实清单**，绝不静默跳过）
   bytes: number;                 // 成功取到的总字节
   archiveName: string | null;    // 真打了包才有
@@ -185,12 +187,12 @@ export interface BackupReport {
 export async function runLibraryBackup(
   files: BackupFileRef[],
   ports: BackupPorts,
-  opts: { budget?: number; now?: Date } = {},
+  opts: { budget?: number; now?: Date; renderManifest?: (r: { zipped: string[]; spilled: string[]; failed: string[] }) => string } = {},
 ): Promise<BackupReport> {
   const budget = createByteBudget(opts.budget ?? BACKUP_BUDGET_BYTES);
   const entries: { path: string; data: Blob }[] = [];
   const failed: string[] = [];
-  let spilled = 0;
+  const spilledNames: string[] = [];
   let bytes = 0;
   for (let i = 0; i < files.length; i++) {
     const path = files[i].path;
@@ -201,17 +203,25 @@ export async function runLibraryBackup(
     if (!blob) { failed.push(path); continue; }
     bytes += blob.size;
     if (budget.admit(blob.size) === "zip") entries.push({ path, data: blob });
-    else { ports.deliver(blob, spillName(path)); spilled++; }
+    else { ports.deliver(blob, spillName(path)); spilledNames.push(path); }
   }
+  const zippedNames = entries.map((e) => e.path);   // manifest 追加之前定格（计数/名单都不含 manifest 自己）
   let archiveName: string | null = null;
   if (entries.length) {
     archiveName = backupArchiveName(opts.now ?? new Date());
+    // 透明账（0828 user 拍板方向）：包内自带 manifest——进包/溢出（逐件下载）/失败三份名单全列，
+    //   离线打开备份包也能对账（宿主给 renderManifest 才写；纯函数保持零 i18n 依赖）。
+    if (opts.renderManifest) {
+      entries.push({ path: "backup-manifest.txt", data: new Blob([opts.renderManifest({ zipped: entries.map((e) => e.path), spilled: spilledNames, failed })], { type: "text/plain" }) });
+    }
     ports.deliver(await ports.pack(entries), archiveName);
   }
   return {
     total: files.length,
-    zipped: entries.length,
-    spilled,
+    zipped: zippedNames.length,
+    zippedNames,
+    spilled: spilledNames.length,
+    spilledNames,
     failed,
     bytes,
     archiveName,

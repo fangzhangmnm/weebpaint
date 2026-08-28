@@ -117,6 +117,7 @@ export function requireStore(): AppStorePort {
 export function hasLiveStore(): boolean { return _storeFull != null; }
 export type { Collection, EncryptedBlob } from "@internal/store";   // app 侧仅剩的两个库类型，经接缝转口
 export { wipeAppNamespace, scanAppNamespace } from "@internal/store";   // P7 深清口子（0.7.0）——maintenance 面经接缝转口（factory-reset.ts 消费）
+export { isCached as isCachedSyncState } from "@internal/store";   // 备份配额归还判据（library-backup：备份前是否已缓存）
 
 // ============ 设置/状态 collection（synced×2 + brush-rack）注入 ============
 // app-prefs/app-state **不 import 本文件**（防 i18n→app-store→store-ui→i18n 成环）；由此处建好 store 后惰性注入。

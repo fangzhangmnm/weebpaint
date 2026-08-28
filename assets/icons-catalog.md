@@ -1,6 +1,6 @@
 # 本 app 的图标
 
-141 icons · 提取自家族图标库 `../20260708 SVG Icons/icons.svg` · 由 `extract-icons.py` 生成，别手改。
+139 icons · 提取自家族图标库 `../20260708 SVG Icons/icons.svg` · 由 `extract-icons.py` 生成，别手改。
 
 用法：把 sprite 整段内联到 `<body>` 顶部，然后按 id 引用；
 ⚠ sprite 根自带的隐藏样式（1×1 + `opacity:0`）别换成 `display:none`——
@@ -26,8 +26,6 @@
 | `lasso` | 套索:闭合绳圈 + 自左下垂出的绳尾 |
 | `magic-wand` | 魔术棒:实心凹边四角星(控制点 0.12r —— 0.42r 会拉成菱形)在杖头 + 左上左下各一小星 + 斜杖 -45° |
 | `paint-bucket` | 线描桶+实心水滴 (定稿:把手弧高≈4.9=原 -3) |
-| `pen-pressure` | 笔压启用·案D:库内 pencil(Bootstrap 实心, 尖本就朝左下)缩到 0.60 置右上 + 笔尖 (9.4,14.6) 处两道同心波纹环(r4.8/7.6, 缺口 100° 让给笔身); 20260728 候选 4 号入库(甲方参考图思路) |
-| `pen-pressure-off` | 笔压禁用:pen-pressure 原图(pencil+两道波纹)整体 + 与笔身垂直的删除线(↘, 遮罩在笔与波纹上都留白, 同 edit-disabled 语法); 20260728 入库 |
 | `pencil` | 铅笔 Bootstrap Icons MIT |
 | `stamp` | 橡皮图章 |
 

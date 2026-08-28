@@ -5499,6 +5499,24 @@ export declare const S: {
         readonly ja: "{n} 件を取得できませんでした（クラウドのみ・オフライン？後で再試行してください）";
         readonly tok: "lipu {n} li kama ala. o sin e ni lon tenpo kama";
     };
+    readonly "bk.andMore": {
+        readonly zh: "……等 {n} 件（全量名单在包内 backup-manifest.txt）";
+        readonly en: "…and {n} more (full list in backup-manifest.txt inside the zip)";
+        readonly ja: "…ほか {n} 件（全リストは zip 内の backup-manifest.txt）";
+        readonly tok: "…en ijo {n} (nimi ale li lon lipu backup-manifest.txt)";
+    };
+    readonly "bk.spilledDetail": {
+        readonly zh: "超出 zip 预算、已改为逐件下载的 {n} 件（一件不丢，注意浏览器多文件下载确认）：";
+        readonly en: "{n} file(s) over the zip budget were delivered as individual downloads (nothing dropped — watch for the browser multi-download prompt):";
+        readonly ja: "zip 予算超過のため個別ダウンロードになった {n} 件（欠落なし。ブラウザの複数ダウンロード確認に注意）：";
+        readonly tok: "ijo {n} li kama lipu wan wan (ala li weka):";
+    };
+    readonly "bk.failedDetail": {
+        readonly zh: "取不到、不在本次备份里的 {n} 件（离线的纯云端件/锁定的加密件等）：";
+        readonly en: "{n} file(s) could NOT be read and are NOT in this backup (cloud-only while offline, locked encrypted, …):";
+        readonly ja: "取得できず今回のバックアップに含まれない {n} 件（オフラインのクラウド専用・ロック中の暗号化など）：";
+        readonly tok: "ijo {n} li ken ala kama la ona li lon ala poki ni:";
+    };
     readonly "bk.partialN": {
         readonly zh: "{n} 个文件夹未能完整列举，备份可能不全";
         readonly en: "{n} folders could not be listed in full — the backup may be incomplete";

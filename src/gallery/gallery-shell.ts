@@ -30,7 +30,7 @@ import { snapshotFolderOnce, walkLibrary, runLibraryBackup, BACKUP_BUDGET_BYTES 
 import { uniqueBareName } from "./gallery-model.ts";   // 撞名后缀兜底（纯·已 pin）；占用检查按库身份（全名 X.ora）查
 import { galleryDefaultName } from "../naming.ts";     // P1 命名器官：yyyymmdd-hex4（v217 惯例）+ 禁「未命名」
 import { humanSize } from "./gallery-view-model.ts";   // 展示格式化（纯·KiB/MiB）；此前本模块私有一份逐字节拷贝，2026-08-21 收敛
-import { requireStore, galleryBackend } from "../app-store.ts";
+import { requireStore, galleryBackend, isCachedSyncState } from "../app-store.ts";
 import { galleryOnline } from "../cloud-capability.ts";
 import { anchorPopupToBtn } from "../anchored-popup.ts";
 import { wireInlineSelect } from "../inline-select.ts";
@@ -209,16 +209,41 @@ async function runFullLibraryBackup(): Promise<void> {
         { onFolder: (_f, n) => showFullscreenBusy(t("bk.scanningFolders", { n })) },
       );
       if (!manifest.files.length) { setStatus(t("bk.empty"), true); return; }
+      const cachedBefore = new Map(manifest.files.map((fr) => [fr.path, fr.syncState != null && isCachedSyncState(fr.syncState as never)]));
       const report = await runLibraryBackup(manifest.files, {
         readBytes: async (path) => {
           const f = requireStore().file(path, { isZip: true, mode: "existing" });
-          return (await f.getEncryptedBlob()) ?? (await f.open());   // 加密件原样搬密文；明文件 null → 明文 open
+          // 红线修（0828）：加密+纯云端件旧路走 `?? open()` 兜底 = 解锁态**明文进备份包**。
+          //   正解：先 open 暖 at-rest 缓存（明文只在内存，引用即弃），再取密文；锁定 → null = failed（诚实）。
+          let bytes: Blob | null = await f.getEncryptedBlob();   // EncryptedBlob 是 Blob 的 brand 子类，宽化只读安全
+          if (!bytes) {
+            if (await f.isEncrypted()) {
+              const warmed = await f.open();
+              bytes = warmed ? await f.getEncryptedBlob() : null;
+            } else {
+              bytes = await f.open();
+            }
+          }
+          // 配额归还（0828 user：「抢救时炸配额不好」）：备份前本无缓存的件，读完立即 offload——
+          //   clean∧可重取 = 库的合法驱逐口径；峰值占用 ≈ 单件。best-effort：还不掉只记账不阻断。
+          if (bytes && cachedBefore.get(path) === false) {
+            try { await f.offload(); } catch (e) { reportError(new Error(`[library-backup] offload after read failed for ${path}: ` + String(e)), "log"); }
+          }
+          return bytes;
         },
         pack: (entries) => zipPack(entries, { lastModDate: now }),
         deliver: (blob, filename) => triggerDownload(blob, filename),
         onProgress: (done, total) => showFullscreenBusy(t("bk.packing", { done: done + 1, total })),
         onError: (path, e) => reportError(new Error(`[library-backup] read failed for ${path}: ` + String(e)), "log"),
-      }, { now });
+      }, { now, renderManifest: (r) => [
+        `WeebPaint backup ${now.toISOString()}`,
+        ``,
+        `[in this zip] (${r.zipped.length})`, ...r.zipped,
+        ``,
+        `[delivered as individual downloads — over the ${humanSize(BACKUP_BUDGET_BYTES)} zip budget, nothing dropped] (${r.spilled.length})`, ...r.spilled,
+        ``,
+        `[FAILED to read — NOT in this backup] (${r.failed.length})`, ...r.failed,
+      ].join("\n") });
       // 诚实回执：拿到多少说多少；取不到的 / 列不全的单独成清单，绝不静默跳过。
       const good: string[] = [];
       if (report.archiveName) good.push(t("bk.done", { name: report.archiveName, n: report.zipped }));
@@ -230,6 +255,14 @@ async function runFullLibraryBackup(): Promise<void> {
       setStatus([...good, ...problems].join(" · "), true);
       // 备份不完整 = 数据安全级别的事实 → 顶层 banner，不只状态行（用户可见文案走 i18n SSoT）。
       if (problems.length) reportError(new Error(problems.join(" · ")), "warning");
+      // 透明回执（0828 user：溢出/失败必须说清是哪些）：名单 sheet（截 12 件 + 等 N 件；全量在包内 manifest.txt）。
+      const listSome = (names: string[]) => names.slice(0, 12).join("\n") + (names.length > 12 ? "\n" + t("bk.andMore", { n: String(names.length - 12) }) : "");
+      if (report.spilledNames.length || report.failed.length) {
+        const parts: string[] = [];
+        if (report.spilledNames.length) parts.push(t("bk.spilledDetail", { n: String(report.spilledNames.length) }) + "\n" + listSome(report.spilledNames));
+        if (report.failed.length) parts.push(t("bk.failedDetail", { n: String(report.failed.length) }) + "\n" + listSome(report.failed));
+        await openConfirmSheet(t("bk.title"), parts.join("\n\n"));
+      }
     });
   } catch (e) {
     reportError(new Error(t("bk.failed", { err: errMsg(e) })), "error");
