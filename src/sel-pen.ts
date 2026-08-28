@@ -4,7 +4,8 @@
 // ①「不接 ResolvedBrush 才会屎山，尽量避免一个逻辑写两条」——笔刷管线动力学
 //   （spacing/压感/taper/引擎平滑）零重写，走 BrushEngine buffered 路径；
 // ②「笔架不是有滤镜笔画画笔橡皮笔吗，加一个选区笔就行了」——**不自造变体轮子**：
-//   笔架第四个工具类别 "selPen"（builtin-brushes.json 三支出厂笔：硬圆/勾线/像素），
+//   笔架第四个工具类别 "selPen"（builtin-brushes.json 五支出厂笔：硬圆/勾线/像素 + 2026-08-28
+//   笔压 toggle sunset 配的固定硬圆/固定勾线），
 //   lasso/fill 经 getRackToolKey 映射；本模块只做「笔架笔 → 选区笔渲染态」的覆写 + 抬笔光栅。
 //
 // 出口：抬笔 collectStamps() → alpha 平面 → ≥128 二值 → Selection（恒二值不变量，2026-07-29）
