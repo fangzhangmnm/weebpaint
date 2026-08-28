@@ -160,3 +160,13 @@ user 所要（「等宽勾线笔改成去掉笔压，不需要额外 toggle」�
 **结案补钉（user 0828）**：水印的「OffscreenCanvas 当 glyph 器官」声明豁免被判**越狱不合法**——设备字体
 栈使产出字节跨设备 divergent（语义级，非硬件浮点误差档），违反无头骑士纯函数良定义理念；未来 **text
 tool** 的文字→字节必须 vendor 字体 + 自带光栅器，系统字体+fillText 路线永久封死。
+
+**0828 iPad 真机批修（edited by Claude Fable 5，v0.11.37 推 dev）**：user 真机四报全根修——
+①连接图库「点两次」= signIn 全平台 loginRedirect 事实：首次连接死在跳转点、二次点靠 boot 领养侥幸。
+修=已登录零跳转直接 mint+attach；未登录 redirect 前落待续标记（device-kv+10min TTL），回程 wp:auth-changed
+续办（resumePendingOneDriveConnect，幂等）。②「已离线」假尾巴=setOnline 翻牌后没人重画名字行 →
+attachment.onChange 挂 renderCurrentGallery。③**HIGH 图层窗失踪双根因**：恢复件带别窗几何坐标而 apply
+left 裸用/top 只夹顶（出屏）+ position=null 分支不清内联样式（上张画的出屏坐标粘单例 DOM 污染含新画的
+后续所有画）→ 全夹取（同 color-panel vetted 形制）+ null 清样式 + 开面板兜底回屏；playwright 注坐标实证。
+④回收站入口从 header 收进图库☰菜单（restore-trash 取货图标——入口语义=找回）。真机回验四条已登记
+device-test-batch。
