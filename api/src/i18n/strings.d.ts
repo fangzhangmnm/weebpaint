@@ -2637,6 +2637,12 @@ export declare const S: {
         readonly ja: "画像";
         readonly tok: "sitelen";
     };
+    readonly "gal.otherFile": {
+        readonly zh: "文件（在 WeebPaint 外管理）";
+        readonly en: "File (managed outside WeebPaint)";
+        readonly ja: "ファイル（WeebPaint 外で管理）";
+        readonly tok: "lipu (lawa lon ilo ante)";
+    };
     readonly "gal.del.imageDetail": {
         readonly zh: "移到回收站（可恢复）。这是图片素材，不是画作。";
         readonly en: "Move to trash (recoverable). This is an image file, not an artwork.";

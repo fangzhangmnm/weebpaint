@@ -70,6 +70,13 @@ declare function itemToG(it: {
     newerOnCloud: boolean;
     conflict: boolean;
 };
+/** 图库杂物条目（#24，user 0828 拍板「显示其他扩展名的文件，不提供打开」——诚实性：看似空夹其实有货）。 */
+export interface CloudOtherItem {
+    path: string;
+    name: string;
+    size?: number;
+    lastModified?: number;
+}
 export interface CloudImageItem {
     path: string;
     name: string;
@@ -81,6 +88,7 @@ export declare function watchFolder(folder: string, cb: (snap: {
     path: string;
     items: ReturnType<typeof itemToG>[];
     images: CloudImageItem[];
+    others: CloudOtherItem[];
     folderNames: string[];
 }) => void): () => void;
 export declare function watchFolderImages(folder: string, cb: (snap: {
