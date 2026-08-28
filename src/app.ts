@@ -611,9 +611,22 @@ new PwaShell({
     pullSettingsAndState();                                   // 前台：拉 4 库
     if (isSignedIn() && session.home?.kind === "gallery") void session.refreshOpenDoc();   // 当前文件显式快进（P1 2026-08-25）
     // 图库开着回前台 → 刷新列表（fire-and-forget，判据同 auth/online 现有姿势）。云端帧只在
-    //   watchFolder 订阅时来一次，不刷的话别的设备的新保存永远看不到——这一刀只让「回前台」变诚实；
-    //   长驻前台的轮询要 store 从被动库变主动 agent = 更大的 ADR（ai-docs/20260528-backlog.md
-    //   「能否在深模块强制」节），本批不做。
+    //   watchFolder 订阅时来一次——回前台刷一次让「别的设备的新保存」可见。长驻前台的持续刷新
+    //   由下方 A6 轮询承担（app 层定时器，store 保持被动——0821「store 变主动 agent」ADR 顾虑
+    //   由此绕开，2026-08-28 user 拍板 a）。
     if (!els.galleryFull.classList.contains("hidden")) gallery.refresh();
   },
 }).init();
+
+// ── A6 图库长驻轮询（2026-08-28 user 拍板 a：轮询归 app、store 保持被动；只属 gallery store——device 槽无云）──
+//   图库页开着不动时也定期拉云端（此前只有 focus/online/回前台三触发）。条件全满足才 tick：
+//   前台可见（省电）+ 图库页开着 + 有库在线（galleryOnline 含 folder 权限语义——folder 库同样轮询，
+//   顺带捡到外部程序改动的夹内文件）。refresh = 同夹重订阅：非清空刷新 + frame-gate 防误触
+//   已在 gallery 侧承重，轮询帧原地 patch 不打扰正在操作的手。
+const GALLERY_POLL_MS = 60_000;
+setInterval(() => {
+  if (document.visibilityState !== "visible") return;
+  if (els.galleryFull.classList.contains("hidden")) return;
+  if (!galleryOnline()) return;
+  gallery.refresh();
+}, GALLERY_POLL_MS);

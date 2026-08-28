@@ -87,3 +87,25 @@ describe("gallery-registry · lastActive / touch / clearLastActive / forget / re
     await r.forget("no-such-id");                       // 幂等不炸
   });
 });
+
+// ── A3 generic-dict 口径契约（2026-08-28）：未知字段在一切 mutation 下存活 ─────────────────
+describe("gallery-registry · A3 未知字段 round-trip（generic JSON dict 口径）", () => {
+  it("touch/relabel/clearLastActive/mint 查重复用 都不丢未来版本写入的未知字段", async () => {
+    const kv = mapKV();
+    const r = createGalleryRegistry(kv);
+    const h = fakeHandle("A");
+    const a = await r.mintFolder(h);
+    // 模拟「未来版本」在条目上加了新字段（旧代码不知道它）
+    const entries = await kv.list();
+    await kv.put({ ...entries.find((x) => x.id === a.id), futureField: { nested: 42 }, anotherFlag: true });
+    await r.touch(a.id);                                    // spread 路径 ①
+    await r.relabel(a.id, "改标签");                        // spread 路径 ②
+    await r.clearLastActive();                              // spread 路径 ③
+    const reMint = await r.mintFolder(h);                   // 查重复用（spread 路径 ④）
+    eq(reMint.id, a.id);
+    const fin = (await kv.list()).find((x) => x.id === a.id);
+    eq(fin.futureField?.nested, 42, "嵌套未知字段存活");
+    eq(fin.anotherFlag, true, "布尔未知字段存活");
+    eq(fin.label, "A", "查重复用刷新了派生标签");
+  });
+});

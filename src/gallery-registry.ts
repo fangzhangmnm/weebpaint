@@ -14,6 +14,12 @@
 // 结构：逻辑走 RegistryKV port（node Map 假件可测，见 test/gallery-registry.test.mjs）；
 //   IDB 适配器只搬运（句柄 structured clone 入库；适配器形状抄 crash-store，刻意 WET——平台层家规）。
 
+// ── A3 序列化口径（2026-08-28 user 拍板「generic JSON dict：旧 json 永不需要 migration，代码层改名随意」）──
+//   ① 条目 = generic dict：**所有 mutation 一律 spread 保留未知字段**（{ ...e, 改动 }）——未来版本加的字段
+//     被旧版本碰过也不丢；契约测试钉在 test/gallery-registry.test.mjs（别把 spread 改成逐字段重建）。
+//   ② kind 是开放扩展位：加 "gdrive" 等 = 纯增量，旧条目零迁移。
+//   ③ 已持久化字段**永不改名**（改名=migration=否决）；homeAccountId 是 onedrive 域专属引用，
+//     未来 provider 各自**加自己的**引用字段（additive），不复用不改名。
 export type GalleryKind = "onedrive" | "folder";
 
 /** FSA 目录句柄的最小面（node 可测；浏览器 FileSystemDirectoryHandle 结构满足）。 */
@@ -24,7 +30,7 @@ export interface GalleryEntry {
   kind: GalleryKind;
   label: string;                 // 派生快照（attach 时 relabel 刷新）；不可编辑
   dbId: string;                  // store databaseId：legacy OneDrive = "defaultStore"（既有缓存/dirty 零迁移）；新铸 = `gallery-<id>`
-  homeAccountId?: string;        // kind=onedrive：账号引用（多账号=多条目；结构支持、UX 不打磨）
+  homeAccountId?: string;        // kind=onedrive 域专属账号引用（MSAL 词；别的 provider 加自己的字段，见 A3 口径③）
   handle?: DirHandleLike;        // kind=folder：FSA 句柄
   lastActive: number | null;     // null = 未激活/已卸下
   createdAt: number;
