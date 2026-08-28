@@ -11,6 +11,7 @@ import { galleryRegistry } from "./gallery-registry.ts";
 import { galleryAttachment } from "./gallery-attachment-host.ts";
 import { storeAbsent, _swapStoreForGallery, signIn, getActiveAccount, isSignedIn } from "./app-store.ts";
 import { deviceKvGet, deviceKvSet } from "./device-kv.ts";
+import { pickerAllowedInFrame } from "./local-file-session.ts";
 import { reportError } from "./error-badge.ts";
 
 // ---- FSA 权限（folder 库）----
@@ -28,7 +29,7 @@ export async function ensureFolderPermission(entry: GalleryEntry, opts: { reques
 
 // ---- 动词 ----
 const _picker = () => (globalThis as { showDirectoryPicker?: (o?: unknown) => Promise<unknown> }).showDirectoryPicker;
-export const canPickFolderGallery = (): boolean => !storeAbsent && typeof _picker() === "function";
+export const canPickFolderGallery = (): boolean => !storeAbsent && pickerAllowedInFrame() && typeof _picker() === "function";   // 跨源 iframe 禁 picker（itch 内嵌实锤 0828）
 
 /** 铸/复用 = 与挂载分离（UI 在两步之间问「继承 or 出厂」并走绿灯门）。created = 这次真铸了新条目。 */
 export interface MintResult { entry: GalleryEntry; created: boolean }

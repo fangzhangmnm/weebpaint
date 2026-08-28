@@ -14,8 +14,19 @@ export interface LocalFileHandle {
   requestPermission?(o: { mode: string }): Promise<string>;
 }
 
+/** 跨源子框架里 FSA picker 一律被浏览器禁（itch 内嵌实锤 2026-08-28：SecurityError "Cross origin sub
+ *  frames aren't allowed to show a file picker"）——探针必须把这层算进去，否则「有函数」是谎报能力：
+ *  settle 会撞 SecurityError 死在弹框上。同源 iframe 不受限；顶层窗口恒放行。 */
+export function pickerAllowedInFrame(): boolean {
+  try {
+    if (window.self === window.top) return true;
+    void (window.top as Window).location.href;   // 跨源访问 top 会 throw → 禁 picker
+    return true;
+  } catch { return false; }
+}
+
 export function supportsFileSystemAccess(): boolean {
-  return typeof (globalThis as { showOpenFilePicker?: unknown }).showOpenFilePicker === "function";
+  return pickerAllowedInFrame() && typeof (globalThis as { showOpenFilePicker?: unknown }).showOpenFilePicker === "function";
 }
 
 /** 系统文件选择器挑一个 .ora。用户取消 → null（不是错误）。 */
@@ -37,7 +48,7 @@ export async function pickLocalOraFile(): Promise<LocalFileHandle | null> {
 
 /** showSaveFilePicker 在场探测（Chromium 桌面）。与 open 侧分开探——两 API 支持面可能不同。 */
 export function supportsSaveFilePicker(): boolean {
-  return typeof (globalThis as { showSaveFilePicker?: unknown }).showSaveFilePicker === "function";
+  return pickerAllowedInFrame() && typeof (globalThis as { showSaveFilePicker?: unknown }).showSaveFilePicker === "function";
 }
 
 /** 系统「另存为」框挑 .ora 落点（2026-08-21，「导出与另存」hub 的本地去向用）。

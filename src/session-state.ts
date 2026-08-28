@@ -242,6 +242,14 @@ async function settleToFile(): Promise<boolean> {
     setStatus(t("ss.settleDownloaded", { name: suggested }), true);   // 下载开始=责任移交（拍板）；没回家，dirty 如实留着
     return false;
   } catch (e) {
+    // 兜底降级（探针为主，这里防未知内嵌形态）：picker 被宿主环境禁（SecurityError）→ 按无 FSA 平台
+    //   处理=下载责任移交，别把内部错误串喂给用户（itch 内嵌实锤 2026-08-28）。
+    if ((e as { name?: string })?.name === "SecurityError") {
+      const { bytes } = await _encodeCurrentOraWithPeek();
+      triggerDownload(bytes, suggested);
+      setStatus(t("ss.settleDownloaded", { name: suggested }), true);
+      return false;
+    }
     reportError(new Error("[settle] save to file failed: " + String(e)), "warning");
     setStatus(t("lf.saveFailed", { error: errMsg(e) }), true);
     return false;

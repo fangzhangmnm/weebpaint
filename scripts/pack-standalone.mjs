@@ -19,7 +19,7 @@ const readText = (p) => read(p).toString("utf8");
 const b64 = (p) => read(p).toString("base64");
 const escScript = (js) => js.replace(/<\/script/gi, "<\\/script");
 const escJson = (s) => s.replace(/<\//g, "<\\/");
-const die = (msg) => { console.error("[pack-single] ✗ " + msg); process.exit(1); };
+const die = (msg) => { console.error("[pack-standalone] ✗ " + msg); process.exit(1); };
 
 let html = readText("index.html");
 const version = (readText("src/version.ts").match(/WEEBPAINT_VERSION = "([^"]+)"/) || [])[1] || "unknown";
@@ -64,5 +64,5 @@ const out = resolve(root, "dist/weebpaint-standalone.html");
 writeFileSync(out, html);
 const mb = statSync(out).size / 1024 / 1024;
 if (mb > 25) die(`体积超限 ${mb.toFixed(1)}MB > 25MB（TiddlyWiki 经验 ~20MB 起明显变慢）`);
-console.log(`[pack-single] ✓ dist/weebpaint-standalone.html（${version}，${mb.toFixed(2)} MB）`);
-console.log("[pack-single] 验法：双击 file:// 开（Chromium/Firefox）；itch 上传该文件；夹具 = tools/itch-iframe-fixture.html");
+console.log(`[pack-standalone] ✓ dist/weebpaint-standalone.html（${version}，${mb.toFixed(2)} MB）`);
+console.log("[pack-standalone] 验法：双击 file:// 开（Chromium/Firefox）；itch 上传该文件；夹具 = tools/itch-iframe-fixture.html");
