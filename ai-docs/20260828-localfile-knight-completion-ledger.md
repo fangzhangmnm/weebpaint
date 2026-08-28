@@ -224,3 +224,8 @@ itch 包 sha 与 standalone 一致。**user 实测：itch 内嵌画→保存弹�
 UI 整改轮（#9/#17 + #4 后半：图层组拖拽/移动列表按显示排序/移出=移动菜单 ../）。iframe 自动重放=维持
 park（依赖无头 multiplayer 未建）。悬余两问：boot 落地画布 2048² 硬编码（app.ts:135，canvas-first 前的
 化石，新建对话框默认已是 1024²——是否对齐 1024 待 user）；两粒沙（duplicate 图层组/禁 reading mode）待裁。
+
+**0828 尾批（v0.11.43 推 dev）**：①boot 落地画布 2048→1024（user 拍板；canvas-first 化石清除，与新建
+对话框默认一致）；②reading mode 尽力面=body role="application"（无标准 opt-out API，真机验）；
+③**沙①勘误**：duplicate 图层组 v0.10.14 已做（duplicateNode 递归深拷+组行 UI 预算门），复扫 grep 词
+没对上误报「未做」。自动重放=user 确认「很以后的事」维持 park。两粒沙至此全闭。
