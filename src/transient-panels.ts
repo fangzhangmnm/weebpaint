@@ -101,9 +101,10 @@ export function initTransientPanels(ctx: AppContext) {
 
   // 所有浮窗注册进 surfaces 的 window band（pointerdown 置顶；open 路径各自调 raiseWindow）
   // v232：补上 layersPanel（user：「toggle layers 之后 layers 应该 pop up 到 reference 上面」）
+  // 2026-08-28（Claude Opus 5）：补上 tlPanel（录制窗以前不在 window band 栈里，被图层面板等压住）
   const panels = [
     "colorPanel", "paletteWindow", "referencePanel",
-    "adjustPanel", "layersPanel",
+    "adjustPanel", "layersPanel", "tlPanel",
   ];
   for (const id of panels) {
     registerWindow(document.getElementById(id));

@@ -125,6 +125,8 @@ import "./mcp-redteam.test.mjs";            // C8：MCP server 红队（spawn �
 //   "注册 app-boot 就有别的测试挂"，先怀疑又一条没拆的全局监听，别直接把 app-boot 摘掉了事。
 //   完整方案（子进程 vs 全面 disposer 化）见 ai-docs/reports/20260718-boot-disposability-and-test-infra.html。
 import "./app-boot.test.mjs";        // 组合根 boot smoke：22×initX + 5×Vue mount + reactive flush 全程不抛。
+import "./timelapse-panel-z.test.mjs";  // 录制窗接进 surfaces window band：开窗即置顶 + 点窗即置顶（user 2026-08-23）。
+                                        // 排在 app-boot 之后：它同样动态 import app 侧整链（见该文件头注释的污染说明）。
 import "./i18n-localize-dom.test.mjs";  // v421：data-i18n 桥不得冲掉内联 <svg><use> 图标（v419 出过）。
 import "./editor-session-safety.test.mjs";   // v417 止血：开文件事务性 / 保存失败不宣布干净 / create 标记 per-name。全是曾会丢画的路径。
 import "./dial-controls.test.mjs";   // dial 写入 setSize/setOpacity + 键盘 [ ] 段量化调粗。
