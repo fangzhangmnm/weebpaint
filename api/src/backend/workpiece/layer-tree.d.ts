@@ -52,8 +52,12 @@ export declare class LayerTree implements CollectorComponent {
     eachLeaf(cb: (leaf: TreeLeaf) => void): void;
     /** 插到 active 同级上方（无 active → 顶层最上）；active = 新层。null = 已到 maxLeaves。 */
     addLayer(name?: string): TreeLeaf | null;
-    /** 新建**空**组（v1 addGroup 语义）：active 是组 → 嵌进去；否则同级之上。active = 新组。
-     *  组不计 maxLeaves（只数叶）。 */
+    /** 新建**空**组：插到 active **同级**上方（无 active → 顶层最上），与 addLayer 同规则。active = 新组。
+     *  组不计 maxLeaves（只数叶）。
+     *  2026-08-28 修（user 0825「一层只有图层组的时候没法创建兄弟图层组」）：旧规则「active 是组 →
+     *  嵌进去」让**只含组的层级**永远建不出兄弟组（那一层选不到叶，active 必然是那个组 → 只会往里钻）。
+     *  改成恒同级后任何层级都能建兄弟组；嵌套仍可达——选组内的某个节点新建（新组落该组内），
+     *  或建完走 moveIntoGroup 移进去（PS 的 New Group 也是同级，不塞进选中的组）。 */
     addGroup(name?: string): TreeGroup | null;
     /** 新建空叶**强制置顶**（根级末尾 = 最顶；盖印 stampAll 用）。active = 新层。null = maxLeaves。 */
     addLayerTop(name?: string): TreeLeaf | null;
@@ -87,8 +91,12 @@ export declare class LayerTree implements CollectorComponent {
     explodeGroupInPlace(id: number): boolean;
     /** 同级移动 delta（越界 → false 不动）。 */
     moveLayer(id: number, delta: number): boolean;
-    /** 移入组，保持相对上下关系（user QA 需求）：与组**同级**且原来在组下方 → 插组内**底**；
-     *  同级在组上方 → 组内**顶**；跨级（不同父）没有可比序 → 沿旧行为放组内顶。
+    /** 移入组，保持相对上下关系（user 2026-08-20「移进移出图层组的时候，能不能尽量保持图层之间
+     *  原来的相对上下关系？」）：被移节点原来在组**下方** → 插组内**底**；在组**上方** → 组内**顶**。
+     *  上下判据 = 树**路径的字典序**（各级 index，index 0 = 最底），跨级也算得对。
+     *  2026-08-28 修（user 0825「移动图层组尽量保证顺序的时候如果是 nested 图层组计算错误」）：
+     *  旧判据是「同一 parentArr 且 index 更低」，只认同级——nested 场景（被移节点与目标组不同父）
+     *  一律当"无可比序"塞组内顶，明明在组下方的层也被抬到顶上。
      *  组不存在/自嵌套 → false。 */
     moveIntoGroup(id: number, gid: number): boolean;
     /** 移出组：提到组的同级，保持相对上下关系——原在组内**底**（index 0）→ 插组**下方**；
@@ -118,7 +126,8 @@ export declare class LayerTree implements CollectorComponent {
     private _eachNode;
     private _contains;
     private _clone;
-    /** 定位 id 所在的 children 数组（parentGroup=null 表示顶层）。 */
+    /** 定位 id 所在的 children 数组（parentGroup=null 表示顶层）。
+     *  path = 从根到该节点的各级 index（末位 == index），给 comparePath 判上下用。 */
     private _locate;
     /** 删除位置的就近叶（同级下方优先，其次上方，再全树第一叶）。 */
     private _nearestLeafId;

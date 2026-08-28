@@ -39,9 +39,20 @@ export interface TreeJson {
 }
 export const isGroupNode = (n: TreeNode): n is TreeGroup => "children" in n;
 
+/** 树路径（各级 children index，index 0 = 该级最底）的**栈序**比较：<0 = a 在 b 下方。
+ *  字典序即栈序：先比同级 index，前缀相同则更浅的在下（祖先组的"位置"= 它整段的底）。
+ *  同级时退化成单纯的 index 比较，所以旧的同级语义逐字保留。 */
+function comparePath(a: readonly number[], b: readonly number[]): number {
+  const n = Math.min(a.length, b.length);
+  for (let i = 0; i < n; i++) if (a[i] !== b[i]) return a[i] - b[i];
+  return a.length - b.length;
+}
+
 export type LayerPropKey = "name" | "visible" | "opacity" | "mode" | "clippingMask" | "lockAlpha";
 
 interface TreeRecord { json: TreeJson }
+/** _locate 的返回：节点所在的 children 数组 + 同级 index + 根到该节点的 index 路径。 */
+interface Loc { parentArr: TreeNode[]; parentGroup: TreeGroup | null; index: number; path: number[] }
 
 export class LayerTree implements CollectorComponent {
   readonly kind = "layerTree";
@@ -107,15 +118,18 @@ export class LayerTree implements CollectorComponent {
     return this.leafById(id);
   }
 
-  /** 新建**空**组（v1 addGroup 语义）：active 是组 → 嵌进去；否则同级之上。active = 新组。
-   *  组不计 maxLeaves（只数叶）。 */
+  /** 新建**空**组：插到 active **同级**上方（无 active → 顶层最上），与 addLayer 同规则。active = 新组。
+   *  组不计 maxLeaves（只数叶）。
+   *  2026-08-28 修（user 0825「一层只有图层组的时候没法创建兄弟图层组」）：旧规则「active 是组 →
+   *  嵌进去」让**只含组的层级**永远建不出兄弟组（那一层选不到叶，active 必然是那个组 → 只会往里钻）。
+   *  改成恒同级后任何层级都能建兄弟组；嵌套仍可达——选组内的某个节点新建（新组落该组内），
+   *  或建完走 moveIntoGroup 移进去（PS 的 New Group 也是同级，不塞进选中的组）。 */
   addGroup(name?: string): TreeGroup | null {
     const id = this._nextId++;
     const g: TreeGroup = { id, name: name ?? `Group ${id}`, visible: true, opacity: 1, mode: "source-over", clippingMask: false, children: [] };
     const next = this._clone(this._json);
     const loc = this._locate(next.nodes, next.activeId);
-    if (loc && isGroupNode(loc.parentArr[loc.index])) (loc.parentArr[loc.index] as TreeGroup).children.push(g);
-    else if (loc) loc.parentArr.splice(loc.index + 1, 0, g);
+    if (loc) loc.parentArr.splice(loc.index + 1, 0, g);
     else next.nodes.push(g);
     next.activeId = id;
     this._swapRoot(next);
@@ -304,8 +318,12 @@ export class LayerTree implements CollectorComponent {
     return true;
   }
 
-  /** 移入组，保持相对上下关系（user QA 需求）：与组**同级**且原来在组下方 → 插组内**底**；
-   *  同级在组上方 → 组内**顶**；跨级（不同父）没有可比序 → 沿旧行为放组内顶。
+  /** 移入组，保持相对上下关系（user 2026-08-20「移进移出图层组的时候，能不能尽量保持图层之间
+   *  原来的相对上下关系？」）：被移节点原来在组**下方** → 插组内**底**；在组**上方** → 组内**顶**。
+   *  上下判据 = 树**路径的字典序**（各级 index，index 0 = 最底），跨级也算得对。
+   *  2026-08-28 修（user 0825「移动图层组尽量保证顺序的时候如果是 nested 图层组计算错误」）：
+   *  旧判据是「同一 parentArr 且 index 更低」，只认同级——nested 场景（被移节点与目标组不同父）
+   *  一律当"无可比序"塞组内顶，明明在组下方的层也被抬到顶上。
    *  组不存在/自嵌套 → false。 */
   moveIntoGroup(id: number, gid: number): boolean {
     if (id === gid) return false;
@@ -316,9 +334,9 @@ export class LayerTree implements CollectorComponent {
     if (isGroupNode(moving) && this._contains([moving], gid)) return false;   // 组不能进自己后代
     const next = this._clone(this._json);
     const loc = this._locate(next.nodes, id)!;
-    // 判据取**摘出前**的位置：同一 parentArr 且被移层 index 低于组 = 原在组下方。
+    // 判据取**摘出前**的位置（摘出会让组的路径左移）。同级时字典序退化成旧的 index 比较。
     const gloc = this._locate(next.nodes, gid)!;
-    const fromBelow = loc.parentArr === gloc.parentArr && loc.index < gloc.index;
+    const fromBelow = comparePath(loc.path, gloc.path) < 0;
     const [n] = loc.parentArr.splice(loc.index, 1);
     let target: TreeGroup | null = null;
     this._eachNode(next.nodes, (x) => { if (x.id === gid && isGroupNode(x)) target = x; });
@@ -455,18 +473,19 @@ export class LayerTree implements CollectorComponent {
       ns.map((n) => (isGroupNode(n) ? { ...n, children: cloneNodes(n.children) } : { ...n }));
     return { ...json, nodes: cloneNodes(json.nodes) };
   }
-  /** 定位 id 所在的 children 数组（parentGroup=null 表示顶层）。 */
-  private _locate(nodes: TreeNode[], id: number | null): { parentArr: TreeNode[]; parentGroup: TreeGroup | null; index: number } | null {
+  /** 定位 id 所在的 children 数组（parentGroup=null 表示顶层）。
+   *  path = 从根到该节点的各级 index（末位 == index），给 comparePath 判上下用。 */
+  private _locate(nodes: TreeNode[], id: number | null): Loc | null {
     if (id === null) return null;
-    const walk = (arr: TreeNode[], pg: TreeGroup | null): { parentArr: TreeNode[]; parentGroup: TreeGroup | null; index: number } | null => {
+    const walk = (arr: TreeNode[], pg: TreeGroup | null, prefix: number[]): Loc | null => {
       for (let i = 0; i < arr.length; i++) {
         const n = arr[i];
-        if (n.id === id) return { parentArr: arr, parentGroup: pg, index: i };
-        if (isGroupNode(n)) { const r = walk(n.children, n); if (r) return r; }
+        if (n.id === id) return { parentArr: arr, parentGroup: pg, index: i, path: [...prefix, i] };
+        if (isGroupNode(n)) { const r = walk(n.children, n, [...prefix, i]); if (r) return r; }
       }
       return null;
     };
-    return walk(nodes, null);
+    return walk(nodes, null, []);
   }
   /** 删除位置的就近叶（同级下方优先，其次上方，再全树第一叶）。 */
   private _nearestLeafId(nodes: TreeNode[], loc: { parentArr: TreeNode[]; index: number }): number | null {

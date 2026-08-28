@@ -108,6 +108,7 @@ const layersUi = reactive<{
 export function toggleLayersPanel(force?: boolean) {
   const hidden = els.layersPanel.classList.contains("hidden");
   const show = force === true ? true : force === false ? false : hidden;
+  if (!show) layersUi.renameId = null;   // 收面板 = 放弃悬着的内联改名（家规「强退=cancel」；也免得重开时高度不重钉）
   els.layersPanel.classList.toggle("hidden", !show);
   els.layersBtn.setAttribute("aria-pressed", show ? "true" : "false");
   // 开关状态随文档走：写进 desk（setter 自动标记 workspace dirty）。
@@ -118,6 +119,8 @@ export function toggleLayersPanel(force?: boolean) {
 // doc 的 desk 加载/重置后，把面板开关 + 位置**只读地**应用到 DOM（绝不回写 desk → 不误标 dirty）。
 // 直接走裸 DOM 开关，不经 toggleLayersPanel（那条路径会写 desk）。session-state 在 desk 就绪后派发 wp:applyEditorState。
 function applyLayersPanelFromEditorState() {
+  // 换文档/重置 desk：悬着的 renameId 是**上一个 doc** 的层 id，必须清（否则新 doc 的同号层被当成正在改名）。
+  layersUi.renameId = null;
   const pos = desk.layersPanel.position;   // {left,top,width?,height?} | null（null = 自动摆放，不动位置）
   if (pos) {
     els.layersPanel.style.left = pos.left + "px";
@@ -192,6 +195,8 @@ function _nextGroupName(): string {
   return t("name.groupN", { n: max + 1 });
 }
 // 新建**空**图层组（创建入口 = 「+」菜单；编组当前层已砍，靠空组 + 移入「某组」达成）。
+// 落点 = active 同级之上（与新建图层同规则）——2026-08-28 起不再"选中组就往组里钻"，
+// 否则只含组的层级永远建不出兄弟组（user 0825）。要嵌套：选组内的节点再新建，或建完「移入某组」。
 function _addEmptyGroup() {
   const name = _nextGroupName();
   const r = layers.addGroup(name, {
@@ -720,9 +725,20 @@ function _settlePendingTransient() {
 // 把图层列表的 max-height 钉到「列表顶 → 视口底」可用空间，列表内部 overflow 滚动。
 //   修：层多 / 面板被拖到屏幕下半 时，最底 item 掉出视口够不着。CSS 的 50vh 是固定上限、不跟位置走。
 let _userListH: number | null = null;   // #13：用户拖出来的列表高度（null = 自动占满可用空间）；随 position.height 持久化
+// 合帧入口（2026-08-28）：resize / 拖动 pointermove 都可能连发（iPad 软键盘弹收、地址栏推送、旋转、
+//   120Hz 笔），逐事件测量+写 style 是面板抖动的经典来源。一帧只钉一次。
+let _clampRaf = 0;
+function _clampListHeightSoon() {
+  if (_clampRaf) return;
+  _clampRaf = requestAnimationFrame(() => { _clampRaf = 0; _clampListHeight(); });
+}
 function _clampListHeight() {
   const list = els.layersList;
   if (!list || els.layersPanel.classList.contains("hidden")) return;
+  // 内联改名期间不重钉（2026-08-28，user 0823「图层组改名的时候 ui 快速抖动」）：改名是本面板里
+  //   唯一会拉起软键盘的交互，键盘弹出/收起那几百毫秒里视口一直在动，跟着写高度 = 面板抖。
+  //   退出改名时由 renameId watch 补钉一次，不会留下过期高度。
+  if (layersUi.renameId !== null) return;
   const top = list.getBoundingClientRect().top;
   // #13：列表**下方**还有 .layers-foot 指令栏——可用空间不减掉它，列表钉到视口底时指令栏被顶出屏幕。
   const footH = els.layersPanel.querySelector<HTMLElement>(".layers-foot")?.offsetHeight ?? 0;
@@ -730,8 +746,11 @@ function _clampListHeight() {
   // v0.5.23（user 拍板）：**永远硬高度**——图层数量变动时面板高度不变；默认高度固定，
   //   用户拖过按拖的来（随 position.height 持久化），仅被「视口可用空间」夹取。
   const want = Math.min(_userListH ?? 260, avail);
-  list.style.height = Math.max(0, want) + "px";
-  list.style.maxHeight = "none";
+  // 「没变就不动」（同 board.resize 的纪律）：无条件写 style 会让每次 docVersion bump / 视口事件
+  //   都触发一次 style recalc，视口在动时更是逐事件推着面板走。
+  const px = Math.max(0, want) + "px";
+  if (list.style.height !== px) list.style.height = px;
+  if (list.style.maxHeight !== "none") list.style.maxHeight = "none";
 }
 
 // 面板外 chrome 同步（计数标签 / 加按钮禁用 / 删按钮禁用 / 滚到活动层）—— 这些 DOM 不在 mount
@@ -802,8 +821,10 @@ export function initLayersPanel(ctx: AppContext) {
   // chrome 副作用：docVersion 变即同步面板外 DOM（+ 初始同步一次）
   watch(() => docVersion.value, _syncChrome);
   _syncChrome();
-  // 视口变（旋转 / 键盘弹出 / resize）也要重钉列表高度
-  window.addEventListener("resize", _clampListHeight);
+  // 视口变（旋转 / 键盘弹出 / resize）也要重钉列表高度（合帧，见 _clampListHeightSoon）
+  window.addEventListener("resize", _clampListHeightSoon);
+  // 退出内联改名（提交 / Esc / 失焦）→ 补钉一次高度：改名期间刻意不跟视口（见 _clampListHeight）。
+  watch(() => layersUi.renameId, (id: number | null) => { if (id === null) nextTick(_clampListHeight); });
 
   // 点击别处收起打开的 ⋯ 菜单（取代旧 popup 的 outside-pointerdown）
   document.addEventListener("pointerdown", (e: Event) => {
@@ -841,7 +862,7 @@ export function initLayersPanel(ctx: AppContext) {
     els.layersPanel.style.left = left + "px";
     els.layersPanel.style.right = "auto";
     els.layersPanel.style.top = top + "px";
-    _clampListHeight();   // 拖动改了面板顶 → 重钉列表高度，底部 item 始终够得着
+    _clampListHeightSoon();   // 拖动改了面板顶 → 重钉列表高度，底部 item 始终够得着（合帧，120Hz 笔不逐事件重排）
     // 位置随文档走；保留已持久化的 width/height（#13），别整枝盖掉
     desk.layersPanel.position = { ...(desk.layersPanel.position ?? {}), left, top };
   });
@@ -860,7 +881,7 @@ export function initLayersPanel(ctx: AppContext) {
     const w = Math.max(200, Math.min(window.innerWidth - r.left - 8, _layersResize.ow + (e.clientX - _layersResize.sx)));
     _userListH = Math.max(0, _layersResize.oh + (e.clientY - _layersResize.sy));
     els.layersPanel.style.width = w + "px";
-    _clampListHeight();   // 高走 maxHeight 夹取：往下拖也永远够不出视口底（含 foot）
+    _clampListHeightSoon();   // 高走 maxHeight 夹取：往下拖也永远够不出视口底（含 foot）
     desk.layersPanel.position = { left: r.left, top: r.top, width: w, height: _userListH };   // 整枝赋值
   });
   resizeEl?.addEventListener("pointerup", (e: PointerEvent) => {

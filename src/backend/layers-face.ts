@@ -167,7 +167,7 @@ export class LayersFace {
 
   // ---- 结构组合动作（原 treeTx 住户，各归各名）----
 
-  /** 新建空组（active 是组 → 嵌入；否则同级之上；active=新组）。命名归调用方（UI 惯例「组 N」）。 */
+  /** 新建空组（恒插 active **同级**之上，与 addLayer 同规则；active=新组）。命名归调用方（UI 惯例「组 N」）。 */
   addGroup(name?: string, statuses?: TreeStatuses, o?: RunOpts): { ok: boolean; groupId?: number; msg?: string } {
     const r = this._point("addGroup", { ...o, statuses }, () => this._tree.addGroup(name));
     if (!r.ok) return { ok: false, msg: r.msg };
@@ -188,7 +188,7 @@ export class LayersFace {
     return r.value ? { ok: true } : { ok: false, msg: "not-group" };
   }
 
-  /** 移入组（保持相对上下：同级下方→组内底、其余→组内顶，见 LayerTree.moveIntoGroup）。 */
+  /** 移入组（保持相对上下：原在组下方→组内底、在组上方→组内顶；跨级按树路径判，见 LayerTree.moveIntoGroup）。 */
   moveIntoGroup(id: number, gid: number, statuses: TreeStatuses, o?: RunOpts): OpStatus {
     const r = this._point("moveIntoGroup", { ...o, statuses }, () => this._tree.moveIntoGroup(id, gid));
     if (!r.ok) return { ok: false, msg: r.msg };

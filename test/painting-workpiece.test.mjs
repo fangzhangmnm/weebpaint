@@ -66,14 +66,15 @@ describe("PaintingWorkpiece · 树模式", () => {
     eq(tiles2.getRegion(id2, 1, 1, 1, 1)[0], 77, "往返逐字节");
   });
 
-  it("addGroup：active 同级之上；active 是组 → 嵌进去；active=新组；可撤", () => {
+  it("addGroup：恒插 active 同级之上（组 active 也是兄弟，2026-08-28 起）；active=新组；可撤", () => {
     const { undo, wp, tree } = mk();
     let t = wp.begin(); const g = tree.addGroup("G"); t.commit();
     assert(g && "children" in tree.nodeById(g.id));
     eq(tree.view().activeId, g.id);
     eq(tree.view().nodes.length, 2);
-    t = wp.begin(); const g2 = tree.addGroup("G2"); t.commit();   // active 是组 → 嵌进 G
-    eq(tree.nodeById(g.id).children.length, 1, "嵌进 active 组");
+    t = wp.begin(); const g2 = tree.addGroup("G2"); t.commit();   // active 是组 → 仍是**兄弟**，不往里钻
+    eq(tree.nodeById(g.id).children.length, 0, "不塞进 active 组（只含组的层级也建得出兄弟组）");
+    eq(tree.view().nodes.length, 3, "根级三个节点");
     eq(tree.view().activeId, g2.id);
     undo.undo(); undo.undo();
     eq(tree.view().nodes.length, 1, "两步撤干净");
