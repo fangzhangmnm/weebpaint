@@ -27,7 +27,9 @@ function idbKv(): RackSlotKv {
   const open = (): Promise<IDBDatabase> => (dbp ??= new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, 1);
     req.onupgradeneeded = () => { req.result.createObjectStore(STORE); };
-    req.onsuccess = () => resolve(req.result);
+    // versionchange 自让路（同 gallery-registry/crash-store 惯例）：还原出厂 wipe 本库时，本 tab 自己的
+    //   连接不关会把 deleteDatabase 卡成 blocked（F4 夹具 2026-08-28 实锤：单 tab 也报「关掉其他标签页」）。
+    req.onsuccess = () => { req.result.onversionchange = () => { req.result.close(); dbp = null; }; resolve(req.result); };
     req.onerror = () => reject(req.error);
   }));
   const tx = async <T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> => {
