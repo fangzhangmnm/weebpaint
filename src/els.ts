@@ -101,6 +101,7 @@ export const els = {
   galleryMenuForceUpdate: byId("galleryMenuForceUpdate"),
   menuGenAI: byId("menuGenAI"),
   galleryMenuLock: byId("galleryMenuLock"),
+  galleryMenuBackup: byId("galleryMenuBackup"),   // #18 全库备份入口（2026-08-28）
   newDocBackdrop: byId("newDocBackdrop"),
   newDocSheet: byId("newDocSheet"),
   newDocName: byId<HTMLInputElement>("newDocName"),

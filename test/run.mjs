@@ -11,6 +11,7 @@ import "./naming.test.mjs";               // P1 命名器官：yyyymmdd-hex4 / �
 import "./crash-store.test.mjs";          // P2 T-crash 库：pending 拒删/原子领养/单帧覆盖（verdicts §2.2 契约钉）
 import "./resume-slate.test.mjs";         // P5 回执条+device-kv：typed 三态/标记同记录/播种幂等/无地降级
 import "./gallery-registry.test.mjs";     // P3 名册：铸 id/isSameEntry 查重/defaultStore 认领零迁移/播种幂等
+import "./library-backup.test.mjs";       // #18 全库备份内核：订阅→一次性快照/递归清单/字节预算/只读编排回执
 import "./gallery-attachment.test.mjs";   // P3 挂载：五步 detach 契约/绿灯门/逃生 force/手势 persist/锁域
 import "./app-prefs.test.mjs";            // P5 preferences 门面：scope 路由（device/gallery/session）+ 播种幂等
 import "./cloud-image-model.test.mjs";    // v0.9.29 云盘图片 picker：扩展名路由/thumb token/白底平铺/jpeg 编码接缝（spec 20260820）
