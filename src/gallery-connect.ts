@@ -30,25 +30,29 @@ export async function ensureFolderPermission(entry: GalleryEntry, opts: { reques
 const _picker = () => (globalThis as { showDirectoryPicker?: (o?: unknown) => Promise<unknown> }).showDirectoryPicker;
 export const canPickFolderGallery = (): boolean => !storeAbsent && typeof _picker() === "function";
 
-/** 连接本地文件夹（手势）：选哪就是哪（VS Code 姿态）；同夹二挂 isSameEntry 复用 id。用户取消 = null。 */
-export async function pickAndConnectFolderGallery(): Promise<GalleryEntry | null> {
+/** 铸/复用 = 与挂载分离（UI 在两步之间问「继承 or 出厂」并走绿灯门）。created = 这次真铸了新条目。 */
+export interface MintResult { entry: GalleryEntry; created: boolean }
+const _withCreated = async (mint: () => Promise<GalleryEntry>): Promise<MintResult> => {
+  const before = new Set((await galleryRegistry.list()).map((e) => e.id));
+  const entry = await mint();
+  return { entry, created: !before.has(entry.id) };
+};
+
+/** 本地文件夹 picker（手势）：选哪就是哪（VS Code 姿态）；同夹二挂 isSameEntry 复用 id。用户取消 = null。 */
+export async function mintFolderByPicker(): Promise<MintResult | null> {
   const picker = _picker();
   if (!picker) throw new Error("FSA directory picker unavailable on this platform");
   let handle: unknown;
   try { handle = await picker({ mode: "readwrite" }); } catch { return null; }   // AbortError = 用户取消，不是错误
-  const entry = await galleryRegistry.mintFolder(handle as DirHandleLike);
-  await attachGallery(entry);
-  return entry;
+  return _withCreated(() => galleryRegistry.mintFolder(handle as DirHandleLike));
 }
 
-/** 连接 OneDrive（手势）：signIn 走 account picker——选哪个账号铸哪个账号的库（多账号=多条目，结构支持）。 */
-export async function connectOneDriveGallery(): Promise<GalleryEntry | null> {
+/** OneDrive（手势）：signIn 走 account picker——选哪个账号铸哪个账号的库（多账号=多条目，结构支持）。 */
+export async function mintOneDriveByAccount(): Promise<MintResult | null> {
   await signIn();
   const acct = getActiveAccount() as { homeAccountId?: string; username?: string; name?: string } | null;
   if (!acct?.homeAccountId) return null;
-  const entry = await galleryRegistry.mintOneDrive(acct.homeAccountId, acct.username || acct.name || "");
-  await attachGallery(entry);
-  return entry;
+  return _withCreated(() => galleryRegistry.mintOneDrive(acct.homeAccountId as string, acct.username || acct.name || ""));
 }
 
 /** 挂载既有条目（手势上下文；调用方保证已过绿灯门 detach）。folder 缺权限当场 request 一次。 */

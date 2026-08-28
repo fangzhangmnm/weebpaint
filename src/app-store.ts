@@ -108,10 +108,15 @@ export type { Collection, EncryptedBlob } from "@internal/store";   // app 侧�
 //   getInitData（brushes.ts 域构造）：仅当这份 collection 的 json 不存在（新库）时 fetch builtin-brushes.json。
 //   P3 起 live binding（换库重灌；app.ts 在 wp:gallery-changed 里 brushRack.rebind(brushRackCollection)）。
 export let brushRackCollection: _Coll;
+// 「继承当前笔刷」种子（P3 verdicts §1.9）：一次性覆写下一次 rack collection 的 getInitData——
+//   只对**空库**生效（getInitData 契约：json 已存在则忽略），与 builtin 播种同一条路 → 天然无竞态无重复。
+let _nextRackInit: { id: string; value: unknown }[] | null = null;
+export function _seedNextRackInitData(items: { id: string; value: unknown }[] | null): void { _nextRackInit = items; }
 function _wireCollections(): void {
   wirePreferences(store.collection("local-user-preference", { local: true }), store.collection("synced-user-preference"));
   wireAppState(store.collection("synced-app-state"), store.collection("local-app-state", { local: true }));
-  brushRackCollection = store.collection("brush-rack", { getInitData: builtinBrushInitData });
+  const rackSeed = _nextRackInit; _nextRackInit = null;
+  brushRackCollection = store.collection("brush-rack", { getInitData: rackSeed ? async () => rackSeed : builtinBrushInitData });
 }
 _wireCollections();   // boot 装配（此后每次换库经 _swapStoreForGallery 重灌）
 

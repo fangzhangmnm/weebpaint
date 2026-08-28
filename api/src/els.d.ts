@@ -68,6 +68,10 @@ export declare const els: {
     cloudIconBtn: HTMLElement;
     cloudAccountPopup: HTMLElement;
     cloudAccountInfo: HTMLElement;
+    galleryCurrentInfo: HTMLElement;
+    galleryListBox: HTMLElement;
+    galleryConnectBtn: HTMLElement;
+    galleryDetachBtn: HTMLElement;
     cloudSignInBtn: HTMLElement;
     cloudSignOutBtn: HTMLElement;
     cloudRefreshBtn: HTMLElement;

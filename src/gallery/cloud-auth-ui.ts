@@ -9,6 +9,7 @@
 // 经 ctx 注册表晚绑（拆分期权宜）。
 
 import { t, tLatin } from "../i18n/index.ts";
+import { renderGalleryManage } from "./gallery-manage-ui.ts";   // P3：popup = 图库管理面 + 账号（一起刷）
 import type { AppContext } from "../app-context.ts";
 import { els } from "../els.ts";
 import { iconHtml } from "../ui/icon.ts";
@@ -25,6 +26,7 @@ const ICON_CLOUD_OUT = iconHtml("cloud");
 const ICON_CLOUD_IN = iconHtml("cloud-synced");
 
 export function updateCloudAuthUI() {
+  try { renderGalleryManage(); } catch { /* P3 管理面未 init（boot 极早）；auth 面照常 */ }
   const signed = isSignedIn();
   const configured = isAuthConfigured();
   const offline = navigator.onLine === false;     // navigator.onLine=undefined 当 true

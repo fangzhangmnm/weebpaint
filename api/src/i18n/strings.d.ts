@@ -5187,6 +5187,180 @@ export declare const S: {
         readonly ja: "使用量：不明";
         readonly tok: "suli awen: mi sona ala";
     };
+    readonly "gm.connectEntry": {
+        readonly zh: "连接图库…";
+        readonly en: "Connect gallery…";
+        readonly ja: "ギャラリーを接続…";
+        readonly tok: "o wan e poki sitelen…";
+    };
+    readonly "gm.detachEntry": {
+        readonly zh: "卸下图库";
+        readonly en: "Detach gallery";
+        readonly ja: "ギャラリーを取り外す";
+        readonly tok: "o weka e poki sitelen";
+    };
+    readonly "gm.connectTitle": {
+        readonly zh: "连接图库";
+        readonly en: "Connect a gallery";
+        readonly ja: "ギャラリーを接続";
+        readonly tok: "o wan e poki sitelen";
+    };
+    readonly "gm.srcOneDrive": {
+        readonly zh: "OneDrive";
+        readonly en: "OneDrive";
+        readonly ja: "OneDrive";
+        readonly tok: "OneDrive";
+    };
+    readonly "gm.srcFolder": {
+        readonly zh: "本地文件夹";
+        readonly en: "Local folder";
+        readonly ja: "ローカルフォルダー";
+        readonly tok: "poki lipu lon ilo ni";
+    };
+    readonly "gm.current": {
+        readonly zh: "当前图库：{label}（{src}）";
+        readonly en: "Current gallery: {label} ({src})";
+        readonly ja: "現在のギャラリー：{label}（{src}）";
+        readonly tok: "poki sitelen lon tenpo ni: {label} ({src})";
+    };
+    readonly "gm.offlineSuffix": {
+        readonly zh: " · 已离线";
+        readonly en: " · offline";
+        readonly ja: " · オフライン";
+        readonly tok: " · weka";
+    };
+    readonly "gm.closeDocFirst": {
+        readonly zh: "先关闭当前画，再切换或卸下图库";
+        readonly en: "Close the current painting before switching or detaching the gallery";
+        readonly ja: "ギャラリーを切り替える前に、現在の絵を閉じてください";
+        readonly tok: "o pini e sitelen ni. o ante e poki sitelen lon tenpo kama";
+    };
+    readonly "gm.dirtyTitle": {
+        readonly zh: "有 {n} 张画未上云";
+        readonly en: "{n} paintings not yet uploaded";
+        readonly ja: "未アップロードの絵が {n} 枚あります";
+        readonly tok: "sitelen {n} li lon poki sewi ala";
+    };
+    readonly "gm.dirtyMsg": {
+        readonly zh: "切换后它们留在本机缓存，回到此图库时继续上传。注意：浏览器可能清除本机缓存，缓存不是保险箱——建议先下载备份。";
+        readonly en: "They stay in this device's cache and upload when you return. Note: the browser may evict local cache — it is not a safe. Consider downloading backups first.";
+        readonly ja: "この端末のキャッシュに残り、戻ったときにアップロードされます。注意：ブラウザはキャッシュを削除することがあります。先にバックアップのダウンロードをおすすめします。";
+        readonly tok: "ona li awen lon ilo ni. taso ilo li ken weka e ona. o kama jo e ona lon lipu awen";
+    };
+    readonly "gm.dirtyBackup": {
+        readonly zh: "下载备份";
+        readonly en: "Download backups";
+        readonly ja: "バックアップをダウンロード";
+        readonly tok: "o kama jo e lipu awen";
+    };
+    readonly "gm.dirtyForce": {
+        readonly zh: "仍要切换";
+        readonly en: "Switch anyway";
+        readonly ja: "それでも切り替える";
+        readonly tok: "o ante kin";
+    };
+    readonly "gm.dirtyAllPushed": {
+        readonly zh: "已全部上传，继续切换";
+        readonly en: "All uploaded — continuing";
+        readonly ja: "すべてアップロードしました。続行します";
+        readonly tok: "ale li lon poki sewi. mi awen pali";
+    };
+    readonly "gm.backupDone": {
+        readonly zh: "已下载 {n} 份备份";
+        readonly en: "Downloaded {n} backups";
+        readonly ja: "バックアップを {n} 件ダウンロードしました";
+        readonly tok: "mi kama jo e lipu awen {n}";
+    };
+    readonly "gm.seedTitle": {
+        readonly zh: "新图库的笔刷与设置";
+        readonly en: "Brushes & settings for the new gallery";
+        readonly ja: "新しいギャラリーのブラシと設定";
+        readonly tok: "ilo sitelen pi poki sin";
+    };
+    readonly "gm.seedMsg": {
+        readonly zh: "「继承」拷贝一份当前笔刷与设置，此后各自独立；「出厂全新」从内置默认起步。";
+        readonly en: "\"Inherit\" copies your current brushes & settings (independent afterwards); \"factory fresh\" starts from built-in defaults.";
+        readonly ja: "「引き継ぐ」は現在のブラシと設定をコピー（以後は独立）。「新規」は内蔵デフォルトから始めます。";
+        readonly tok: "\"kama jo\" li pali e kopi. \"sin\" li open tan lawa open";
+    };
+    readonly "gm.seedInherit": {
+        readonly zh: "继承当前笔刷与设置";
+        readonly en: "Inherit current brushes & settings";
+        readonly ja: "現在のブラシと設定を引き継ぐ";
+        readonly tok: "o kama jo e ilo sitelen ni";
+    };
+    readonly "gm.seedFresh": {
+        readonly zh: "出厂全新";
+        readonly en: "Factory fresh";
+        readonly ja: "新規（デフォルト）";
+        readonly tok: "sin";
+    };
+    readonly "gm.alreadyCurrent": {
+        readonly zh: "已经是当前图库";
+        readonly en: "Already the current gallery";
+        readonly ja: "すでに現在のギャラリーです";
+        readonly tok: "ni li poki sitelen lon tenpo ni";
+    };
+    readonly "gm.switched": {
+        readonly zh: "已切换到 {label}";
+        readonly en: "Switched to {label}";
+        readonly ja: "{label} に切り替えました";
+        readonly tok: "mi ante tawa {label}";
+    };
+    readonly "gm.detached": {
+        readonly zh: "已卸下图库（画布与图库文件不受影响）";
+        readonly en: "Gallery detached (canvas and gallery files untouched)";
+        readonly ja: "ギャラリーを取り外しました（キャンバスとファイルはそのまま）";
+        readonly tok: "poki sitelen li weka. sitelen li awen pona";
+    };
+    readonly "gm.forgetTitle": {
+        readonly zh: "忘记「{label}」？";
+        readonly en: "Forget \"{label}\"?";
+        readonly ja: "「{label}」を一覧から削除しますか？";
+        readonly tok: "o weka e \"{label}\" tan lipu?";
+    };
+    readonly "gm.forgetMsg": {
+        readonly zh: "只从这台设备的名册移除，不动图库本身的文件。";
+        readonly en: "Removes it from this device's list only; gallery files are untouched.";
+        readonly ja: "この端末の一覧から削除するだけで、ギャラリーのファイルには触れません。";
+        readonly tok: "ni li weka e nimi taso. lipu li awen pona";
+    };
+    readonly "gm.forgotten": {
+        readonly zh: "已忘记 {label}";
+        readonly en: "Forgot {label}";
+        readonly ja: "{label} を一覧から削除しました";
+        readonly tok: "mi weka e {label} tan lipu";
+    };
+    readonly "gm.forgetHint": {
+        readonly zh: "忘记（不动文件）";
+        readonly en: "Forget (files untouched)";
+        readonly ja: "一覧から削除（ファイルはそのまま）";
+        readonly tok: "o weka e nimi taso";
+    };
+    readonly "gm.offlineBanner": {
+        readonly zh: "图库「{label}」已离线——画照常，同步暂停";
+        readonly en: "Gallery \"{label}\" is offline — keep painting, sync paused";
+        readonly ja: "ギャラリー「{label}」はオフライン——描画は通常どおり、同期は一時停止";
+        readonly tok: "poki sitelen \"{label}\" li weka. o sitelen kin. awen sewi li lape";
+    };
+    readonly "gm.reconnect": {
+        readonly zh: "重新连接";
+        readonly en: "Reconnect";
+        readonly ja: "再接続";
+        readonly tok: "o wan sin";
+    };
+    readonly "gm.reconnected": {
+        readonly zh: "已重新连接";
+        readonly en: "Reconnected";
+        readonly ja: "再接続しました";
+        readonly tok: "wan sin li pona";
+    };
+    readonly "gm.dismiss": {
+        readonly zh: "关闭";
+        readonly en: "Dismiss";
+        readonly ja: "閉じる";
+        readonly tok: "o pini";
+    };
     readonly "gs.cloudDisabledNoGallery": {
         readonly zh: "云端功能已停用，图库不可用（可在设置里重新开启）";
         readonly en: "Cloud features are disabled; the gallery is unavailable (re-enable in settings)";

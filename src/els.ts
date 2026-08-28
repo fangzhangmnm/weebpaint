@@ -86,6 +86,10 @@ export const els = {
   cloudIconBtn: byId("cloudIconBtn"),
   cloudAccountPopup: byId("cloudAccountPopup"),
   cloudAccountInfo: byId("cloudAccountInfo"),
+  galleryCurrentInfo: byId("galleryCurrentInfo"),   // P3 图库管理面（gallery-manage-ui）
+  galleryListBox: byId("galleryListBox"),
+  galleryConnectBtn: byId("galleryConnectBtn"),
+  galleryDetachBtn: byId("galleryDetachBtn"),
   cloudSignInBtn: byId("cloudSignInBtn"),
   cloudSignOutBtn: byId("cloudSignOutBtn"),
   cloudRefreshBtn: byId("cloudRefreshBtn"),

@@ -6,6 +6,10 @@ export type AppStorePort = Pick<Store, "file" | "files" | "collection" | "encryp
 export declare let store: AppStorePort;
 export type { Collection, EncryptedBlob } from "@internal/store";
 export declare let brushRackCollection: _Coll;
+export declare function _seedNextRackInitData(items: {
+    id: string;
+    value: unknown;
+}[] | null): void;
 /** 换当前 store 实例（next=null → null-store = 无库模式）。重灌 4+1 collections、重跑 init 门、
  *  广播 wp:gallery-changed（笔架等持句柄消费者在 app.ts 监听重挂）。旧实例的 dispose 由调用方（attachment 器官）负责。 */
 export declare function _swapStoreForGallery(next: Store | null): Promise<void>;

@@ -40,6 +40,7 @@ import { initTheme, reconcileThemeFromPrefs } from "./theme.ts";
 import { initLayersPanel, renderLayersPanel, LAYER_MODE_LABEL } from "./layers-panel.ts";
 import { initDocOps } from "./doc-ops.ts";
 import { initCloudAuthUI, updateCloudAuthUI } from "./gallery/cloud-auth-ui.ts";
+import { initGalleryManageUI } from "./gallery/gallery-manage-ui.ts";
 import { initSettingsMenu, applyCheckerboard, renderSettingsFromPrefs } from "./settings-menu.ts";   // setMenuOpen→各菜单模块
 import { initFiltersAdjust } from "./filters-adjust.ts";
 import { initToolbar, RACK_PANEL_BY_TOOL, closeTransientMenus } from "./toolbar.ts";
@@ -468,6 +469,7 @@ initCloudPickerHost(ctx);  // <wp-cloud-picker> 宿主层（需 ctx.gallery.getF
 initTopbarMenu(ctx);       // 顶栏/菜单/sheet/save 触发 事件接线（需 ctx.gallery）
 initBlenderSync(ctx);      // Blender 同步面板（菜单入口 menuBlender → 自建 float panel）
 initCloudAuthUI(ctx);
+initGalleryManageUI(ctx);   // P3 图库管理面（同住云 popup；连接/切换/卸下/忘记 + 离线横幅）
 
 // v0.5.12（真机 bug 架构修）：board 订阅 docVersion——合成输出如今依赖 activeId/lockAlpha
 //   （fill 预览落活动层 slot、尊重锁α），而 docVersion 正是图层面板态的既有失效信号；此前 board

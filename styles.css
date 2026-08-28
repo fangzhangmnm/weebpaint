@@ -2779,3 +2779,9 @@ body[data-mode="gallery"] .board { display: none !important; }
 .tl-icon-btn svg { width: 20px; height: 20px; }
 .tl-menu-item.danger { color: #c0392b; }
 .tl-menu-item.danger:hover { background: color-mix(in srgb, #c0392b 12%, transparent); }
+
+/* ---- P3 图库管理面（gallery-manage-ui） ---- */
+.gm-row { display: flex; align-items: stretch; gap: 2px; }
+.gm-row .menu-item { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gm-x { flex: 0 0 auto; background: none; border: none; color: inherit; opacity: .55; cursor: pointer; padding: 0 8px; border-radius: 6px; }
+.gm-x:hover { opacity: 1; background: color-mix(in srgb, currentColor 12%, transparent); }

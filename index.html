@@ -563,8 +563,16 @@
       </button>
     </div>
 
-    <!-- 云图标 popup：未登录显示"登录"；已登录显示账号 + 退出 -->
+    <!-- 云图标 popup：P3 起 = 图库管理面（当前库 + 名册 + 连接/卸下）+ 账号（登录/退出） -->
     <div class="menu-panel hidden" id="cloudAccountPopup" role="menu">
+      <div class="menu-item-info hidden" id="galleryCurrentInfo"></div>
+      <div id="galleryListBox"></div>
+      <button class="menu-item hidden menu-item-with-icon" id="galleryConnectBtn" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#create-folder"/></svg>
+        <span class="menu-item-label" data-i18n="gm.connectEntry">连接图库…</span>
+      </button>
+      <button class="menu-item hidden menu-item-with-icon" id="galleryDetachBtn" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#sign-out"/></svg>
+        <span class="menu-item-label" data-i18n="gm.detachEntry">卸下图库</span>
+      </button>
       <div class="menu-item-info" id="cloudAccountInfo" data-i18n="cf.cloudNotConfigured">云端：未配置</div>
       <button class="menu-item hidden menu-item-with-icon" id="cloudSignInBtn" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#cloud"/></svg>
         <span class="menu-item-label" data-i18n="gal.menu.signIn">登录 OneDrive</span>

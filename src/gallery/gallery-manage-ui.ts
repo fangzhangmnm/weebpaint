@@ -1,0 +1,267 @@
+// gallery-manage-ui.ts —— P3 图库管理面（VS Code 模型：库的生死管理全住 gallery 页）。
+// created 2026-08-27 by Claude Fable 5. 拍板 = ai-docs/20260827-p3-gallery-multiinstance-grill-verdicts.md §1。
+//
+// 住处 = gallery header 云 popup（cloudAccountPopup）：当前库行 + 名册列表（卡标来源）+
+//   「连接图库…」+「卸下图库」。低频动作（忘记条目）= 行尾 ✕ + 确认 sheet。
+// 流程红线：切库/卸库前置 = 收口开画（docHome≠gallery）+ 绿灯门（dirty=0）；dirty 逃生 sheet 三口 =
+//   下载备份（pushAll 先推、推不上去的逐张 triggerDownload）/ 仍要切换（警告缓存可能被清）/ 取消。
+// 离线态主动引导（verdicts §1.7）：attached 且 !online → 顶部非模态横幅「图库已离线—重新连接」
+//   （一键手势：OneDrive=signIn / folder=requestPermission），可关闭；banner DOM 动态建（同 error-badge 手法）。
+
+import { t } from "../i18n/index.ts";
+import { els } from "../els.ts";
+import { openChoiceSheet, openConfirmSheet } from "../sheets.ts";
+import { galleryAttachment } from "../gallery-attachment-host.ts";
+import { galleryRegistry } from "../gallery-registry.ts";
+import type { GalleryEntry } from "../gallery-registry.ts";
+import { mintFolderByPicker, mintOneDriveByAccount, attachGallery, ensureFolderPermission, canPickFolderGallery, type MintResult } from "../gallery-connect.ts";
+import { store, signIn, isSignedIn, isAuthConfigured, _seedNextRackInitData, _takeBootStore, brushRackCollection } from "../app-store.ts";
+import { getAllBrushes, getMeta, RACK_META_ID } from "../brushes.ts";
+import { preferences, PREF_REGISTRY, type PrefKey } from "../app-prefs.ts";
+import { docHome } from "../doc-home.ts";
+import { triggerDownload } from "../session.ts";
+import { reportError } from "../error-badge.ts";
+import type { AppContext } from "../app-context.ts";
+
+let _ctx: AppContext | null = null;
+const _status = (msg: string, persist = false) => _ctx?.setStatus(msg, persist);
+
+const sourceLabel = (e: GalleryEntry): string => e.kind === "onedrive" ? t("gm.srcOneDrive") : t("gm.srcFolder");
+
+// ---- 种子（「继承当前笔刷与设置」，verdicts §1.9：一次性拷贝即分叉）----
+interface SeedBundle { rack: { id: string; value: unknown }[]; prefs: Partial<Record<PrefKey, unknown>> }
+function captureSeed(): SeedBundle | null {
+  try {
+    const coll = brushRackCollection as unknown as { entries(): { id: string; value: unknown }[]; getItem(id: string, def?: unknown): unknown };
+    const brushes = getAllBrushes(coll);
+    const rack: { id: string; value: unknown }[] = [
+      ...brushes.map((b) => ({ id: b.id, value: b as unknown })),
+      { id: RACK_META_ID, value: getMeta(coll) as unknown },
+    ];
+    const prefs: SeedBundle["prefs"] = {};
+    for (const k of Object.keys(PREF_REGISTRY) as PrefKey[]) {
+      if (PREF_REGISTRY[k].scope === "gallery") prefs[k] = preferences.get(k);   // cascade 终值 = 「当前」的语义
+    }
+    return { rack: brushes.length ? rack : [], prefs };
+  } catch (e) {
+    reportError(new Error("[gallery-manage] seed capture failed (soft, factory-fresh instead): " + String(e)), "log");
+    return null;
+  }
+}
+
+// ---- 绿灯门 + 逃生（切库/卸库共用）----
+/** 关掉当前店（挂载态走器官绿灯门；legacy 未领养态直接对当前 store 走同口径）。false = 用户取消/被 gate。 */
+async function closeCurrentStoreWithGates(): Promise<boolean> {
+  if (docHome()?.kind === "gallery") { _status(t("gm.closeDocFirst"), true); return false; }   // 收口开画
+  const att = galleryAttachment.state();
+  if (att.kind === "attached") {
+    const r = await galleryAttachment.detach();
+    if (r.ok) return true;
+    if (r.reason === "doc-open") { _status(t("gm.closeDocFirst"), true); return false; }
+    const go = await escapeSheet(r.dirtyCount);
+    if (!go) return false;
+    await galleryAttachment.forceDetach();
+    return true;
+  }
+  // legacy 未领养态（登出用户/播种未跑）：同口径手工走（dirty 扫 → 逃生 → 快拆预建实例）
+  const dirty = await store.files.dirty.count();
+  if (dirty > 0 && !(await escapeSheet(dirty))) return false;
+  const boot = _takeBootStore();
+  if (boot) await boot.dispose({ drain: false }).catch((e) => reportError(new Error("[gallery-manage] legacy dispose: " + String(e)), "log"));
+  return true;
+}
+
+/** dirty 逃生 sheet：true = 仍要切换（用户已过警告）。「下载备份」跑完回到 sheet（数字会变小）。 */
+async function escapeSheet(dirtyCount: number): Promise<boolean> {
+  for (;;) {
+    const v = await openChoiceSheet<"backup" | "force">(
+      t("gm.dirtyTitle", { n: String(dirtyCount) }),
+      t("gm.dirtyMsg"),
+      [
+        { label: t("gm.dirtyBackup"), value: "backup" },
+        { label: t("gm.dirtyForce"), value: "force" },
+      ],
+    );
+    if (v == null) return false;                       // 取消
+    if (v === "force") return true;
+    await backupDirty();                               // 备份后重扫再问（推上去的已不 dirty）
+    dirtyCount = await store.files.dirty.count();
+    if (dirtyCount === 0) { _status(t("gm.dirtyAllPushed"), true); return true; }
+  }
+}
+
+/** 下载备份：先 pushAll 尽力推（在线时最好的备份就是云）；推不上去的（failed=错误报告面）逐张下载。 */
+async function backupDirty(): Promise<void> {
+  try {
+    const { failed } = await store.files.dirty.pushAll();
+    let saved = 0;
+    for (const name of failed) {
+      try {
+        const blob = await store.file(name, { isZip: false, mode: "existing" }).open();
+        if (blob) { triggerDownload(blob, name.split("/").pop() || name); saved++; }
+      } catch (e) { reportError(new Error(`[gallery-manage] backup download failed for ${name}: ` + String(e)), "log"); }
+    }
+    _status(t("gm.backupDone", { n: String(saved) }), true);
+  } catch (e) {
+    reportError(new Error("[gallery-manage] backupDirty failed: " + String(e)), "error");
+  }
+}
+
+// ---- 切库 / 连接 / 卸下 / 忘记 ----
+async function switchFlow(entry: GalleryEntry, opts: { askSeed: boolean }): Promise<void> {
+  const att = galleryAttachment.state();
+  if (att.kind === "attached" && att.entry.id === entry.id) { _status(t("gm.alreadyCurrent")); return; }
+  let seed: SeedBundle | null = null;
+  if (opts.askSeed) {
+    const v = await openChoiceSheet<"inherit" | "fresh">(t("gm.seedTitle"), t("gm.seedMsg"), [
+      { label: t("gm.seedInherit"), value: "inherit", primary: true },
+      { label: t("gm.seedFresh"), value: "fresh" },
+    ]);
+    if (v == null) return;                             // 取消整个连接流程（条目已铸无妨，名册可复用）
+    if (v === "inherit") seed = captureSeed();         // 旧库还活着的此刻捕快照
+  }
+  if (!(await closeCurrentStoreWithGates())) return;
+  if (seed?.rack.length) _seedNextRackInitData(seed.rack);
+  try {
+    await attachGallery(entry);
+  } catch (e) {
+    _seedNextRackInitData(null);
+    reportError(new Error("[gallery-manage] attach failed: " + String(e)), "error");
+    return;
+  }
+  if (seed) for (const [k, v] of Object.entries(seed.prefs)) preferences.set(k as PrefKey, v as never);
+  _status(t("gm.switched", { label: entry.label }), true);
+  try { _ctx?.gallery.refresh(); } catch { /* gallery 未挂 */ }
+  renderGalleryManage();
+}
+
+async function connectFlow(): Promise<void> {
+  // iOS/手势红线（sheets.ts 头注释）：signIn popup / FSA picker 都要活着的 user activation——
+  //   必须在 onPick（点击同步栈）起跳，不能等 `await openChoiceSheet` 回来再调。
+  let mintP: Promise<MintResult | null> | null = null;
+  const src = await openChoiceSheet<"od" | "folder">(t("gm.connectTitle"), "", [
+    ...(isAuthConfigured() ? [{ label: t("gm.srcOneDrive"), value: "od" as const, primary: true, onPick: () => { mintP = mintOneDriveByAccount(); } }] : []),
+    ...(canPickFolderGallery() ? [{ label: t("gm.srcFolder"), value: "folder" as const, onPick: () => { mintP = mintFolderByPicker(); } }] : []),
+  ]);
+  if (src == null || mintP == null) return;
+  try {
+    const minted = await (mintP as Promise<MintResult | null>);   // TS 看不见 onPick 副作用的窄化补丁
+    if (!minted) return;                               // 用户取消 picker / 登录失败无账号
+    await switchFlow(minted.entry, { askSeed: minted.created });
+  } catch (e) {
+    reportError(new Error("[gallery-manage] connect failed: " + String(e)), "error");
+  }
+}
+
+async function detachFlow(): Promise<void> {
+  if (galleryAttachment.state().kind !== "attached") return;
+  if (!(await closeCurrentStoreWithGates())) return;
+  _status(t("gm.detached"), true);
+  try { _ctx?.gallery.refresh(); } catch { /* noop */ }
+  renderGalleryManage();
+}
+
+async function forgetFlow(entry: GalleryEntry): Promise<void> {
+  const ok = await openConfirmSheet(t("gm.forgetTitle", { label: entry.label }), t("gm.forgetMsg"));
+  if (!ok) return;
+  await galleryRegistry.forget(entry.id);
+  _status(t("gm.forgotten", { label: entry.label }));
+  renderGalleryManage();
+}
+
+// ---- 渲染（popup 内容；updateCloudAuthUI 每次一并调）----
+export function renderGalleryManage(): void {
+  const box = els.galleryListBox; const cur = els.galleryCurrentInfo;
+  if (!box || !cur) return;
+  const att = galleryAttachment.state();
+  if (att.kind === "attached") {
+    cur.textContent = t("gm.current", { label: att.entry.label, src: sourceLabel(att.entry) }) + (att.online ? "" : t("gm.offlineSuffix"));
+    cur.classList.remove("hidden");
+    els.galleryDetachBtn.classList.remove("hidden");
+  } else {
+    cur.classList.add("hidden");
+    els.galleryDetachBtn.classList.add("hidden");
+  }
+  els.galleryConnectBtn.classList.remove("hidden");
+  // 名册列表（当前库不列；卡标来源——撞名不设机制，user 拍板）
+  box.textContent = "";
+  void galleryRegistry.list().then((entries) => {
+    const others = entries.filter((e) => !(att.kind === "attached" && e.id === att.entry.id));
+    for (const e of others) {
+      const row = document.createElement("div");
+      row.className = "gm-row";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "menu-item";
+      btn.textContent = `${e.label} — ${sourceLabel(e)}`;
+      btn.addEventListener("click", () => { void switchFlow(e, { askSeed: false }); });
+      const x = document.createElement("button");
+      x.type = "button";
+      x.className = "gm-x";
+      x.title = t("gm.forgetHint");
+      x.textContent = "✕";
+      x.addEventListener("click", (ev) => { ev.stopPropagation(); void forgetFlow(e); });
+      row.append(btn, x);
+      box.appendChild(row);
+    }
+  }).catch((e) => reportError(new Error("[gallery-manage] list failed: " + String(e)), "log"));
+  renderOfflineBanner();
+}
+
+// ---- 离线横幅（主动引导；动态 DOM，同 error-badge 手法）----
+let _bar: HTMLDivElement | null = null;
+let _dismissed = false;
+function _ensureBar(): HTMLDivElement {
+  if (_bar) return _bar;
+  const bar = document.createElement("div");
+  bar.id = "__galleryOfflineBar";
+  bar.style.cssText = "position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:9000;display:flex;gap:8px;align-items:center;" +
+    "padding:6px 12px;border-radius:0 0 8px 8px;background:var(--panel-bg,#333);color:var(--fg,#eee);box-shadow:0 2px 8px rgba(0,0,0,.35);font-size:13px;";
+  const txt = document.createElement("span");
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.style.cssText = "padding:2px 10px;border-radius:6px;cursor:pointer;";
+  btn.addEventListener("click", () => { void reconnectFlow(); });
+  const x = document.createElement("button");
+  x.type = "button";
+  x.textContent = "✕";
+  x.title = t("gm.dismiss");
+  x.style.cssText = "background:none;border:none;color:inherit;cursor:pointer;opacity:.7;";
+  x.addEventListener("click", () => { _dismissed = true; renderOfflineBanner(); });
+  bar.append(txt, btn, x);
+  document.body.appendChild(bar);
+  _bar = bar;
+  return bar;
+}
+function renderOfflineBanner(): void {
+  const att = galleryAttachment.state();
+  const show = att.kind === "attached" && !att.online && !_dismissed;
+  if (!show) { _bar?.remove(); _bar = null; return; }
+  const bar = _ensureBar();
+  (bar.children[0] as HTMLElement).textContent = t("gm.offlineBanner", { label: att.entry.label });
+  (bar.children[1] as HTMLElement).textContent = t("gm.reconnect");
+}
+/** 重新连接（手势）：OneDrive=signIn popup；folder=requestPermission。接通即翻牌+补推。 */
+async function reconnectFlow(): Promise<void> {
+  const att = galleryAttachment.state();
+  if (att.kind !== "attached") return;
+  try {
+    if (att.entry.kind === "onedrive") { await signIn(); galleryAttachment.setOnline(isSignedIn()); }
+    else galleryAttachment.setOnline(await ensureFolderPermission(att.entry, { request: true }));
+    if (galleryAttachment.state().kind === "attached" && (galleryAttachment.state() as { online?: boolean }).online) {
+      store.files.drainOfflineQueue().catch(() => { /* 良性 */ });
+      try { _ctx?.gallery.refresh(); } catch { /* noop */ }
+      _status(t("gm.reconnected"));
+    }
+  } catch (e) {
+    reportError(new Error("[gallery-manage] reconnect failed: " + String(e)), "error");
+  }
+}
+
+export function initGalleryManageUI(ctx: AppContext): void {
+  _ctx = ctx;
+  els.galleryConnectBtn?.addEventListener("click", () => { void connectFlow(); });
+  els.galleryDetachBtn?.addEventListener("click", () => { void detachFlow(); });
+  galleryAttachment.onChange(() => { _dismissed = false; renderGalleryManage(); });
+  renderGalleryManage();
+}

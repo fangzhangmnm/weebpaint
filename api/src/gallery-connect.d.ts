@@ -4,10 +4,15 @@ export declare function ensureFolderPermission(entry: GalleryEntry, opts: {
     request: boolean;
 }): Promise<boolean>;
 export declare const canPickFolderGallery: () => boolean;
-/** 连接本地文件夹（手势）：选哪就是哪（VS Code 姿态）；同夹二挂 isSameEntry 复用 id。用户取消 = null。 */
-export declare function pickAndConnectFolderGallery(): Promise<GalleryEntry | null>;
-/** 连接 OneDrive（手势）：signIn 走 account picker——选哪个账号铸哪个账号的库（多账号=多条目，结构支持）。 */
-export declare function connectOneDriveGallery(): Promise<GalleryEntry | null>;
+/** 铸/复用 = 与挂载分离（UI 在两步之间问「继承 or 出厂」并走绿灯门）。created = 这次真铸了新条目。 */
+export interface MintResult {
+    entry: GalleryEntry;
+    created: boolean;
+}
+/** 本地文件夹 picker（手势）：选哪就是哪（VS Code 姿态）；同夹二挂 isSameEntry 复用 id。用户取消 = null。 */
+export declare function mintFolderByPicker(): Promise<MintResult | null>;
+/** OneDrive（手势）：signIn 走 account picker——选哪个账号铸哪个账号的库（多账号=多条目，结构支持）。 */
+export declare function mintOneDriveByAccount(): Promise<MintResult | null>;
 /** 挂载既有条目（手势上下文；调用方保证已过绿灯门 detach）。folder 缺权限当场 request 一次。 */
 export declare function attachGallery(entry: GalleryEntry): Promise<void>;
 /** boot 静默重挂（app.ts prefsReady 链头，fixup/restore 之前）：
