@@ -22,11 +22,13 @@
   文件笔架句柄放弃；settings 维持 P5 形（device-kv+collection 各归契约成立处）；resume-slate 留 localStorage
   （同步原子写 affordance）；必有 store 模型不回归，kind:none 现架构不动。→ **✅ 已落 v0.11.28**
   （createMemoryCollection 同日退役；store-absent.ts 只剩平台探针）。
-- **A3**：registry 序列化 = generic JSON dict 口径（旧 json 永不需要 migration；代码层改名随意）→ store agenda。
-- **A4 = a 同意**（本地版本戳+写前 backup；双版本 spam 要去重设计）；b 只读打开 park；瑞士奶酪同意 → store agenda。
+- **A3**：registry 序列化 = generic JSON dict 口径（旧 json 永不需要 migration；代码层改名随意）→ **✅ 已落 v0.11.32**（spread 保未知字段契约测试 + 口径注释三条：generic dict / kind 开放扩展位 / 持久化字段永不改名，homeAccountId 走 b 案=名不动宣告 onedrive 域专属，未来 provider additive 加自己的字段）。
+- **A4 = a 同意**（本地版本戳+写前 backup；双版本 spam 要去重设计）；b 只读打开 park；瑞士奶酪同意 → **✅ 已落 store 仓 00fdd92（待 0.8.0 审版）**：CacheRecord.rev（老记录缺席视 0 零迁移）+ save guard="user-save"（仅用户保存路径传；pull/改名不传=不误报）+ 撞版先备份**对方**字节再覆盖 + LocalSaveReceipt 回执 → reportStoreError surface + 每 tab 每名 5min 冷却防 spam；读-比-写 TOCTOU 毫秒窗 = 已知失败（同文件器官 mtime 对表姿势）；契约测试 6 件。
 - **A5**：等 user 真机「一句话的事」——park 到真机 session。
 - **A6 = a**（app 层轮询）+ store 出**强制表态 reconcilePolicy**（逼消费者选而非无视）；多 store 口径=
-  轮询只属 gallery store（device store 无云）→ store agenda。
+  轮询只属 gallery store（device store 无云）→ **✅ 双侧已落**：reconcilePolicy 表态制已进 store 0.8.0 批；
+  app 轮询已落 v0.11.32（app.ts 60s 前台定时器：可见+图库页开着+galleryOnline 才 tick；folder 库同样轮询
+  顺带捡外部改动；非清空刷新+frame-gate 已有承重，轮询帧不打扰操作）。
 
 ## A′. 原摊面存档（grill 已过，仅考古用）
 
