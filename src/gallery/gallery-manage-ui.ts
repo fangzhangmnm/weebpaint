@@ -63,7 +63,8 @@ async function closeCurrentStoreWithGates(): Promise<boolean> {
     await galleryAttachment.forceDetach();
     return true;
   }
-  // legacy 未领养态（登出用户/播种未跑）：同口径手工走（dirty 扫 → 逃生 → 快拆预建实例）
+  // detached 态兜底：2026-08-27 真 sunset 后 boot 收口即无库（null-store：dirty 恒 0、boot 店已取走
+  //   → 本分支直通 true）；保留 dirty 扫代码当保险带（万一 boot 窗口内被调，口径同绿灯门）
   const dirty = await store.files.dirty.count();
   if (dirty > 0 && !(await escapeSheet(dirty))) return false;
   const boot = _takeBootStore();

@@ -64,16 +64,18 @@ export async function attachGallery(entry: GalleryEntry): Promise<void> {
 /** boot 静默重挂（app.ts prefsReady 链头，fixup/restore 之前）：
  *  · lastActive = legacy OneDrive（dbId=defaultStore）→ **领养**预建实例（零换店零重灌 = 现状路径）；
  *  · lastActive = folder / 非 legacy OneDrive → 规矩 dispose 预建实例（无人用过，无数据风险）→ attach（权限只 query）；
- *  · 无 lastActive → 不动（legacy 现状继续当家；关云/无库的真 sunset = Slice E）。
+ *  · 无 lastActive / registry 读不出 → **无库模式**（预建实例 dispose + swap(null)）——真 sunset
+ *    （user 2026-08-27 拍板：「无账号无文件不应该有 gallery——这时候只有 IDB 承重」；registry 条目
+ *    是 gallery 存在的唯一凭据）。未播种老设备（登录态在）本次 boot 无库、auth 醒来播种后下次 boot
+ *    领养；IDB 缓存/dirty 原样保留（dispose 不删数据），重连即浮出。
  *  任何失败 → 响亮上报 + 回落无库模式（绝不让 app 骑在已 dispose 的店上）。 */
 export async function bootAttachFromRegistry(): Promise<void> {
   if (storeAbsent) return;
   let e: GalleryEntry | null = null;
   try { e = await galleryRegistry.lastActive(); } catch (err) {
-    reportError(new Error("[gallery-connect] registry read failed at boot (soft, legacy path): " + String(err)), "log");
-    return;
+    reportError(new Error("[gallery-connect] registry read failed at boot — entering no-gallery mode: " + String(err)), "error");
   }
-  if (!e) return;
+  if (!e) { await _enterNoGalleryMode(); return; }
   if (e.kind === "onedrive" && e.dbId === "defaultStore") {
     const boot = _takeBootStore();
     if (boot) galleryAttachment.bootAdopt(e, boot as SwappableStore, { online: isSignedIn() });
@@ -88,4 +90,12 @@ export async function bootAttachFromRegistry(): Promise<void> {
     reportError(new Error("[gallery-connect] boot attach failed — falling back to no-gallery mode: " + String(err)), "error");
     try { await _swapStoreForGallery(null); } catch { /* 已在 null 态 */ }
   }
+}
+
+/** 无库模式收口（boot 专用）：拆预建实例 → null-store。dispose 只关实例不动 IDB 数据。 */
+async function _enterNoGalleryMode(): Promise<void> {
+  const boot = _takeBootStore();
+  try { if (boot) await boot.dispose({ drain: false }); }
+  catch (err) { reportError(new Error("[gallery-connect] boot store dispose failed (soft): " + String(err)), "log"); }
+  try { await _swapStoreForGallery(null); } catch { /* 已在 null 态 */ }
 }

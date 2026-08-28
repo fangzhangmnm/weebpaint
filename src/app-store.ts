@@ -101,7 +101,8 @@ export type AppStorePort = Pick<Store, "file" | "files" | "collection" | "encryp
 let _storeFull: Store = _asm.store;            // 全 Store（含 dispose）——只有 attachment 器官经 seam 摸它
 let _isNull = storeAbsent;                     // 当前是不是 null-store（无库模式/absent）；cloud-capability 的真相源
 export let store: AppStorePort = _storeFull;
-/** 有活店？（attachment attached 或 legacy 预建店在岗）。P3 sunset：isCloudEnabled 的新真相。 */
+/** 有活店？（attachment attached；预建店只在 boot 窗口内短暂在岗——bootAttachFromRegistry 收口后
+ *  要么被领养、要么 dispose 进无库模式，2026-08-27 真 sunset）。P3 sunset：isCloudEnabled 的新真相。 */
 export function hasLiveStore(): boolean { return !_isNull; }
 export type { Collection, EncryptedBlob } from "@internal/store";   // app 侧仅剩的两个库类型，经接缝转口
 
