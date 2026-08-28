@@ -52,3 +52,5 @@ journals/
 # 惰性创建——第一次真要写私密内容才建仓（届时自己 git init + OneDrive bare 远端）。
 private/
 dist/weebpaint-standalone.html
+dist/weebpaint-standalone-*.html
+dist/weebpaint-itch*.zip
