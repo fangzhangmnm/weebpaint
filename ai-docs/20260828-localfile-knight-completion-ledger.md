@@ -139,3 +139,13 @@ Azure localhost 白名单；encryption/wipe 两轮 store 发版的 exports 过�
   +内存线性无上限；④#18 备份范围含图片杂物+autoCache residency 副作用；⑤A5 主菜单精简+#14（等你真机
   「一句话」session）。除此五条外，wave1/2/6 技术余量=**零**；wave4（single html+itch）=宣发当天；
   #9/#17 等 UI 整改与产品工具项=你已裁宣发后。
+
+**0828 晚裁决批（edited by Claude Fable 5，v0.11.35 推 dev）**：五条待裁清账——①addGroup 兄弟【同意】闭案；
+②固定笔满宽【蛮宽更诚实】维持现状闭案（喷枪类固定变体=待裁，要发明 flow 值）；③液化隐藏叶跟动【可以跟】+
+**全隐组护栏已落**（组可见但组内无有效可见叶=hidden 软拒，同画隐藏层；部分可见放行跟动；嵌套子组链算入）；
+液化**内存墙=方案已呈待选**（a 进笔门 worst-case 估算 / b 描边期 COW tile 对账超预算提前落笔 / c 现状+T-crash 兜底）；
+④A5 半边落地：scope 微章 order:3 右对齐到状态后（9 处 markup 零改）+「当前图库」行删=图库大标题旁小字
+(#galleryTitleName 下对齐) + 回图库行尾截断名 (#menuGalleryName)。
+**同批新需求**：Delete/Backspace=删除选区内容（浮层先收摊再删、无选区状态行提示不清层、不删图层——删层留面板正门）；
+文件粘贴=代码已覆盖（paste kind=file 路径），进真机批；**水印现状**=#13 图片导出水印已落（自定义文字白字+深描边，
+四去向共用，字体=系统栈 canvas 声明豁免）、视频/timelapse 无水印——建议图片保留、视频不做（宣发素材外部 ffmpeg 加）。
