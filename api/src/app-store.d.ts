@@ -42,7 +42,9 @@ export declare function _buildStoreForGalleryEntry(entry: {
 }): Store;
 export declare const isAuthConfigured: () => boolean;
 export declare const initAuth: () => Promise<void> | Promise<import("@internal/store").AuthState>;
-export declare const signIn: () => Promise<unknown>;
+export declare const signIn: (opts?: {
+    prompt?: "select_account";
+} | undefined) => Promise<unknown>;
 export declare const signOut: () => Promise<void>;
 export declare const isSignedIn: () => boolean;
 export declare const getActiveAccount: () => any;

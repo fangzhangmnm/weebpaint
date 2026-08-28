@@ -3963,11 +3963,29 @@ export declare const S: {
         readonly ja: "プッシュに失敗しました：{error}";
         readonly tok: "pana li pakala: {error}";
     };
-    readonly "ss.encryptGalleryOnly": {
-        readonly zh: "加密目前只对图库里的画可用——先把画保存进图库";
-        readonly en: "Encryption is currently available for gallery artworks only — save it into a gallery first";
-        readonly ja: "暗号化は現在ギャラリー内の作品のみ対応——先にギャラリーへ保存してください";
-        readonly tok: "len li ken taso lon poki sitelen. o awen e sitelen lon poki sitelen.";
+    readonly "ss.encryptNeedsHome": {
+        readonly zh: "先保存这张画（进图库或存成文件）再加密";
+        readonly en: "Save this artwork first (into a gallery or as a file), then encrypt";
+        readonly ja: "先に作品を保存（ギャラリーまたはファイル）してから暗号化してください";
+        readonly tok: "o awen e sitelen lon poki anu lipu la sina ken len e ona";
+    };
+    readonly "ss.decryptFileHint": {
+        readonly zh: "文件家的画要明文副本：用「导出与另存」另存一份 .ora 即可（当前加密文件不动）";
+        readonly en: "For a plaintext copy of a file-home artwork, use Export & save a copy (.ora); the encrypted file stays as is";
+        readonly ja: "平文コピーは「書き出しと別名保存」で .ora を保存してください（暗号化ファイルはそのまま）";
+        readonly tok: "o kepeken nasin pana la sina ken jo e lipu open. lipu len li awen.";
+    };
+    readonly "lf.encSavedAs": {
+        readonly zh: "已加密另存为「{name}」——此后保存都会写回加密容器。原来的明文文件还在磁盘上，请自行处置";
+        readonly en: "Encrypted and saved as \"{name}\" — future saves write the encrypted container. The original plaintext file remains on disk; dispose of it yourself";
+        readonly ja: "「{name}」として暗号化保存しました——以後の保存は暗号化コンテナに書き込みます。元の平文ファイルはディスクに残っています";
+        readonly tok: "awen len lon \"{name}\". lipu open pi tenpo pini li awen lon ilo. o lawa e ona.";
+    };
+    readonly "lf.encDownloadedCopy": {
+        readonly zh: "已下载加密副本「{name}」。注意：当前打开的仍是那个明文文件（此平台不支持原位换文件）";
+        readonly en: "Encrypted copy \"{name}\" downloaded. Note: the file you have open is still the plaintext one (this platform can't switch files in place)";
+        readonly ja: "暗号化コピー「{name}」をダウンロードしました。現在開いているのは平文ファイルのままです";
+        readonly tok: "lipu len \"{name}\" li kama. lipu open li awen open.";
     };
     readonly "ss.renameNeedsHome": {
         readonly zh: "这张画还没安家——保存进图库后就能重命名";
@@ -5210,6 +5228,12 @@ export declare const S: {
         readonly en: "OneDrive";
         readonly ja: "OneDrive";
         readonly tok: "OneDrive";
+    };
+    readonly "gm.srcOneDriveSwitch": {
+        readonly zh: "OneDrive · 换一个账号…";
+        readonly en: "OneDrive · use another account…";
+        readonly ja: "OneDrive · 別のアカウントで…";
+        readonly tok: "OneDrive · kepeken jan ante…";
     };
     readonly "gm.srcFolder": {
         readonly zh: "本地文件夹";

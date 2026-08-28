@@ -64,6 +64,15 @@ export async function mintOneDriveByAccount(): Promise<MintResult | null> {
   return _withCreated(() => galleryRegistry.mintOneDrive(acct.homeAccountId as string, acct.username || acct.name || ""));
 }
 
+/** 换一个账号连接（0.9.0 口子，user 0828「加口子」）：强制微软账号选择页。必在点击同步栈调
+ *  （signIn=loginRedirect 页面即离开）；回程由 resumePendingOneDriveConnect 用新 active 账号续办
+ *  mint+attach——多账号「铸第二账号」的唯一入口（P3 §1.10）。 */
+export async function mintOneDriveSwitchAccount(): Promise<MintResult | null> {
+  markPendingOneDriveConnect();
+  await signIn({ prompt: "select_account" });   // redirect：正常情况下页面已离开
+  return null;                                  // 罕见非跳转路径：本次不续（标记在，下次 auth-changed 兜）
+}
+
 // ── 待续连接标记（P3 iOS redirect 续办；形制=device-kv 标量 + TTL，不是 crash-store 的字节记录）──
 const PENDING_CONNECT_KEY = "pending-onedrive-connect-at";
 const PENDING_CONNECT_TTL_MS = 10 * 60_000;   // 用户在微软页取消/走神：过期作废，绝不隔天幽灵自动连库

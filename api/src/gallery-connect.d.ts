@@ -18,6 +18,10 @@ export declare function mintFolderByPicker(): Promise<MintResult | null>;
  *  ② 未登录 → redirect 前落「待续连接」标记（device-kv + 时间戳），回程 auth-changed 由
  *    resumePendingOneDriveConnect 续办 mint+attach（gallery-manage-ui 接线）。 */
 export declare function mintOneDriveByAccount(): Promise<MintResult | null>;
+/** 换一个账号连接（0.9.0 口子，user 0828「加口子」）：强制微软账号选择页。必在点击同步栈调
+ *  （signIn=loginRedirect 页面即离开）；回程由 resumePendingOneDriveConnect 用新 active 账号续办
+ *  mint+attach——多账号「铸第二账号」的唯一入口（P3 §1.10）。 */
+export declare function mintOneDriveSwitchAccount(): Promise<MintResult | null>;
 export declare function markPendingOneDriveConnect(): void;
 export declare function clearPendingOneDriveConnect(): void;
 /** 读并判新鲜；不清除（清除归续办成功/作废方调 clear——读写分离防半路丢标记）。 */

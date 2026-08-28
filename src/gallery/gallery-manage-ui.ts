@@ -14,7 +14,7 @@ import { openChoiceSheet, openConfirmSheet } from "../sheets.ts";
 import { galleryAttachment } from "../gallery-attachment-host.ts";
 import { galleryRegistry } from "../gallery-registry.ts";
 import type { GalleryEntry } from "../gallery-registry.ts";
-import { mintFolderByPicker, mintOneDriveByAccount, attachGallery, ensureFolderPermission, canPickFolderGallery, hasFreshPendingOneDriveConnect, clearPendingOneDriveConnect, type MintResult } from "../gallery-connect.ts";
+import { mintFolderByPicker, mintOneDriveByAccount, mintOneDriveSwitchAccount, attachGallery, ensureFolderPermission, canPickFolderGallery, hasFreshPendingOneDriveConnect, clearPendingOneDriveConnect, type MintResult } from "../gallery-connect.ts";
 import { requireStore, galleryBackend, signIn, isSignedIn, isAuthConfigured, _seedNextRackInitData, _buildStoreForGalleryEntry, brushRackCollection } from "../app-store.ts";
 import { getAllBrushes, getMeta, RACK_META_ID } from "../brushes.ts";
 import { preferences, PREF_REGISTRY, type PrefKey } from "../app-prefs.ts";
@@ -171,8 +171,10 @@ async function connectFlow(): Promise<void> {
   // iOS/手势红线（sheets.ts 头注释）：signIn popup / FSA picker 都要活着的 user activation——
   //   必须在 onPick（点击同步栈）起跳，不能等 `await openChoiceSheet` 回来再调。
   let mintP: Promise<MintResult | null> | null = null;
-  const src = await openChoiceSheet<"od" | "folder">(t("gm.connectTitle"), "", [
+  const src = await openChoiceSheet<"od" | "od-switch" | "folder">(t("gm.connectTitle"), "", [
     ...(isAuthConfigured() ? [{ label: t("gm.srcOneDrive"), value: "od" as const, primary: true, onPick: () => { mintP = mintOneDriveByAccount(); } }] : []),
+    // 已登录才给「换一个账号」（0.9.0 口子）：铸第二账号入口——redirect 走微软账号选择页，回程续办。
+    ...(isAuthConfigured() && isSignedIn() ? [{ label: t("gm.srcOneDriveSwitch"), value: "od-switch" as const, onPick: () => { mintP = mintOneDriveSwitchAccount(); } }] : []),
     ...(canPickFolderGallery() ? [{ label: t("gm.srcFolder"), value: "folder" as const, onPick: () => { mintP = mintFolderByPicker(); } }] : []),
   ]);
   if (src == null || mintP == null) return;

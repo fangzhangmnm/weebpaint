@@ -42,13 +42,15 @@ export function supportsSaveFilePicker(): boolean {
 
 /** 系统「另存为」框挑 .ora 落点（2026-08-21，「导出与另存」hub 的本地去向用）。
  *  用户取消 → null（不是错误）。必须在 user-gesture 活化窗口内调（调用方先 pick 再 encode）。 */
-export async function pickSaveOraFile(suggestedName: string): Promise<LocalFileHandle | null> {
+export async function pickSaveOraFile(suggestedName: string, opts?: { encrypted?: boolean }): Promise<LocalFileHandle | null> {
   const picker = (globalThis as unknown as { showSaveFilePicker?: (o: unknown) => Promise<LocalFileHandle> }).showSaveFilePicker;
   if (!picker) return null;
   try {
     return (await picker({
       suggestedName,
-      types: [{ description: "OpenRaster", accept: { "image/openraster": [".ora"] } }],
+      types: opts?.encrypted
+        ? [{ description: "Encrypted OpenRaster", accept: { "application/zip": [".zip"] } }]   // X.ora.zip（家族容器扩展名 ADR-0012 同款）
+        : [{ description: "OpenRaster", accept: { "image/openraster": [".ora"] } }],
     })) ?? null;
   } catch (e) {
     if ((e as { name?: string })?.name === "AbortError") return null;   // 用户取消保存框

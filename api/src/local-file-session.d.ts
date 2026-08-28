@@ -18,7 +18,9 @@ export declare function pickLocalOraFile(): Promise<LocalFileHandle | null>;
 export declare function supportsSaveFilePicker(): boolean;
 /** 系统「另存为」框挑 .ora 落点（2026-08-21，「导出与另存」hub 的本地去向用）。
  *  用户取消 → null（不是错误）。必须在 user-gesture 活化窗口内调（调用方先 pick 再 encode）。 */
-export declare function pickSaveOraFile(suggestedName: string): Promise<LocalFileHandle | null>;
+export declare function pickSaveOraFile(suggestedName: string, opts?: {
+    encrypted?: boolean;
+}): Promise<LocalFileHandle | null>;
 /** 读句柄当前字节（File 自带 name/lastModified，打开时顺手拿 mtime 基线）。 */
 export declare function readHandleFile(h: LocalFileHandle): Promise<File>;
 /** 句柄当前 mtime（写前陈旧对表用）。读不到（句柄失效等）→ null，调用方自行决定敢不敢写。 */

@@ -36,7 +36,7 @@ import { invalidateCachedThumb } from "./gallery/cloud-thumb-cache.ts";
 import { sessionFileName, sessionBareName, stripSessionExt } from "./config.ts";
 import { serializedToolStatePatch, desk } from "./workbench-state.ts";
 import { getBlenderSyncState, applyBlenderSyncState } from "./blender-sync.ts";
-import { ensureNewPassword, ensureUnlocked } from "./enc-thumbs.ts";
+import { ensureNewPassword, ensureUnlocked, unlockImportedContainer } from "./enc-thumbs.ts";
 import { setPassword, getPassword } from "./crypto-state.ts";
 import { shouldCapture, checkpointKey, planRingEviction, ringBudget, isNewSitting, type CheckpointTrigger, type RingEntryMeta } from "./checkpoint-policy.ts";
 import { getCheckpoint, deleteCheckpoint, ringPut, ringGet, ringAll, ringDelete, ringDeleteByDoc, mintRingId } from "./storage.ts";
@@ -254,10 +254,19 @@ function _esRebound() { _esMuted = false; }
  *  加密容器 / 外来 ora → 不原位，把 File 还给调用方走导入路径（返回 File）。 */
 async function openLocalFile(handle: LocalFileHandle): Promise<File | null> {
   const file = await readHandleFile(handle);
-  // 加密容器：原位模式 v1 不吃密文（解锁/记忆密码/落库语义全在导入路径）→ 交还导入。
-  //   加密器官无库也活着（@internal/encryption 0.1.0 立户闭环：kind:none 分叉床垫拆除）。
-  if (await appEncryption.isEncryptedBlob(file)) return file;
-  const loaded = await decodeOraToPainting(file) as LoadedDoc;
+  // 加密容器**原位打开**（0828 user「加密扩展到文件」；此前 v1 交还导入=丢文件家身份）：
+  //   busy 外解锁循环 → 解出明文进画布 → file 家 + enc 态 + 会话密码——此后保存原位写回**容器**。
+  //   取消解锁 = 不打开（不再交还导入，免得二次要密码）。外来加密 ora（无 WeebPaint 痕迹）仍交还
+  //   导入路径（rare；会再要一次密码，诚实代价）。
+  let plainForDecode: Blob = file;
+  let encOpen: { pw: string } | null = null;
+  if (await appEncryption.isEncryptedBlob(file)) {
+    const got = await unlockImportedContainer(file);
+    if (!got) { setStatus(t("mi.importCancelledNeedPw"), true); return null; }
+    plainForDecode = got.plain;
+    encOpen = { pw: got.pw };
+  }
+  const loaded = await decodeOraToPainting(plainForDecode) as LoadedDoc;
   if (!hasWeebPaintTraces(loaded)) return file;   // 外来 ora（Krita 等）→ 导入为新 doc，绝不原位覆写别人的文件
   if (!(await _gateFillOnSwitch())) return null; // 挽留门：fill 预览挂着 → 应用/丢弃/取消（user 2026-08-21）
   if (!(await leaveLocalDoc())) return null;    // 已在无地且脏 → 先问（保存/丢弃/取消）
@@ -265,16 +274,32 @@ async function openLocalFile(handle: LocalFileHandle): Promise<File | null> {
   _esMuted = true;   // 墙②先立再换内容：adoptModel 之后 canvas 就不再是 es._name 的像素了
   adoptModel(loaded);
   _setActive(null); _isLazyBlankSession = false;   // 先离旧家（释放锁 + 清持久 currentFile）
-  _enc.encrypted = false;
+  _enc.encrypted = encOpen != null;
+  if (encOpen) setPassword(encOpen.pw);            // 会话密码：后续原位写回打包容器用
   _homeAuth.setHome({ kind: "file", handle, fileName: file.name, lastSeenMtime: file.lastModified });
   _luggageTag = mintLuggageTag(); _snapSerial = _editSerial;   // T-crash：新家现铸新牌（旧牌上面 leaveLocalDoc 已焚）
-  // 打开点快照（P4 §2.7：file 家 revert 锚；session 级挂行李牌，正常关闭随牌焚）——字节现成（刚读的文件），零重编码。
-  void _ringCapture(_luggageTag, "local-open", file, false).catch((e) => reportError(new Error("[checkpoint] local-open capture failed: " + String(e)), "log"));
+  // 打开点快照（P4 §2.7：file 家 revert 锚；session 级挂行李牌，正常关闭随牌焚）——字节现成（刚读的文件），
+  //   零重编码。加密件=容器原样入档（encrypted:true）——**明文永不落 IDB**（at-rest 红线，file 家同守）。
+  void _ringCapture(_luggageTag, "local-open", file, encOpen != null).catch((e) => reportError(new Error("[checkpoint] local-open capture failed: " + String(e)), "log"));
   _recomputePhase();
   updateSaveStatus();
   await setGalleryOpen(false);
   setStatus(t("lf.opened", { name: file.name }));
   return null;
+}
+
+/** file 家加密打包（0828「扩展到文件」）：明文 ora + peek → 加密容器。密码=会话密码（打开解锁/加密
+ *  动词时进驻）；密码不在（理论不可达：enc 态必伴密码）→ 响亮抛，绝不静默写明文进加密家的文件。 */
+async function _packFileHomeContainer(bytes: Blob, peek: Blob | null, fileName: string): Promise<Blob> {
+  const pw = getPassword(null);
+  if (!pw) throw new Error("encrypted file home has no session password (locked?) — refusing to write plaintext");
+  return appEncryption.packContainer({
+    dataBytes: new Uint8Array(await bytes.arrayBuffer()),
+    fileName: stripSessionExt(fileName.replace(/\.zip$/i, "")),
+    ext: "ora",
+    peek: peek ? new Uint8Array(await peek.arrayBuffer()) : null,
+    password: pw,
+  });
 }
 
 /** Ctrl+S / save 按钮在无地模式的落点：encode → mtime 陈旧对表 → 原子写回句柄。 */
@@ -294,8 +319,8 @@ async function saveLocalFileNow(): Promise<boolean> {
       const ok = await openConfirmSheet(t("lf.staleTitle"), t("lf.staleMsg", { name: fh.fileName }));
       if (!ok) { setStatus(t("ss.saveCancelled")); return false; }
     }
-    const { bytes } = await _encodeCurrentOraWithPeek();
-    await writeHandleBlob(fh.handle, bytes);
+    const { bytes, peek } = await _encodeCurrentOraWithPeek();
+    await writeHandleBlob(fh.handle, _enc.encrypted ? await _packFileHomeContainer(bytes, peek, fh.fileName) : bytes);
     // await 间隙家可能已换（挽留 sheet 期间新文件落地等）——只有仍是同一个家才前移对表基准/清脏
     //   （旧代码此处改的是已脱钩的对象快照，效果等价；keeper 动词换家后调会响亮 throw，故先对指纹）。
     if (docHome() === fh) {
@@ -576,7 +601,7 @@ async function _readCheckpointEntry(id: string): Promise<{ blob: Blob; at: numbe
       : await ringGet(id);
     if (!rec || !rec.bytes) return null;
     if (!rec.encrypted) return { blob: rec.bytes, at: rec.at };
-    if (!name) return null;                              // 加密档只可能是 gallery 家（file 家原位=明文件）
+    // 加密档两种家（0828 扩域）：gallery=per-name 密码；file 家（name=null）=会话密码。
     const pw = getPassword(name);
     if (!pw) return null;                                // 锁定 → 调用方提示「需要密码」
     const plain = await appEncryption.tryDecryptEncryptedBlob(rec.bytes, pw);
@@ -590,8 +615,9 @@ async function capturePreRevert(): Promise<void> {
   if (name) { await saveNow(); await _captureCheckpoint(name, "pre-revert"); return; }
   const fh = _fileHome();
   if (fh && _luggageTag) {
-    const { bytes } = await _encodeCurrentOraWithPeek();
-    await _ringCapture(_luggageTag, "pre-revert", bytes, false);
+    const { bytes, peek } = await _encodeCurrentOraWithPeek();
+    if (_enc.encrypted) await _ringCapture(_luggageTag, "pre-revert", await _packFileHomeContainer(bytes, peek, fh.fileName), true);
+    else await _ringCapture(_luggageTag, "pre-revert", bytes, false);
   }
 }
 /** 作品被删/改名 → 丢掉它的快照（legacy 单槽 + 整份 ring；按 docKey 精确清）。 */
@@ -704,11 +730,50 @@ async function saveAndPush() {
 }
 
 // ---- 加密 / 解除（对活动 doc；at-rest 字节换容器，内存态透明不动）----
+/** file 家加密（0828「你可以保存加密文件」）＝**加密另存**：设密码 → 另存为 X.ora.zip（FSA picker；
+ *  无 FSA 平台=下载容器，家不换、明说）→ 家切到新句柄 + enc 态进驻，此后原位保存全走容器。
+ *  磁盘上的**旧明文文件原样留着**（我们绝不删用户文件）——状态行明说，处置归用户。 */
+async function _encryptFileHome(): Promise<void> {
+  const fh = _fileHome();
+  if (!fh) return;
+  if (_enc.encrypted) { setStatus(t("ss.alreadyEncrypted")); return; }
+  const pw = await ensureNewPassword();
+  if (pw == null) { setStatus(t("ss.cancelled")); return; }
+  const suggested = `${stripSessionExt(fh.fileName)}.ora.zip`;
+  try {
+    if (!supportsSaveFilePicker()) {
+      // 下载形态：容器下载=副本，当前打开的仍是明文文件——诚实说清，不装作已加密。
+      const { bytes, peek } = await _encodeCurrentOraWithPeek();
+      const container = await appEncryption.packContainer({ dataBytes: new Uint8Array(await bytes.arrayBuffer()), fileName: stripSessionExt(fh.fileName), ext: "ora", peek: peek ? new Uint8Array(await peek.arrayBuffer()) : null, password: pw });
+      triggerDownload(container, suggested);
+      setStatus(t("lf.encDownloadedCopy", { name: suggested }), true);
+      return;
+    }
+    const h = await pickSaveOraFile(suggested, { encrypted: true });   // 先 picker 后 encode（gesture 纪律，settle 同款）
+    if (!h) { setStatus(t("ss.cancelled")); return; }
+    setPassword(pw);
+    const { bytes, peek } = await _encodeCurrentOraWithPeek();
+    await withBusy(t("ss.encryptingBusy", { name: fh.fileName }), async () => {
+      const container = await appEncryption.packContainer({ dataBytes: new Uint8Array(await bytes.arrayBuffer()), fileName: stripSessionExt(fh.fileName), ext: "ora", peek: peek ? new Uint8Array(await peek.arrayBuffer()) : null, password: pw });
+      await writeHandleBlob(h, container);
+    });
+    _enc.encrypted = true;
+    _homeAuth.setHome({ kind: "file", handle: h, fileName: h.name, lastSeenMtime: (await handleMtime(h)) ?? Date.now() });
+    if (_luggageTag) { crashStore.dropOnCleanClose(_luggageTag).catch(() => {}); _snapSerial = _editSerial; }   // 旧（明文）快照作废：磁盘容器已是最新
+    updateSaveStatus();
+    setStatus(t("lf.encSavedAs", { name: h.name }), true);
+  } catch (e) {
+    reportError(new Error("[encrypt-file] failed: " + String(e)), "warning");
+    setStatus(t("lf.saveFailed", { error: errMsg(e) }), true);
+  }
+}
+
 async function encryptCurrent() {
-  // 残留审计 C（0828）：DocHome 表态（save-status switch 范本）。加密动词现阶段=**图库家专属**
-  //   （at-rest 容器换壳走 store _file 面）；file/transient 家给诚实话，不再对已存盘的 file 家说
-  //   「先打开或保存」这种假话。（无库/文件家要不要扩加密 = 产品件，总账 §8 C 附带表态待 user。）
-  if (docHome()?.kind !== "gallery") { setStatus(t("ss.encryptGalleryOnly"), true); return; }
+  // DocHome 表态（残留审计 C → 0828 user 扩域「加密扩展到文件」）：gallery=store 容器换壳（原路）；
+  //   **file=加密另存**（appEncryption 直连，零 store）；transient=先安家（保存进图库/存成文件）。
+  const home = docHome();
+  if (home?.kind === "file") { await _encryptFileHome(); return; }
+  if (home?.kind !== "gallery") { setStatus(t("ss.encryptNeedsHome"), true); return; }
   const name = _activeName();   // 快照一次（TS 无法跨调用窄化；语义同旧局部变量读法）
   if (!name || _isLazyBlankSession) { setStatus(t("ss.openOrSaveBeforeEncrypt"), true); return; }
   const online = () => galleryOnline();   // 库在线 SSoT（folder=权限即在线；0828 修）
@@ -730,7 +795,9 @@ async function encryptCurrent() {
   });
 }
 async function decryptCurrent() {
-  if (docHome()?.kind !== "gallery") { setStatus(t("ss.encryptGalleryOnly"), true); return; }   // 同 encryptCurrent（残留审计 C）
+  const dh = docHome();
+  if (dh?.kind === "file") { setStatus(t(_enc.encrypted ? "ss.decryptFileHint" : "ss.notEncrypted"), true); return; }   // file 家解除=另存明文副本（导出与另存），不原位改写容器
+  if (dh?.kind !== "gallery") { setStatus(t("ss.encryptNeedsHome"), true); return; }
   const name = _activeName();
   if (!name) { setStatus(t("ss.noDocOpen"), true); return; }
   const online = () => galleryOnline();   // 库在线 SSoT（folder=权限即在线；0828 修）
@@ -1273,10 +1340,17 @@ export function initSession(ctx: AppContext) {
       const name = homeAtStart!.kind === "file" ? homeAtStart!.fileName : (_transientName ?? t("nd.untitled"));
       void (async () => {
         try {
-          const { bytes } = await _encodeCurrentOraWithPeek();
+          const { bytes, peek } = await _encodeCurrentOraWithPeek();
+          // 加密 file 家（0828 扩域）：快照=容器（明文永不落 IDB，at-rest 红线 file 家同守）；
+          //   密码不在（理论不可达）→ 跳拍 + log，绝不降级明文。
+          let put: Blob = bytes;
+          if (kind === "file" && _enc.encrypted) {
+            if (!getPassword(null)) { reportError(new Error("[t-crash] encrypted file home locked — snapshot skipped (never plaintext)"), "log"); return; }
+            put = await _packFileHomeContainer(bytes, peek, homeAtStart!.kind === "file" ? homeAtStart!.fileName : name);
+          }
           // encode 的 await 间隙可能换家/领养——对指纹再写，别把别的画写进这张牌。
           if (docHome() === homeAtStart && _luggageTag) {
-            await crashStore.put(_luggageTag, bytes, { state: "crash", name, at: Date.now(), homeKind: kind });
+            await crashStore.put(_luggageTag, put, { state: "crash", name, at: Date.now(), homeKind: kind });
             _snapSerial = serial;
           }
         } catch (e) { reportError(new Error("[t-crash] snapshot failed (best-effort, load-bearing layers unaffected): " + String(e)), "log"); }
