@@ -157,3 +157,6 @@ Azure localhost 白名单；encryption/wipe 两轮 store 发版的 exports 过�
 user 所要（「等宽勾线笔改成去掉笔压，不需要额外 toggle」）；喷枪不拆，无机制可喂。③液化 buffer 事实
 钉档：LayerPixels=稀疏 256² tile（构造零分配、写才 COW、shadow 起步共享真叶句柄）——内存墙若做，
 准确口径=实际触及 tile×叶数，非叶数×画布（方案 a 的 worst-case 估算过悲观，方案 b 对账才是准的）。
+**结案补钉（user 0828）**：水印的「OffscreenCanvas 当 glyph 器官」声明豁免被判**越狱不合法**——设备字体
+栈使产出字节跨设备 divergent（语义级，非硬件浮点误差档），违反无头骑士纯函数良定义理念；未来 **text
+tool** 的文字→字节必须 vendor 字体 + 自带光栅器，系统字体+fillText 路线永久封死。
