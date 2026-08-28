@@ -8,7 +8,7 @@ import { wireAppState, initAppState, appState } from "../src/app-state.ts";
 
 const dumpKv = () => { const m = new Map(); return { get: (k) => (m.has(k) ? m.get(k) : null), set: (k, v) => m.set(k, String(v)), remove: (k) => m.delete(k), keys: () => [...m.keys()] }; };
 const UI = { busy: (_l, fn) => fn(), resolveConflict: async () => ({ choice: "cancel" }), reportError: () => {} };
-const mkStore = () => createStore({ encryption: createMockEncryption(), appId: "wp", persistence: "none", provider: createMockProvider(), ui: UI, validateAdopt: () => true, kv: dumpKv(), local: createMockLocal(), fileName: (n) => n, isOnline: () => true, signedIn: () => true, skipMigration: true });
+const mkStore = () => createStore({ encryption: createMockEncryption(), reconcilePolicy: "app-driven", appId: "wp", persistence: "none", provider: createMockProvider(), ui: UI, validateAdopt: () => true, kv: dumpKv(), local: createMockLocal(), fileName: (n) => n, isOnline: () => true, signedIn: () => true, skipMigration: true });
 
 test("[app-state] struct 冷字段直读写 collection（不落 RAM）+ 默认 + 类型强制", async () => {
   const store = mkStore();

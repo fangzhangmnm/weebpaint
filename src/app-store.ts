@@ -53,6 +53,7 @@ const _createRealStore = (provider: _Prov, signedIn: () => boolean, databaseId?:
   //   加密件云端 = X.ora.zip（追加，无损可逆），由库据字节加密态自动翻转，app 只管明文全名。
   //   身份从出生即全名——无迁移（无用户/无后向兼容，2026-07-13 清 tax；migration 框架留库内待将来）。
   encryption: appEncryption,   // EncryptionPort（0.7.0 必填表态；app 与 store 共用同一实例）
+  reconcilePolicy: "app-driven",   // 0.8.0 必填表态（A6）：库保持被动，云端刷新由 app 驱动（focus/online/回前台 + app.ts 60s 前台轮询）
   crypt: {
     ext: "ora",
     makePeek: async (blob) => { try { return await zipReadEntry(blob, "Thumbnails/thumbnail.png"); } catch { return null; } },  // ora 内容知识只此一行
