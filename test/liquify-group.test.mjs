@@ -330,6 +330,71 @@ describe("液化 · 组能力门（C 路由面）", () => {
     const { LiquifyFilter } = await import("../src/plugins/liquify.ts");
     eq(LiquifyFilter.supportsLayerGroup, true);
   });
+
+  it("input 接线：editMode=filterBrush + 组能力 filter → 组内全部叶；换成无能力 filter/别的工具 → 空", async () => {
+    const { InputController } = await import("../src/input.ts");
+    const { EditMode } = await import("../src/edit-mode.ts");
+    const r = groupRig();
+    const editMode = new EditMode({ initialTool: "brush" });
+    let fbState = null;
+    const board = {
+      canvas: document.createElement("canvas"),
+      requestRender: () => {}, setCursor: () => {}, markDocDirty: () => {},
+      screenToDoc: (x, y) => ({ x, y }), viewport: { scale: 1 },
+    };
+    const input = new InputController(board, r.doc, {
+      editMode, getFilterBrushState: () => fbState, getResolvedBrush: () => ({ size: 20, opacity: 1 }),
+    });
+    // ① 液化模式 + 组能力 filter → 组内 3 叶
+    editMode.setTool("filterBrush");
+    fbState = { Filter: { id: "liquify", supportsLayerGroup: true }, params: {} };
+    eq(input._filterBrushAllowsGroup(), true);
+    eq(input._filterBrushTargets().length, 3, "组内全部叶（含隐藏）进写靶");
+    // ② 同样是 filterBrush，但 filter 没声明组能力（模糊/锐化）→ 组仍硬拒
+    fbState = { Filter: { id: "sharpenBlur" }, params: {} };
+    eq(input._filterBrushAllowsGroup(), false);
+    eq(input._filterBrushTargets().length, 0, "无组能力 filter 在组上拿不到写靶");
+    // ③ 不在 filterBrush 模式（画笔）→ 能力位不生效
+    editMode.setTool("brush");
+    fbState = { Filter: { id: "liquify", supportsLayerGroup: true }, params: {} };
+    eq(input._filterBrushAllowsGroup(), false, "工具不是 filterBrush 时能力位不生效");
+  });
+
+  it("pointerdown 全链：组 active + 真 LiquifyFilter → 起笔成功（不再报「请选择一个图层」）", async () => {
+    const { InputController } = await import("../src/input.ts");
+    const { EditMode } = await import("../src/edit-mode.ts");
+    const { LiquifyFilter } = await import("../src/plugins/liquify.ts");
+    const r = groupRig();
+    const editMode = new EditMode({ initialTool: "brush" });
+    const statuses = [];
+    let shadows = [];
+    const board = {
+      canvas: document.createElement("canvas"),
+      requestRender: () => {}, setCursor: () => {}, markDocDirty: () => {}, invalidateAll: () => {},
+      commitBrushStroke: () => false,
+      setStrokeShadows: (entries) => { shadows = entries.slice(); },
+      screenToDoc: (x, y) => ({ x, y }), viewport: { scale: 1 },
+    };
+    const input = new InputController(board, r.doc, {
+      editMode, wp2: r.wp2, history: r.h, layerTiles: r.wp2.layerTiles,
+      getFilterBrushState: () => ({ Filter: LiquifyFilter, params: { mode: "push", strengthScale: 1 } }),
+      getResolvedBrush: () => ({ size: 24, opacity: 1, hardness: 0.6, spacing: 0.06 }),
+      getTool: () => editMode.current(),
+      status: (m) => statuses.push(m),
+    });
+    editMode.setTool("filterBrush");
+    const ev = (type, x, y) => ({
+      type, pointerId: 1, pointerType: "mouse", button: 0, buttons: 1,
+      clientX: x, clientY: y, pressure: 0.5, timeStamp: 100, preventDefault: () => {},
+    });
+    input._down(ev("pointerdown", 30, 40));
+    assert(input._activeStroke, `组上落笔应起笔成功；status=${JSON.stringify(statuses)}`);
+    eq(input._activeStroke.targets.length, 3, "写靶 = 组内 3 叶");
+    eq(shadows.length, 3, "board 收到 3 个替身叶");
+    eq(statuses.filter((m) => /图层组/.test(m)).length, 0, "不再弹「请选择一个图层」");
+    input._activeStroke.cancel();
+    input._activeStroke = null;
+  });
 });
 
 // 测试卫生：统一释放（防 tile-pool FR 泄漏 assert 刷屏；float-ops.test.mjs 同款）
