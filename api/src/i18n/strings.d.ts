@@ -318,6 +318,12 @@ export declare const S: {
         readonly ja: "テクスチャ用フリンジ除去（透明部に縁色を延長、PNG のみ）";
         readonly tok: "pona e selo (kule pi poka li tawa insa pi ala, PNG taso)";
     };
+    readonly "tm.alphaGuard": {
+        readonly zh: "导出护栏：检测到 {n} 个可疑半透明像素（{pm}‰）——可能是软橡皮误擦或喷枪喷出界。图已导出，建议在黑底上看一眼";
+        readonly en: "Export check: {n} suspicious semi-transparent pixels ({pm}‰) — could be a stray soft eraser or airbrush pass. The file was exported; take a look at it on a dark background";
+        readonly ja: "書き出しチェック：疑わしい半透明ピクセルが {n} 個（{pm}‰）——消しゴムやエアブラシのはみ出しかもしれません。書き出しは完了しています。黒背景で確認してください";
+        readonly tok: "o lukin: nanpa {n} pi sike kule lili ({pm}‰) li nasa — ken la ilo weka anu ilo kon li pakala. sitelen li kama lipu. o lukin e ona lon monsi pimeja";
+    };
     readonly "tm.configBg": {
         readonly zh: "背景";
         readonly en: "Background";

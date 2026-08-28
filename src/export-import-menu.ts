@@ -33,6 +33,7 @@ import { nextFreeExportName } from "./gallery/cloud-image-model.ts";
 import { withBusy } from "./fullscreen-busy.ts";
 
 import type { AppContext } from "./app-context.ts";
+import type { AlphaAudit } from "./backend/algorithms/alpha-audit.ts";
 const errMsg = (e: unknown): string => String((e as { message?: unknown })?.message || e);
 let doc: AppContext["doc"], setStatus: AppContext["setStatus"], board: AppContext["board"];
 
@@ -55,6 +56,21 @@ function _selCropRect(): { x: number; y: number; w: number; h: number } | null {
 }
 // v0.5.20：导出图片/导出项目合并为一个「导出」入口——format=ora/psd 即项目语义（所有图层·文件）。
 function _isProjectFormat(fmt: string): boolean { return (getExporter(fmt)?.kind ?? "image") === "project"; }
+
+// #7 导出 alpha 护栏（2026-08-28，user 2026-08-23：软橡皮误擦 / 喷枪喷出界白底看不见，
+//   发到 discord 黑底才发现，已三次事故）。护栏 = **提示不是拦截**：字节照出、状态行多说一句。
+//   收口在这里而不是 session.ts：护栏要等「导出真的成功了」才说话，而成败只有这一层知道。
+let _lastAudit: AlphaAudit | null = null;
+const _auditSink = (a: AlphaAudit) => { _lastAudit = a; };
+/** 导出成功且护栏命中 → 琥珀 banner（点一下消失）。
+ *  走 reportError("warning") 而不是 setStatus：① 状态行这会儿正拿着「存到哪了/文件名」这类不能被顶掉的
+ *  信息（云盘去向尤其）；② banner 是家规里唯一的 warning 面，且**要点一下才消失** = 真持久，
+ *  比状态行更适合一条「已经出过三次事故」的提醒；③ 仍是非阻塞——字节已经出去了，不拦任何流程。 */
+function _alphaGuardNotice(): void {
+  const a = _lastAudit;
+  if (!a || !a.flagged) return;
+  reportError(new Error(t("tm.alphaGuard", { n: String(a.suspicious), pm: (a.suspiciousRatio * 1000).toFixed(1) })), "warning");
+}
 
 // 导出文件名的基名（v0.9.31，QA ③；P1 2026-08-26 收敛进 doc-home.homeDisplayName）：
 //   file 家用文件 stem；gallery 家用户口 path（自带夹前缀）；transient/无 doc 兜 "export"。
@@ -170,11 +186,13 @@ export function initExportImportMenu(ctx: AppContext) {
       return;
     }
     const cropRect = _selCropRect();   // #16：仅导出选区范围（三种去向统一生效）
+    _lastAudit = null;                 // #7：本次导出的护栏回执（四个去向共用，末尾统一说话）
     try {
       if (c.target === "clipboard") {
         // 剪贴板恒为 PNG（ClipboardItem image/png）——格式选择只作用于文件/分享路径；底色/防黑边同享（v0.9.14）
-        await copyImageToClipboard(doc, c.scope, cropRect, desk.export.defringe, desk.export.bg);
+        await copyImageToClipboard(doc, c.scope, cropRect, desk.export.defringePng, desk.export.bg, null, _auditSink);
         setStatus(t("tm.copiedPngToClipboard", { scope: c.scope === "active" ? t("tm.scopeActiveLayer") : t("tm.scopeMerged") }));
+        _alphaGuardNotice();
       } else if (c.target === "print" && !prefersShare()) {
         // 打印恒走位图（PNG）——矢量/ora 之类没意义；scope 仍生效。
         const exp = getExporter(c.format === "jpg" ? "jpg" : "png") || getExporter("png");
@@ -182,7 +200,7 @@ export function initExportImportMenu(ctx: AppContext) {
         //   window.open 必须在此**手势同步期**就开好，不能等 encode 的 await（iOS transient-activation 严）。
         const win = window.open("", "_blank");
         if (exp.busyHint) setStatus(exp.busyHint, true);
-        const blob = await exp.encode(doc, { scope: c.scope, cropRect, defringe: desk.export.defringe, bg: desk.export.bg });
+        const blob = await exp.encode(doc, { scope: c.scope, cropRect, defringe: desk.export.defringePng, bg: desk.export.bg, onAudit: _auditSink });
         if (win) {
           await printImageInNewWindow(win, blob);
           setStatus(t("tm.printOpenedNewTab"));
@@ -191,22 +209,25 @@ export function initExportImportMenu(ctx: AppContext) {
           await printImageBlob(blob, () => board.invalidateAll());
           setStatus(t("tm.popupBlockedInlinePrint"));
         }
+        _alphaGuardNotice();   // #7：纸面同理会印出更淡的一块，照样提示
       } else if (c.target === "cloud") {
         // v0.9.30 导出到云盘（缺席/无地/加密 前置闸软拒 v0.9.31；导出配置 defringe/底色/选区裁剪全生效）
         const blocked = _cloudSinkBlocked();
         if (blocked) { setStatus(blocked, true); return; }
         const exp = getExporter(c.format) || getExporter("png");
         await withBusy(t("tm.exportingCloud"), async () => {
-          const blob = await exp.encode(doc, { scope: c.scope, cropRect, defringe: desk.export.defringe, bg: desk.export.bg });
+          const blob = await exp.encode(doc, { scope: c.scope, cropRect, defringe: desk.export.defringePng, bg: desk.export.bg, onAudit: _auditSink });
           await _exportBlobToCloud(blob, exp.ext);
         });
+        _alphaGuardNotice();
       } else {
         // 文件/分享——以及 #23：iOS/iPad 上「打印」也走这里（分享面板自带打印；PWA 里 window.open 打印脆弱）
         const exp = getExporter(c.target === "print" ? (c.format === "jpg" ? "jpg" : "png") : c.format) || getExporter("png");
         if (exp.busyHint) setStatus(exp.busyHint, true);
-        const blob = await exp.encode(doc, { scope: c.scope, cropRect, defringe: desk.export.defringe, bg: desk.export.bg });
+        const blob = await exp.encode(doc, { scope: c.scope, cropRect, defringe: desk.export.defringePng, bg: desk.export.bg, onAudit: _auditSink });
         const r = await shareOrDownloadBlob(blob, `${exportBaseName()}-${downloadStamp()}.${exp.ext}`, exp.mime);
         setStatus(r.method === "share" ? t("tm.sharePanelOpened") : r.method === "cancel" ? t("tm.shareCancelled") : t("tm.extDownloadedUpper", { ext: exp.ext.toUpperCase() }));
+        if (r.method !== "cancel") _alphaGuardNotice();   // 用户取消分享 = 没导出，不啰嗦
       }
     } catch (e) { reportError(new Error(t("tm.exportFailed", { err: String(errMsg(e)) })), "warning"); }   // #34：剪贴板/分享权限被拒也走 banner，不再静默状态栏
   };
@@ -315,7 +336,7 @@ export function initExportImportMenu(ctx: AppContext) {
       bgChip.style.background = bgEff ? desk.export.bg : "transparent";
       // v0.9.13/14 联动：defringe 只对「PNG 且透明底」有意义（涂了底 α 全 255；JPG 无 alpha；项目格式不碰像素）
       defrEl.disabled = fmtSel.value !== "png" || !!bgEff;
-      if (!defrEl.disabled) desk.export.defringe = defrEl.checked;
+      if (!defrEl.disabled) desk.export.defringePng = defrEl.checked;
       _updateMenuSubLabels();
     };
     _openMenuConfigPopup(e.currentTarget as HTMLElement, `
@@ -353,7 +374,7 @@ export function initExportImportMenu(ctx: AppContext) {
       <div class="menu-config-section">
         <div class="menu-config-title">${t("tm.configRange")}</div>
         <label><input type="checkbox" name="clipsel" ${c.clipSelection ? "checked" : ""} ${(proj0 || !doc.selection) ? "disabled" : ""} /> ${t("tm.clipToSelection")}${doc.selection ? "" : `（${t("tm.noSelectionNow")}）`}</label>
-        <label><input type="checkbox" name="defringe" ${desk.export.defringe ? "checked" : ""} ${(c.format !== "png" || !!parseExportBg(bg0)) ? "disabled" : ""} /> ${t("tm.defringe")}</label>
+        <label><input type="checkbox" name="defringe" ${desk.export.defringePng ? "checked" : ""} ${(c.format !== "png" || !!parseExportBg(bg0)) ? "disabled" : ""} /> ${t("tm.defringe")}</label>
       </div>
     `, applyLocks);
   });

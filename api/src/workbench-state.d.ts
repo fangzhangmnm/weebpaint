@@ -23,7 +23,7 @@ declare function freshGroups(): {
         target: string;
         layerMode: string;
         clipSelection: boolean;
-        defringe: boolean;
+        defringePng: boolean;
         bg: string;
     };
     colorPanel: {
@@ -198,7 +198,7 @@ export declare const desk: {
         target: string;
         layerMode: string;
         clipSelection: boolean;
-        defringe: boolean;
+        defringePng: boolean;
         bg: string;
     };
     colorPanel: {
