@@ -23,6 +23,7 @@ import { renderNodesToBytes } from "./backend/doc-render.ts";
 import { areaResampleBytes } from "./backend/algorithms/resample-bytes.ts";
 import { encodePngFromBytes } from "./backend/png-codec.ts";
 import { defringeAlphaZero } from "./backend/algorithms/defringe.ts";
+import { auditExportAlpha, type AlphaAudit } from "./backend/algorithms/alpha-audit.ts";
 import { flattenToBg, parseExportBg } from "./backend/algorithms/flatten-bg.ts";
 import { canvasToBlob } from "./shell/image-io.ts";
 import { setOpened } from "./resume-slate.ts";   // active session 持久层（P5：device 回执条，永不同步）
@@ -94,7 +95,9 @@ export async function thumbBlobFromBytes(merged: { data: Uint8ClampedArray; w: n
 // v0.9.22 合并复制（spec ai-docs/20260819-clipboard-and-local-file-spec.md）：selMask = 选区形状
 //   gray8 mask（长度 = cropRect.w*h，0..255）——裁剪后逐像素 alpha×mask/255，mask 外透明
 //   （与 Ctrl+C 层复制的 alpha×mask 同口径，不是光裁 bbox）。仅 PNG 路径有意义（JPG flatten 无 alpha）。
-export async function renderDocToImageBlob(doc: PaintingView, mime = "image/png", quality?: number, scope = "merged", cropRect?: { x: number; y: number; w: number; h: number } | null, defringe = false, bg = "transparent", selMask?: Uint8Array | null) {
+// #7（2026-08-28）：onAudit = 导出 alpha 护栏的回执口——**只在「PNG + 透明底」这一支**触发，
+//   把 α 统计交给调用方去说话（导出本身照常，护栏是提示不是拦截）。判据见 algorithms/alpha-audit.ts。
+export async function renderDocToImageBlob(doc: PaintingView, mime = "image/png", quality?: number, scope = "merged", cropRect?: { x: number; y: number; w: number; h: number } | null, defringe = false, bg = "transparent", selMask?: Uint8Array | null, onAudit?: (a: AlphaAudit) => void) {
   // S9：合成走 GL（doc-render，与 display 同源，含 clip + 组隔离）。C3（债 d）：全字节管线——
   //   合成字节 → 裁剪/铺底全在字节上做；canvas 只剩 JPEG 编码边界（提案 §4 壳域合法名单）。
   //   scope==="active"：仅当前节点（组照常整树合成）；剥掉节点**自身**的 clippingMask（基底不在导出里，
@@ -129,10 +132,17 @@ export async function renderDocToImageBlob(doc: PaintingView, mime = "image/png"
   if (mime !== "image/jpeg") {
     if (bgRgb) {
       plane = { data: flattenToBg(plane.data, bgRgb.r, bgRgb.g, bgRgb.b), w: plane.w, h: plane.h };
-    } else if (defringe) {
-      // v0.9.13 贴图防黑边：α=0 区 RGB 回填边缘色（全字节管线才留得住——encodePngFromBytes 直写
-      //   straight RGBA，不过 canvas premult；JPG 无 alpha 无此题）。默认关，导出配置里开。
-      defringeAlphaZero(plane.data, plane.w, plane.h);
+    } else {
+      // #7 导出 alpha 护栏（2026-08-28）：只读统计，命中由调用方提示「黑底看一眼」。
+      //   只在这一支有意义——铺了底 α 全 255、JPG 无 alpha，误擦/喷出界被底色吃掉，不存在黑底翻车。
+      if (onAudit) onAudit(auditExportAlpha(plane.data, plane.w, plane.h));
+      if (defringe) {
+        // v0.9.13 贴图防黑边：α=0 区 RGB 回填边缘色（全字节管线才留得住——encodePngFromBytes 直写
+        //   straight RGBA，不过 canvas premult；JPG 无 alpha 无此题）。
+        //   v0.11.x 起导出菜单**默认开**（user 2026-08-23「png导出默认defringe」）；产品默认值的
+        //   SSoT 在 workbench-state.freshGroups().export.defringePng，本形参只是无 opts 时的库级兜底。
+        defringeAlphaZero(plane.data, plane.w, plane.h);
+      }
     }
     const png = await encodePngFromBytes(plane.data, plane.w, plane.h);
     return new Blob([png as unknown as BlobPart], { type: "image/png" });
@@ -192,11 +202,11 @@ export async function shareOrDownloadBlob(blob: Blob, filename: string, mime?: s
 // ---- 剪贴板 IO ----
 
 /** 把 doc 合成图复制到剪贴板（PNG）。iPad Safari / 桌面都支持。 */
-export async function copyImageToClipboard(doc: PaintingView, scope = "merged", cropRect?: { x: number; y: number; w: number; h: number } | null, defringe = false, bg = "transparent", selMask?: Uint8Array | null) {
+export async function copyImageToClipboard(doc: PaintingView, scope = "merged", cropRect?: { x: number; y: number; w: number; h: number } | null, defringe = false, bg = "transparent", selMask?: Uint8Array | null, onAudit?: (a: AlphaAudit) => void) {
   // iOS Safari 要求 clipboard.write 在 user gesture 内"同步"触达；**不能**先 await blob 再 write
   // （那个 await 跨过 gesture 窗口 → NotAllowedError）。把 renderDocToImageBlob 的 Promise<Blob>
   // 直接交给 ClipboardItem（lazy promise 写法），复用 writeImageBlobToClipboard 同款路径。
-  const blobPromise = renderDocToImageBlob(doc, "image/png", undefined, scope, cropRect, defringe, bg, selMask)
+  const blobPromise = renderDocToImageBlob(doc, "image/png", undefined, scope, cropRect, defringe, bg, selMask, onAudit)
     .then((blob) => { if (!blob) throw new Error("PNG generation failed"); return blob; });
   await writeImageBlobToClipboard(blobPromise);
 }

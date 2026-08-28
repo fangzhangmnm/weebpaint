@@ -1,4 +1,5 @@
 import type { PaintingView } from "./backend/workpiece/painting-view.ts";
+import type { AlphaAudit } from "./backend/algorithms/alpha-audit.ts";
 export interface ExportOpts {
     scope?: string;
     cropRect?: {
@@ -9,6 +10,7 @@ export interface ExportOpts {
     } | null;
     defringe?: boolean;
     bg?: string;
+    onAudit?: (a: AlphaAudit) => void;
 }
 export interface Exporter {
     id: string;

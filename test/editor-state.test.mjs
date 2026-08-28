@@ -168,6 +168,24 @@ test("[editor-state] v0.7.40 蚂蚁线 per-tool：双默认开、stale fill 组�
   desk.reset();
 });
 
+// #8（user 2026-08-23「png导出默认defringe」，2026-08-28 落地 by Claude Opus 5）：
+//   默认翻 true + 键 defringe→defringePng，好让存量 .ora 里那句老默认 false 被 mergeInto 甩掉。
+//   不改名的话 user 自己已有的画导出仍不 defringe = 等于没做，所以这条是需求的一部分不是顺手重命名。
+test("[editor-state] #8 defringePng 默认开 + 老键 defringe 被甩掉（升级到默认开）", () => {
+  desk.reset();
+  eq(desk.export.defringePng, true, "PNG 导出默认 defringe（user 2026-08-23）");
+  eq("defringe" in desk.export, false, "老键门面已删");
+  desk.Unserialize({ export: { format: "png", defringe: false } });   // 存量 doc 的老形状
+  eq(desk.export.defringePng, true, "老 defringe:false 被静默忽略 → 升级到默认开");
+  // 新键照常往返（用户显式关掉仍跟着画走）
+  desk.export.defringePng = false;
+  const s = desk.Serialize();
+  desk.reset();
+  desk.Unserialize(s);
+  eq(desk.export.defringePng, false, "显式关掉的偏好往返");
+  desk.reset();
+});
+
 // P5 Slice C（2026-08-27）：per-doc 三项（pixel-grid/long-press-pick/menu-tab 迁 desk，user 拍板）。
 test("desk P5 三项：工厂默认 pixelGrid=开 / longPressPick=开 / menuTab=file", () => {
   desk.reset();

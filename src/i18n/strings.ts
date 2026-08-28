@@ -72,6 +72,9 @@ export const S = {
   "tm.configRange":     { zh: "裁剪", en: "Crop", ja: "切り抜き", tok: "kipisi" },
   "tm.clipToSelection": { zh: "裁到选区", en: "Clip to selection", ja: "選択範囲に切り抜き", tok: "o kipisi tawa ma wile" },
   "tm.defringe":        { zh: "贴图防黑边（透明区回填边缘色，仅 PNG）", en: "Defringe for textures (extend edge colors under transparency, PNG only)", ja: "テクスチャ用フリンジ除去（透明部に縁色を延長、PNG のみ）", tok: "pona e selo (kule pi poka li tawa insa pi ala, PNG taso)" },
+  // #7 导出 alpha 护栏（2026-08-28）：命中 = 琥珀 banner，字节照出（提示不是拦截）。
+  //   判据见 backend/algorithms/alpha-audit.ts。
+  "tm.alphaGuard":      { zh: "导出护栏：检测到 {n} 个可疑半透明像素（{pm}‰）——可能是软橡皮误擦或喷枪喷出界。图已导出，建议在黑底上看一眼", en: "Export check: {n} suspicious semi-transparent pixels ({pm}‰) — could be a stray soft eraser or airbrush pass. The file was exported; take a look at it on a dark background", ja: "書き出しチェック：疑わしい半透明ピクセルが {n} 個（{pm}‰）——消しゴムやエアブラシのはみ出しかもしれません。書き出しは完了しています。黒背景で確認してください", tok: "o lukin: nanpa {n} pi sike kule lili ({pm}‰) li nasa — ken la ilo weka anu ilo kon li pakala. sitelen li kama lipu. o lukin e ona lon monsi pimeja" },
   "tm.configBg":        { zh: "背景", en: "Background", ja: "背景", tok: "monsi" },
   "tm.bgTransparent":   { zh: "透明（JPG=白底）", en: "Transparent (JPG = white)", ja: "透明（JPG は白）", tok: "ala (JPG la walo)" },
   "tm.bgWhite":         { zh: "白", en: "White", ja: "白", tok: "walo" },

@@ -133,7 +133,11 @@ export interface EditorViewport { tx: number; ty: number; scale: number; rot: nu
 // 序列化形状 = `.weebpaint/editor-state.json` 的内容（freshGroups() 即 defaults SSoT）。
 function freshGroups() {
   return {
-    export:        { format: "png" as string, target: "file" as string, layerMode: "merged" as string, clipSelection: false, defringe: false, bg: "transparent" as string },   // layerMode=scope "merged"|"active"；clipSelection=#16 仅导出选区范围；defringe=v0.9.13 贴图防黑边（PNG）；bg=v0.9.14 导出底色（"transparent"|"#rrggbb"，PNG 透明/JPG 白）
+    // #8（user 2026-08-23「png导出默认defringe」）：键 defringe→defringePng、默认 false→true。
+    //   键改名 = 存量 doc 里的旧 defringe（几乎全是老默认 false，正是这条要求要消灭的状态）被
+    //   mergeInto 静默忽略、统一升级到默认开——precedent 同 v0.10.11 lineartInk→lineartInkTh。
+    //   （不改名的话 user 自己已有的画导出仍不 defringe，等于没做。）
+    export:        { format: "png" as string, target: "file" as string, layerMode: "merged" as string, clipSelection: false, defringePng: true, bg: "transparent" as string },   // layerMode=scope "merged"|"active"；clipSelection=#16 仅导出选区范围；defringePng=v0.9.13 贴图防黑边（PNG，#8 起默认开）；bg=v0.9.14 导出底色（"transparent"|"#rrggbb"，PNG 透明/JPG 白）
     colorPanel:    { enabled: false, position: null as PanelPos | null },
     layersPanel:   { enabled: false, position: null as PanelPos | null },
     refPanel:      { enabled: false, position: null as PanelPos | null, viewport: { tx: 0, ty: 0, scale: 1, rot: 0 } as EditorViewport },
@@ -261,7 +265,7 @@ export const desk = {
     get target(): string { return S.g.export.target; }, set target(v: string) { S.g.export.target = v; },
     get layerMode(): string { return S.g.export.layerMode; }, set layerMode(v: string) { S.g.export.layerMode = v; },
     get clipSelection(): boolean { return S.g.export.clipSelection; }, set clipSelection(v: boolean) { S.g.export.clipSelection = v; },
-    get defringe(): boolean { return S.g.export.defringe; }, set defringe(v: boolean) { S.g.export.defringe = v; },
+    get defringePng(): boolean { return S.g.export.defringePng; }, set defringePng(v: boolean) { S.g.export.defringePng = v; },
     get bg(): string { return S.g.export.bg; }, set bg(v: string) { S.g.export.bg = v; },
   },
   // panels（enabled/position 全 per-doc，决策1「desk 跟画走」）──

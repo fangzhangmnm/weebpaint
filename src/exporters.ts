@@ -24,12 +24,16 @@ import { encodeDocToOra } from "./backend/ora.ts";
 import { WEEBPAINT_VERSION } from "./version.ts";
 import { renderDocToImageBlob } from "./session.ts";
 import type { PaintingView } from "./backend/workpiece/painting-view.ts";
+import type { AlphaAudit } from "./backend/algorithms/alpha-audit.ts";
 
 export interface ExportOpts {
   scope?: string;
   cropRect?: { x: number; y: number; w: number; h: number } | null;   // #16：仅导出选区范围（bbox，doc 坐标）
-  defringe?: boolean;   // v0.9.13 贴图防黑边：α=0 区 RGB 回填边缘色（仅 PNG 生效）
+  defringe?: boolean;   // v0.9.13 贴图防黑边：α=0 区 RGB 回填边缘色（仅 PNG 生效；产品默认开，见 workbench-state）
   bg?: string;          // v0.9.14 导出底色："transparent"（PNG 透明/JPG 白）| "#rrggbb"
+  // #7 导出 alpha 护栏回执（2026-08-28）：仅「PNG + 透明底」会回调。字节照出——护栏是提示不是拦截，
+  //   消费方（导出菜单）拿它决定要不要多说一句「黑底看一眼」。判据见 backend/algorithms/alpha-audit.ts。
+  onAudit?: (a: AlphaAudit) => void;
 }
 export interface Exporter {
   id: string;
@@ -78,7 +82,7 @@ registerExporter({
 });
 registerExporter({
   id: "png", label: "PNG", ext: "png", mime: "image/png", kind: "image",
-  encode: (doc, { scope = "merged", cropRect = null, defringe = false, bg = "transparent" } = {}) => renderDocToImageBlob(doc, "image/png", undefined, scope, cropRect, defringe, bg) as Promise<Blob>,
+  encode: (doc, { scope = "merged", cropRect = null, defringe = false, bg = "transparent", onAudit } = {}) => renderDocToImageBlob(doc, "image/png", undefined, scope, cropRect, defringe, bg, undefined, onAudit) as Promise<Blob>,
 });
 registerExporter({
   id: "jpg", label: "JPG", ext: "jpg", mime: "image/jpeg", kind: "image",
