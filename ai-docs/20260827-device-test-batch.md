@@ -48,6 +48,15 @@
 
 `python3 -m http.server` 服 single html → `http://localhost:8000` 开 → 试 OneDrive 登录。**前置**：Azure 侧确认 `http://localhost` redirect URI 在册（不在 = 逃生舱不通，记录即可不修）。
 
+## 新增（2026-08-28，edited by Claude Fable 5）
+
+- **Windows 资源管理器复制图片文件 → Ctrl+V**：Explorer 里复制一个 .png/.jpg 文件 → WeebPaint Ctrl+V
+  应贴成新层（paste 事件 `kind=file` 路径，代码已在、headless 无法给 OS 文件剪贴板）。顺带试 .webp/.gif；
+  非图片扩展（.ora）预期报「剪贴板没有图片」。
+- **Delete/Backspace 删除选区内容**（v0.11.35）：有选区删内容、浮层期先收摊再删、无选区= 状态行提示不清层。
+- **菜单整改一眼**（v0.11.35）：scope 微章右对齐到 on/off 后；「当前图库」行没了 → 图库页大标题旁小字 +
+  「回到图库」行尾截断名。
+
 ## 回流
 
 folder 库的 native move/mtime/权限过期表现（场景 C.3）请顺手记录 → 回流 store 仓真机矩阵（`../20260813 internal-store/ai-docs/20260825-localfile-knight-store-round.md` 挂账）；假冲突观察喂 ADR-0025（懒 hash park 的启动条件）。

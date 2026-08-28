@@ -309,6 +309,30 @@ describe("液化 · 组能力门（C 路由面）", () => {
     eq(empty.reason, "group", "空组没叶可写 → 照旧提示选图层");
   });
 
+  it("activeStrokeLeaves：全隐组（组可见但组内无有效可见叶）= hidden 软拒（user 0828「与画在隐藏图层同款护栏」）", () => {
+    const r = groupRig();
+    // groupRig：L2 已隐藏——把其余两叶也藏掉 = 全隐组（组自身仍 visible）
+    for (const id of r.ids) r.lt.setLayerProp(id, "visible", false);
+    r.lt.setActive(r.gid);
+    const all = r.doc.activeStrokeLeaves({ allowGroup: true });
+    eq(all.leaves.length, 0);
+    eq(all.reason, "hidden", "全隐组液化=盲改，同画隐藏层护栏");
+    // 只要还有一叶有效可见 → 放行（隐藏叶跟动是整组变换语义，不是盲改）
+    r.lt.setLayerProp(r.ids[0], "visible", true);
+    const some = r.doc.activeStrokeLeaves({ allowGroup: true });
+    eq(some.reason, null);
+    eq(some.leaves.length, 3, "放行时隐藏叶仍在写靶列表（跟动）");
+    // 嵌套：可见叶全被隐藏**子组**罩住 = 仍算全隐
+    r.lt.setLayerProp(r.ids[0], "visible", false);
+    const g2 = r.lt.addGroup("子组");
+    r.lt.moveIntoGroup(g2.groupId, r.gid, {});
+    const L4 = r.lt.addLayer("子组里的叶").layer;
+    r.lt.moveIntoGroup(L4.id, g2.groupId, {});
+    r.lt.setLayerProp(g2.groupId, "visible", false);
+    r.lt.setActive(r.gid);
+    eq(r.doc.activeStrokeLeaves({ allowGroup: true }).reason, "hidden", "叶自身可见但子组链隐藏=无有效可见叶");
+  });
+
   it("FilterBrushEngine：没声明 supportsLayerGroup 的 filter 收到多叶 = 响亮拒绝", () => {
     const fbe = new FilterBrushEngine();
     const single = { id: "fake-single", beginBrushStroke: () => ({}), extendBrushStamp: () => {} };

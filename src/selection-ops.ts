@@ -200,6 +200,24 @@ export function initSelectionOps(ctx: AppContext) {
     board.invalidateAll();
     setStatus(sel ? t("se.cutSelectionToClipboard") : t("se.cutLayerToClipboard"));
   });
+  // Delete/Backspace：删除选区内容（user 2026-08-28）。= 剪切的擦除半边，不碰剪贴板。
+  //   浮层期 = 先收摊回原位（cancel 非 undo、选区 stamp 保留）再删——「删除浮着的那块」与
+  //   「删除选区内容」收敛为同一动词。**无选区 = no-op + 状态行**（user 拍板：不帮你清空图层）；
+  //   粘贴产的新层浮层（无选区）同理不删层——删层走图层面板正门。
+  window.addEventListener("wp:deleteSelection", () => {
+    if (isBusyActive()) return;
+    const sel = doc.selection as unknown as Selection | null;
+    if (!sel) { setStatus(t("se.noSelectionToDelete"), true); return; }
+    if (input.lasso.hasFloating()) input._abortLasso();
+    const layer = requireEditableLeaf(doc, setStatus) as LayerLike | null;
+    if (!layer) return;
+    const r = history.withPoint("deleteSelection", {}, () => {
+      sel.clearOnLayer(layer as unknown as Parameters<Selection["clearOnLayer"]>[0]);
+    });
+    if (!r.ok) { setStatus(errMsg(r.msg), true); return; }
+    board.invalidateAll();
+    setStatus(t("se.deletedSelection"));
+  });
   // 粘贴共用落点：blob → 新层，视口居中（复用 importImageAsLayer；新层 + 自动进 transform）
   const pasteBlobAsLayer = async (blob: Blob) => {
     const file = new File([blob], "paste.png", { type: blob.type || "image/png" });

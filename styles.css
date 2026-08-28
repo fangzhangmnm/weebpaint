@@ -914,7 +914,8 @@ input[type=range] {
 .menu-item-state { color: var(--ink-soft); font-size: 12px; }
 /* P5 scope 分区（2026-08-27 拍板「人话标题+行尾微章」）：设置项按归属分组，微章答「这设置跟谁走」 */
 .menu-section-label { font-size: 11px; color: var(--ink-soft); padding: 10px 14px 2px; user-select: none; letter-spacing: .06em; opacity: .85; }
-.menu-scope-badge { width: 13px; height: 13px; flex: none; color: var(--ink-soft); opacity: .5; margin-left: 6px; }
+/* 微章右对齐（user 2026-08-28「放在 on 后面，整齐」）：flex order 挪到行尾最右——9 处 markup 零改 */
+.menu-scope-badge { width: 13px; height: 13px; flex: none; color: var(--ink-soft); opacity: .5; margin-left: 6px; order: 3; }
 /* v0.6.14 版本号（menu/图库两处）：去「版本：」前缀后再压瘦——字号降一档 + 横向 92% 压缩省行宽 */
 .version-slim { display: inline-block; font-size: 10.5px; letter-spacing: -0.02em; transform: scaleX(0.92); transform-origin: right center; white-space: nowrap; }
 div.version-slim { transform-origin: left center; }   /* 图库菜单的 info 行左对齐，压缩锚点跟着靠左 */
@@ -1401,7 +1402,11 @@ input[type="range"].color-ramp::-moz-range-thumb {
   padding: 12px 16px;
   border-bottom: 1px solid var(--line);
 }
-.gallery-title { font-size: 20px; font-weight: 600; color: var(--ink); flex: 1; }
+.gallery-title { font-size: 20px; font-weight: 600; color: var(--ink); flex: 1; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+/* 图库名：大标题旁小字下对齐（user 2026-08-28；替代 ☰ 里的「当前图库」信息行） */
+.gallery-title-sub { font-size: 12px; font-weight: 400; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+/* 「回到图库」行尾的图库名简写（截断） */
+.gallery-name-clip { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gallery-actions { display: flex; align-items: center; gap: 6px; }
 .gallery-icon-btn {
   width: 36px; height: 36px;

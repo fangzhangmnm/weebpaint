@@ -6153,6 +6153,24 @@ export declare const S: {
         readonly ja: "選択範囲の合成画像をクリップボードにコピーしました";
         readonly tok: "sitelen wan pi ma wile li tawa poki kipisi";
     };
+    readonly "sc.deleteSel": {
+        readonly zh: "删除选区内容";
+        readonly en: "Delete selection contents";
+        readonly ja: "選択範囲の内容を削除";
+        readonly tok: "o weka e ijo pi wan sitelen";
+    };
+    readonly "se.noSelectionToDelete": {
+        readonly zh: "无选区（不清空图层；删除图层请在图层面板操作）";
+        readonly en: "No selection (layer not cleared; delete layers from the layer panel)";
+        readonly ja: "選択範囲がありません（レイヤーは消去しません。削除はレイヤーパネルから）";
+        readonly tok: "wan sitelen li lon ala";
+    };
+    readonly "se.deletedSelection": {
+        readonly zh: "已删除选区内容";
+        readonly en: "Selection contents deleted";
+        readonly ja: "選択範囲の内容を削除しました";
+        readonly tok: "ijo pi wan sitelen li weka";
+    };
     readonly "se.cutSelectionToClipboard": {
         readonly zh: "已剪切选区到剪贴板";
         readonly en: "Cut selection to clipboard";

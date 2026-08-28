@@ -226,6 +226,11 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   { combo: "Ctrl+E",           desc: "sc.mergeDown", category: "sc.cat.edit",
     when: (i) => _editMode(i) && !_floating(i),
     run: () => window.dispatchEvent(new CustomEvent("wp:mergeDown")) },
+  // Delete/Backspace = 删除选区内容（含浮层：先收摊再删；无选区 no-op 不清层——user 2026-08-28）
+  { combo: "Delete",           desc: "sc.deleteSel", category: "sc.cat.edit",
+    when: _editMode, run: () => window.dispatchEvent(new CustomEvent("wp:deleteSelection")) },
+  { combo: "Backspace",        desc: "sc.deleteSel", category: "sc.cat.edit",
+    when: _editMode, run: () => window.dispatchEvent(new CustomEvent("wp:deleteSelection")) },
 
   // 套索 / 选区（在浮层时只 Enter/Esc，其它跳过）
   { combo: "Enter",            desc: "sc.applyTransform", category: "sc.cat.lasso",

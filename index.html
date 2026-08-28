@@ -58,7 +58,7 @@
     <link rel="icon" href="./icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=7cb57a6355dd" />
+    <link rel="stylesheet" href="./styles.css?v=0fcdfc982e9b" />
     <!-- zip.js UMD bundle：自挂 window.zip。必须在 module bundle 之前。
          defer（v417）：原来是 parser-blocking 的，硬刷新时 SW 被绕过 → 直奔网络 → 网络一卡整个
          文档解析就停住（浏览器标签页转圈）。defer 后它与下面的 type=module bundle 同属延迟脚本、
@@ -472,7 +472,7 @@
          无返回键 —— 点当前 active tile 关闭。详见 ai-docs/20260527-artist-priorities.md ergonomics. -->
     <div class="gallery-full hidden" id="galleryFull" role="dialog" data-i18n-aria="nav.gallery">
       <div class="gallery-header">
-        <span class="gallery-title" data-i18n="nav.gallery">图库</span>
+        <span class="gallery-title"><span data-i18n="nav.gallery">图库</span><span class="gallery-title-sub" id="galleryTitleName"></span></span>
         <div class="gallery-actions" role="group" data-i18n-aria="account.add.aria">
           <button class="gallery-icon-btn" id="cloudIconBtn" type="button" data-i18n-title="cloud.account" aria-haspopup="true" aria-expanded="false"></button>
           <button class="gallery-icon-btn hidden" id="cloudRefreshBtn" type="button" data-i18n-title="cloud.refresh">
@@ -1294,6 +1294,7 @@
         <!-- v0.5.27 user：图库直达撤置顶，收进文件页首位 -->
         <button class="menu-item menu-item-with-icon" id="menuGallery" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#gallery"/></svg>
         <span class="menu-item-label" data-i18n="menu.backToGallery">回到图库</span>
+        <span class="menu-item-sub gallery-name-clip" id="menuGalleryName"></span>
       </button>
         <!-- P3 无库模式单入口（VS Code 无文件夹时 Open Folder 姿态；有库时藏，gating 同 menuGallery 反相） -->
         <button class="menu-item menu-item-with-icon" id="menuConnectGallery" type="button" role="menuitem" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#gallery"/></svg>
@@ -1410,7 +1411,6 @@
         <button id="menuTheme" type="button" hidden></button><!-- 旧 id stub：theme.ts renderTheme 查它，v0.6C 下拉化后留防崩 -->
         <!-- P3 sunset（§9.8）：cloud-enabled toggle 退役——「关云」的真身 = 没挂图库；动词（连接/卸下）
              住 gallery 页管理面。此处只留只读当前库行（Q1 拍板：设置页不管库的生死）。 -->
-        <div class="menu-item-info" id="menuCurrentGallery"></div>
         <label class="menu-item menu-lang-row menu-item-with-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#globe-speech"/></svg>
         <span class="menu-item-label" data-i18n="menu.language">语言</span>
         <button class="menu-lang-select menu-inline-select" id="menuLanguageBtn" type="button" aria-haspopup="true"><span id="menuLanguageBtnLabel">中文</span><svg class="menu-inline-caret" viewBox="0 0 8 8" aria-hidden="true"><path d="M1.4 2.8 L4 5.6 L6.6 2.8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -1532,6 +1532,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-38ab594eeb81.mjs"></script>
+    <script type="module" src="./dist/weebpaint-b6e33483dea4.mjs"></script>
   </body>
 </html>

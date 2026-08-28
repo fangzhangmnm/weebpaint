@@ -122,13 +122,16 @@ function applyGenAI(on: boolean) {
 // toggle 已退役（§9.8：「关云」的真身 = 没挂图库；动词在 gallery 管理面）。设置页只读显示当前库
 //   （Q1 拍板：设置页管库内偏好，不管库的生死）。gating 消费面照旧（isCloudEnabled 换了真相源）。
 function renderCurrentGallery() {
-  const row = document.getElementById("menuCurrentGallery");
-  if (row) {
-    const att = galleryAttachment.state();
-    row.textContent = att.kind === "attached"
-      ? t("gm.current", { label: att.entry.label, src: att.entry.kind === "onedrive" ? t("gm.srcOneDrive") : t("gm.srcFolder") }) + (att.online ? "" : t("gm.offlineSuffix"))
-      : isCloudEnabled() ? t("gm.currentLegacy") : t("gm.noneConnected");
-  }
+  // 「当前图库」信息行已删（user 2026-08-28「位置奇怪」）→ 改两处就地显示：
+  //   ① gallery 页大标题旁小字（#galleryTitleName，下对齐）②「回到图库」行尾简写截断（#menuGalleryName）。
+  const att = galleryAttachment.state();
+  const name = att.kind === "attached"
+    ? att.entry.label + (att.online ? "" : t("gm.offlineSuffix"))
+    : isCloudEnabled() ? "OneDrive" : "";
+  const titleEl = document.getElementById("galleryTitleName");
+  if (titleEl) titleEl.textContent = name;
+  const menuEl = document.getElementById("menuGalleryName");
+  if (menuEl) { menuEl.textContent = name; menuEl.title = name; }
   // P6 轻折叠（P5 注：无库语境该区折叠=不撒谎）：无库时 gallery scope 徽章藏起——那些行此刻
   //   经 cascade 写落 device 层，挂着「这个图库」徽章才是撒谎。行本身保留（lang 无库也要能改）。
   try { document.body.toggleAttribute("data-no-gallery", !isCloudEnabled()); } catch { /* node */ }

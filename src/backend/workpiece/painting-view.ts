@@ -302,7 +302,13 @@ export class PaintingView {
     if (a && a.isGroup && allowGroup) {
       if (this.activeNodeHidden() && !allowHidden) return { leaves: [], reason: "hidden" };
       const leaves = flattenViewLeaves(a.children);
-      return leaves.length ? { leaves, reason: null } : { leaves: [], reason: "group" };
+      if (!leaves.length) return { leaves: [], reason: "group" };
+      // 全隐组护栏（2026-08-28 user 拍板「隐藏叶可以跟，但全隐=与画在隐藏图层同款护栏」）：
+      //   组可见但组内**无任何有效可见叶**（叶自身或其子组链隐藏）→ hidden 软拒（盲改）。
+      //   部分可见照常放行——隐藏叶跟着可见叶动是整组变换语义，不是盲改。
+      const anyVisible = (ns: readonly ViewNode[]): boolean => ns.some((n) => n.visible && (n.isGroup ? anyVisible(n.children) : true));
+      if (!anyVisible(a.children) && !allowHidden) return { leaves: [], reason: "hidden" };
+      return { leaves, reason: null };
     }
     const { leaf, reason } = this.activeEditableLeaf({ allowHidden });
     return { leaves: leaf ? [leaf] : [], reason };
