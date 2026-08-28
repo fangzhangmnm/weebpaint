@@ -196,6 +196,12 @@ T-crash 快照带 mp4 ✓、标题栏画名 ✓、云端 .trash/.backup 时刻�
 
 ## 8. 架构自查裁决台账（2026-08-28；报告=ai-docs/20260828-cloud-native-residue-audit.md）
 
-第一档 A-I（宣发前建议）/ 第二档 J-Q（宣发后）/ 三档=合理妥协不动。**全部待 user 逐条「做/park」**；
-A 已有既有裁决背书（§4 pin【必做】——app 侧接线是它没做完的另一半，此前误记全达成，本日勘误）。
-产品表态件：C 附带「加密动词=图库家专属」接受与否。
+**user「回来了，该修的修」→ 第一档九刀全落 v0.11.38**（1246 测+F1 绿）：A pin 接线（0.8.0 口子通电，
+forgetFlow 临时店同修）/ B sink 判 galleryBackend / C rename+encrypt+decrypt DocHome 表态 / D 词根改名
+（hasGallery/gallery-capability.ts/wp:gallery-capability-changed/blank-no-gallery，零持久化风险已核）/
+E 文案十处图库中性化（含 ja filePulling 对齐、store 内部词清除）/ F blender-url 迁 prefs gallery scope
+（保 0714 同步拍板+无库 cascade；旧 collection 值不迁移，重填一次）/ G attach 事务化（簿记失败上报不拦挂载，
+swap 失败清 _current）/ H embed 对账测试 / I sourcemap 回写（真构建实证）。
+**残余三件待 user**：①A picker 半边——已登录连接不弹 account picker=第二账号铸不出（要 store signIn 加
+prompt:"select_account" 口子，store 轮件）；②C 产品表态：加密动词=图库家专属，接受还是扩无库/文件家；
+③I 深化：红线夹具跑单文件壳=wave4 当天件（已记 wave6 doc 待补）。第二档 J-Q=宣发后（user 未另裁维持）。
