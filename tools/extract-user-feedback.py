@@ -1,4 +1,4 @@
-import json, sys, glob, re, os
+import argparse, json, glob, re, os, sys
 # 人类语料抽取（出处核查用）。两个通道缺一不可：
 #   ① type=user 的文本回合；② type=queue-operation 的 enqueue（用户在 AI 干活时排队塞的消息）。
 # ②是 2026-08-25 补的——2026-08-21 审计只扫①，把「E1 E2 E3批准」「禁用云的时候应该所有用户路线都走
@@ -28,7 +28,20 @@ def extract(files, out):
                         o.write('### ' + t + '\n\n'); n += 1
     return n
 base = os.path.expanduser('~/.claude/projects')
-outdir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.environ.get('CLAUDE_JOB_DIR') or '/tmp', 'tmp', 'userlogs')
+# 2026-08-28 前这里裸拿 sys.argv[1]：agent 用 --help/--list 探用法，输出目录字面叫「--help」落在
+# WeebPaint 仓根，被 add -A 扫进公开仓（transcript 语料外泄，当天历史重写清除）。故：
+#   ① argparse——--help 是帮助，未知旗标报错；② 输出目录落在任何 git 仓内一律拒绝（语料只许去 tmp/私有归档）。
+ap = argparse.ArgumentParser(description='人类语料抽取（出处核查用），输出每项目一个 md')
+ap.add_argument('outdir', nargs='?', default=os.path.join(os.environ.get('CLAUDE_JOB_DIR') or '/tmp', 'tmp', 'userlogs'),
+                help='输出目录（默认 $CLAUDE_JOB_DIR/tmp/userlogs；不许指到 git 仓内）')
+outdir = os.path.abspath(ap.parse_args().outdir)
+p = outdir
+while True:
+    if os.path.exists(os.path.join(p, '.git')):
+        sys.exit(f'拒绝：输出目录 {outdir} 在 git 仓 {p} 内——语料不直接抽进任何 repo（2026-08-28 外泄教训）；先抽到 tmp，要归档再人为拷进私有语料仓')
+    parent = os.path.dirname(p)
+    if parent == p: break
+    p = parent
 os.makedirs(outdir, exist_ok=True)
 # 迁移史：2026-08-18 JupyterLocal→WSL，前缀换家；两个都认、同名合并（否则后扫的覆盖先扫的，语料静默变半截）
 PREFIXES = ('-home-fangzhangmnm-jupyter-20260601-PWAProjects', '-mnt-d-JupyterLocal-20260601-PWAProjects')
