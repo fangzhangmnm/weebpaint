@@ -20,7 +20,8 @@ import { encodeDocToOra, decodeOraToPainting, paintingDataToEncodeDoc, parseAppV
 import { ORA_FORMAT_VERSION } from "./backend/ora-stack-xml.ts";
 import { flattenViewLeaves } from "./backend/workpiece/painting-view.ts";
 import { tLatin } from "./i18n/index.ts";
-import { isSignedIn, requireStore, galleryBackend } from "./app-store.ts";
+import { requireStore, galleryBackend } from "./app-store.ts";
+import { galleryOnline } from "./cloud-capability.ts";   // 库在线 SSoT（0828：isSignedIn 是 MSAL 词，folder 库别问它）
 import { appEncryption } from "./encryption.ts";
 import type { EncryptedBlob } from "./app-store.ts";   // 密文 at-rest 字节（branded）；B2：类型经接缝转口
 import { openInputSheet, openConfirmSheet, openChoiceSheet, lockSyncGate, settleSyncGate } from "./sheets.ts";
@@ -694,7 +695,7 @@ async function saveAndPush() {
     await es.forceSaveAndPush();
     // 别无条件报「已同步」：push 失败在 store 内部被 catch 成 banner，这里**不会**抛。
     //   唯一可靠的判据是 es.isPushPending()（v433）——它是 save() 返回的 pushed 一路带上来的。
-    setStatus(!isSignedIn() ? t("ss.savedLocalIdb", { name })
+    setStatus(!galleryOnline() ? t("ss.savedLocalIdb", { name })
       : es.isPushPending() ? t("ss.savedNotPushed", { name })
       : t("ss.synced", { name }));
     gallery.refresh();
@@ -706,7 +707,7 @@ async function saveAndPush() {
 async function encryptCurrent() {
   const name = _activeName();   // 快照一次（TS 无法跨调用窄化；语义同旧局部变量读法）
   if (!name || _isLazyBlankSession) { setStatus(t("ss.openOrSaveBeforeEncrypt"), true); return; }
-  const online = () => isSignedIn() && navigator.onLine !== false;
+  const online = () => galleryOnline();   // 库在线 SSoT（folder=权限即在线；0828 修）
   if (await _file(name).isEncrypted()) { setStatus(t("ss.alreadyEncrypted")); return; }
   const pw = await ensureNewPassword();
   if (pw == null) { setStatus(t("ss.cancelled")); return; }
@@ -727,7 +728,7 @@ async function encryptCurrent() {
 async function decryptCurrent() {
   const name = _activeName();
   if (!name) { setStatus(t("ss.noDocOpen"), true); return; }
-  const online = () => isSignedIn() && navigator.onLine !== false;
+  const online = () => galleryOnline();   // 库在线 SSoT（folder=权限即在线；0828 修）
   if (!(await _file(name).isEncrypted())) { setStatus(t("ss.notEncrypted")); return; }
   const ok = await openConfirmSheet(t("ss.decryptConfirmTitle"), t("ss.decryptConfirmMsg"));
   if (!ok) return;

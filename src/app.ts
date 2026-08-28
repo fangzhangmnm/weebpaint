@@ -76,6 +76,7 @@ import { initCrashBanner } from "./crash-banner.ts";            // T-crash 恢�
 import "./plugins/index.ts";    // 触发 HSB / ColorBalance / Curves / SharpenBlur 自注册
 // candidate 2：导出格式 = 注册表插件（含第一方 ora/psd/png/jpg 自注册）
 import { isAuthConfigured, initAuth, isSignedIn, retrySilentSignIn, getActiveAccount, brushRackCollection, requireStore, galleryBackend } from "./app-store.ts";   // cut-over：cloud/auth/graph 全走 lib
+import { galleryOnline } from "./cloud-capability.ts";   // 库在线 SSoT（0828 folder 无云 bug 修）
 import { galleryRegistry } from "./gallery-registry.ts";     // P3 名册器官（播种接线在 boot 收尾段）
 import { setAttachmentGate, galleryAttachment } from "./gallery-attachment-host.ts";   // P3 挂载器官（收口开画 gate + 笔架重挂接线在 rack 构造后）
 import { bootAttachFromRegistry } from "./gallery-connect.ts";      // P3 boot 静默重挂（prefsReady 链头）
@@ -439,7 +440,7 @@ initDevConsole();
 // 图库外壳（setGalleryOpen/chrome/新建sheet/占用/配额/popup接线/uniqueNameFor）= gallery-shell.ts。
 // ===== 图库 = <Gallery> 深模块（src/gallery/gallery.ts）。app 只供画布耦合 host 回调 + 无系统弹窗 UI =====
 const gallery = mountGallery(document.getElementById("galleryMount")!, {
-  signedIn: () => isSignedIn(),
+  signedIn: () => galleryOnline(),   // 语义=「云腿可达」（0828 修：folder 库权限即在线；字段名留 host 兼容）
   online: () => navigator.onLine !== false,
   // gallery 的「活动项」只对 gallery 家有意义（file/transient 家在图库里没有对应卡片）。
   activeName: () => { const h = session.home; return h?.kind === "gallery" ? h.path : null; },

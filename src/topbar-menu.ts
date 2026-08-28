@@ -28,7 +28,8 @@ import { els } from "./els.ts";
 import { openInputSheet, openConfirmSheet, openChoiceSheet, lockSyncGate } from "./sheets.ts";
 import { setMenuOpen } from "./settings-menu.ts";
 import { signIn, isSignedIn } from "./app-store.ts";   // auth 是公共面（cloud-auth-ui 同款直连；v415 红线针对的是 sync store，不含 auth）
-import { isCloudEnabled } from "./cloud-capability.ts";
+import { isCloudEnabled, galleryOnline } from "./cloud-capability.ts";
+import { galleryAttachment } from "./gallery-attachment-host.ts";
 import { sessionNameConflict } from "./session-name.ts";
 import { supportsFileSystemAccess, pickLocalOraFile } from "./local-file-session.ts";
 import { intakeOraDoc } from "./import-image.ts";
@@ -71,7 +72,16 @@ function smartSaveAndPush() {
   //   一律交 saveAndPush 内部按家派发；「登录同步」只对 gallery 家有意义，不弹。
   if (session.home?.kind !== "gallery") { void session.saveAndPush(); return; }
   if (!isCloudEnabled()) { void session.save({ commitPending: true }); return; }
-  if (isSignedIn()) { void session.saveAndPush(); return; }
+  // 库在线判据 = galleryOnline()（SSoT=attachment.online；0828 bug 修：folder 库挂着曾被 isSignedIn 误判无云）
+  if (galleryOnline()) { void session.saveAndPush(); return; }
+  // folder 库离线 = 权限掉——「登录」是 MSAL 词不适用；本地存 + 指路重连（横幅/图库页是正门）
+  const _att = galleryAttachment.state();
+  if (_att.kind === "attached" && _att.entry.kind === "folder") {
+    void session.save({ commitPending: true }).catch(() => {});
+    setStatus(t("save.savedLocalGalleryOffline"), true);
+    updateSaveStatus();
+    return;
+  }
   // —— 已配置未登录：本地保存照做（不 await——sheet 弹出与 IDB 事务并行，beforeunload 偷存同款姿态）——
   void session.save({ commitPending: true }).catch(() => {});
   // 离线时登录无意义（与旧 menuSignIn「未登录+已配置+在线才显示」同判据）→ 不弹，只提示。

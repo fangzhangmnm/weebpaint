@@ -1033,7 +1033,7 @@ export const S = {
   "gs.clipboardNewFailed": { zh: "从剪切板新建失败：{err}", en: "Failed to create from clipboard: {err}", ja: "クリップボードからの新規作成に失敗しました：{err}", tok: "pali tan poki kipisi li pakala: {err}" }, 
   "gs.untitled": { zh: "未命名", en: "Untitled", ja: "名称未設定", tok: "nimi ala" }, 
   "gs.created": { zh: "新建：{name}（{w}×{h}）", en: "Created: {name} ({w}×{h})", ja: "新規作成：{name}（{w}×{h}）", tok: "sitelen sin li lon: {name} ({w}×{h})" }, 
-  "gs.folderNeedSignin": { zh: "新建文件夹需先登录云端（空文件夹存在 OneDrive 上）", en: "Creating a folder requires signing in to the cloud first (empty folders live on OneDrive)", ja: "フォルダを作成するにはクラウドにサインインが必要です（空フォルダは OneDrive に保存されます）", tok: "poki sin li wile e ni: poki sewi li sona e sina. poki pi jo ala li lon poki sewi taso." }, 
+  "gs.folderNeedSignin": { zh: "图库离线（未登录或权限失效），无法新建文件夹", en: "Gallery is offline (not signed in / permission lost) — can't create a folder", ja: "ギャラリーがオフライン（未ログイン／権限切れ）のためフォルダを作成できません", tok: "poki sitelen li weka la mi ken ala pali e poki sin" },
   "gs.newFolderTitle": { zh: "新建文件夹", en: "New folder", ja: "新しいフォルダ", tok: "poki sin" }, 
   "gs.newFolderDefault": { zh: "新文件夹", en: "New folder", ja: "新しいフォルダ", tok: "poki sin" }, 
   "gs.folderNamePlaceholder": { zh: "文件夹名", en: "Folder name", ja: "フォルダ名", tok: "nimi poki" }, 
@@ -1340,6 +1340,7 @@ export const S = {
   "save.signInPromptMsg":   { zh: "云端未登录，现在登录同步？", en: "Not signed in to the cloud. Sign in now to sync?", ja: "クラウドに未ログインです。今すぐログインして同期しますか？", tok: "sina lon ala poki sewi. sina wile kama lon poki sewi lon tenpo ni anu seme?" },
   "save.signInNow":         { zh: "登录", en: "Sign in", ja: "ログイン", tok: "o kama lon poki sewi" },
   "save.signInLater":       { zh: "暂不", en: "Not now", ja: "今はしない", tok: "tenpo ni la mi wile ala" },
+  "save.savedLocalGalleryOffline": { zh: "已存本地。图库已离线（文件夹权限失效）——顶部横幅或图库页可重新连接", en: "Saved locally. Gallery is offline (folder permission lost) — reconnect from the banner or gallery page", ja: "ローカルに保存しました。ギャラリーはオフラインです（フォルダ権限切れ）。バナーかギャラリーページから再接続してください", tok: "awen lon ilo ni. poki sitelen li weka (ken poki li weka). o wan sin kepeken lipu sewi" },
   "save.savedLocalNotSignedIn": { zh: "已存本地 · 未登录", en: "Saved locally · not signed in", ja: "ローカル保存済み · 未ログイン", tok: "awen lon ilo ni · sina lon ala poki sewi" },
   "save.cloudOff":          { zh: "已存本地（云端功能已关闭） · {name}", en: "Saved locally (cloud features are off) · {name}", ja: "ローカル保存済み（クラウド機能オフ） · {name}", tok: "awen lon ilo ni (poki sewi li pini) · {name}" },
   // P5 scope 分区（2026-08-27）：设置按归属分组 + 行尾微章 tooltip

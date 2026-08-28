@@ -25,7 +25,8 @@ import { readImageFromClipboard } from "../session.ts";
 import { uniqueBareName } from "./gallery-model.ts";   // 撞名后缀兜底（纯·已 pin）；占用检查按库身份（全名 X.ora）查
 import { galleryDefaultName } from "../naming.ts";     // P1 命名器官：yyyymmdd-hex4（v217 惯例）+ 禁「未命名」
 import { humanSize } from "./gallery-view-model.ts";   // 展示格式化（纯·KiB/MiB）；此前本模块私有一份逐字节拷贝，2026-08-21 收敛
-import { isSignedIn, requireStore, galleryBackend } from "../app-store.ts";
+import { requireStore, galleryBackend } from "../app-store.ts";
+import { galleryOnline } from "../cloud-capability.ts";
 import { anchorPopupToBtn } from "../anchored-popup.ts";
 import { wireInlineSelect } from "../inline-select.ts";
 import { applyTheme, themeLabel, THEMES, currentTheme } from "../theme.ts";
@@ -410,8 +411,8 @@ export function initGalleryShell(ctx: AppContext) {
   // + 新建文件夹（云端真文件夹为准：在 OneDrive 上建真文件夹，需登录+在线）
   els.addNewFolder?.addEventListener("click", async () => {
     els.galleryAddPopup.classList.add("hidden");
-    // 文件夹模型「云端真文件夹为准」→ 必须登录+在线才能建（否则无处持久化空文件夹）
-    if (!isSignedIn() || navigator.onLine === false) {
+    // 文件夹模型「远端真文件夹为准」→ 库必须在线才能建（folder 库=磁盘权限已授即在线；0828 修）
+    if (!galleryOnline()) {
       setStatus(t("gs.folderNeedSignin"), true);
       return;
     }

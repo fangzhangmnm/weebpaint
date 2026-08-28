@@ -6,7 +6,7 @@
 // 依赖全是单例/leaf，直接 import：isSignedIn ← app-store.ts，session ← session-state.ts，els ← els.ts。
 import { els } from "./els.ts";
 import { isSignedIn } from "./app-store.ts";
-import { isCloudEnabled } from "./cloud-capability.ts";
+import { isCloudEnabled, galleryOnline } from "./cloud-capability.ts";
 import { session } from "./session-state.ts";
 import { assertNever, type DocHome } from "./doc-home.ts";
 import { t, tLatin } from "./i18n/index.ts";
@@ -58,8 +58,8 @@ function computeSaveState() {
   //   删得对，别加回来）。这条是**终态**：已经存完了、而且云端那条腿确定没成——离线 / 冲突面选了取消 /
   //   deferred 落地未确认。v432 之前它没有任何渲染面，于是 push 失败后徽章照画云朵对勾、状态栏照报「已同步」，
   //   正是用户报的「远端文件不一样，而 UI 从没说过失败」。别为了「3 态更简洁」把它再删一次。
-  if (session.pushPending && isSignedIn()) return "unpushed";
-  return isSignedIn() ? "synced" : "local-only";
+  if (session.pushPending && galleryOnline()) return "unpushed";
+  return galleryOnline() ? "synced" : "local-only";   // 0828 修：判据=库在线（folder 权限即在线），不再问 MSAL
 }
 // 标题栏 = 画名 + dirty 点（verdicts §2.1：document.title 不产生历史记录，零 spam）。
 //   跟着 updateSaveStatus 走——它已经是「家/脏」全部状态迁移的中心渲染点（editGate/标脏/保存/换家全经过）。
