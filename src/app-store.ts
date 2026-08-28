@@ -97,7 +97,10 @@ export type AppStorePort = Pick<Store, "file" | "files" | "collection" | "encryp
 //   换库 = _swapStoreForGallery 重指 + 重灌 collections + 广播 wp:gallery-changed；旧实例已 dispose，
 //   谁还攥着旧 collection 句柄谁就吃 StoreDisposedError（响亮死是契约，不是失败）。
 let _storeFull: Store = _asm.store;            // 全 Store（含 dispose）——只有 attachment 器官经 seam 摸它
+let _isNull = storeAbsent;                     // 当前是不是 null-store（无库模式/absent）；cloud-capability 的真相源
 export let store: AppStorePort = _storeFull;
+/** 有活店？（attachment attached 或 legacy 预建店在岗）。P3 sunset：isCloudEnabled 的新真相。 */
+export function hasLiveStore(): boolean { return !_isNull; }
 export type { Collection, EncryptedBlob } from "@internal/store";   // app 侧仅剩的两个库类型，经接缝转口
 
 // ============ 设置/状态 collection（4 个）注入 ============
@@ -125,6 +128,7 @@ _wireCollections();   // boot 装配（此后每次换库经 _swapStoreForGaller
  *  广播 wp:gallery-changed（笔架等持句柄消费者在 app.ts 监听重挂）。旧实例的 dispose 由调用方（attachment 器官）负责。 */
 export async function _swapStoreForGallery(next: Store | null): Promise<void> {
   _storeFull = next ?? createNullStore();
+  _isNull = next == null;
   store = _storeFull;
   _wireCollections();
   await Promise.all([initPreferences(), initAppState()]);   // wirePreferences 重调已重置 ready 门（app-prefs 不 import 本文件，无环）

@@ -4,6 +4,8 @@ export declare const provider: import("@internal/store").CloudProvider | null;
 declare const _auth: import("@internal/store").OneDriveAuth;
 export type AppStorePort = Pick<Store, "file" | "files" | "collection" | "encryption">;
 export declare let store: AppStorePort;
+/** 有活店？（attachment attached 或 legacy 预建店在岗）。P3 sunset：isCloudEnabled 的新真相。 */
+export declare function hasLiveStore(): boolean;
 export type { Collection, EncryptedBlob } from "@internal/store";
 export declare let brushRackCollection: _Coll;
 export declare function _seedNextRackInitData(items: {

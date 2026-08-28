@@ -37,6 +37,7 @@ import { isBusyActive } from "./fullscreen-busy.ts";
 import { reportError } from "./error-badge.ts";
 import { decodeOraToPainting } from "./backend/ora.ts";
 import { t } from "./i18n/index.ts";
+import { openGalleryConnectFlow } from "./gallery/gallery-manage-ui.ts";   // P3 无库单入口
 import type { ViewLeaf } from "./backend/workpiece/painting-view.ts";
 
 import type { AppContext } from "./app-context.ts";
@@ -224,6 +225,8 @@ export function initTopbarMenu(ctx: AppContext) {
   document.getElementById("topGalleryBtn")?.addEventListener("click", () => { if (isCloudEnabled()) void session.exit(); });
   // v0.5.21：图库回三条杠菜单（独立 pill 一日游——user：visually distracting）
   els.menuGallery?.addEventListener("click", () => { if (!isCloudEnabled()) return; setMenuOpen(false); void session.exit(); });
+  // P3 无库模式单入口（VS Code Open Folder 姿态；显隐由 settings-menu gating 反相管）
+  document.getElementById("menuConnectGallery")?.addEventListener("click", () => { setMenuOpen(false); void openGalleryConnectFlow(); });
   // v0.9.25 编辑器内新建（user 2026-08-20）：复用图库加号的三选 popup（新建/从图片/从剪切板），
   //   三个条目的 handler 全在 gallery-shell（init 时已接好，与图库开合无关）——这里只开 popup，
   //   零逻辑重复。「新建文件夹」是图库视图操作，编辑器语境隐藏（图库加号打开时恢复）。

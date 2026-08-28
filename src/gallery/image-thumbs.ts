@@ -13,6 +13,7 @@ import { resampleBytes } from "../backend/algorithms/resample-bytes.ts";
 import { encodeJpegFromBytes } from "../backend/jpeg-codec.ts";
 import { getImageThumb, setImageThumb, clearImageThumbs } from "../storage.ts";
 import { openCloudImage } from "../app-store.ts";
+import { activeGalleryId } from "../active-gallery.ts";
 import { thumbTargetSize, flattenOntoWhite } from "./cloud-image-model.ts";
 import { reportError } from "../error-badge.ts";
 
@@ -60,22 +61,25 @@ const _inflight = new Map<string, Promise<Blob>>();
  * @param token imageThumbToken(item)；变 = 文件改了 → 重拉覆盖同 key
  */
 export async function getOrFetchImageThumb(path: string, token: string): Promise<Blob> {
+  // P3 多库：缓存 DB app 级共享 → key 前缀 gallery 域（legacy "default" 不加前缀，存量零迁移）。
+  const g = activeGalleryId();
+  const key = g === "default" ? path : `${g}:${path}`;
   try {
-    const cached = await getImageThumb(path) as CachedImageThumb | undefined;
+    const cached = await getImageThumb(key) as CachedImageThumb | undefined;
     if (cached && cached.blob && cached.token === token) return cached.blob;
   } catch { /* cache 读挂 = miss */ }
-  const running = _inflight.get(path);
+  const running = _inflight.get(key);
   if (running) return running;
   const job = (async () => {
     const fileBlob = await openCloudImage(path);
     if (!fileBlob) throw new Error(`cloud image unreachable: ${path}`);
     const thumb = await makeImageThumb(fileBlob);
-    setImageThumb(path, { token, blob: thumb, at: Date.now() } satisfies CachedImageThumb)
+    setImageThumb(key, { token, blob: thumb, at: Date.now() } satisfies CachedImageThumb)
       .catch((e) => reportError(new Error("[image-thumbs] cache write failed: " + String(e)), "log"));
     return thumb;
   })();
-  _inflight.set(path, job);
-  try { return await job; } finally { _inflight.delete(path); }
+  _inflight.set(key, job);
+  try { return await job; } finally { _inflight.delete(key); }
 }
 
 /** 调试：清空全部图片缩略图缓存（无损可再生）。window.WeebPaint 挂载见 dev-console。 */

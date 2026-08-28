@@ -74,14 +74,29 @@ export interface SeedBundle { rack?: unknown; gallerySettings?: Record<string, u
 // wp:gallery-changed 重新取（window 事件 = WeebPaint UI 约定，同 wp:auth-changed）。
 ```
 
-## 4. 工单切片（版本对应）
+## 4. 落地台账（全部已推 dev；提案 .h 回写见 §3 附注）
 
-- **v0.11.15 = Slice 0+A**：收货 store 0.6.0（`persistence:"app-managed"` 表态 breaking 一行 + requestStoragePersistence 手势体）+ registry 器官 + 播种（既有 OneDrive 态→条目 dbId=defaultStore；cloudEnabled=false→lastActive=null）+ 测试。
-- **v0.11.16 = Slice B**：attachment 器官 + app-store 门面化热插拔 + 锁名 `gallery-id:path` + 契约测试。
-- **v0.11.17 = Slice C**：folder provider 接线（FSA picker → createFolderProvider）+ 离线态 + 主动引导横幅 + boot 静默重挂。
-- **v0.11.18 = Slice D**：gallery 页管理 UI 全套 + 无库编辑器单入口 + 绿灯门逃生 sheet。
-- **v0.11.19 = Slice E**：cloud-enabled sunset 收尾 + 设置页无库折叠 + 孤儿 dirty 扫 + gen-api 重打。
+> edited by Claude Fable 5, 2026-08-27（实现同日完成；形状回写）
 
-## 5. 真机验证批（并入 0825 案卷 §6 攒批）
+- **v0.11.15 = Slice 0+A**：收货 store 0.6.0（persistence 表态 + requestStoragePersistence 手势入口）+ gallery-registry 器官 + boot 播种接线。
+- **v0.11.16 = Slice B**：热插拔机器面——app-store live binding 化（`export let store/brushRackCollection` + `_swapStoreForGallery` 重灌+重跑 init 门+广播 `wp:gallery-changed`）+ gallery-attachment 器官（五步 detach 契约测试钉死）+ 笔架 `rebind` + null-store 补 dirty/persistence 面。
+- **v0.11.17 = Slice C**：gallery-connect 动词中心 + boot 静默重挂 + **active-gallery.ts**（「当前库 id」唯一真相：锁名/回执条/安家铸户口三处接管）+ OneDrive 离线翻牌接 wp:auth-changed。
+- **v0.11.18 = Slice D**：图库管理面（住 gallery 云 popup：当前库+来源标/名册切换/连接二选/卸下/忘记✕）+ 播种二选 sheet + 绿灯门逃生 sheet（下载备份=pushAll+failed 逐张下载）+ 离线主动引导横幅 + iOS 手势红线走 onPick。
+- **v0.11.19 = Slice E**：cloud-enabled sunset（isCloudEnabled 真相源换 `hasLiveStore()`；toggle 退役；设置页只读当前库行）+ 编辑器无库单入口「连接图库…」+ 忘记时孤儿 dirty surfaced（临时建店读标量）+ thumb 缓存 key 加库域。
 
-folder 改名后 handle.name 是否更新（标签自愈）；FSA 句柄跨改名存活（原有项）；Chrome 持久权限静默重取；多账号 token 切换。
+### §3 提案回写（实现中定型的形状偏差）
+
+- **legacy 连续性拍定（Slice C 关键决定）**：认领 `defaultStore` 的条目 **id = "default"**（= SOLE_GALLERY_ID）——锁名 `default:名`、回执条键 `resume:default`、thumb 缓存 key 与 P3 前逐字节相同，**零迁移**。
+- registry：`mintOneDrive(homeAccountId, username)`（label 内部派生）；+`relabel(id,label)`（attach 尽力自愈）；`seedLegacyOneDrive` 挂在 registry 对象上。
+- attachment：`attach(entry, opts?{online})`；+`bootAdopt(entry, store, opts?)`（boot 领养预建实例，零换店零重灌）；dep `setLockGalleryId` 广义化为 `setActiveGalleryId`（active-gallery.ts）。
+- 连接动词拆分：`mintFolderByPicker()/mintOneDriveByAccount()` 返 `{entry, created}`（与挂载分离，UI 在中间问播种）+ `attachGallery(entry)` + `bootAttachFromRegistry()`。
+- 「继承」种子实现 = `_seedNextRackInitData()` 一次性覆写 rack collection 的 getInitData（只对空库生效——与 builtin 播种同一条路，天然无竞态无重复）；gallery 层 prefs 直接 preferences.set 拷入。
+- UI 形状偏差：「创建时打勾」落地为**二选 sheet**（继承[默认高亮]/出厂全新，复用 openChoiceSheet 不造新件）；管理面住 gallery 云 popup（原 Q1 拍板的自然落点，UI 做了再迭代）。
+- cloud-enabled sunset 实现：`isCloudEnabled()` 保名换真相源（= `hasLiveStore()`，auth 无关化——folder 库无需登录也是有库），10 个消费文件零改动；`cloudPrefEnabled` 只剩播种源；`CLOUD_CAPABILITY_EVENT` 由 wp:gallery-changed 驱动。
+
+## 5. 余账 / park
+
+- **P6**：设置页无库态折叠（lang 有 device cascade，无库时该区仍有意义——折叠等 Editor-only build 语境）；single html 构建套（原案）。
+- **P7**：孤儿缓存库全量 GC（忘记时已 surfaced dirty，全量扫挂深清）；`cloud-enabled` pref 键物理清理。
+- **store escalation（下次 store 轮）**：OneDrive provider 的 per-account pin（现状 provider 绑 MSAL active account，`getTokenFor(homeAccountId)` 只在 auth 面——多账号切库需先交互登录切 active；结构支持已够 Q8 档位，真多账号顺滑需 provider 级口子）。
+- **真机验证批（并入 0825 案卷 §6 攒批）**：folder 改名后 handle.name 是否更新（标签自愈）；FSA 句柄跨改名存活；Chrome 持久权限静默重取（boot query 分支）；多账号 token 切换；切库全流程（绿灯门/逃生/播种）；离线横幅一键重连；itch/file:// 形态照旧。

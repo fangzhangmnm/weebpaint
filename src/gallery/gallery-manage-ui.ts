@@ -15,7 +15,7 @@ import { galleryAttachment } from "../gallery-attachment-host.ts";
 import { galleryRegistry } from "../gallery-registry.ts";
 import type { GalleryEntry } from "../gallery-registry.ts";
 import { mintFolderByPicker, mintOneDriveByAccount, attachGallery, ensureFolderPermission, canPickFolderGallery, type MintResult } from "../gallery-connect.ts";
-import { store, signIn, isSignedIn, isAuthConfigured, _seedNextRackInitData, _takeBootStore, brushRackCollection } from "../app-store.ts";
+import { store, signIn, isSignedIn, isAuthConfigured, _seedNextRackInitData, _takeBootStore, _buildStoreForGalleryEntry, brushRackCollection } from "../app-store.ts";
 import { getAllBrushes, getMeta, RACK_META_ID } from "../brushes.ts";
 import { preferences, PREF_REGISTRY, type PrefKey } from "../app-prefs.ts";
 import { docHome } from "../doc-home.ts";
@@ -131,9 +131,14 @@ async function switchFlow(entry: GalleryEntry, opts: { askSeed: boolean }): Prom
   }
   if (seed) for (const [k, v] of Object.entries(seed.prefs)) preferences.set(k as PrefKey, v as never);
   _status(t("gm.switched", { label: entry.label }), true);
+  // 切库后落 gallery 页（Q4 拍板：切库意图=去看那个库；不写回执条，boot 恢复不受影响）
+  try { if (els.galleryFull.classList.contains("hidden")) _ctx?.setGalleryOpen(true); } catch { /* noop */ }
   try { _ctx?.gallery.refresh(); } catch { /* gallery 未挂 */ }
   renderGalleryManage();
 }
+
+/** 编辑器无库单入口（topbar 文件菜单）也走同一条连接流程。 */
+export const openGalleryConnectFlow = (): Promise<void> => connectFlow();
 
 async function connectFlow(): Promise<void> {
   // iOS/手势红线（sheets.ts 头注释）：signIn popup / FSA picker 都要活着的 user activation——
@@ -162,7 +167,16 @@ async function detachFlow(): Promise<void> {
 }
 
 async function forgetFlow(entry: GalleryEntry): Promise<void> {
-  const ok = await openConfirmSheet(t("gm.forgetTitle", { label: entry.label }), t("gm.forgetMsg"));
+  // 孤儿 dirty surfaced（0825 案卷：忘记是孤儿缓存的主要出生点）：临时建店只读 dirty 标量再拆，
+  //   有账就写进确认文案。建不出（无权限/absent）→ 不加注，照常确认。全量 GC 挂深清（P7）。
+  let dirtyNote = "";
+  try {
+    const tmp = _buildStoreForGalleryEntry(entry) as unknown as { files: { dirty: { count(): Promise<number> } }; dispose(o?: { drain?: boolean }): Promise<void> };
+    const n = await tmp.files.dirty.count();
+    await tmp.dispose({ drain: false });
+    if (n > 0) dirtyNote = "\n" + t("gm.forgetDirtyWarn", { n: String(n) });
+  } catch { /* soft */ }
+  const ok = await openConfirmSheet(t("gm.forgetTitle", { label: entry.label }), t("gm.forgetMsg") + dirtyNote);
   if (!ok) return;
   await galleryRegistry.forget(entry.id);
   _status(t("gm.forgotten", { label: entry.label }));

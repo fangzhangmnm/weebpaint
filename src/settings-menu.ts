@@ -19,7 +19,8 @@ import { wireInlineSelect } from "./inline-select.ts";
 import { openInputSheet } from "./sheets.ts";
 import { reportError } from "./error-badge.ts";   // 全 app 唯一错误汇拢点（CLAUDE.md）
 import { initInstallCapture, bindInstallButton } from "./install-prompt.ts";
-import { isCloudEnabled, setCloudEnabled, CLOUD_CAPABILITY_EVENT } from "./cloud-capability.ts";
+import { isCloudEnabled, CLOUD_CAPABILITY_EVENT } from "./cloud-capability.ts";
+import { galleryAttachment } from "./gallery-attachment-host.ts";   // P3：设置页只读显示当前库
 import { isAuthConfigured, isSignedIn } from "./app-store.ts";   // auth 公共面（cloud-auth-ui 同款直连）
 import { session } from "./session-state.ts";   // 云开关关闭前 flush（saveAndPush）用；只调不改
 import type { AppContext } from "./app-context.ts";
@@ -117,22 +118,17 @@ function applyGenAI(on: boolean) {
   preferences.set("gen-ai", !!on);
 }
 
-// ============ 云端功能开关 v1（2026-08-21 user 拍板；接缝 = cloud-capability.ts）============
-// 编排（toggle 姿势照 menuGenAI）：render = 只贴 DOM（boot/fixup 安全）；点击 handler 才 setCloudEnabled。
-// gating（v1 = 全部显隐/短路，零数据变更）：①菜单「图库」项隐藏（其余入口守卫在 topbar-menu）
-//   ②boot 不自动恢复（boot-restore 端口门）③save 徽章无云态（save-status）④图库藏了云 popup 即不可达。
-// !isAuthConfigured()（容器不支持云）→ toggle 灰显强制关（aria-disabled + title 说明），**不写盘**：
-//   配置恢复后自愈回用户存值（cloudPrefEnabled 原样）。
-function renderCloudEnabled() {
-  const btn = document.getElementById("menuCloudEnabled");
-  if (!btn) return;
-  const configured = isAuthConfigured();
-  const on = isCloudEnabled();   // = configured && 用户存值
-  btn.setAttribute("aria-pressed", on ? "true" : "false");
-  btn.setAttribute("aria-disabled", configured ? "false" : "true");
-  btn.title = configured ? "" : t("menu.cloudUnavailableTitle");
-  const st = btn.querySelector('[data-state-for="cloudEnabled"]');
-  if (st) st.textContent = configured ? (on ? t("common.on") : t("common.off")) : t("common.off");
+// ============ 图库能力区（P3 sunset 2026-08-27；接缝 = cloud-capability.ts）============
+// toggle 已退役（§9.8：「关云」的真身 = 没挂图库；动词在 gallery 管理面）。设置页只读显示当前库
+//   （Q1 拍板：设置页管库内偏好，不管库的生死）。gating 消费面照旧（isCloudEnabled 换了真相源）。
+function renderCurrentGallery() {
+  const row = document.getElementById("menuCurrentGallery");
+  if (row) {
+    const att = galleryAttachment.state();
+    row.textContent = att.kind === "attached"
+      ? t("gm.current", { label: att.entry.label, src: att.entry.kind === "onedrive" ? t("gm.srcOneDrive") : t("gm.srcFolder") }) + (att.online ? "" : t("gm.offlineSuffix"))
+      : isCloudEnabled() ? t("gm.currentLegacy") : t("gm.noneConnected");
+  }
   applyCloudCapabilityGating();
 }
 
@@ -145,9 +141,11 @@ function applyCloudCapabilityGating() {
   if (els.menuGallery) els.menuGallery.hidden = !on;                   // 图库入口（云账号 popup 等随图库一并不可达）
   const cloudImport = document.getElementById("layerImportCloudBtn");  // 图层面板「从云盘导入…」
   if (cloudImport) (cloudImport as HTMLButtonElement).hidden = !on;
+  const connect = document.getElementById("menuConnectGallery");       // P3 无库单入口（与 menuGallery 反相）
+  if (connect) (connect as HTMLButtonElement).hidden = on;
   document.getElementById("referencePanel")?.toggleAttribute("no-cloud", !on);   // 参考窗云盘选图钮（组件观察属性）
 }
-window.addEventListener(CLOUD_CAPABILITY_EVENT, applyCloudCapabilityGating);
+window.addEventListener(CLOUD_CAPABILITY_EVENT, renderCurrentGallery);   // 换库/卸库 → 当前库行 + gating 一并重贴
 
 // v124 快捷键 sheet：从 KEYBOARD_SHORTCUTS 自动渲染（input.js 注册的唯一真理源）
 const _shortcutsSheet = document.getElementById("shortcutsSheet");
@@ -179,7 +177,7 @@ export function renderSettingsFromPrefs(): void {
   //   处的 _renderPerDocFromDesk 随每次载入回灌，不在本函数（本函数只管非 per-doc 层）。
   renderFps(preferences.get("show-fps"));
   renderGenAI(genAiEnabled());
-  renderCloudEnabled();   // 云端功能开关真值回灌（device 层；只 render 不写盘）
+  renderCurrentGallery();   // P3：当前库只读行 + gating 重贴
   renderSingleFingerDraw(preferences.get("single-finger-draw"));
   _renderPerDocFromDesk();   // boot 首帧也灌一次（此刻 desk=工厂默认；开画后 applyEditorState 再灌真值）
 }
@@ -295,29 +293,8 @@ export function initSettingsMenu(ctx: AppContext) {
     applyGenAI(next);
     setStatus(t("status.genAI", { s: next ? t("common.on") : t("common.off") }));
   });
-  // 云端功能开关（2026-08-21；纪律/gating 见 renderCloudEnabled 头注释）
-  document.getElementById("menuCloudEnabled")?.addEventListener("click", async () => {
-    if (!isAuthConfigured()) return;   // 灰显强制关：容器不支持云，点了也不动用户存值
-    const next = !isCloudEnabled();
-    if (!next && session.home?.kind === "gallery") {   // 关云前 flush 只对 gallery 家有意义（file 家无云腿）
-      // 关闭前 flush：有活动 store 画 → 先存（登录着才带云腿；**未登录只本地**——v1.1 headless 实锤：
-      //   未登录跑 saveAndPush 会让云腿把「Not signed in」推上红 banner，关云的动作自己先炸一条云错误）。
-      //   没落成（内存脏残留 / 登录态云腿仍 pending）→ 提示并**不切换**。
-      try {
-        if (isSignedIn()) await session.saveAndPush();
-        else await session.save({ commitPending: true });
-      } catch { /* 内部已 surface；下面判据兜底 */ }
-      if (session.dirty || (isSignedIn() && session.pushPending)) {
-        setStatus(t("status.cloudOffFlushFailed"), true);
-        renderCloudEnabled();
-        return;
-      }
-    }
-    setCloudEnabled(next);   // 只写设备本地 pref + 广播 wp:cloud-capability-changed；零数据变更（红线）
-    renderCloudEnabled();
-    updateSaveStatus();      // ③save 徽章无云态立即生效
-    setStatus(t("status.cloudEnabled", { s: next ? t("common.on") : t("common.off") }));
-  });
+  // P3 sunset：云端功能 toggle 已退役（关云前 flush 的数据安全职责由 attachment 器官的
+  //   收口开画 gate + 绿灯门接管——detach 前必须无开画、无 dirty，比旧 flush 更硬）。
   // v0.5.37（user）：主题/语言换 in-app 下拉——原生 select 打开态是 chrome 域（iPad 弹层系统字体，
   //   UCSUR 必豆腐；夜间白底、装不了 SVG 同根性坑）。弹层复用紧凑菜单 list 形态 + 锚定。
   //   条目开时现建 → 标签永远新鲜（字体门迟到翻转后 endonym/主题名自动带字形）。

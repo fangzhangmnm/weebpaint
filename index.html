@@ -1295,6 +1295,10 @@
         <button class="menu-item menu-item-with-icon" id="menuGallery" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#gallery"/></svg>
         <span class="menu-item-label" data-i18n="menu.backToGallery">回到图库</span>
       </button>
+        <!-- P3 无库模式单入口（VS Code 无文件夹时 Open Folder 姿态；有库时藏，gating 同 menuGallery 反相） -->
+        <button class="menu-item menu-item-with-icon" id="menuConnectGallery" type="button" role="menuitem" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#gallery"/></svg>
+        <span class="menu-item-label" data-i18n="gm.connectEntry">连接图库…</span>
+      </button>
         <!-- v0.9.25 编辑器内新建（user 2026-08-20）：弹图库加号同款三选 popup（新建/从图片/从剪切板），
              不用回图库。无地模式照常可用——三入口都汇到 session.newDoc 的 leaveLocalFile 门 -->
         <!-- 2026-08-21 甲方拍板「新建/打开」并一条：本行开三选 popup（新建/从图片/从剪切板），
@@ -1405,14 +1409,10 @@
           <svg class="menu-scope-badge" viewBox="0 0 24 24" aria-hidden="true" data-i18n-title="menu.scopeDeviceTip"><use href="#device"/></svg>
         </label>
         <button id="menuTheme" type="button" hidden></button><!-- 旧 id stub：theme.ts renderTheme 查它，v0.6C 下拉化后留防崩 -->
-        <!-- 2026-08-21 云端功能开关 v1（接缝=cloud-capability.ts；纯 UI gating 零数据变更）：
-             设备本地 pref，默认开；未配置 auth 时灰显强制关（settings-menu 派生 aria-disabled+title） -->
-        <button class="menu-item menu-item-with-icon" id="menuCloudEnabled" type="button" role="menuitemcheckbox" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#cloud"/></svg>
-          <span class="menu-item-label" data-i18n="menu.cloudEnabled">启用云端功能</span>
-          <svg class="menu-scope-badge" viewBox="0 0 24 24" aria-hidden="true" data-i18n-title="menu.scopeDeviceTip"><use href="#device"/></svg>
-        <span class="menu-item-state" data-state-for="cloudEnabled">开</span>
-        </button>
+        <!-- P3 sunset（§9.8）：cloud-enabled toggle 退役——「关云」的真身 = 没挂图库；动词（连接/卸下）
+             住 gallery 页管理面。此处只留只读当前库行（Q1 拍板：设置页不管库的生死）。 -->
         <div class="menu-section-label" data-i18n="menu.scopeGallery">这个图库</div>
+        <div class="menu-item-info" id="menuCurrentGallery"></div>
         <label class="menu-item menu-lang-row menu-item-with-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#globe-speech"/></svg>
         <span class="menu-item-label" data-i18n="menu.language">语言</span>
         <button class="menu-lang-select menu-inline-select" id="menuLanguageBtn" type="button" aria-haspopup="true"><span id="menuLanguageBtnLabel">中文</span><svg class="menu-inline-caret" viewBox="0 0 8 8" aria-hidden="true"><path d="M1.4 2.8 L4 5.6 L6.6 2.8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>

@@ -1,7 +1,6 @@
-/** 开关变更广播（window 事件；detail 无——消费方自己重读 isCloudEnabled()）。 */
+/** 能力变更广播（window 事件；消费方自己重读 isCloudEnabled()）。P3 起由换库事件驱动。 */
 export declare const CLOUD_CAPABILITY_EVENT = "wp:cloud-capability-changed";
-/** 用户存的 pref 原值（不含 isAuthConfigured 门）——设置页 toggle 显示「用户意愿」用。 */
+/** 退役 pref 的播种源读口（见头注释；除播种外别再消费）。 */
 export declare function cloudPrefEnabled(): boolean;
-/** 云端功能有效开关：容器不支持云（未配置 auth）→ 恒 false；否则读设备本地 pref（默认 true）。 */
+/** 图库能力真状态：有活店 = true（folder 库不需要登录也是有库）；无库模式/absent = false。 */
 export declare function isCloudEnabled(): boolean;
-export declare function setCloudEnabled(v: boolean): void;

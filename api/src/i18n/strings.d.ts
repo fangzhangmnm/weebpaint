@@ -5361,6 +5361,24 @@ export declare const S: {
         readonly ja: "閉じる";
         readonly tok: "o pini";
     };
+    readonly "gm.currentLegacy": {
+        readonly zh: "当前图库：OneDrive（本机既有）";
+        readonly en: "Current gallery: OneDrive (this device's existing library)";
+        readonly ja: "現在のギャラリー：OneDrive（この端末の既存ライブラリ）";
+        readonly tok: "poki sitelen lon tenpo ni: OneDrive";
+    };
+    readonly "gm.noneConnected": {
+        readonly zh: "未连接图库（去图库页或文件菜单连接）";
+        readonly en: "No gallery connected (connect from the gallery page or file menu)";
+        readonly ja: "ギャラリー未接続（ギャラリーページかファイルメニューから接続）";
+        readonly tok: "poki sitelen ala. o wan e ona lon lipu poki";
+    };
+    readonly "gm.forgetDirtyWarn": {
+        readonly zh: "⚠ 该图库还有 {n} 张画未上云（缓存留在本机，重新连接后可继续上传）。";
+        readonly en: "⚠ {n} paintings in that gallery are not yet uploaded (cache stays on this device; reconnect later to resume uploading).";
+        readonly ja: "⚠ そのギャラリーには未アップロードの絵が {n} 枚あります（キャッシュは端末に残り、再接続で再開できます）。";
+        readonly tok: "⚠ sitelen {n} li lon poki sewi ala. ona li awen lon ilo ni";
+    };
     readonly "gs.cloudDisabledNoGallery": {
         readonly zh: "云端功能已停用，图库不可用（可在设置里重新开启）";
         readonly en: "Cloud features are disabled; the gallery is unavailable (re-enable in settings)";

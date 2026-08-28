@@ -21,9 +21,15 @@ import { reportError } from "../error-badge.ts";
 import { getThumb, setThumb, deleteThumb, clearThumbs } from "../storage.ts";
 import { fetchOraThumbnail } from "./cloud-thumbs.ts";
 import { sessionFileName } from "../config.ts";
+import { activeGalleryId } from "../active-gallery.ts";
 
-// cache key = store 文件身份（sessionFileName(裸名)=全名 X.ora）；专用 store 即命名空间，key 无需前缀。caller 仍传裸名。
-function _key(name: string): string { return sessionFileName(name); }
+// cache key = store 文件身份（sessionFileName(裸名)=全名 X.ora）；caller 仍传裸名。
+// P3 多库：缓存 DB 是 app 级共享 → key 前缀 gallery 域防跨库同名撞（token 自愈只挡「不同 mtime」，
+//   同名同戳的极端撞不住）。legacy 库（id="default"）**不加前缀**——存量缓存条目零迁移直接命中。
+function _key(name: string): string {
+  const g = activeGalleryId();
+  return g === "default" ? sessionFileName(name) : `${g}:${sessionFileName(name)}`;
+}
 
 // IDB 里存的缓存条目形态
 interface CachedThumb {
