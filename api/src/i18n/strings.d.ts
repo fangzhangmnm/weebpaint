@@ -5463,6 +5463,84 @@ export declare const S: {
         readonly ja: "ギャラリー「{label}」はオフライン——描画は通常どおり、同期は一時停止";
         readonly tok: "poki sitelen \"{label}\" li weka. o sitelen kin. awen sewi li lape";
     };
+    readonly "bk.menuItem": {
+        readonly zh: "下载全库备份…";
+        readonly en: "Download full backup…";
+        readonly ja: "ライブラリ全体をバックアップ…";
+        readonly tok: "o kama jo e lipu awen ale…";
+    };
+    readonly "bk.title": {
+        readonly zh: "下载全库备份";
+        readonly en: "Download full backup";
+        readonly ja: "ライブラリ全体をバックアップ";
+        readonly tok: "o kama jo e lipu awen ale";
+    };
+    readonly "bk.msg": {
+        readonly zh: "把这个图库里的全部文件打包成一个 zip 下载到本机。只读取，不改动图库。加密作品保持密文原样（备份里没有明文）。超过 {size} 的部分改为逐件下载。";
+        readonly en: "Packs every file in this gallery into one zip and downloads it. Read-only — the gallery is not modified. Encrypted artworks stay as ciphertext (no plaintext in the backup). Anything beyond {size} is downloaded file by file instead.";
+        readonly ja: "このギャラリーの全ファイルを 1 つの zip にまとめてダウンロードします。読み取りのみで、ギャラリーは変更しません。暗号化された作品は暗号文のまま（バックアップに平文は入りません）。{size} を超えた分は 1 ファイルずつダウンロードします。";
+        readonly tok: "ni li pana e lipu ale tawa poki wan. ni li ante ala e poki sitelen. lipu len li awen len. lipu suli mute la ona li kama jo wan wan.";
+    };
+    readonly "bk.scanning": {
+        readonly zh: "正在清点图库…";
+        readonly en: "Scanning the gallery…";
+        readonly ja: "ギャラリーを確認中…";
+        readonly tok: "mi lukin e poki sitelen…";
+    };
+    readonly "bk.scanningFolders": {
+        readonly zh: "正在清点图库…（已扫 {n} 个文件夹）";
+        readonly en: "Scanning the gallery… ({n} folders)";
+        readonly ja: "ギャラリーを確認中…（{n} フォルダー）";
+        readonly tok: "mi lukin e poki sitelen… (poki {n})";
+    };
+    readonly "bk.packing": {
+        readonly zh: "正在备份…（{done} / {total}）";
+        readonly en: "Backing up… ({done} / {total})";
+        readonly ja: "バックアップ中…（{done} / {total}）";
+        readonly tok: "mi pali e lipu awen… ({done} / {total})";
+    };
+    readonly "bk.empty": {
+        readonly zh: "图库里没有可备份的文件";
+        readonly en: "Nothing in this gallery to back up";
+        readonly ja: "バックアップできるファイルがありません";
+        readonly tok: "lipu ala li lon poki sitelen";
+    };
+    readonly "bk.done": {
+        readonly zh: "已下载备份 {name}（{n} 件）";
+        readonly en: "Backup downloaded: {name} ({n} files)";
+        readonly ja: "バックアップをダウンロードしました：{name}（{n} 件）";
+        readonly tok: "lipu awen {name} li kama ({n})";
+    };
+    readonly "bk.spilled": {
+        readonly zh: "库太大，另有 {n} 件改为逐件下载";
+        readonly en: "Library too large — {n} more files downloaded individually";
+        readonly ja: "ライブラリが大きいため、他の {n} 件は個別にダウンロードしました";
+        readonly tok: "poki li suli mute la lipu {n} li kama jo wan wan";
+    };
+    readonly "bk.failedN": {
+        readonly zh: "{n} 件未能取到（纯云端且离线？稍后重试）";
+        readonly en: "{n} files could not be read (cloud-only while offline? try again later)";
+        readonly ja: "{n} 件を取得できませんでした（クラウドのみ・オフライン？後で再試行してください）";
+        readonly tok: "lipu {n} li kama ala. o sin e ni lon tenpo kama";
+    };
+    readonly "bk.partialN": {
+        readonly zh: "{n} 个文件夹未能完整列举，备份可能不全";
+        readonly en: "{n} folders could not be listed in full — the backup may be incomplete";
+        readonly ja: "{n} 個のフォルダーを完全に一覧できませんでした。バックアップが不完全な可能性があります";
+        readonly tok: "poki {n} li lukin pona ala. lipu awen li ken pini ala";
+    };
+    readonly "bk.truncated": {
+        readonly zh: "文件夹太多，只扫到前 {n} 个，备份不全";
+        readonly en: "Too many folders — only the first {n} were scanned; the backup is incomplete";
+        readonly ja: "フォルダーが多すぎます。最初の {n} 個のみを走査しました。バックアップは不完全です";
+        readonly tok: "poki mute a. mi lukin e poki {n} taso. lipu awen li pini ala";
+    };
+    readonly "bk.failed": {
+        readonly zh: "备份失败：{err}";
+        readonly en: "Backup failed: {err}";
+        readonly ja: "バックアップに失敗しました：{err}";
+        readonly tok: "lipu awen li pakala: {err}";
+    };
     readonly "gm.reconnect": {
         readonly zh: "重新连接";
         readonly en: "Reconnect";
@@ -5614,10 +5692,10 @@ export declare const S: {
         readonly tok: "sitelen sin li lon: {name} ({w}×{h})";
     };
     readonly "gs.folderNeedSignin": {
-        readonly zh: "新建文件夹需先登录云端（空文件夹存在 OneDrive 上）";
-        readonly en: "Creating a folder requires signing in to the cloud first (empty folders live on OneDrive)";
-        readonly ja: "フォルダを作成するにはクラウドにサインインが必要です（空フォルダは OneDrive に保存されます）";
-        readonly tok: "poki sin li wile e ni: poki sewi li sona e sina. poki pi jo ala li lon poki sewi taso.";
+        readonly zh: "图库离线（未登录或权限失效），无法新建文件夹";
+        readonly en: "Gallery is offline (not signed in / permission lost) — can't create a folder";
+        readonly ja: "ギャラリーがオフライン（未ログイン／権限切れ）のためフォルダを作成できません";
+        readonly tok: "poki sitelen li weka la mi ken ala pali e poki sin";
     };
     readonly "gs.newFolderTitle": {
         readonly zh: "新建文件夹";
@@ -7191,6 +7269,12 @@ export declare const S: {
         readonly en: "Not now";
         readonly ja: "今はしない";
         readonly tok: "tenpo ni la mi wile ala";
+    };
+    readonly "save.savedLocalGalleryOffline": {
+        readonly zh: "已存本地。图库已离线（文件夹权限失效）——顶部横幅或图库页可重新连接";
+        readonly en: "Saved locally. Gallery is offline (folder permission lost) — reconnect from the banner or gallery page";
+        readonly ja: "ローカルに保存しました。ギャラリーはオフラインです（フォルダ権限切れ）。バナーかギャラリーページから再接続してください";
+        readonly tok: "awen lon ilo ni. poki sitelen li weka (ken poki li weka). o wan sin kepeken lipu sewi";
     };
     readonly "save.savedLocalNotSignedIn": {
         readonly zh: "已存本地 · 未登录";
