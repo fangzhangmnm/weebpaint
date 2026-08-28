@@ -10,5 +10,4 @@
      需求登记：全局清单 ../20260708 SVG Icons/TODO.md（美工 agent 的取活处）。
      重新烤制：仓库根跑 python3 tools/bake-stopgap-glyphs.py（SPECS 即声明）。
 -->
-  <symbol id="device" data-cat="stopgap" data-src="baked:DroidSansFallbackFull(Apache-2.0)/DejaVuSans-Bold(Bitstream-Vera)" data-note="P5 设置 scope 微章·这台设备(跟机器走的设置)。stopgap 字形；真图标=显示器/平板设备轮廓, 与 image(这幅画)/gallery(这个图库) 组成 scope 三件套, 12px 小尺寸可读优先" viewBox="0 0 24 24"><path d="M3.75 6.8H6.54V3.34H8.05V6.8H10.68V8.23H8.05V8.99L10.91 12.53L9.93 13.96L8.05 11.02V20.66H6.54V12.15Q5.64 14.71 4.05 16.59L3 15.54Q5.49 12.45 6.39 8.23H3.75ZM18.14 4.32V17.95Q18.14 18.7 18.74 18.7Q19.12 18.7 19.23 18.44Q19.34 18.18 19.42 16.74L21 17.2Q20.92 19.08 20.47 19.64Q20.02 20.21 18.59 20.21Q17.31 20.21 16.97 19.91Q16.63 19.61 16.63 18.4V5.82H13.17V12Q13.02 17.5 9.63 20.59L8.57 19.31Q11.66 16.59 11.66 10.42V4.32Z" fill="currentColor" stroke="none"/></symbol>
 </svg>

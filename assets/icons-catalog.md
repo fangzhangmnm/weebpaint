@@ -1,6 +1,6 @@
 # 本 app 的图标
 
-137 icons · 提取自家族图标库 `../20260708 SVG Icons/icons.svg` · 由 `extract-icons.py` 生成，别手改。
+140 icons · 提取自家族图标库 `../20260708 SVG Icons/icons.svg` · 由 `extract-icons.py` 生成，别手改。
 
 用法：把 sprite 整段内联到 `<body>` 顶部，然后按 id 引用；
 ⚠ sprite 根自带的隐藏样式（1×1 + `opacity:0`）别换成 `display:none`——
@@ -199,6 +199,8 @@
 | `sign-out` | 退出登录:门框+向外箭头(通用 logout 图元) |
 | `unload-local-cache` | 卸载本地副本:database(=本地) + 斜删除线(mask 留 gap)【非垃圾桶, 云端仍保留】 |
 | `upload` | 上传 |
+| `cloud-download` | 云+下载箭头:cloud-upload 的精确上下镜像(箭头绕 y=14 翻转); WeebPaint gallery 同步徽章 newer-on-cloud, 12px 用量 (甲方 20260825 拍板候选 1 号) |
+| `cloud-conflict` | 云+感叹号(2.4 描边整体收在云内不破轮廓, 点半径=描边半宽; 与 cloud-pending 问号云成对但云为实线); WeebPaint gallery 同步徽章 conflict, 12px 用量 (甲方 20260825 拍板候选 5 号=大号收内) |
 
 ## globalization
 
@@ -227,6 +229,7 @@
 | `shortcut` | 快捷键:键帽圆角方块内放 V |
 | `theme` | 主题日月同辉:细月牙(大圆挖近等大圆) + 八芒太阳嵌在缺口里, 光芒是与太阳脱开的短线。日月直径比 1.00, 分离角 -30°, 分离距离 1.05 倍月半径;太阳用遮罩描边留白从月牙上抠出白边 |
 | `wrench` | 扳手:斜置组合扳手轮廓(feather:wrench 衍生), 20260724 候选 1 号入库 |
+| `device` | 这台设备(WeebPaint P5 设置项 scope 微章, 答「这设置跟谁走」):横屏 18x12.4 rx1.6 **屏内留空** + 细颈 + 宽底脚连成一笔 T。与 image(这幅画)/gallery(这个图库) 组成 scope 三件套 —— 三者在 13px 下靠**轮廓**分辨, 故此件与 image 的区别全在屏下那个 T, **屏内不许再放东西**(image 已是「框里有画」, 再来一个「框里放东西」就分不出了)。⚠ 用量硬约束 = 13px + opacity .5 + --ink-soft(WeebPaint styles.css .menu-scope-badge), 实渲结论: 1x 非 retina 下**任何内部细节都会糊掉**, 能站住的只有轮廓 —— 改动时别往屏里加细节。20260827 甲方拍板候选 1 号入库; 落选: 2(梯形实脚)/3(平板竖+底部指示条)/4(平板竖纯轮廓)/5(平板竖+home 圆点)/6(笔记本), 考古回 git 2a9d559 |
 
 ## ai
 
