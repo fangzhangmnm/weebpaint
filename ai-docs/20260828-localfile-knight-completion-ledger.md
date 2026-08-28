@@ -212,3 +212,10 @@ prompt:"select_account" 口子，store 轮件）；②C 产品表态：加密动
 ②加密扩域【扩展到文件，可以保存加密文件；与 store 解耦、store 原生库支持不动】：文件家加密全闭环
 （原位打开容器/加密另存 .ora.zip/续存打包/三类快照全密文=at-rest 红线 file 家同守/恢复解锁/解除=另存明文
 指路）；transient=先安家。③「3」已向 user 解释=单文件壳夹具深化归 wave4。1246 测+F2 绿。真机批两条新增。
+
+**wave 4 收官（2026-08-28 晚，edited by Claude Fable 5）**：single→**standalone-html** 改名（v0.11.41 全链）；
+file:// 上云逃生舱 helper 落地（v0.11.40）；**itch 内嵌实锤修**（v0.11.42）：跨源 iframe 禁 FSA picker →
+三探针 frame 判定 + settle SecurityError 兜底降级下载（真双端口跨源 iframe headless 实证）；SAB 不开
+（全仓零使用）。上传前 ritual 干净 3 轮全绿（v0.11.42，log=tmp/preflight-20260828-173609.log），
+itch 包 sha 与 standalone 一致。**user 实测：itch 内嵌画→保存弹下载 ✓，上传通 ✓**。prod=v0.11.39。
+余：iframe 自动重放归位（荐维持 park）、桌面 popup 撤案、#4 后半、两粒沙——四个一句话。
