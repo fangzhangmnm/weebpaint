@@ -170,3 +170,26 @@ left 裸用/top 只夹顶（出屏）+ position=null 分支不清内联样式（
 后续所有画）→ 全夹取（同 color-panel vetted 形制）+ null 清样式 + 开面板兜底回屏；playwright 注坐标实证。
 ④回收站入口从 header 收进图库☰菜单（restore-trash 取货图标——入口语义=找回）。真机回验四条已登记
 device-test-batch。
+
+## 7. journal 复扫核查（2026-08-28，user 令「重新扫 v0.10 起全部记录」；edited by Claude Fable 5）
+
+扫描面 = journal/ 八份（0820/0821 thread/thread2/0823 thread3/0825 thread4/0825 无地骑士 62KB/0828
+checklist dump/0828 persistence feedback/0828 又是一批小需求），逐条对现状。结论：**绝大多数已闭环**
+（含 0821 QA 全量、opus 回滚案 R1-O2、0823 组会、0825 无地宪法与 P1-P7、0828 三批）。抽查实证过的
+易漏项：形状笔 alt 取色 ✓（pointer-route 白名单）、等比在自由前 ✓、像素缩略图 pixelated ✓、
+KiB/MiB 统一 ✓（0821 humanSize 收敛）、R1 rename onabort ✓（idb-tx-guard 语法护栏）、
+T-crash 快照带 mp4 ✓、标题栏画名 ✓、云端 .trash/.backup 时刻戳 ✓。
+
+**复扫抓获（此前未入账）**：
+1. **架构自查到期**（checklist dump 91 行：「1做完后跑 improve-codebase-architecture：云本位残留/
+   无地四问/greenfield」）——wave1 已完 → 已于本日启动（opus 只读 subagent），报告回来主 session 验收。
+2. **桌面 MSAL popup 未做**（0825 拍板「创建 gallery/token 流程：桌面主场 MSAL popup 做、iOS
+   redirect」）——store auth 现状=全平台 loginRedirect，popup 从未实现（store 仓 auth 面，动=escalate）。
+   v0.11.37 已把 redirect 流程修顺（已登录零跳转/回程续办），**要不要仍上 popup 待 user 重新表态**：
+   a) 维持 redirect（省一刀，流程已顺）b) 桌面上 popup（原拍板，store 轮工单）。
+3. **#4 后半未做**（0825 原文三个具体件）：图层组**拖拽**；「移动到图层组」列表**按显示排序**；
+   **移出=移动菜单里的 ../ 选项**。前半（兄弟组+保序计算）已落。归位待 user：大概率 UI 整改轮（宣发后），
+   但需一句话。
+4. **两粒沙未做未 park**（0821 low/very-low）：duplicate 图层组（low）；禁用浏览器 reading mode
+   （very low）。待裁：做/park。
+5. 非代码件：0823「宣发讨论记忆封存 zip」——由宣发分仓（20260821 宣发仓）实质承接，user 侧自理，视为 OBE。
