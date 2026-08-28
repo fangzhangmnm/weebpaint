@@ -3,14 +3,14 @@
 // （busy 遮罩 z 高于 sheet，盖住密码框 = 无限转圈死锁；sheets 护栏也会 throw）。
 
 import { t } from "./i18n/index.ts";
-import { store } from "./app-store.ts";
+import { requireStore } from "./app-store.ts";
 import { sessionFileName } from "./config.ts";   // 边界：裸 item.name → 库全名（薄库身份=X.ora）
 import { SUFFIX_BYTES, THUMB_PATH } from "./gallery/cloud-thumbs.ts";
 import { isUnlocked, getPassword, onPasswordVerified, promptPassword } from "./crypto-state.ts";
 import { hasVerifier, checkVerifier, createVerifier } from "./password-verifier.ts";
 
 // 边界：app 传裸 session 名，库身份是全名 → sessionFileName 统一转（与 session-state/gallery 一致）。
-const encFile = (name: string) => store.file(sessionFileName(name), { isZip: true, mode: "existing" });
+const encFile = (name: string) => requireStore().file(sessionFileName(name), { isZip: true, mode: "existing" });
 
 /** 本地加密作品的缩略图（内存密码解得开→PNG Blob；锁定/没有→null）。非交互——批量渲染不弹窗。 */
 export async function localPeekThumb(name: string): Promise<Blob | null> {
@@ -58,7 +58,7 @@ export async function ensureUnlocked(name: string): Promise<boolean> {
 export async function unlockImportedContainer(blob: Blob): Promise<{ pw: string; plain: Blob } | null> {
   const cur = getPassword(null);
   if (cur) {
-    const plain = await store.encryption.tryDecryptEncryptedBlob(blob, cur);
+    const plain = await requireStore().encryption.tryDecryptEncryptedBlob(blob, cur);
     if (plain) return { pw: cur, plain };
   }
   for (let attempt = 0; ; attempt++) {
@@ -67,7 +67,7 @@ export async function unlockImportedContainer(blob: Blob): Promise<{ pw: string;
       message: attempt > 0 ? t("enc.wrongRetry") : t("enc.importPrompt"),
     });
     if (pw == null) return null;
-    const plain = await store.encryption.tryDecryptEncryptedBlob(blob, pw);
+    const plain = await requireStore().encryption.tryDecryptEncryptedBlob(blob, pw);
     if (plain) return { pw, plain };
   }
 }

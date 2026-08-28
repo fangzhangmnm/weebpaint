@@ -25,7 +25,7 @@ import { readImageFromClipboard } from "../session.ts";
 import { uniqueBareName } from "./gallery-model.ts";   // 撞名后缀兜底（纯·已 pin）；占用检查按库身份（全名 X.ora）查
 import { galleryDefaultName } from "../naming.ts";     // P1 命名器官：yyyymmdd-hex4（v217 惯例）+ 禁「未命名」
 import { humanSize } from "./gallery-view-model.ts";   // 展示格式化（纯·KiB/MiB）；此前本模块私有一份逐字节拷贝，2026-08-21 收敛
-import { isSignedIn } from "../app-store.ts";
+import { isSignedIn, requireStore } from "../app-store.ts";
 import { anchorPopupToBtn } from "../anchored-popup.ts";
 import { wireInlineSelect } from "../inline-select.ts";
 import { applyTheme, themeLabel, THEMES, currentTheme } from "../theme.ts";
@@ -43,7 +43,7 @@ import type { AppContext } from "../app-context.ts";
 const errMsg = (e: unknown): string => String((e as { message?: unknown })?.message || e);
 
 // ---- ctx-bound 协作件（app 拥有，boot 时 initGalleryShell(ctx) 注入）----
-let editMode: AppContext["editMode"], board: AppContext["board"], gallery: AppContext["gallery"], doc: AppContext["doc"], _store: AppContext["store"], setStatus: AppContext["setStatus"], withBusy: AppContext["withBusy"];
+let editMode: AppContext["editMode"], board: AppContext["board"], gallery: AppContext["gallery"], doc: AppContext["doc"], setStatus: AppContext["setStatus"], withBusy: AppContext["withBusy"];
 
 // trash-bar / add / trash 按钮的可见性随视图（旧 renderGallery 内联，现 app chrome 显式管）。
 function _galleryChrome(view: string) {
@@ -121,7 +121,7 @@ function _selectPreset(val: string) {
 // ⚠ 只在图库打开/刷新时调：内部是一次全表 cursor（本地、无网络，但别挂每帧）。
 export async function updateIdbUsage() {
   try {
-    const { bytes, count } = await _store.files.usage();
+    const { bytes, count } = await requireStore().files.usage();
     let label = t("gs.footUsage", { size: humanSize(bytes), count });
     let level = "ok";   // ok | warn | critical
     if (navigator.storage && navigator.storage.estimate) {
@@ -180,7 +180,7 @@ export async function checkQuotaAndWarn() {
 //   归一化必须发生在名字**诞生的地方**，不是比较的地方。
 // 逻辑本体 = gallery-model.uniqueBareName（纯·已 pin）；此处只绑 store 的占用谓词。
 export async function uniqueNameFor(stem: string) {
-  return uniqueBareName(stem, (n) => _store.files.nameOccupied(n));
+  return uniqueBareName(stem, (n) => requireStore().files.nameOccupied(n));   // gallery 命名专用（无库铸户口不可达）
 }
 
 export function initGalleryShell(ctx: AppContext) {
@@ -188,7 +188,6 @@ export function initGalleryShell(ctx: AppContext) {
   board = ctx.board;
   gallery = ctx.gallery;
   doc = ctx.doc;
-  _store = ctx.store;
   setStatus = ctx.setStatus;
   withBusy = ctx.withBusy;
 
@@ -415,9 +414,9 @@ export function initGalleryShell(ctx: AppContext) {
     //   withBusy 可重入（ref-count），内层 store.flow.newFolder 再包一层 busy 不会提前解锁。
     await withBusy(t("gs.creatingFolder", { name: trimmed }), async () => {
       // 统一走 store.nameOccupied（唯一占用检查）：同名文件占了 → 提示；纯文件夹已存在则 ensureFolder 幂等（复用无害）。
-      if (await _store.files.nameOccupied(fullPath)) { setStatus(t("gs.folderExists", { name: trimmed }), true); return; }
+      if (await requireStore().files.nameOccupied(fullPath)) { setStatus(t("gs.folderExists", { name: trimmed }), true); return; }
       // 走 store.flow.newFolder（深模块窄接口）而非裸 ensureSubfolder——锁屏/单飞守卫由库内强制。
-      try { await _store.files.newFolder(fullPath); setStatus(t("gs.folderCreated", { name: trimmed })); }
+      try { await requireStore().files.newFolder(fullPath); setStatus(t("gs.folderCreated", { name: trimmed })); }
       catch (e) { reportError(new Error("[folder] cloud ensure failed: " + String(e)), "log"); setStatus(t("gs.folderCreateFailed", { err: errMsg(e) }), true); }
     });
     gallery.refresh();

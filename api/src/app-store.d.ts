@@ -1,10 +1,19 @@
+import { createOneDriveProvider } from "@internal/store";
 import type { Store, Collection as _Coll } from "@internal/store";
 export declare const storeAbsent: boolean;
+type _Auth = ReturnType<typeof createOneDriveProvider>["auth"];
 export declare const provider: import("@internal/store").CloudProvider | null;
-declare const _auth: import("@internal/store").OneDriveAuth;
 export type AppStorePort = Pick<Store, "file" | "files" | "collection" | "encryption">;
-export declare let store: AppStorePort;
-/** 有活店？（attachment attached 或 legacy 预建店在岗）。P3 sunset：isCloudEnabled 的新真相。 */
+export type GalleryBackend = {
+    kind: "live";
+    store: AppStorePort;
+} | {
+    kind: "none";
+};
+export declare function galleryBackend(): GalleryBackend;
+export declare function requireStore(): AppStorePort;
+/** 有活店？店懒出生后的不变量：_storeFull≠null ⇔ attachment attached（无预建店无 boot 窗口）。
+ *  P3 sunset：isCloudEnabled 的真相源。 */
 export declare function hasLiveStore(): boolean;
 export type { Collection, EncryptedBlob } from "@internal/store";
 export declare let brushRackCollection: _Coll;
@@ -15,11 +24,8 @@ export declare function _seedNextRackInitData(items: {
 /** 换当前 store 实例（next=null → null-store = 无库模式）。重灌 4+1 collections、重跑 init 门、
  *  广播 wp:gallery-changed（笔架等持句柄消费者在 app.ts 监听重挂）。旧实例的 dispose 由调用方（attachment 器官）负责。 */
 export declare function _swapStoreForGallery(next: Store | null): Promise<void>;
-/** attachment 器官取全 Store（dispose/files.dirty 面）。app 层其余一律走 AppStorePort。 */
-export declare function _currentFullStore(): Store;
 /** persist 三件套③执行体（手势时刻调；fire-and-forget，结果永不改变数据安全行为）。值级 import 收拢本接缝。 */
 export declare function requestGalleryPersist(): void;
-export declare function _takeBootStore(): Store | null;
 /** 为 registry 条目建新 store 实例（不换当前——换是 _swapStoreForGallery 的事）。 */
 export declare function _buildStoreForGalleryEntry(entry: {
     kind: "onedrive" | "folder";
@@ -27,15 +33,17 @@ export declare function _buildStoreForGalleryEntry(entry: {
     handle?: unknown;
 }): Store;
 export declare const isAuthConfigured: () => boolean;
-export declare const initAuth: () => Promise<import("@internal/store").AuthState>;
+export declare const initAuth: () => Promise<void> | Promise<import("@internal/store").AuthState>;
 export declare const signIn: () => Promise<unknown>;
 export declare const signOut: () => Promise<void>;
 export declare const isSignedIn: () => boolean;
 export declare const getActiveAccount: () => any;
 export declare const retrySilentSignIn: () => Promise<boolean>;
-export declare const getToken: () => Promise<string>;
-export declare const onAuthChanged: (cb: Parameters<typeof _auth.onAuthChanged>[0]) => () => void;
-export declare const getAuthState: () => import("@internal/store").AuthState;
+export declare const getToken: () => Promise<string> | Promise<null>;
+export declare const onAuthChanged: (cb: Parameters<_Auth["onAuthChanged"]>[0]) => () => void;
+export declare const getAuthState: () => import("@internal/store").AuthState | {
+    signedIn: false;
+};
 declare function itemToG(it: {
     path: string;
     syncState: string;

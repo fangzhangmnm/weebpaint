@@ -23,7 +23,7 @@ import {
   createApp, defineComponent, reactive, ref, computed, watch, onMounted, onUnmounted, nextTick,
 } from "../../vendor/vue/vue.esm-browser.prod.js";
 import {
-  store as _store,
+  requireStore, galleryBackend,
   watchFolder, listGalleryTrash, openCloudImage,
 } from "../app-store.ts";
 import type { CloudImageItem } from "../app-store.ts";
@@ -180,7 +180,7 @@ const ThumbCell = defineComponent({
         .then(({ blob }: { blob: Blob }) => {
           if (seq !== fetchSeq) return;
           showCloud.value = false;
-          if (_store.encryption.isEncryptedPeekBlob(blob)) { cloudEncBlob = blob; return tryDecrypt(); }
+          if (requireStore().encryption.isEncryptedPeekBlob(blob)) { cloudEncBlob = blob; return tryDecrypt(); }
           setBlob(blob);
         })
         .catch((err: unknown) => reportError(new Error("[gallery] thumb: " + String(err)), "log"));
@@ -318,6 +318,9 @@ function makeGallery(host: GalleryHost) {
       function subscribe() {
         _unsub?.(); _unsub = null;
         if (view.value !== "files") return;
+        // kind:none：不订阅、空网格（图库页无库不可开——组件 boot 期在场但静默；挂库后 refresh 重订）。
+        //   旧版靠 null-store 喂空帧装订阅，替身退役后这里显式表态（2026-08-27 single-html smoke 逮到）。
+        if (galleryBackend().kind === "none") { data.files = []; data.images = []; data.folderNames = []; loading.value = false; return; }
         loading.value = _framedFolder !== folder.value;
         _unsub = watchFolder(folder.value, (snap) => {
           if (snap.path !== folder.value) return;   // 双保险：换夹途中的旧帧丢弃（库内已 sanity-check，此处再挡）
@@ -441,7 +444,7 @@ function makeGallery(host: GalleryHost) {
         // 竞态窗（v0.9.35，QA 3）：云端帧未到时孪生可能不在当前帧 → store.nameOccupied 权威补查
         //   （本地命中即短路；在线含云端一次往返）。session.open 只消费 item.name（openItem 已核实），
         //   最小 item 即可——别猜 local/cloud 腿的形状。
-        if (await _store.files.nameOccupied(sessionFileName(twin))) {
+        if (await requireStore().files.nameOccupied(sessionFileName(twin))) {
           await session.open({ name: twin, local: null, cloud: null, dirty: false, ghost: false, pendingGone: false } as unknown as GItem);
           return;
         }
@@ -457,7 +460,7 @@ function makeGallery(host: GalleryHost) {
         if (!(await host.confirm(t("gal.dlg.delTitle", { name: img.name }), t("gal.del.imageDetail")))) return;
         await host.busy(t("gal.busy.del", { name: img.name }), async () => {
           try {
-            const del = await _store.file(img.path, { isZip: false, mode: "existing" }).delete();
+            const del = await requireStore().file(img.path, { isZip: false, mode: "existing" }).delete();
             if (del.status === "cancelled") { host.status(t("gal.st.delCancelled", { name: img.name })); return; }
             host.status(del.status === "noop" ? t("gal.st.delNothing", { name: img.name })
               : del.queuedCloudDelete === false ? t("gal.st.delLocalOnly", { name: img.name })
@@ -488,7 +491,7 @@ function makeGallery(host: GalleryHost) {
           // 也包进来——否则确认后到锁屏之间有明显空窗（用户：「点了没立刻锁，过一会才锁」）。
           const result = await host.busy<{ taken?: string; ok?: boolean; error?: unknown }>(t("gal.busy.rename", { name: item.name, to: trimmed }), async () => {
             try {
-              const r = await _store.file(sessionFileName(item.name), { isZip: true, mode: "existing" }).tryMove(sessionFileName(trimmed));   // 含占用检查（不动字节直接返错）；不抛碰撞。边界转全名。
+              const r = await requireStore().file(sessionFileName(item.name), { isZip: true, mode: "existing" }).tryMove(sessionFileName(trimmed));   // 含占用检查（不动字节直接返错）；不抛碰撞。边界转全名。
               if (!r.ok) return { taken: whereLabel(r.where) };
               host.status(t("gal.st.renamed", { to: trimmed }));
               return { ok: true };
@@ -519,7 +522,7 @@ function makeGallery(host: GalleryHost) {
         // 占用检查内化在 store.tryMove（第一行 nameOccupied，占用则不动字节返 {ok:false}）——app 不 list 目标夹。
         await host.busy(t("gal.busy.move", { base, target: target || t("gal.root") }), async () => {
           try {
-            const r = await _store.file(sessionFileName(item.name), { isZip: true, mode: "existing" }).tryMove(sessionFileName(newName));   // 边界转全名
+            const r = await requireStore().file(sessionFileName(item.name), { isZip: true, mode: "existing" }).tryMove(sessionFileName(newName));   // 边界转全名
             if (!r.ok) { host.status(t("gal.st.nameTakenTarget", { loc: whereLabel(r.where), base }), true); return; }
             if (item.name === host.activeName()) session.setName(newName);
             host.status(t("gal.st.moved", { target: target || t("gal.root") }));
@@ -540,7 +543,7 @@ function makeGallery(host: GalleryHost) {
         await host.busy(t("gal.busy.copy", { base: pathBasename(item.name) }), async () => {
           try {
             // 加密源优先走密文原样搬；非加密件 getEncryptedBlob 返 null → 回落 open()（明文源本来就该明文拷）。
-            const src = _store.file(sessionFileName(item.name), { isZip: true, mode: "existing" });
+            const src = requireStore().file(sessionFileName(item.name), { isZip: true, mode: "existing" });
             const bytes: Blob | null = (await src.getEncryptedBlob()) ?? (await src.open());
             if (!bytes) { host.status(t("gal.st.copyNoBytes"), true); return; }
             // 目标名：同文件夹下「<名> 副本」「<名> 副本2」…取首个不占用的。源在当前夹 → 直接用手上的单夹快照，不 poll、不列全库。
@@ -550,7 +553,7 @@ function makeGallery(host: GalleryHost) {
             const taken = new Set(data.files.map((it) => it.name));
             const newName = copyTargetName(item.name, (n: string) => taken.has(n));
             // 写新身份：本地存 + 云端 push（云端 best-effort，离线/失败标未推送，下次 Ctrl+S 续）。
-            await _store.file(sessionFileName(newName), { isZip: true, mode: "new" }).save(bytes, { tryPush: cloudOn });   // 新身份：本地存 + best-effort 推。边界转全名。
+            await requireStore().file(sessionFileName(newName), { isZip: true, mode: "new" }).save(bytes, { tryPush: cloudOn });   // 新身份：本地存 + best-effort 推。边界转全名。
             host.status(t("gal.st.copied", { name: pathBasename(newName) }));
           } catch (e: unknown) { host.status(t("gal.st.copyFail", { e: String((e as { message?: unknown })?.message || e) }), true); }
         });
@@ -563,7 +566,7 @@ function makeGallery(host: GalleryHost) {
         openMenu.value = null;
         await host.busy(t("gal.busy.reupload"), async () => {
           try {
-            const r = await _store.file(sessionFileName(item.name), { isZip: true, mode: "existing" }).reupload();
+            const r = await requireStore().file(sessionFileName(item.name), { isZip: true, mode: "existing" }).reupload();
             if (r.status === "no-local") { host.status(t("gal.st.reuploadFail", { e: "no-local" }), true); return; }
             host.status(t("gal.st.reuploaded", { name: item.name }));
           } catch (e: unknown) {
@@ -608,7 +611,7 @@ function makeGallery(host: GalleryHost) {
         if (pw == null) { host.status(t("gal.st.cancelled")); return; }
         setPassword(pw);
         try {
-          const res = await _store.file(sessionFileName(item.name), { isZip: true, mode: "existing" }).encrypt({ isOnline: () => host.signedIn() && host.online() });
+          const res = await requireStore().file(sessionFileName(item.name), { isZip: true, mode: "existing" }).encrypt({ isOnline: () => host.signedIn() && host.online() });
           if (res.status === "already") { host.status(t("gal.st.alreadyEnc")); return; }
           if (!(await _afterSwap(item, res, t("gal.st.encryptedOk", { name: item.name })))) return;
         } catch (e: unknown) { host.status(t("gal.st.encFail", { e: String((e as { message?: unknown })?.message || e) }), true); }
@@ -623,7 +626,7 @@ function makeGallery(host: GalleryHost) {
         // **解锁在 busy 之前**（flow.decrypt 自带 busy；密码框不能在 busy 里弹→死锁）
         if (!(await ensureUnlocked(item.name))) { host.status(t("gal.st.cancelledPw"), true); return; }
         try {
-          const res = await _store.file(sessionFileName(item.name), { isZip: true, mode: "existing" }).decrypt({ isOnline: () => host.signedIn() && host.online() });
+          const res = await requireStore().file(sessionFileName(item.name), { isZip: true, mode: "existing" }).decrypt({ isOnline: () => host.signedIn() && host.online() });
           if (res.status === "not-encrypted") { host.status(t("gal.st.notEnc")); return; }
           await _afterSwap(item, res, t("gal.st.decrypted", { name: item.name }));
         } catch (e: unknown) { host.status(t("gal.st.decryptFail", { e: String((e as { message?: unknown })?.message || e) }), true); }
@@ -649,7 +652,7 @@ function makeGallery(host: GalleryHost) {
           try {
             // 读 DelResult（v436）：以前丢掉它，于是用户在脏文件警告里点「取消」也报「已删除」，
             //   离线且谱系不明（云端那份还在）同样报「已删除」。范本就在隔壁：emptyTrash 一直正确读 res.failed。
-            const del = await _store.file(sessionFileName(item.name), { isZip: true, mode: "existing" }).delete();
+            const del = await requireStore().file(sessionFileName(item.name), { isZip: true, mode: "existing" }).delete();
             if (del.status === "cancelled") { host.status(t("gal.st.delCancelled", { name: item.name })); return; }
             void session.dropCheckpoint(item.name);   // 作品没了 → 丢掉它的 revert 快照（按 key 精确清，不扫全库）
             if (isActive) await session.exit();
@@ -668,7 +671,7 @@ function makeGallery(host: GalleryHost) {
         // 走 store.flow.deleteFolder：库内强制锁屏 + 「必须空」兜底 + 不吞错（旧版 getItemByPath 没选 folder facet
         //   → item.folder 永远 undefined → 根本没删却照报「已删除」= N9 + 用户「删空夹不可用」）。
         try {
-          await _store.files.deleteFolder(ft.path);
+          await requireStore().files.deleteFolder(ft.path);
           host.status(t("gal.st.folderDeleted", { name: ft.name }));
         } catch (e: unknown) { host.status(t("gal.st.folderDelFail", { e: String((e as { message?: unknown })?.message || e) }), true); }
         await reload();
@@ -678,7 +681,7 @@ function makeGallery(host: GalleryHost) {
         openMenu.value = null;
         await host.busy(t("gal.busy.restore", { name: item.name }), async () => {
           try {
-            const res = await _store.files.restoreTrash({
+            const res = await requireStore().files.restoreTrash({
               trashKey: item.local ? item.local.trashKey : null,
               fromCloud: !!item.cloud,
               cloudRef: item.cloud ? item.cloud.id : null,
@@ -697,7 +700,7 @@ function makeGallery(host: GalleryHost) {
         if (!(await host.confirm(t("gal.dlg.purgeTitle", { name: item.name }), t("gal.dlg.purgeMsg")))) return;
         await host.busy(t("gal.busy.purge", { name: item.name }), async () => {
           try {
-            await _store.files.purgeTrash({ trashKey: item.local ? item.local.trashKey : null, cloudRef: item.cloud ? item.cloud.id : null });
+            await requireStore().files.purgeTrash({ trashKey: item.local ? item.local.trashKey : null, cloudRef: item.cloud ? item.cloud.id : null });
             host.status(t("gal.st.purged", { name: item.name }));
           } catch (e: unknown) { host.status(t("gal.st.purgeFail", { e: String((e as { message?: unknown })?.message || e) }), true); }
         });
@@ -710,7 +713,7 @@ function makeGallery(host: GalleryHost) {
         if (scope === "cloud" && !(host.signedIn() && host.online())) { host.status(t("gal.st.emptyTrashCloudNeedLogin"), true); return; }
         if (!(await host.confirm(t("gal.dlg.emptyTrashTitle", { label }), t("gal.dlg.emptyTrashMsg", { label })))) return;
         await host.busy(t("gal.busy.emptyTrash", { label }), async () => {
-          const res = await _store.files.emptyTrash({ scope });
+          const res = await requireStore().files.emptyTrash({ scope });
           const cloudFails = ((res.failed || []) as Array<{ where?: string }>).filter((f) => f.where !== "local").length;
           if (scope !== "local" && cloudFails) host.status(t("gal.st.emptyTrashCloudFail", { n: cloudFails }), true);
           else if ((res.failed || []).length) host.status(t("gal.st.emptyTrashPartial"), true);

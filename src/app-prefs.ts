@@ -45,8 +45,8 @@ let _synced: Collection | undefined;   // gallery 层引擎（P3 起换成「当
 const _session = new Map<string, unknown>();
 const _dk = (k: string) => `pref:${k}`;
 
-export function wirePreferences(local: Collection, synced: Collection): void {
-  _local = local; _synced = synced;
+export function wirePreferences(local: Collection | undefined, synced: Collection | undefined): void {
+  _local = local; _synced = synced;   // undefined 对 = kind:none（无库：gallery scope 经 cascade 落 device 层）
   _ready = undefined;   // P3 热插拔：换库重灌 → 重置 ready 门（下一次 initPreferences 对新 collection 重跑 init）
 }
 // P6：gallery 层在不在（P5 §9.7 cascade 的开关）。无库模式（null-store）时 gallery scope 读写全落

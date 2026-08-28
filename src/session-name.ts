@@ -3,12 +3,14 @@
 // topbar-menu.runSaveAsFlow（原 menuSaveAs handler，2026-08-21 入口挪进导出与另存 hub）各抄一份占用检查。两者循环结构有意不同
 // （rename 把检查包进 withBusy 覆盖空窗；saveAs 在 busy 前查），故只抽**检查本身**，调用点结构不动。
 
-import { store } from "./app-store.ts";
+import { galleryBackend } from "./app-store.ts";
 import { sessionFileName } from "./config.ts";
 
 // 名字占用预检（rename / saveAs 共用）——**统一走 store.files.nameOccupied**（唯一 local+remote 占用检查）。
 //   返回 **boolean**（在线云端+本地都看，离线只看本地；store 自己按在线态决定查不查云）。
 //   边界：**session 名**（非文件夹）→ sessionFileName 转全名（库身份=X.ora）。文件夹占用检查另有其路（gallery-shell 传裸文件夹路径，不经此）。
 export async function sessionNameConflict(name: string): Promise<boolean> {
-  return store.files.nameOccupied(sessionFileName(name));
+  const be = galleryBackend();
+  if (be.kind === "none") return false;   // 无库：无占用可查（下载名浏览器自补 (1)；saveAs 入口无库本就不可达）
+  return be.store.files.nameOccupied(sessionFileName(name));
 }

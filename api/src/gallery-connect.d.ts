@@ -15,9 +15,9 @@ export declare function mintFolderByPicker(): Promise<MintResult | null>;
 export declare function mintOneDriveByAccount(): Promise<MintResult | null>;
 /** 挂载既有条目（手势上下文；调用方保证已过绿灯门 detach）。folder 缺权限当场 request 一次。 */
 export declare function attachGallery(entry: GalleryEntry): Promise<void>;
-/** boot 静默重挂（app.ts prefsReady 链头，fixup/restore 之前）：
- *  · lastActive = legacy OneDrive（dbId=defaultStore）→ **领养**预建实例（零换店零重灌 = 现状路径）；
- *  · lastActive = folder / 非 legacy OneDrive → 规矩 dispose 预建实例（无人用过，无数据风险）→ attach（权限只 query）；
- *  · 无 lastActive → 不动（legacy 现状继续当家；关云/无库的真 sunset = Slice E）。
- *  任何失败 → 响亮上报 + 回落无库模式（绝不让 app 骑在已 dispose 的店上）。 */
+/** boot 静默重挂（app.ts prefsReady 链头，fixup/restore 之前）。店懒出生（2026-08-27）后只剩一问：
+ *  registry lastActive 有条目吗？有 → 普通 attach（建店+换入；gesture:false 不 requestPersist、folder 权限
+ *  只 query 不弹）；无/读不出 → 什么都不做（eval 起点就是 kind:"none"，无预建实例可拆）——
+ *  「无账号无文件不应该有 gallery」（user 2026-08-27）由出生姿势直接保证，不再靠 boot 拆迁。
+ *  attach 失败 → 响亮上报 + 回落无库（绝不让 app 骑在半挂的店上）。 */
 export declare function bootAttachFromRegistry(): Promise<void>;

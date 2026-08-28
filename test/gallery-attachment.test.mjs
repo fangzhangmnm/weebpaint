@@ -95,23 +95,18 @@ describe("gallery-attachment · detach（绿灯门：收口开画 → dirty 扫 
   });
 });
 
-describe("gallery-attachment · bootAdopt（legacy 领养预建实例：零换店零重灌）", () => {
-  it("领养：不 build 不 swap，只 lock+touch；attach(opts.online:false) = 离线挂载", async () => {
+describe("gallery-attachment · boot 静默 attach（店懒出生 2026-08-27：bootAdopt 退役，boot=普通 attach + gesture:false）", () => {
+  it("attach(gesture:false) 跳过 requestPersist（persist 只在用户手势申请）；缺省手势仍申请", async () => {
     const { a, calls } = rig();
-    const boot = { dispose: async () => {}, files: { dirty: { count: async () => 0 } } };
-    a.bootAdopt(entry("default"), boot, { online: false });
-    assert(!calls.some((c) => c[0] === "build" || c[0] === "swap"), "零换店零重灌");
-    assert(calls.some((c) => c[0] === "lock" && c[1] === "default"), "active id 就位");
+    await a.attach(entry("g1"), { online: false, gesture: false });
+    assert(!calls.some((c) => c[0] === "persist"), "boot 静默不申请 persist");
+    assert(calls.some((c) => c[0] === "build"), "boot attach 照建店（懒出生的出生点）");
     eq(a.state().kind, "attached"); eq(a.state().online, false);
-    let threw = false;
-    try { a.bootAdopt(entry("g2"), boot); } catch { threw = true; }
-    assert(threw, "attached 时 bootAdopt 拒绝");
-    const r = await a.detach();                            // 领养的实例照样能走绿灯门卸下
+    const r = await a.detach();
     eq(r.ok, true);
     const { a: b, calls: c2 } = rig();
-    await b.attach(entry("g1"), { online: false });
-    eq(b.state().online, false);
-    assert(c2.some((c) => c[0] === "build"), "正常 attach 仍建店");
+    await b.attach(entry("g2"));
+    assert(c2.some((c) => c[0] === "persist"), "手势 attach 申请 persist");
   });
 });
 

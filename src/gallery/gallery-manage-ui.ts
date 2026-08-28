@@ -15,7 +15,7 @@ import { galleryAttachment } from "../gallery-attachment-host.ts";
 import { galleryRegistry } from "../gallery-registry.ts";
 import type { GalleryEntry } from "../gallery-registry.ts";
 import { mintFolderByPicker, mintOneDriveByAccount, attachGallery, ensureFolderPermission, canPickFolderGallery, type MintResult } from "../gallery-connect.ts";
-import { store, signIn, isSignedIn, isAuthConfigured, _seedNextRackInitData, _takeBootStore, _buildStoreForGalleryEntry, brushRackCollection } from "../app-store.ts";
+import { requireStore, galleryBackend, signIn, isSignedIn, isAuthConfigured, _seedNextRackInitData, _buildStoreForGalleryEntry, brushRackCollection } from "../app-store.ts";
 import { getAllBrushes, getMeta, RACK_META_ID } from "../brushes.ts";
 import { preferences, PREF_REGISTRY, type PrefKey } from "../app-prefs.ts";
 import { docHome } from "../doc-home.ts";
@@ -63,12 +63,8 @@ async function closeCurrentStoreWithGates(): Promise<boolean> {
     await galleryAttachment.forceDetach();
     return true;
   }
-  // detached 态兜底：2026-08-27 真 sunset 后 boot 收口即无库（null-store：dirty 恒 0、boot 店已取走
-  //   → 本分支直通 true）；保留 dirty 扫代码当保险带（万一 boot 窗口内被调，口径同绿灯门）
-  const dirty = await store.files.dirty.count();
-  if (dirty > 0 && !(await escapeSheet(dirty))) return false;
-  const boot = _takeBootStore();
-  if (boot) await boot.dispose({ drain: false }).catch((e) => reportError(new Error("[gallery-manage] legacy dispose: " + String(e)), "log"));
+  // detached 态：店懒出生后的不变量 = detached ⇔ kind:none（无预建店无领养窗，无店可拆）。
+  //   万一不变量被打破（backend live 却 detached）也宁可放行 attach（attach 自己有 attached 门），不在这吞。
   return true;
 }
 
@@ -86,7 +82,7 @@ async function escapeSheet(dirtyCount: number): Promise<boolean> {
     if (v == null) return false;                       // 取消
     if (v === "force") return true;
     await backupDirty();                               // 备份后重扫再问（推上去的已不 dirty）
-    dirtyCount = await store.files.dirty.count();
+    dirtyCount = await requireStore().files.dirty.count();
     if (dirtyCount === 0) { _status(t("gm.dirtyAllPushed"), true); return true; }
   }
 }
@@ -94,11 +90,11 @@ async function escapeSheet(dirtyCount: number): Promise<boolean> {
 /** 下载备份：先 pushAll 尽力推（在线时最好的备份就是云）；推不上去的（failed=错误报告面）逐张下载。 */
 async function backupDirty(): Promise<void> {
   try {
-    const { failed } = await store.files.dirty.pushAll();
+    const { failed } = await requireStore().files.dirty.pushAll();
     let saved = 0;
     for (const name of failed) {
       try {
-        const blob = await store.file(name, { isZip: false, mode: "existing" }).open();
+        const blob = await requireStore().file(name, { isZip: false, mode: "existing" }).open();
         if (blob) { triggerDownload(blob, name.split("/").pop() || name); saved++; }
       } catch (e) { reportError(new Error(`[gallery-manage] backup download failed for ${name}: ` + String(e)), "log"); }
     }
@@ -132,8 +128,12 @@ async function switchFlow(entry: GalleryEntry, opts: { askSeed: boolean }): Prom
   }
   if (seed) for (const [k, v] of Object.entries(seed.prefs)) preferences.set(k as PrefKey, v as never);
   _status(t("gm.switched", { label: entry.label }), true);
-  // 切库后落 gallery 页（Q4 拍板：切库意图=去看那个库；不写回执条，boot 恢复不受影响）
-  try { if (els.galleryFull.classList.contains("hidden")) _ctx?.setGalleryOpen(true); } catch { /* noop */ }
+  // 切库后落 gallery 页（Q4 拍板：切库意图=去看那个库；不写回执条，boot 恢复不受影响）。
+  //   ⚠ 仅当没有开着的画（docHome=null）——2026-08-27 无痕事故：transient 脏画布被这行无门导航
+  //   正常关闭焚毁（词典序②当前操作不丢）。有画开着 = 留在编辑器：画照画，库已挂上，图库自己去点。
+  if (docHome() == null) {
+    try { if (els.galleryFull.classList.contains("hidden")) _ctx?.setGalleryOpen(true); } catch { /* noop */ }
+  }
   try { _ctx?.gallery.refresh(); } catch { /* gallery 未挂 */ }
   renderGalleryManage();
 }
@@ -264,7 +264,7 @@ async function reconnectFlow(): Promise<void> {
     if (att.entry.kind === "onedrive") { await signIn(); galleryAttachment.setOnline(isSignedIn()); }
     else galleryAttachment.setOnline(await ensureFolderPermission(att.entry, { request: true }));
     if (galleryAttachment.state().kind === "attached" && (galleryAttachment.state() as { online?: boolean }).online) {
-      store.files.drainOfflineQueue().catch(() => { /* 良性 */ });
+      requireStore().files.drainOfflineQueue().catch(() => { /* 良性 */ });
       try { _ctx?.gallery.refresh(); } catch { /* noop */ }
       _status(t("gm.reconnected"));
     }

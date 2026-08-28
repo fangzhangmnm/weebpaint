@@ -20,7 +20,7 @@ import { encodeDocToOra, decodeOraToPainting, paintingDataToEncodeDoc, parseAppV
 import { ORA_FORMAT_VERSION } from "./backend/ora-stack-xml.ts";
 import { flattenViewLeaves } from "./backend/workpiece/painting-view.ts";
 import { tLatin } from "./i18n/index.ts";
-import { isSignedIn, store as _store } from "./app-store.ts";
+import { isSignedIn, requireStore, galleryBackend } from "./app-store.ts";
 import type { EncryptedBlob } from "./app-store.ts";   // 密文 at-rest 字节（branded）；B2：类型经接缝转口
 import { openInputSheet, openConfirmSheet, openChoiceSheet, lockSyncGate, settleSyncGate } from "./sheets.ts";
 import { readHandleFile, writeHandleBlob, handleMtime, hasWeebPaintTraces, supportsSaveFilePicker, pickSaveOraFile, type LocalFileHandle } from "./local-file-session.ts";
@@ -113,7 +113,7 @@ function _setActive(name: string | null): void {
   //   无地**不持锁**：无 store 身份、FS handle 拿不到全路径无稳定唯一键，且已有 mtime 陈旧对表兜底）。
   if (bare != null) holdDocLock(bare); else releaseDocLock();
 }
-const _file = (name: string) => _store.file(toFull(name), { isZip: true, mode: "existing" });   // WeebPaint work-file = ora-zip 容器（有 peek）
+const _file = (name: string) => requireStore().file(toFull(name), { isZip: true, mode: "existing" });   // WeebPaint work-file = ora-zip 容器（有 peek）
 async function _refreshEncrypted() {
   const name = _activeName();
   try { _enc.encrypted = name ? await _file(name).isEncrypted() : false; }
@@ -252,7 +252,10 @@ function _esRebound() { _esMuted = false; }
 async function openLocalFile(handle: LocalFileHandle): Promise<File | null> {
   const file = await readHandleFile(handle);
   // 加密容器：原位模式 v1 不吃密文（解锁/记忆密码/落库语义全在导入路径）→ 交还导入。
-  if (await _store.encryption.isEncryptedBlob(file)) return file;
+  //   kind:none 探不了加密（encryption 面挂在 store 实例上；独立出口 = store escalation 已登记）——
+  //   加密件会在下面 decode 响亮失败，与旧 null-store「谎报不加密」同终点但不再靠替身撒谎。
+  const _be = galleryBackend();
+  if (_be.kind === "live" && await _be.store.encryption.isEncryptedBlob(file)) return file;
   const loaded = await decodeOraToPainting(file) as LoadedDoc;
   if (!hasWeebPaintTraces(loaded)) return file;   // 外来 ora（Krita 等）→ 导入为新 doc，绝不原位覆写别人的文件
   if (!(await _gateFillOnSwitch())) return null; // 挽留门：fill 预览挂着 → 应用/丢弃/取消（user 2026-08-21）
@@ -556,7 +559,7 @@ async function _readCheckpointEntry(id: string): Promise<{ blob: Blob; at: numbe
     if (!name) return null;                              // 加密档只可能是 gallery 家（file 家原位=明文件）
     const pw = getPassword(name);
     if (!pw) return null;                                // 锁定 → 调用方提示「需要密码」
-    const plain = await _store.encryption.tryDecryptEncryptedBlob(rec.bytes, pw);
+    const plain = await requireStore().encryption.tryDecryptEncryptedBlob(rec.bytes, pw);   // 加密档只可能是 gallery 家（上行注释）→ 必有库
     return plain ? { blob: plain, at: rec.at } : null;
   } catch (e) { reportError(new Error("[checkpoint] read failed: " + String(e)), "log"); return null; }
 }
@@ -976,7 +979,7 @@ async function saveAs(newName: string): Promise<void> {
   _applyPendingForExplicitSave();   // 显式保存：fill 预览也收口（topbar 侧只 apply 了 transient）
   const { bytes, peek } = await _encodeCurrentOraWithPeek();
   // 另存为=写**新身份** → mode:"new"（撞名不静默覆盖；topbar 已 nameOccupied 预检，这里 store 层再兜底红线）。
-  await _store.file(toFull(newName), { isZip: true, mode: "new" }).save(bytes, { tryPush: true, hint: peek ? { peek } : undefined });
+  await requireStore().file(toFull(newName), { isZip: true, mode: "new" }).save(bytes, { tryPush: true, hint: peek ? { peek } : undefined });
   if (_fileHome()) { _homeAuth.setHome(null); _dropLuggage(); }   // 收编：内容已进库（就是刚写的字节），不算丢弃，无需问
   _setActive(newName); _isLazyBlankSession = false; _recomputePhase();
   es.adopted(toFull(newName));   // es 切到新名（内容即新名的；下轮 autosave 若跑=同内容 re-save，无害）。边界转全名。
@@ -1143,7 +1146,9 @@ export function initSession(ctx: AppContext) {
 
   // ora editor 适配器 + editor-session（生命周期编排全塌进这里）。
   es = createEditorSession({
-    store: _store as unknown as StoreLike,   // 真 store 结构满足 StoreLike（file/reconcile 超集）；断言解耦
+    // 调用时解析（ambient 退役 2026-08-27）：es 不再捕获 store 实例——热插拔换库后 file 面永远新鲜
+    //   （旧版 init 捕获 = 换库后 es 保存踩 stale 句柄的潜伏雷）。gallery 家以外的 saveRoute 分支摸不到这里。
+    store: { file: (n, o) => requireStore().file(n, o) } as StoreLike,
 
     editor: {
       adopt: async (bytes: Blob) => {

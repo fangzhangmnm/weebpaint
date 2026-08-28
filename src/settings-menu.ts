@@ -28,7 +28,7 @@ import type { AppContext } from "./app-context.ts";
 // KEYBOARD_SHORTCUTS 元素（input.js 未类型化 → 描述渲染用到的字段）。
 interface ShortcutLike { category?: string; desc: string; combo: string; }
 
-let state: AppContext["state"], board: AppContext["board"], setStatus: AppContext["setStatus"], store: AppContext["store"], updateSaveStatus: AppContext["updateSaveStatus"];
+let state: AppContext["state"], board: AppContext["board"], setStatus: AppContext["setStatus"], updateSaveStatus: AppContext["updateSaveStatus"];
 
 // openSheet/closeSheet：app.js-local 小工具被快捷键 sheet 用，inline 复制一份（app 仍各自保留）
 function openSheet(sheet: HTMLElement | null, backdrop: HTMLElement | null) {
@@ -214,7 +214,7 @@ function _applyMenuTab() {
 }
 
 export function initSettingsMenu(ctx: AppContext) {
-  ({ state, board, setStatus, store, updateSaveStatus } = ctx);
+  ({ state, board, setStatus, updateSaveStatus } = ctx);
 
   // v0.9.26 PWA 安装入口（user 2026-08-20）：capture 要尽早挂（事件发在监听前就收不到了）；
   //   设置页按钮在此绑，图库菜单那颗在 gallery-shell 绑（各自收各自的面板）。

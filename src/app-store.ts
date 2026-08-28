@@ -3,7 +3,7 @@
 //   app 只碰 store 两面（**file / collection**）+ editor-session。绝不裸碰 kv/IDB/graph/vendor。
 //   （localSettings/syncedSettings 那两面已于 2026-07-13 删除 —— 全部 KV 化进 collection。别照旧注释找。）
 import { createStore, createOneDriveProvider, createFolderProvider, isCached, isDirty, requestStoragePersistence } from "@internal/store";
-import { detectStoreAbsent, createNullStore, createDormantAuth } from "./store-absent.ts";
+import { detectStoreAbsent, createMemoryCollection } from "./store-absent.ts";
 import { embeddedBlobUrl } from "./single-file.ts";   // P6 单文件内嵌读口（msal 逃生舱）
 import type { Store, Collection as _Coll } from "@internal/store";
 import { stripSessionExt, sessionFileName } from "./config.ts";
@@ -19,18 +19,20 @@ import { builtinBrushInitData } from "./brushes.ts";
 import { isDocPath, isImagePath, imageBasename } from "./gallery/cloud-image-model.ts";
 import { naturalCompare } from "./gallery/natural-order.ts";
 
-// ============ 显式装配（v0.8.7 · B 骑士）============
-// store = 插件不是地基：装配收进 _assemble()，按 detectStoreAbsent()（?nostore / localStorage 开关）
-// 选真 store 或 null-store（src/store-absent.ts——内存 collection / 空 gallery / 不落盘 / auth·加密 dormant）。
+// ============ 显式装配（v0.8.7 · B 骑士；2026-08-27 替身退役）============
+// store = 插件不是地基：按 detectStoreAbsent()（?nostore / 平台探针）选真装配或 kind:"none"。
 // 缺席模式下 createOneDriveProvider/createStore **完全不被调用**（零 IDB/localStorage 命名空间副作用）。
 export const storeAbsent = detectStoreAbsent();
 
 type _Prov = ReturnType<typeof createOneDriveProvider>["provider"];
 type _Auth = ReturnType<typeof createOneDriveProvider>["auth"];
-function _assembleReal(): { provider: _Prov | null; auth: _Auth; store: Store } {
+function _assembleReal(): { provider: _Prov | null; auth: _Auth } {
   // P6 单文件：msal 从内嵌走 blob URL（file:// MSAL 无戏，这条是 http://localhost 逃生舱用——verdicts §2.9）。
+  // ⚠ 这里**不再预建 store**（2026-08-27 懒出生）：店只在 attach 时刻经 _buildStoreForGalleryEntry 出生。
+  //   预建的代价实测过：boot 进无库要 dispose 它，migration 后台自跑被腰斩 + eval 期 collections 骑上
+  //   注定要死的实例 →「idb cache closed」黄警告（user 无痕实锤 2026-08-27）。
   const od = createOneDriveProvider({ clientId: CLIENT_ID, scopes: SCOPES, authority: AUTHORITY, msalUrl: embeddedBlobUrl("msal-browser.min.js", "text/javascript") ?? "./vendor/msal/msal-browser.min.js" });
-  return { provider: od.provider, auth: od.auth, store: _createRealStore(od.provider, () => od.auth.isSignedIn()) };
+  return { provider: od.provider, auth: od.auth };
 }
 
 // 加密 codec 注入（不注入 = 加密 dormant）。
@@ -82,28 +84,37 @@ const _createRealStore = (provider: _Prov, signedIn: () => boolean, databaseId?:
   activeFileName: () => { try { const o = readSlate().opened; return o?.kind === "doc" ? sessionFileName(o.path) : null; } catch { return null; } },
 });
 
-const _asm = storeAbsent
-  ? { provider: null, auth: createDormantAuth() as unknown as _Auth, store: createNullStore() }   // dormant auth：结构镜像 cast（同 null-store 纪律，smoke 点名 drift）
+// 缺席平台（storeAbsent）= 三个 null，不再造 dormant/null 替身（2026-08-27 ambient store 退役：
+//   替身的每个 benign no-op 都是一个没被迫回答的问题——现在由类型逼每个消费点表态）。
+const _asm: { provider: _Prov | null; auth: _Auth | null } = storeAbsent
+  ? { provider: null, auth: null }
   : _assembleReal();
 export const provider = _asm.provider;
-const _auth = _asm.auth;
+const _auth: _Auth | null = _asm.auth;
 
-// ============ B2 窄接口（C7 裁定落地，2026-08-10）============
+// ============ B2 窄接口（C7 裁定落地，2026-08-10；2026-08-27 ambient 退役改造）============
 // app 消费的 store 面**只有四个**：file / files / collection / encryption（全仓实测，其余 grep 命中皆旧注释）。
-// 裁定：全量手写镜像**不做**——「物理删除仍编译」的极端目标无受益方（headless 分层 = WeebPaintBackend，
-// 零 store 依赖；运行时缺席已由 null-store 达成），而镜像是 drift 源（维护成本 > 收益，
-// epoch-handoff §B2 的怀疑成立）。收敛形 = **派生窄 Port**（Pick 自库类型 SSoT，零镜像零 drift）：
-// 面收窄在此单点声明；app 若碰四面之外的成员 = 编译错。类型 import 也收拢本接缝（下方 re-export）。
+// 收敛形 = **派生窄 Port**（Pick 自库类型 SSoT，零镜像零 drift）；类型 import 也收拢本接缝（下方 re-export）。
 export type AppStorePort = Pick<Store, "file" | "files" | "collection" | "encryption">;
-// P3 热插拔：store 是 **live binding**（export let，全仓实测零模块级捕获——消费方都在调用点访问 store.xxx）。
+// ambient store 退役（2026-08-27 user 拍板「依赖整理好」）：不再有 take-as-granted 的全局 store 出口。
+//   消费点二选一表态（build.sh lint 守）：
+//   · requireStore()   —— 「此路径结构上必有库」（gallery UI / gallery 家保存）。无库被调 = 响亮 throw（bug surfaced）。
+//   · galleryBackend() —— 「此路径合法分叉」。exhaustive switch（DocHome 同手法）；禁 ?. 静默中间态。
+//   两者都是**调用时解析**（比旧 live binding 更强：模块级捕获物理不可能 stale）。
 //   换库 = _swapStoreForGallery 重指 + 重灌 collections + 广播 wp:gallery-changed；旧实例已 dispose，
 //   谁还攥着旧 collection 句柄谁就吃 StoreDisposedError（响亮死是契约，不是失败）。
-let _storeFull: Store = _asm.store;            // 全 Store（含 dispose）——只有 attachment 器官经 seam 摸它
-let _isNull = storeAbsent;                     // 当前是不是 null-store（无库模式/absent）；cloud-capability 的真相源
-export let store: AppStorePort = _storeFull;
-/** 有活店？（attachment attached；预建店只在 boot 窗口内短暂在岗——bootAttachFromRegistry 收口后
- *  要么被领养、要么 dispose 进无库模式，2026-08-27 真 sunset）。P3 sunset：isCloudEnabled 的新真相。 */
-export function hasLiveStore(): boolean { return !_isNull; }
+export type GalleryBackend = { kind: "live"; store: AppStorePort } | { kind: "none" };
+let _storeFull: Store | null = null;           // 全 Store（含 dispose）——**出生即 kind:none**（店懒出生：attach 才建）
+export function galleryBackend(): GalleryBackend {
+  return _storeFull ? { kind: "live", store: _storeFull } : { kind: "none" };
+}
+export function requireStore(): AppStorePort {
+  if (!_storeFull) throw new Error("requireStore() with no gallery backend — this path is structurally gallery-only (kind:none reached it = bug)");
+  return _storeFull;
+}
+/** 有活店？店懒出生后的不变量：_storeFull≠null ⇔ attachment attached（无预建店无 boot 窗口）。
+ *  P3 sunset：isCloudEnabled 的真相源。 */
+export function hasLiveStore(): boolean { return _storeFull != null; }
 export type { Collection, EncryptedBlob } from "@internal/store";   // app 侧仅剩的两个库类型，经接缝转口
 
 // ============ 设置/状态 collection（4 个）注入 ============
@@ -119,39 +130,37 @@ export let brushRackCollection: _Coll;
 let _nextRackInit: { id: string; value: unknown }[] | null = null;
 export function _seedNextRackInitData(items: { id: string; value: unknown }[] | null): void { _nextRackInit = items; }
 function _wireCollections(): void {
-  wirePreferences(store.collection("local-user-preference", { local: true }), store.collection("synced-user-preference"));
-  wireAppState(store.collection("synced-app-state"), store.collection("local-app-state", { local: true }));
+  const s = _storeFull;
   const rackSeed = _nextRackInit; _nextRackInit = null;
-  brushRackCollection = store.collection("brush-rack", { getInitData: rackSeed ? async () => rackSeed : builtinBrushInitData });
+  if (!s) {
+    // kind:none——prefs/state 引擎自带 Collection|undefined 位（gallery scope 经 cascade 落 device 层）；
+    //   笔架 = **内存 collection 器官**（无地全功能：内置笔可用、session 内可编辑、reload 失——
+    //   显式选择，不再是 null-store 替身的副作用；将来「笔架=文件家公民」另案）。
+    wirePreferences(undefined, undefined);
+    wireAppState(undefined, undefined);
+    brushRackCollection = createMemoryCollection({ getInitData: rackSeed ? async () => rackSeed : builtinBrushInitData });
+    return;
+  }
+  wirePreferences(s.collection("local-user-preference", { local: true }), s.collection("synced-user-preference"));
+  wireAppState(s.collection("synced-app-state"), s.collection("local-app-state", { local: true }));
+  brushRackCollection = s.collection("brush-rack", { getInitData: rackSeed ? async () => rackSeed : builtinBrushInitData });
 }
-_wireCollections();   // boot 装配（此后每次换库经 _swapStoreForGallery 重灌）
-setGalleryLayerLive(!storeAbsent);   // P6 cascade 开关：absent = 无库起步（gallery scope 落 device 层）
+_wireCollections();   // eval 装配 = kind:none（内存笔架 + prefs/state undefined 对）；attach 经 _swapStoreForGallery 重灌
+setGalleryLayerLive(false);   // P6 cascade：**恒无库起步**（gallery scope 落 device 层）；boot attach 的 swap 翻 true
 
 // ============ P3 热插拔 seam（只准 gallery-attachment-host 调）============
 /** 换当前 store 实例（next=null → null-store = 无库模式）。重灌 4+1 collections、重跑 init 门、
  *  广播 wp:gallery-changed（笔架等持句柄消费者在 app.ts 监听重挂）。旧实例的 dispose 由调用方（attachment 器官）负责。 */
 export async function _swapStoreForGallery(next: Store | null): Promise<void> {
-  _storeFull = next ?? createNullStore();
-  _isNull = next == null;
-  store = _storeFull;
+  _storeFull = next;
   _wireCollections();
   setGalleryLayerLive(next != null);   // P6 cascade：无库 → gallery scope 读写落 device 层
   await Promise.all([initPreferences(), initAppState()]);   // wirePreferences 重调已重置 ready 门（app-prefs 不 import 本文件，无环）
   try { window.dispatchEvent(new Event("wp:gallery-changed")); } catch { /* node 测试环境无 window */ }
 }
-/** attachment 器官取全 Store（dispose/files.dirty 面）。app 层其余一律走 AppStorePort。 */
-export function _currentFullStore(): Store { return _storeFull; }
 /** persist 三件套③执行体（手势时刻调；fire-and-forget，结果永不改变数据安全行为）。值级 import 收拢本接缝。 */
 export function requestGalleryPersist(): void {
   if (!storeAbsent) requestStoragePersistence().catch(() => { /* 降概率层，静默 */ });
-}
-// boot 预建实例的一次性移交（P3 Slice C）：boot 时 registry 说了算——legacy OneDrive 条目领养它、
-//   其余情形（folder / 非 legacy）规矩 dispose 后另建。取过一次或 absent 模式 = null。
-let _bootStoreTaken = false;
-export function _takeBootStore(): Store | null {
-  if (_bootStoreTaken || storeAbsent) return null;
-  _bootStoreTaken = true;
-  return _storeFull;
 }
 /** 为 registry 条目建新 store 实例（不换当前——换是 _swapStoreForGallery 的事）。 */
 export function _buildStoreForGalleryEntry(entry: { kind: "onedrive" | "folder"; dbId: string; handle?: unknown }): Store {
@@ -161,31 +170,34 @@ export function _buildStoreForGalleryEntry(entry: { kind: "onedrive" | "folder";
     const prov = createFolderProvider(entry.handle as Parameters<typeof createFolderProvider>[0]) as unknown as _Prov;
     return _createRealStore(prov, () => true, entry.dbId);   // folder=本地即在线；权限掉→provider 失败呈离线态（P3 verdicts §1.7）
   }
-  if (!provider) throw new Error("onedrive provider unavailable");
-  return _createRealStore(provider, () => _auth.isSignedIn(), entry.dbId === "defaultStore" ? undefined : entry.dbId);
+  if (!provider || !_auth) throw new Error("onedrive provider unavailable");
+  const auth = _auth;
+  return _createRealStore(provider, () => auth.isSignedIn(), entry.dbId === "defaultStore" ? undefined : entry.dbId);
 }
 
-// ============ auth（转发）============
-export const isAuthConfigured = () => _auth.isAuthConfigured();
-export const initAuth = (...a: Parameters<typeof _auth.initAuth>) => _auth.initAuth(...a);
-export const signIn = (...a: Parameters<typeof _auth.signIn>) => {
+// ============ auth（转发；_auth=null = 缺席平台，dormant 替身已退役 2026-08-27）============
+// null 语义与旧 dormant auth 逐条等价（isAuthConfigured=false 让 UI 整段跳过；signIn=响亮 throw），
+//   但不再靠结构镜像 cast——tsc 逼这里逐个表态，drift 由编译器点名而非 smoke。
+export const isAuthConfigured = () => _auth?.isAuthConfigured() ?? false;
+export const initAuth = (...a: Parameters<_Auth["initAuth"]>) => _auth ? _auth.initAuth(...a) : Promise.resolve();
+export const signIn = (...a: Parameters<_Auth["signIn"]>) => {
+  if (!_auth) return Promise.reject(new Error("store-absent mode: no cloud sign-in"));
   // persist 三件套之③（P3）：signIn = 现阶段唯一「挂图库」手势。在手势**入口**即调（popup 往返会耗尽
   //   user activation，Firefox 的 persist 弹窗要活着的手势）；fire-and-forget——结果永不改变数据安全行为
   //   （库契约：persist 是降概率层，真承重 = dirty 窗口短 + 正本不进 IDB）。Slice B 起移进 attachment.attach()。
-  if (!storeAbsent) requestStoragePersistence().catch(() => {});
+  requestStoragePersistence().catch(() => {});
   return _auth.signIn(...a);
 };
-export const signOut = (...a: Parameters<typeof _auth.signOut>) => _auth.signOut(...a);
-export const isSignedIn = () => _auth.isSignedIn();
-export const getActiveAccount = () => _auth.getActiveAccount();
-export const retrySilentSignIn = (...a: Parameters<typeof _auth.retrySilentSignIn>) => _auth.retrySilentSignIn(...a);
-export const getToken = (...a: Parameters<typeof _auth.getToken>) => _auth.getToken(...a);
-export const onAuthChanged = (cb: Parameters<typeof _auth.onAuthChanged>[0]) => _auth.onAuthChanged(cb);
-export const getAuthState = () => _auth.getAuthState();
+export const signOut = (...a: Parameters<_Auth["signOut"]>) => _auth ? _auth.signOut(...a) : Promise.resolve();
+export const isSignedIn = () => _auth?.isSignedIn() ?? false;
+export const getActiveAccount = () => _auth?.getActiveAccount() ?? null;
+export const retrySilentSignIn = (...a: Parameters<_Auth["retrySilentSignIn"]>) => _auth ? _auth.retrySilentSignIn(...a) : Promise.resolve(false);
+export const getToken = (...a: Parameters<_Auth["getToken"]>) => _auth ? _auth.getToken(...a) : Promise.resolve(null);
+export const onAuthChanged = (cb: Parameters<_Auth["onAuthChanged"]>[0]) => _auth?.onAuthChanged(cb) ?? (() => {});
+export const getAuthState = () => _auth?.getAuthState() ?? { signedIn: false as const };
 // wp:auth-changed window 广播由**接缝**派发（@internal/store 0.1.0 起库不再碰 browser 事件——
-//   订阅走 auth.onAuthChanged 回调，window 事件是 WeebPaint 自己的 UI 约定）。缺席模式 dormant auth 的
-//   onAuthChanged 是 noop，天然不发。
-_auth.onAuthChanged(() => { try { window.dispatchEvent(new Event("wp:auth-changed")); } catch { /* node 测试环境无 window */ } });
+//   订阅走 auth.onAuthChanged 回调，window 事件是 WeebPaint 自己的 UI 约定）。缺席平台无 auth，天然不发。
+_auth?.onAuthChanged(() => { try { window.dispatchEvent(new Event("wp:auth-changed")); } catch { /* node 测试环境无 window */ } });
 
 // 上次登录 flag（设备级 auth flag → local-app-state collection，经 appState struct）。boot 门 init 后才读写。
 
@@ -245,7 +257,7 @@ export function watchFolder(
   cb: (snap: { path: string; items: ReturnType<typeof itemToG>[]; images: CloudImageItem[]; folderNames: string[] }) => void,
 ): () => void {
   const prefix = folder ? `${folder}/` : "";
-  return store.files.watchFolder(folder, (snap) => {
+  return requireStore().files.watchFolder(folder, (snap) => {
     cb({
       path: snap.path,
       // 文件名**倒序**（自然序 numeric，见 natural-order.ts）：新文档名 yyyymmdd-xxxx → 新日期在前，稳定（不随存盘时间跳）。
@@ -266,7 +278,7 @@ export function watchFolderImages(
   cb: (snap: { path: string; images: CloudImageItem[]; folderNames: string[] }) => void,
 ): () => void {
   const prefix = folder ? `${folder}/` : "";
-  return store.files.watchFolder(folder, (snap) => {
+  return requireStore().files.watchFolder(folder, (snap) => {
     cb({
       path: snap.path,
       images: _toImageItems(snap.items),
@@ -277,12 +289,12 @@ export function watchFolderImages(
 
 /** picker 选中后取整份图片字节（本地缓存优先、整份拉云、autoCacheOpenedFile 顺手落缓存）。拿不到 → null。 */
 export const openCloudImage = (path: string): Promise<Blob | null> =>
-  store.file(path, { isZip: false, mode: "existing" }).open();
+  requireStore().file(path, { isZip: false, mode: "existing" }).open();
 // ⛔ listGallery（全树列举）已删 2026-07-12——**库唯一列举面 = store.watchFolder（订阅当前夹）**，app 包成 watchFolder。
 //   app 原则上不知道别的 folder 内容（内存只放当前夹）；名字碰撞由 store rename/saveAs 目标护栏内化检测（撞名抛 CloudNameCollisionError），不靠先 list 目标夹。
 // 回收站视图：store.listTrash 返**两端聚合**的 TrashItem[]（side/localKey/cloudRef/encrypted/conflictLive）→ 映射成 gallery 的 TrashGItem。
 //   local/cloud 两腿据 localKey/cloudRef 填（app 原有 both-side 模型此前从没被本地腿填充；0.4.0 id→ref 行李牌语义改名）。只元数据，无 blob。
-export const listGalleryTrash = async () => (await store.files.listTrash()).map((it) => ({
+export const listGalleryTrash = async () => (await requireStore().files.listTrash()).map((it) => ({
   name: stripSessionExt(it.name),
   deletedAt: 0,
   encrypted: it.encrypted,

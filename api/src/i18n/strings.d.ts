@@ -5368,10 +5368,10 @@ export declare const S: {
         readonly tok: "poki sitelen lon tenpo ni: OneDrive";
     };
     readonly "gm.noneConnected": {
-        readonly zh: "未连接图库（去图库页或文件菜单连接）";
-        readonly en: "No gallery connected (connect from the gallery page or file menu)";
-        readonly ja: "ギャラリー未接続（ギャラリーページかファイルメニューから接続）";
-        readonly tok: "poki sitelen ala. o wan e ona lon lipu poki";
+        readonly zh: "未连接图库（在文件菜单「连接图库…」接入）";
+        readonly en: "No gallery connected (use “Connect gallery…” in the file menu)";
+        readonly ja: "ギャラリー未接続（ファイルメニューの「ギャラリーに接続…」から）";
+        readonly tok: "poki sitelen ala. o kepeken nimi “o wan e poki sitelen” lon lipu nasin";
     };
     readonly "gm.forgetDirtyWarn": {
         readonly zh: "⚠ 该图库还有 {n} 张画未上云（缓存留在本机，重新连接后可继续上传）。";

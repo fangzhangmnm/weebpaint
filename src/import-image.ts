@@ -18,7 +18,7 @@ import { session } from "./session-state.ts";
 import { decodeImageFile, imageSourceToBytes } from "./shell/image-io.ts";
 import { resampleBytes } from "./backend/algorithms/resample-bytes.ts";
 import { decodeOraToPainting } from "./backend/ora.ts";
-import { store as _store } from "./app-store.ts";
+import { galleryBackend } from "./app-store.ts";
 import { stripSessionExt } from "./config.ts";
 import { unlockImportedContainer } from "./enc-thumbs.ts";
 import { onPasswordVerified } from "./crypto-state.ts";
@@ -271,7 +271,10 @@ async function importOraFileAsNew(file: File) {
   // 外来文件可能是加密容器（可能用与图库不同的密码）→ busy 外解锁 + 显式密码解，
   //   再按落库 name 记忆（onPasswordVerified：全局空→上位 / 否则 per-name 覆盖）。
   let plain: Blob = file;
-  if (await _store.encryption.isEncryptedBlob(file)) {   // 便宜嗅探（不解密）→ 分流
+  // kind:none 探不了加密（encryption 面挂 store 实例；独立出口 = store escalation 已登记）——
+  //   无库导入加密件走明文路、decode 响亮失败（与旧 null-store 谎报同终点，但分叉显式化）。
+  const _be = galleryBackend();
+  if (_be.kind === "live" && await _be.store.encryption.isEncryptedBlob(file)) {   // 便宜嗅探（不解密）→ 分流
     // 解锁循环一次尝试 = 一次解密，成功那次的明文直接拿来用（旧版要全量解两遍）。
     const got = await unlockImportedContainer(file);
     if (!got) { setStatus(t("mi.importCancelledNeedPw"), true); return; }

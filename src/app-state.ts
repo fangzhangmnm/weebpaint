@@ -44,8 +44,8 @@ export type AppStateKey = keyof typeof APP_STATE_DEFAULTS;
 let _synced: Collection | undefined;
 let _local: Collection | undefined;
 
-// app-store 唯一调：接入 synced-app-state / local-app-state（后者走 {local:true}）。
-export function wireAppState(synced: Collection, local: Collection): void { _synced = synced; _local = local; }
+// app-store 唯一调：接入 synced-app-state / local-app-state（后者走 {local:true}）。undefined 对 = kind:none（无库）。
+export function wireAppState(synced: Collection | undefined, local: Collection | undefined): void { _synced = synced; _local = local; }
 // boot 门：hydrate 两个 collection（各自 init 内部先 hydrate 本地再后台对齐云端）。快、离线 OK。
 export function initAppState(): Promise<void> {
   return Promise.all([_synced?.init() ?? Promise.resolve(), _local?.init() ?? Promise.resolve()])

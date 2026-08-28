@@ -74,11 +74,30 @@ echo "[build] B 分层 lint（app 层 store 值级 import 只许接缝）…"
 APPSTORE_HITS=$(grep -rnE "(from|import)[[:space:]]*\(?[[:space:]]*['\"]@internal/store['\"]" src --include='*.ts' 2>/dev/null \
   | grep -v "^src/app-store.ts" | grep -v "import type" || true)
 if [ -n "$APPSTORE_HITS" ]; then
-  echo "[build] ✗ app 层出现 store 值级 import（只准接缝 app-store.ts；其余用 import type 或走 ctx.store）：" >&2
+  echo "[build] ✗ app 层出现 store 值级 import（只准接缝 app-store.ts；其余用 import type，消费走 requireStore()/galleryBackend()）：" >&2
   echo "$APPSTORE_HITS" >&2
   exit 1
 fi
 echo "[build] ✓ B 分层 lint 过"
+
+# 0.55 ambient-store lint（2026-08-27 ambient 退役封口，user 拍板「依赖整理好」）：
+#   ①全局 `store` 出口已删——禁止从 app-store 值级 import `store`（复活 = take-as-granted 随地引用回归）；
+#     消费点必须表态：requireStore()（结构上必有库，无库响亮 throw）或 galleryBackend()（typed union 分叉）。
+#   ②null-store / dormant auth 替身已物理退役——禁复活（替身的 benign no-op = 没被迫回答的问题）。
+echo "[build] ambient-store lint（无全局 store / 替身不复活）…"
+AMBIENT_HITS=$(grep -Prn "import\s*\{[^}]*\bstore\b[^}]*\}\s*from\s*['\"][^'\"]*app-store" src --include='*.ts' 2>/dev/null || true)
+if [ -n "$AMBIENT_HITS" ]; then
+  echo "[build] ✗ 出现 ambient store import（全局 store 已退役；用 requireStore()/galleryBackend() 表态）：" >&2
+  echo "$AMBIENT_HITS" >&2
+  exit 1
+fi
+REVIVAL_HITS=$(grep -rnE "createNullStore\(|createDormantAuth\(|import[^\n]*\{[^}]*(createNullStore|createDormantAuth)" src test --include='*.ts' --include='*.mjs' 2>/dev/null || true)
+if [ -n "$REVIVAL_HITS" ]; then
+  echo "[build] ✗ null-store/dormant 替身复活（2026-08-27 物理退役；缺席=kind:none，消费点自己表态）：" >&2
+  echo "$REVIVAL_HITS" >&2
+  exit 1
+fi
+echo "[build] ✓ ambient-store lint 过"
 
 # 0.6 v0.4 分层 lint（workpiece/tiles 红线 + 已死模块防复活）。
 #   · workpiece/** 不碰 store（持久化归 importer/exporter/persistency；spec journal/20260721 §workpiece）

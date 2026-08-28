@@ -32,7 +32,7 @@ export declare const PREF_REGISTRY: {
 export type PrefKey = keyof typeof PREF_REGISTRY;
 type PrefValue<K extends PrefKey> = (typeof PREF_REGISTRY)[K]["def"];
 export declare const PREF_DEFAULTS: { [K in PrefKey]: PrefValue<K>; };
-export declare function wirePreferences(local: Collection, synced: Collection): void;
+export declare function wirePreferences(local: Collection | undefined, synced: Collection | undefined): void;
 export declare function setGalleryLayerLive(v: boolean): void;
 export declare function initPreferences(): Promise<void>;
 export declare function preferencesReady(): Promise<void>;

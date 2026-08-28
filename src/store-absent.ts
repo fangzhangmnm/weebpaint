@@ -1,16 +1,16 @@
-// store-absent —— sync-store 的**缺席变体**（v0.8.7 · B 骑士：store = 插件不是地基）。
+// store-absent —— 平台缺席探针 + 内存 collection 器官（2026-08-27 替身大清洗后的残余职责）。
 //
-// 胜利条件（user 蓝图 2026-08-02）：store 缺席时 app 仍可 boot、画画、导入导出 ora、编辑笔刷——
-// 只是不落盘。本文件是 app-store 接缝的另一半：assembleStore() 按开关选真 store 或这里的 null-store。
-// null-object 纪律：app 面对的接口**永远非 null**（样板 = app-prefs 的 face()）——没有持久层而已：
-//   - collection → 内存 Map（session 内可编辑，reload 即失；getInitData 照 seed → 内置笔刷可用）
-//   - files.watchFolder → 立即空帧（gallery 空态，不是 boot 卡死——「gallery 要列表所以必须有 store」是幻觉）
-//   - file().open → null、save → {pushed:false}（editor-session 的 push-pending 语义自然成立）
-//   - 加密 dormant（不注入即静默，与 JRP 同构）；auth isAuthConfigured=false → initAuth 整段跳过
-// 开关：URL ?nostore 或 localStorage "weebpaint.nostore"="1"（体检/mhtml 排练用；正常用户永远走真 store）。
-// ⚠ 本文件是接缝（与 app-store.ts 同级），只准 import store 的**类型**——零 store 运行时代码、零 IDB。
+// 历史：v0.8.7 起这里住着 createNullStore/createDormantAuth——给「随地引用全局 store」的代码垫的
+//   结构镜像替身。2026-08-27 user 拍板 ambient store 退役（「依赖整理好」）：app-store 接缝改出
+//   requireStore()/galleryBackend() 两口，消费点逐个表态，替身**物理退役**（每个 benign no-op 都是
+//   一个没被迫回答的问题；无库加密探测谎报即其现行犯）。本文件只剩两个诚实职责：
+//   - detectStoreAbsent()：平台探针「持久化器官被没收」（file:// Safari / ?nostore / env）→ kind:"none"
+//     且 attach 永久禁用（能力位，与运行态「现在没挂库」正交但合流同一 GalleryBackend）。
+//   - createMemoryCollection()：无库笔架的**合法器官**（builtin 种子、session 内可编辑、reload 失）——
+//     显式选择（app-store._wireCollections kind:none 分支），不再是替身的副作用。
+// ⚠ 本文件是接缝级（与 app-store.ts 同级），只准 import store 的**类型**——零 store 运行时代码、零 IDB。
 
-import type { Collection, CollectionEntry, ReconcileResult, Store } from "@internal/store";
+import type { Collection, CollectionEntry, ReconcileResult } from "@internal/store";
 
 export function detectStoreAbsent(): boolean {
   try {
@@ -85,84 +85,4 @@ export function createMemoryCollection(opts: { getInitData?: () => InitItem[] | 
     isDirty() { return false; },
   };
   return col;
-}
-
-// ---- null-store（Store 表面的缺席实现；成员集以 create-store.ts 返回块为准，drift 由 boot smoke 点名）----
-export function createNullStore(): Store {
-  const nullFile = (_name: string, _opts: { isZip: boolean; mode: "new" | "existing" }) => ({
-    async open() { return null; },
-    async save(_bytes: Blob, _o?: unknown) { return { pushed: false, reason: "store-absent" }; },
-    async getPeek() { return null; },
-    async decryptPeek() { return null; },
-    async getEncryptedBlob() { return null; },
-    async pullIfClean() { return { status: "offline" }; },
-    async tryMove(_to: string) { return { ok: false as const, reason: "offline" }; },
-    async delete() { return { status: "noop" }; },
-    async reupload() { return { status: "no-local" }; },
-    isKeptOffline() { return false; },
-    async keepOffline() { /* no-op */ },
-    async offload() { return { ok: false }; },
-    async isEncrypted() { return false; },
-    async encrypt() { return { ok: false, reason: "store-absent" }; },
-    async decrypt() { return { ok: false, reason: "store-absent" }; },
-    async verifyPassword() { return false; },
-  });
-  const collections = new Map<string, Collection>();
-  const s = {
-    file: nullFile,
-    collection(name: string, opts: { getInitData?: () => InitItem[] | Promise<InitItem[]> } = {}) {
-      let c = collections.get(name);
-      if (!c) { c = createMemoryCollection(opts); collections.set(name, c); }
-      return c;
-    },
-    files: {
-      async nameOccupied(_n: string) { return false; },
-      watchFolder(folder: string, cb: (snap: { path: string; items: never[]; folders: string[] }) => void) {
-        queueMicrotask(() => cb({ path: folder, items: [], folders: [] }));   // 立即空帧：gallery 空态而非挂起
-        return () => {};
-      },
-      async usage() { return { bytes: 0, count: 0 }; },
-      async ensureFolder(_p: string) { /* no-op */ },
-      async newFolder(_p: string) { /* no-op */ },
-      async deleteFolder(_p: string) { /* no-op */ },
-      async drainOfflineQueue() { /* no-op */ },
-      // P3（store 0.6.0 形状跟进）：persist 感知纯查询 + dirty 标量面（绿灯门口径；无库=永远全绿）。
-      async persistence() { return { supported: false, persisted: false }; },
-      dirty: {
-        async count() { return 0; },
-        async pushAll() { return { pushed: 0, failed: [] as string[] }; },
-      },
-      async listTrash() { return []; },
-      async listBackup() { return []; },
-      async restoreTrash(_n: string) { return { status: "noop" }; },
-      async purgeTrash(_n: string) { return { status: "noop" }; },
-      async emptyTrash() { return { status: "noop" }; },
-      async emptyBackup() { return { status: "noop" }; },
-      async reconcileAll() { return { status: "offline" }; },
-    },
-    encryption: {
-      async isEncryptedBlob(_b: Blob | Uint8Array) { return false; },
-      async tryDecryptEncryptedBlob(_b: Blob, _pw: string) { return null; },
-      isEncryptedPeekBlob(_b: Blob | null | undefined) { return false; },
-    },
-  };
-  // 结构镜像 cast（B 骑士的已知代价）：完备性不是编译期保证——由 test/store-absent.test.mjs
-  // 对照消费面逐成员点名；真 store 长新面时 smoke 会红。物理删除仍编译的「极端目标」不在本版。
-  return s as unknown as Store;
-}
-
-// ---- dormant auth（isAuthConfigured=false → app.ts 整段跳过 initAuth；signIn 走 reportError 由调用方处理）----
-export function createDormantAuth() {
-  return {
-    isAuthConfigured: () => false,
-    initAuth: async () => {},
-    signIn: async () => { throw new Error("store-absent mode: no cloud sign-in"); },
-    signOut: async () => {},
-    isSignedIn: () => false,
-    getActiveAccount: () => null,
-    retrySilentSignIn: async () => false,
-    getToken: async () => null,
-    onAuthChanged: (_cb: unknown) => () => {},
-    getAuthState: () => ({ signedIn: false }),
-  };
 }

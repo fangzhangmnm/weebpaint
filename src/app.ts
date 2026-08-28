@@ -75,7 +75,7 @@ import { initCrashBanner } from "./crash-banner.ts";            // T-crash 恢�
 //   每个调色器在 src/plugins/ 自成一文件，import 时自注册
 import "./plugins/index.ts";    // 触发 HSB / ColorBalance / Curves / SharpenBlur 自注册
 // candidate 2：导出格式 = 注册表插件（含第一方 ora/psd/png/jpg 自注册）
-import { isAuthConfigured, initAuth, isSignedIn, retrySilentSignIn, getActiveAccount, brushRackCollection, store as _store } from "./app-store.ts";   // cut-over：cloud/auth/graph 全走 lib
+import { isAuthConfigured, initAuth, isSignedIn, retrySilentSignIn, getActiveAccount, brushRackCollection, requireStore, galleryBackend } from "./app-store.ts";   // cut-over：cloud/auth/graph 全走 lib
 import { galleryRegistry } from "./gallery-registry.ts";     // P3 名册器官（播种接线在 boot 收尾段）
 import { setAttachmentGate, galleryAttachment } from "./gallery-attachment-host.ts";   // P3 挂载器官（收口开画 gate + 笔架重挂接线在 rack 构造后）
 import { bootAttachFromRegistry } from "./gallery-connect.ts";      // P3 boot 静默重挂（prefsReady 链头）
@@ -93,7 +93,7 @@ const pullSettingsAndState = (): void => { void refreshPreferences(); void appSt
 
 
 
-// cut-over 完成：_store 从 app-store import（接 lib）。explicit 保存恒走 store.flow.push（B1/B2/B5/retry/C4）。
+// cut-over 完成（2026-08-27 ambient 退役：store 引用一律 requireStore()/galleryBackend() 调用时取）。
 
 // ============ 设置/状态就绪 promise（v409：**不再是 TLA 门**）============
 // 设置/状态 SSoT = 4 个 IDB collection。IDB 是 async，而组合根是同步的 → 两种办法：
@@ -341,7 +341,7 @@ const isMidOperation = () =>
 const ctx: AppContext = freezeCtx({
   backend,
   state, dialReactive, currentBrush, editMode, doc, board, input, history, layers, wp2, layerTiles: wp2.layerTiles, isMidOperation,
-  rack, store: _store, setStatus, withBusy, leftDial,
+  rack, setStatus, withBusy, leftDial,
   updateSaveStatus, updateZoomLabel, updateNewerBanner, pullSettingsAndState,
   _suppressTransientPanels, _restoreTransientPanels, _bringPanelTop,
   _commitTransform, _cancelTransform, selectionToNewLayer,
@@ -454,7 +454,7 @@ const gallery = mountGallery(document.getElementById("galleryMount")!, {
   busy: (label, fn) => withBusy(label, fn),
   // 加密态探测 / 交互解锁：store 的 Item 内容盲（没有 encrypted 轴），由图库按夹自己探。
   //   isEncrypted = 纯本地 IDB 读文件头，无网络；unlock = busy 外弹密码 + verifyPassword（验 peek，便宜）。
-  isEncrypted: (name) => _store.file(sessionFileName(name), { isZip: true, mode: "existing" }).isEncrypted(),
+  isEncrypted: (name) => requireStore().file(sessionFileName(name), { isZip: true, mode: "existing" }).isEncrypted(),   // gallery 项专用 → 必有库
   unlock: (name) => ensureUnlocked(name),
   // 画布耦合操作（open/push/unload/rename/exit/setName）gallery.ts 直调 session.*，不再经 host。
 });
@@ -533,7 +533,7 @@ window.addEventListener("online", async () => {
   if (!isSignedIn()) await retrySilentSignIn();
   pullSettingsAndState();                                    // 回线：拉 4 库 settings/state 对齐
   updateCloudAuthUI();
-  if (isSignedIn()) _store.files.drainOfflineQueue().catch((e) => reportError(new Error("drainOfflineQueue: " + String(e)), "log"));   // N3：重连重放离线删队列
+  { const be = galleryBackend(); if (be.kind === "live" && isSignedIn()) be.store.files.drainOfflineQueue().catch((e) => reportError(new Error("drainOfflineQueue: " + String(e)), "log")); }   // N3：重连重放离线删队列（无库=无队列）
   if (!els.galleryFull.classList.contains("hidden")) gallery.refresh();
   if (isSignedIn() && session.home?.kind === "gallery") void session.refreshOpenDoc();   // 回线：显式快进（P1 2026-08-25——裸 pullIfClean 不接结果=画布陈旧的第二案，禁用回）
 });
@@ -583,7 +583,7 @@ void prefsReady.then(() => bootRestoreSession(ctx)).catch((e) => reportError(new
 // T-crash 恢复横幅（P2 2026-08-26）：扫 crash 库，有崩溃快照 → 非模态浮卡叠画布（不挡 boot、不 await）。
 initCrashBanner(ctx);
 // N3：启动时若在线+已登录，排空上次离线攒下的删除队列（fresh boot 不触发 online 事件，故此处补一刀）。
-if (navigator.onLine && isSignedIn()) _store.files.drainOfflineQueue().catch((e: unknown) => reportError(new Error("drainOfflineQueue: " + String(e)), "log"));
+{ const be = galleryBackend(); if (be.kind === "live" && navigator.onLine && isSignedIn()) be.store.files.drainOfflineQueue().catch((e: unknown) => reportError(new Error("drainOfflineQueue: " + String(e)), "log")); }
 
 // 笔架深模块装配：mount sheet/settings 组件 + 注册 panel + 绑 DOM 事件 + 订阅 collection.onChange。
 rack.init({

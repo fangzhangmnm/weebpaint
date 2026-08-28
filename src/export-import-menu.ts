@@ -28,7 +28,7 @@ import { triggerDownload, shareOrDownloadBlob, copyImageToClipboard, readImageFr
 import { importImageAsLayer } from "./import-image.ts";
 import { desk } from "./workbench-state.ts";
 import { reportError } from "./error-badge.ts";
-import { store, storeAbsent } from "./app-store.ts";
+import { requireStore, storeAbsent } from "./app-store.ts";
 import { nextFreeExportName } from "./gallery/cloud-image-model.ts";
 import { withBusy } from "./fullscreen-busy.ts";
 
@@ -79,8 +79,8 @@ function _cloudSinkBlocked(): string | null {
 //   撞名自动后缀（mode:"new" 首存护栏仍兜底）。save 默认 best-effort push：
 //   toast 按 pushed 事实说话（在线=已上云 / 离线=已存本地待补推），不谎报。
 async function _exportBlobToCloud(blob: Blob, ext: string): Promise<void> {
-  const name = await nextFreeExportName(`${exportBaseName()}-${downloadStamp()}`, ext, (n) => store.files.nameOccupied(n).then(Boolean));
-  const r = await store.file(name, { isZip: false, mode: "new" }).save(blob);
+  const name = await nextFreeExportName(`${exportBaseName()}-${downloadStamp()}`, ext, (n) => requireStore().files.nameOccupied(n).then(Boolean));
+  const r = await requireStore().file(name, { isZip: false, mode: "new" }).save(blob);
   setStatus(r.pushed ? t("tm.exportedCloud", { name }) : t("tm.exportedCloudLocal", { name }), true);
 }
 function _updateMenuSubLabels() {

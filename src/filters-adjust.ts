@@ -49,7 +49,7 @@ interface AdjustState {
 
 let state: AppContext["state"], editMode: AppContext["editMode"], doc: AppContext["doc"], board: AppContext["board"], history: AppContext["history"];
 let wp2: AppContext["wp2"];
-let setStatus: AppContext["setStatus"], store: AppContext["store"], updateSaveStatus: AppContext["updateSaveStatus"];
+let setStatus: AppContext["setStatus"], updateSaveStatus: AppContext["updateSaveStatus"];
 let _bringPanelTop: AppContext["_bringPanelTop"];
 let _suppressTransientPanels: AppContext["_suppressTransientPanels"], _restoreTransientPanels: AppContext["_restoreTransientPanels"];
 
@@ -381,7 +381,7 @@ function _renderFilterBrushToolbar() {
 }
 
 export function initFiltersAdjust(ctx: AppContext) {
-  ({ state, editMode, doc, board, history, setStatus, store, updateSaveStatus, wp2,
+  ({ state, editMode, doc, board, history, setStatus, updateSaveStatus, wp2,
      _bringPanelTop, _suppressTransientPanels, _restoreTransientPanels } = ctx);
 
   els.topAdjustBtn.addEventListener("click", (e: Event) => {

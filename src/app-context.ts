@@ -118,8 +118,7 @@ export interface AppContext {
   layerTiles: LayerTiles;        // v2 像素组件（= wp2.layerTiles，热路径直取）
   rack: RackHandle;
 
-  // 同步存储 / HUD
-  store: import("./app-store.ts").AppStorePort;     // B2 窄 Port（file/files/collection/encryption 四面；面收窄声明在接缝 app-store.ts）
+  // HUD（store 已出 ctx——2026-08-27 ambient 退役：消费点直连接缝 requireStore()/galleryBackend()）
   setStatus: (text: string, persist?: boolean) => void;
   withBusy: <T>(label: string, fn: () => Promise<T> | T) => Promise<T>;
   leftDial: LeftDialHandle;

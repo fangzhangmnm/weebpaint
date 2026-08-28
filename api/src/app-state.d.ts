@@ -12,7 +12,7 @@ export declare const APP_STATE_DEFAULTS: {
     readonly "restore-attempt": string | null;
 };
 export type AppStateKey = keyof typeof APP_STATE_DEFAULTS;
-export declare function wireAppState(synced: Collection, local: Collection): void;
+export declare function wireAppState(synced: Collection | undefined, local: Collection | undefined): void;
 export declare function initAppState(): Promise<void>;
 export declare function flushAppState(): Promise<void>;
 export declare const appState: {

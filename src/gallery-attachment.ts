@@ -38,12 +38,11 @@ export interface AttachmentDeps {
 
 export interface GalleryAttachment {
   state(): AttachmentState;
-  /** 挂库（必须 detached；UI 保证手势上下文）。五步逆序：建实例→换入→锁域→touch/relabel。
-   *  opts.online：folder=权限已 granted / onedrive=isSignedIn（调用方查好传入；缺省 true）。 */
-  attach(entry: GalleryEntry, opts?: { online?: boolean }): Promise<void>;
-  /** boot 领养预建实例（legacy 路径：module 预建的 defaultStore 店就是该条目的店）——不换店不重灌，
-   *  只接管：登记 _current、设 active id、touch。必须 detached 时调（boot 一次）。 */
-  bootAdopt(entry: GalleryEntry, store: SwappableStore, opts?: { online?: boolean }): void;
+  /** 挂库（必须 detached）。五步逆序：建实例→换入→锁域→touch/relabel。
+   *  opts.online：folder=权限已 granted / onedrive=isSignedIn（调用方查好传入；缺省 true）。
+   *  opts.gesture=false：boot 静默重挂——跳过 requestPersist（persist 只在用户手势申请，P3 verdicts）。
+   *  （bootAdopt 已退役 2026-08-27：店懒出生后 boot 领养 = 普通 attach，无预建实例可领。） */
+  attach(entry: GalleryEntry, opts?: { online?: boolean; gesture?: boolean }): Promise<void>;
   /** 卸库（绿灯门）。拒卸返账（doc-open / dirty），不销毁任何东西。detached 时幂等 ok。 */
   detach(): Promise<DetachResult>;
   /** 显式逃生（用户过了警告 sheet 才走到这）：不 drain、dirty 留缓存。 */
@@ -75,21 +74,13 @@ export function createGalleryAttachment(deps: AttachmentDeps): GalleryAttachment
     async attach(entry, opts) {
       if (deps.storeAbsent) throw new Error("store-absent mode: attach unavailable");
       if (_state.kind === "attached") throw new Error("attach while attached — detach first (green-gate)");
-      deps.requestPersist();                          // 手势入口即调（popup/权限往返会耗尽 activation）
+      if (opts?.gesture !== false) deps.requestPersist();   // 手势入口即调（popup/权限往返会耗尽 activation）；boot 静默不申请
       const next = deps.buildStore(entry);
       _current = next;
       await deps.swap(next);
       deps.setActiveGalleryId(entry.id);
       await deps.registry.touch(entry.id);
       if (entry.kind === "folder" && entry.handle?.name) await deps.registry.relabel(entry.id, entry.handle.name);   // 标签尽力自愈
-      _state = { kind: "attached", entry, online: opts?.online ?? true };
-      _notify();
-    },
-    bootAdopt(entry, store, opts) {
-      if (_state.kind === "attached") throw new Error("bootAdopt while attached");
-      _current = store;
-      deps.setActiveGalleryId(entry.id);
-      void deps.registry.touch(entry.id);             // fire-and-forget（LWW 便利值）
       _state = { kind: "attached", entry, online: opts?.online ?? true };
       _notify();
     },

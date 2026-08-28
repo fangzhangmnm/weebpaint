@@ -9,8 +9,7 @@
 import type { GalleryEntry, DirHandleLike } from "./gallery-registry.ts";
 import { galleryRegistry } from "./gallery-registry.ts";
 import { galleryAttachment } from "./gallery-attachment-host.ts";
-import { storeAbsent, _takeBootStore, _swapStoreForGallery, signIn, getActiveAccount, isSignedIn } from "./app-store.ts";
-import type { SwappableStore } from "./gallery-attachment.ts";
+import { storeAbsent, _swapStoreForGallery, signIn, getActiveAccount, isSignedIn } from "./app-store.ts";
 import { reportError } from "./error-badge.ts";
 
 // ---- FSA 权限（folder 库）----
@@ -61,41 +60,23 @@ export async function attachGallery(entry: GalleryEntry): Promise<void> {
   await galleryAttachment.attach(entry, { online });
 }
 
-/** boot 静默重挂（app.ts prefsReady 链头，fixup/restore 之前）：
- *  · lastActive = legacy OneDrive（dbId=defaultStore）→ **领养**预建实例（零换店零重灌 = 现状路径）；
- *  · lastActive = folder / 非 legacy OneDrive → 规矩 dispose 预建实例（无人用过，无数据风险）→ attach（权限只 query）；
- *  · 无 lastActive / registry 读不出 → **无库模式**（预建实例 dispose + swap(null)）——真 sunset
- *    （user 2026-08-27 拍板：「无账号无文件不应该有 gallery——这时候只有 IDB 承重」；registry 条目
- *    是 gallery 存在的唯一凭据）。未播种老设备（登录态在）本次 boot 无库、auth 醒来播种后下次 boot
- *    领养；IDB 缓存/dirty 原样保留（dispose 不删数据），重连即浮出。
- *  任何失败 → 响亮上报 + 回落无库模式（绝不让 app 骑在已 dispose 的店上）。 */
+/** boot 静默重挂（app.ts prefsReady 链头，fixup/restore 之前）。店懒出生（2026-08-27）后只剩一问：
+ *  registry lastActive 有条目吗？有 → 普通 attach（建店+换入；gesture:false 不 requestPersist、folder 权限
+ *  只 query 不弹）；无/读不出 → 什么都不做（eval 起点就是 kind:"none"，无预建实例可拆）——
+ *  「无账号无文件不应该有 gallery」（user 2026-08-27）由出生姿势直接保证，不再靠 boot 拆迁。
+ *  attach 失败 → 响亮上报 + 回落无库（绝不让 app 骑在半挂的店上）。 */
 export async function bootAttachFromRegistry(): Promise<void> {
   if (storeAbsent) return;
   let e: GalleryEntry | null = null;
   try { e = await galleryRegistry.lastActive(); } catch (err) {
-    reportError(new Error("[gallery-connect] registry read failed at boot — entering no-gallery mode: " + String(err)), "error");
+    reportError(new Error("[gallery-connect] registry read failed at boot — staying in no-gallery mode: " + String(err)), "error");
   }
-  if (!e) { await _enterNoGalleryMode(); return; }
-  if (e.kind === "onedrive" && e.dbId === "defaultStore") {
-    const boot = _takeBootStore();
-    if (boot) galleryAttachment.bootAdopt(e, boot as SwappableStore, { online: isSignedIn() });
-    return;
-  }
-  const boot = _takeBootStore();
+  if (!e) return;
   try {
-    if (boot) await boot.dispose({ drain: false });
     const online = e.kind === "folder" ? await ensureFolderPermission(e, { request: false }) : isSignedIn();
-    await galleryAttachment.attach(e, { online });
+    await galleryAttachment.attach(e, { online, gesture: false });
   } catch (err) {
     reportError(new Error("[gallery-connect] boot attach failed — falling back to no-gallery mode: " + String(err)), "error");
     try { await _swapStoreForGallery(null); } catch { /* 已在 null 态 */ }
   }
-}
-
-/** 无库模式收口（boot 专用）：拆预建实例 → null-store。dispose 只关实例不动 IDB 数据。 */
-async function _enterNoGalleryMode(): Promise<void> {
-  const boot = _takeBootStore();
-  try { if (boot) await boot.dispose({ drain: false }); }
-  catch (err) { reportError(new Error("[gallery-connect] boot store dispose failed (soft): " + String(err)), "log"); }
-  try { await _swapStoreForGallery(null); } catch { /* 已在 null 态 */ }
 }

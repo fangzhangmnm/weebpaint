@@ -5,7 +5,7 @@
 //   **按文件名**抓 entry（CD/entry 溢出尾片则各一次额外 byte-range）。明文 ora → entry 原始字节 blob(无 type)；
 //   加密 ora → 密文 peek blob(ENC_PEEK_MIME，caller 缓存原样存密文)。库不认 PNG/任何内容格式。
 //   身份 = 库的**裸 session 名**（item.name），边界 sessionFileName 转全名（库身份=X.ora）。
-import { store } from "../app-store.ts";
+import { requireStore } from "../app-store.ts";
 import { sessionFileName } from "../config.ts";
 
 // 先拉尾窗口 80KB：thumb 自适应目标 ≤70KB + 尾巴 ~10KB（CD + EOCD）。图层多 → CD 大把缩略图挤出尾片，
@@ -23,7 +23,7 @@ export const THUMB_PATH = "Thumbnails/thumbnail.png";
  *     （newer-on-cloud 刷新用；落回本地就会重现「新 token 配旧字节」的假新鲜缓存）。
  */
 export async function fetchOraThumbnail(name: string, source: "local" | "cloud"): Promise<Blob> {
-  const blob = await store.file(sessionFileName(name), { isZip: true, mode: "existing" }).getPeek({ bytesLength: SUFFIX_BYTES, zipEntry: THUMB_PATH, source });
+  const blob = await requireStore().file(sessionFileName(name), { isZip: true, mode: "existing" }).getPeek({ bytesLength: SUFFIX_BYTES, zipEntry: THUMB_PATH, source });
   if (!blob) throw new Error("getPeek returned null (cloud unreachable / no such file / no such entry / no local copy)");
   return blob;
 }
