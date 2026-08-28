@@ -3,9 +3,33 @@ import { mountBrushSettings } from "./ui/brush-config-view.ts";
 import type { Brush, BrushRackData } from "./brush-types.ts";
 import type { EditorRuntimeState, DialReactive, ToolDial } from "./app-context.ts";
 import type { EditMode } from "./edit-mode.ts";
-import type { Collection } from "./app-store.ts";
+import type { ReconcileResult } from "@internal/store";
+/** 笔架持久化条目（结构同 CollectionEntry，免耦合库类型——brushes.ts CollectionLike 同款先例）。 */
+export interface RackEntry {
+    id: string;
+    uat: number;
+    value: unknown;
+}
+/** 笔架持久化 port（A2 收敛终案 2026-08-28：**脑定义窄接口，器官实现**）：
+ *  ①挂库 = gallery collection（结构满足零适配——per-gallery 同步/LWW 语义真实存在，是 store 的正当业务）；
+ *  ②无库 = device-rack-slot（IDB 单槽，「reload 不丢」user 唯一拍板）；③无地平台 = slot 自动纯内存降级。
+ *  reconcileWithRemote **可缺席**——只有真云器官有远端可对；缺的能力就是接口上的缺席，不装死
+ *  （否决案：「memory/兜底 store」= null-store 转世；store 单一职责=同步引擎不做容器，user 0828）。 */
+export interface RackPersistence {
+    init(): Promise<void>;
+    entries(): RackEntry[];
+    getItem<V>(id: string, def?: V | (() => V)): V | undefined;
+    setItem(id: string, value: unknown): void;
+    deleteItem(id: string): void;
+    onChange(cb: (changedIds: string[]) => void): () => void;
+    flushLocal(): Promise<{
+        ok: boolean;
+        error?: unknown;
+    }>;
+    reconcileWithRemote?(): Promise<ReconcileResult>;
+}
 export interface BrushRackDeps {
-    collection: Collection;
+    collection: RackPersistence;
     state: EditorRuntimeState;
     dialReactive: DialReactive;
     editMode: () => EditMode;
@@ -76,10 +100,10 @@ export declare class BrushRackController {
     /** collection → 笔架的**唯一**绑定。本地写和云端写在 store 层已一视同仁，这里也不分。
      *  放在 load()（数据层）而非 init()（要 DOM）：绑定与 UI 无关，且这样才能 node 测。 */
     subscribeToCollection(): void;
-    reconcileWithRemote(): Promise<import("@internal/store").ReconcileResult>;
+    reconcileWithRemote(): Promise<ReconcileResult | null>;
     /** P3 热插拔：换库后重挂新 collection（app.ts 在 wp:gallery-changed 里调，传新的 brushRackCollection）。
      *  旧 collection 已随旧 store dispose——旧 onChange 订阅从此永不 fire，随它 GC；镜像/自愈/初值全按新库重走。 */
-    rebind(collection: Collection): Promise<void>;
+    rebind(collection: RackPersistence): Promise<void>;
     getRackToolKey(tool: string): string;
     defaultToolStateFor(tool: string): {
         size: number;

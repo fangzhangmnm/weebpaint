@@ -58,7 +58,7 @@ export interface RackHandle {
         status: string;
         pushed?: boolean;
         error?: unknown;
-    }>;
+    } | null>;
     restoreBuiltins(): Promise<number>;
 }
 export interface ReferenceWindowHandle {

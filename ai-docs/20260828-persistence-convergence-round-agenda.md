@@ -14,6 +14,14 @@
   store[local-idb backend] + 可插拔 gallery store；gallery 可见性从 hasLiveStore 解耦成 backend-kind）+
   两条反对（resume-slate 同步原子写别回滚=affordance 分工不是债；驱逐面回宽要点头）+ 切法提议
   （数据结构/提案 .h 宣发前钉死，代码重构可宣发后撕书——A3 原则自适用）。**等 user 对双店模型与切法表态**。
+- **A2 终案（user 0828 深夜二轮）**：「兜底/memory store」两案**全否**——核心判据 =「store 单一职责：
+  只负责数据持久化+云同步冲突解析，不做容器」；纯内存 store = null-store 转世（满足接口不满足契约 = mock，
+  mock 的家在 ./testing）。双店模型（我方一轮提案）同刀撤回。收敛落地 = **笔架 port 化**：
+  RackPersistence（脑定义窄接口，reconcileWithRemote 可缺席=缺的能力不装死）+ 三器官
+  （gallery collection / device-rack-slot IDB 单槽 / 槽内纯内存降级诚实上报）。「reload 不丢」拍板达成；
+  文件笔架句柄放弃；settings 维持 P5 形（device-kv+collection 各归契约成立处）；resume-slate 留 localStorage
+  （同步原子写 affordance）；必有 store 模型不回归，kind:none 现架构不动。→ **✅ 已落 v0.11.28**
+  （createMemoryCollection 同日退役；store-absent.ts 只剩平台探针）。
 - **A3**：registry 序列化 = generic JSON dict 口径（旧 json 永不需要 migration；代码层改名随意）→ store agenda。
 - **A4 = a 同意**（本地版本戳+写前 backup；双版本 spam 要去重设计）；b 只读打开 park；瑞士奶酪同意 → store agenda。
 - **A5**：等 user 真机「一句话的事」——park 到真机 session。

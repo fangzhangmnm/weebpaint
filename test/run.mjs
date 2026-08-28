@@ -9,7 +9,8 @@ import "./local-file-session.test.mjs";   // v0.9.24 无地本地文件：WeebPa
 import "./doc-home.test.mjs";             // P1 2026-08-26 一画一家：keeper 单持权 + (家×动作) 保存派发矩阵（verdicts §4-P1）
 import "./naming.test.mjs";               // P1 命名器官：yyyymmdd-hex4 / 下载分钟戳（verdicts §2.1 三粒度）
 import "./crash-store.test.mjs";          // P2 T-crash 库：pending 拒删/原子领养/单帧覆盖（verdicts §2.2 契约钉）
-import "./resume-slate.test.mjs";         // P5 回执条+device-kv：typed 三态/标记同记录/播种幂等/无地降级
+import "./resume-slate.test.mjs";
+import "./device-rack-slot.test.mjs";         // A2 终案：无库笔架 device 槽（reload 不丢/防抖/降级诚实）
 import "./gallery-registry.test.mjs";     // P3 名册：铸 id/isSameEntry 查重/defaultStore 认领零迁移/播种幂等
 import "./gallery-attachment.test.mjs";   // P3 挂载：五步 detach 契约/绿灯门/逃生 force/手势 persist/锁域
 import "./app-prefs.test.mjs";            // P5 preferences 门面：scope 路由（device/gallery/session）+ 播种幂等

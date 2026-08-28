@@ -36,7 +36,25 @@ import { exportBrush, exportRackFolder, buildRackCode, shareOrDownloadJSON } fro
 import type { Brush, BrushRackData } from "./brush-types.ts";
 import type { EditorRuntimeState, DialReactive, ToolDial } from "./app-context.ts";
 import type { EditMode } from "./edit-mode.ts";
-import type { Collection } from "./app-store.ts";   // B2：类型经接缝转口
+import type { ReconcileResult } from "@internal/store";   // type-only（B 分层 lint 允许）
+
+/** 笔架持久化条目（结构同 CollectionEntry，免耦合库类型——brushes.ts CollectionLike 同款先例）。 */
+export interface RackEntry { id: string; uat: number; value: unknown }
+/** 笔架持久化 port（A2 收敛终案 2026-08-28：**脑定义窄接口，器官实现**）：
+ *  ①挂库 = gallery collection（结构满足零适配——per-gallery 同步/LWW 语义真实存在，是 store 的正当业务）；
+ *  ②无库 = device-rack-slot（IDB 单槽，「reload 不丢」user 唯一拍板）；③无地平台 = slot 自动纯内存降级。
+ *  reconcileWithRemote **可缺席**——只有真云器官有远端可对；缺的能力就是接口上的缺席，不装死
+ *  （否决案：「memory/兜底 store」= null-store 转世；store 单一职责=同步引擎不做容器，user 0828）。 */
+export interface RackPersistence {
+  init(): Promise<void>;
+  entries(): RackEntry[];
+  getItem<V>(id: string, def?: V | (() => V)): V | undefined;
+  setItem(id: string, value: unknown): void;
+  deleteItem(id: string): void;
+  onChange(cb: (changedIds: string[]) => void): () => void;
+  flushLocal(): Promise<{ ok: boolean; error?: unknown }>;
+  reconcileWithRemote?(): Promise<ReconcileResult>;
+}
 import { t } from "./i18n/index.ts";
 import { reportError } from "./error-badge.ts";
 
@@ -45,7 +63,7 @@ const toolLabel = (tool: string): string => tool === "eraser" ? t("br.toolEraser
 
 // 构造期依赖（早于 SSoT 块构造，故 editMode 走 thunk 避 TDZ；DOM/icons/panels 等晚绑走 init()）。
 export interface BrushRackDeps {
-  collection: Collection;     // store.collection("brush-rack")：持久化 + 云同步唯一入口（红线在库内）
+  collection: RackPersistence;   // 笔架持久化器官（挂库=store collection / 无库=device 槽；port 见上）
   state: EditorRuntimeState;  // 共享 SSoT（state.toolStates 反应式）
   dialReactive: DialReactive; // 共享 SSoT（当前 tool）
   editMode: () => EditMode;   // thunk：构造时 editMode 尚未定义
@@ -167,11 +185,14 @@ export class BrushRackController {
     });
   }
   // 事件驱动重拉云端（刷新按钮 / 前台）。
-  reconcileWithRemote() { return this.d.collection.reconcileWithRemote(); }   // 返 ReconcileResult：调用方须读 status（v436）
+  reconcileWithRemote(): Promise<ReconcileResult | null> {
+    const f = this.d.collection.reconcileWithRemote;
+    return f ? f.call(this.d.collection) : Promise.resolve(null);   // null = 器官无远端（device 槽）——调用方须区分（v436 精神）
+  }
 
   /** P3 热插拔：换库后重挂新 collection（app.ts 在 wp:gallery-changed 里调，传新的 brushRackCollection）。
    *  旧 collection 已随旧 store dispose——旧 onChange 订阅从此永不 fire，随它 GC；镜像/自愈/初值全按新库重走。 */
-  async rebind(collection: Collection): Promise<void> {
+  async rebind(collection: RackPersistence): Promise<void> {
     this.d.collection = collection;
     this._stopHeal();
     this._loadPromise = this._load();   // 重跑 load 管线（init→订阅→灌镜像→空库自愈→applyToolState），写路径 await load() 的门继续成立
@@ -430,6 +451,7 @@ export class BrushRackController {
       // 读 status，别只 await（v436）：以前这里没有任何终态提示，离线/被拒/推失败
       //   全都表现为「正在刷新…」永远挂着。
       const r = await this.reconcileWithRemote();
+      if (r == null) { this.d.setStatus(t("br.refreshLocalOnly"), false); return; }   // device 槽：无云可刷，诚实说
       const bad = r.status === "offline" || r.status === "invalid" || r.status === "dirty" || r.status === "error";
       this.d.setStatus(bad ? t("br.refreshFailed", { status: r.status }) : t("br.refreshed"), bad);
     });

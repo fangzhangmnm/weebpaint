@@ -10,7 +10,6 @@
 //     显式选择（app-store._wireCollections kind:none 分支），不再是替身的副作用。
 // ⚠ 本文件是接缝级（与 app-store.ts 同级），只准 import store 的**类型**——零 store 运行时代码、零 IDB。
 
-import type { Collection, CollectionEntry, ReconcileResult } from "@internal/store";
 
 export function detectStoreAbsent(): boolean {
   try {
@@ -32,57 +31,6 @@ export function detectStoreAbsent(): boolean {
   }
   return false;
 }
-
-// ---- 内存 Collection（满足 store/collection.ts 的 Collection 契约；无持久层）----
-type InitItem = { id: string; value: unknown };
-export function createMemoryCollection(opts: { getInitData?: () => InitItem[] | Promise<InitItem[]> } = {}): Collection {
-  const map = new Map<string, CollectionEntry>();
-  const subsAll = new Set<(changedIds: string[]) => void>();
-  const subsKey = new Map<string, Set<() => void>>();
-  let inited = false;
-  const fire = (ids: string[]) => {
-    for (const cb of subsAll) cb(ids);
-    for (const id of ids) for (const cb of subsKey.get(id) ?? []) cb();
-  };
-  const col: Collection = {
-    async init() {
-      if (inited) return;
-      inited = true;
-      if (opts.getInitData) {
-        try {
-          const items = await opts.getInitData();
-          for (const it of items) map.set(it.id, { id: it.id, uat: 1, value: it.value } as CollectionEntry);
-          if (items.length) fire(items.map((i) => i.id));
-        } catch { /* seed 失败 = 空库（与真 collection 新库无网同形） */ }
-      }
-    },
-    async reconcileWithRemote(): Promise<ReconcileResult> { return { status: "offline" }; },
-    setItem(id, value) {
-      if (value === undefined) throw new Error("Collection.setItem: value must not be undefined");
-      map.set(id, { id, uat: (map.get(id)?.uat ?? 0) + 1, value } as CollectionEntry);
-      fire([id]);
-    },
-    deleteItem(id) { map.set(id, { id, uat: (map.get(id)?.uat ?? 0) + 1, value: null } as CollectionEntry); fire([id]); },
-    getItem<V = unknown>(id: string, def?: V | (() => V)): V | undefined {
-      const e = map.get(id);
-      if (!e || e.value === null || e.value === undefined) return typeof def === "function" ? (def as () => V)() : def;
-      return e.value as V;
-    },
-    getEntry(id) { const e = map.get(id); return e && e.value != null ? e : undefined; },
-    entries() { return [...map.values()].filter((e) => e.value != null); },
-    keys() { return [...map.values()].filter((e) => e.value != null).map((e) => e.id); },
-    onChange(a: unknown, b?: unknown): () => void {
-      if (typeof a === "string") {
-        const set = subsKey.get(a) ?? new Set();
-        subsKey.set(a, set);
-        set.add(b as () => void);
-        return () => set.delete(b as () => void);
-      }
-      subsAll.add(a as (ids: string[]) => void);
-      return () => subsAll.delete(a as (ids: string[]) => void);
-    },
-    async flushLocal() { return { ok: true }; },
-    isDirty() { return false; },
-  };
-  return col;
-}
+// （createMemoryCollection 已退役 2026-08-28 A2 终案：无库笔架改 device-rack-slot 器官（IDB 单槽，
+//   reload 不丢）；「memory collection 当无库容器」与「memory/兜底 store」同案否决——
+//   store/collection 是同步引擎的词汇，不做容器。本文件从此只剩平台探针。）

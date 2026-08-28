@@ -1096,6 +1096,7 @@ export const S = {
   "br.folderExported": { zh: "已导出文件夹「{folder}」（{n} 笔）", en: "Exported folder “{folder}” ({n} brushes)", ja: "フォルダ「{folder}」をエクスポートしました（{n} 本）", tok: "pana li pini: poki \"{folder}\" (ilo {n})" }, 
   "br.folderEmpty": { zh: "本文件夹是空的", en: "This folder is empty", ja: "このフォルダは空です", tok: "poki ni li jo e ala" }, 
   "br.refreshed": { zh: "笔架已与云端同步", en: "Brush rack synced with cloud", ja: "ブラシラックをクラウドと同期しました", tok: "poki pi ilo sitelen li sama poki sewi" }, 
+  "br.refreshLocalOnly": { zh: "本机笔架（未挂图库，无云可刷）", en: "Local brush rack (no gallery attached — nothing to refresh from the cloud)", ja: "ローカルブラシラック（ギャラリー未接続のためクラウド更新なし）", tok: "ilo sitelen lon ilo ni taso (poki sitelen ala)" },
   "br.refreshFailed": { zh: "笔架刷新未完成（{status}）", en: "Brush rack refresh incomplete ({status})", ja: "ブラシラックの更新が完了しませんでした（{status}）", tok: "kama sama li pini ala ({status})" }, 
   "br.refreshing": { zh: "正在从云端刷新笔架…", en: "Refreshing rack from cloud…", ja: "クラウドからブラシラックを更新中…", tok: "mi kama sama poki sewi…" }, 
   "br.resetRackTitle": { zh: "还原内置笔刷？", en: "Restore built-in brushes?", ja: "内蔵ブラシを復元しますか？", tok: "sina wile ala wile kama sin e ilo pi tan open?" }, 

@@ -5949,6 +5949,12 @@ export declare const S: {
         readonly ja: "ブラシラックをクラウドと同期しました";
         readonly tok: "poki pi ilo sitelen li sama poki sewi";
     };
+    readonly "br.refreshLocalOnly": {
+        readonly zh: "本机笔架（未挂图库，无云可刷）";
+        readonly en: "Local brush rack (no gallery attached — nothing to refresh from the cloud)";
+        readonly ja: "ローカルブラシラック（ギャラリー未接続のためクラウド更新なし）";
+        readonly tok: "ilo sitelen lon ilo ni taso (poki sitelen ala)";
+    };
     readonly "br.refreshFailed": {
         readonly zh: "笔架刷新未完成（{status}）";
         readonly en: "Brush rack refresh incomplete ({status})";

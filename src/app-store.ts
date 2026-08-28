@@ -3,7 +3,9 @@
 //   app 只碰 store 两面（**file / collection**）+ editor-session。绝不裸碰 kv/IDB/graph/vendor。
 //   （localSettings/syncedSettings 那两面已于 2026-07-13 删除 —— 全部 KV 化进 collection。别照旧注释找。）
 import { createStore, createOneDriveProvider, createFolderProvider, isCached, isDirty, requestStoragePersistence } from "@internal/store";
-import { detectStoreAbsent, createMemoryCollection } from "./store-absent.ts";
+import { detectStoreAbsent } from "./store-absent.ts";
+import { createDeviceRackSlot } from "./device-rack-slot.ts";   // A2 终案：无库笔架器官（reload 不丢）
+import type { RackPersistence } from "./brush-rack-controller.ts";   // 脑定义 port（type-only 无环）
 import { embeddedBlobUrl } from "./single-file.ts";   // P6 单文件内嵌读口（msal 逃生舱）
 import type { Store, Collection as _Coll } from "@internal/store";
 import { stripSessionExt, sessionFileName } from "./config.ts";
@@ -124,7 +126,7 @@ export { wipeAppNamespace, scanAppNamespace } from "@internal/store";   // P7 �
 // ---- brush-rack collection（逐 brush 一 item + 一条 .meta）：持久化 + 云同步唯一入口，红线在库内。----
 //   getInitData（brushes.ts 域构造）：仅当这份 collection 的 json 不存在（新库）时 fetch builtin-brushes.json。
 //   P3 起 live binding（换库重灌；app.ts 在 wp:gallery-changed 里 brushRack.rebind(brushRackCollection)）。
-export let brushRackCollection: _Coll;
+export let brushRackCollection: RackPersistence;   // A2：类型收窄到笔架自己的 port（Collection 结构满足零适配）
 // 「继承当前笔刷」种子（P3 verdicts §1.9）：一次性覆写下一次 rack collection 的 getInitData——
 //   只对**空库**生效（getInitData 契约：json 已存在则忽略），与 builtin 播种同一条路 → 天然无竞态无重复。
 let _nextRackInit: { id: string; value: unknown }[] | null = null;
@@ -134,11 +136,11 @@ function _wireCollections(): void {
   const rackSeed = _nextRackInit; _nextRackInit = null;
   if (!s) {
     // kind:none——prefs/state 引擎自带 Collection|undefined 位（gallery scope 经 cascade 落 device 层）；
-    //   笔架 = **内存 collection 器官**（无地全功能：内置笔可用、session 内可编辑、reload 失——
-    //   显式选择，不再是 null-store 替身的副作用；将来「笔架=文件家公民」另案）。
+    //   笔架 = **device 槽器官**（A2 终案 2026-08-28：IDB 单槽 write-through，「reload 不丢」达成；
+    //   无地平台自动纯内存降级诚实上报。memory-collection 器官同日退役——「兜底 store/memory store」否决案）。
     wirePreferences(undefined);
     wireAppState(undefined);
-    brushRackCollection = createMemoryCollection({ getInitData: rackSeed ? async () => rackSeed : builtinBrushInitData });
+    brushRackCollection = createDeviceRackSlot({ getInitData: rackSeed ? async () => rackSeed : builtinBrushInitData });
     return;
   }
   wirePreferences(s.collection("synced-user-preference"));

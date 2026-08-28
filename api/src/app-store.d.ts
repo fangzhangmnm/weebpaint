@@ -1,5 +1,6 @@
 import { createOneDriveProvider } from "@internal/store";
-import type { Store, Collection as _Coll } from "@internal/store";
+import type { RackPersistence } from "./brush-rack-controller.ts";
+import type { Store } from "@internal/store";
 export declare const storeAbsent: boolean;
 type _Auth = ReturnType<typeof createOneDriveProvider>["auth"];
 export declare const provider: import("@internal/store").CloudProvider | null;
@@ -17,7 +18,7 @@ export declare function requireStore(): AppStorePort;
 export declare function hasLiveStore(): boolean;
 export type { Collection, EncryptedBlob } from "@internal/store";
 export { wipeAppNamespace, scanAppNamespace } from "@internal/store";
-export declare let brushRackCollection: _Coll;
+export declare let brushRackCollection: RackPersistence;
 export declare function _seedNextRackInitData(items: {
     id: string;
     value: unknown;

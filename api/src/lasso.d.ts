@@ -102,7 +102,7 @@ export declare class LassoEngine {
         bridges: import("./backend/algorithms/flat-coloring/partition.ts").FlatColoringPartition["bridges"];
     } | null;
     setSampleMode(m: string): void;
-    getSampleMode(): "nearest" | "bilinear" | "bicubic" | "spline" | "rotsprite";
+    getSampleMode(): "nearest" | "bicubic" | "bilinear" | "spline" | "rotsprite";
     setConstrainSquare(on: unknown): void;
     getConstrainSquare(): boolean;
     beginPath(x: number, y: number): void;
