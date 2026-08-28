@@ -43,17 +43,15 @@ test("出厂笔数据契约：id 唯一、字段齐全", () => {
   }
 });
 
-test("固定变体：该有的一支不少、不该有的一支不多", () => {
-  for (const o of origins) {
-    const want = o.id + FIXED_SUFFIX;
-    if (needsFixed(o)) {
-      assert(byId.has(want), `${o.id}（${o.name}）压感主导笔宽，缺固定变体 ${want}`);
-    } else {
-      assert(!byId.has(want), `${o.id}（${o.name}）不在拆分判据内，不该有 ${want}——` +
-        `flow 主导 / 本来零压感的笔要「固定版」得先发明新参数值，那是人类的活`);
-    }
-  }
-  assert(variants.length > 0, "一支固定变体都没有——判据或数据大概被改坏了，先修这条");
+// user 2026-08-28 裁：「只有勾线笔做无压感版先」——白名单收缩到 ink 一支（判据 needsFixed 命中的
+//   其余 6 支撤回待产品验证后再放；喷枪类另案不变）。加固定变体 = 改这份白名单（人类拍板再动）。
+const FIXED_ALLOWLIST = ["default-brush-ink-fixed"] as const;
+test("固定变体：白名单一支不少、名单外一支不多（user 0828「只勾线先行」）", () => {
+  for (const want of FIXED_ALLOWLIST) assert(byId.has(want), `白名单缺 ${want}`);
+  for (const v of variants) assert((FIXED_ALLOWLIST as readonly string[]).includes(v.id),
+    `${v.id} 不在白名单——固定变体扩容要 user 拍板（0828 只勾线先行）`);
+  // needsFixed 判据保留为参考（将来扩容时的候选池），不再作为完备性断言。
+  void needsFixed;
 });
 
 test("★ 固定变体 = 原笔逐字拷贝，只有三个压感 coeff 归零（不许发明数值）", () => {
