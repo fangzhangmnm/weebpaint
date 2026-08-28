@@ -1,5 +1,6 @@
 import type { PaintingView } from "./backend/workpiece/painting-view.ts";
 import type { AlphaAudit } from "./backend/algorithms/alpha-audit.ts";
+import type { WatermarkRaster } from "./backend/algorithms/watermark.ts";
 export interface ExportOpts {
     scope?: string;
     cropRect?: {
@@ -11,6 +12,7 @@ export interface ExportOpts {
     defringe?: boolean;
     bg?: string;
     onAudit?: (a: AlphaAudit) => void;
+    watermark?: WatermarkRaster;
 }
 export interface Exporter {
     id: string;

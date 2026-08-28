@@ -25,6 +25,7 @@ import { encodePngFromBytes } from "./backend/png-codec.ts";
 import { defringeAlphaZero } from "./backend/algorithms/defringe.ts";
 import { auditExportAlpha, type AlphaAudit } from "./backend/algorithms/alpha-audit.ts";
 import { flattenToBg, parseExportBg } from "./backend/algorithms/flatten-bg.ts";
+import { compositeWatermark, type WatermarkRaster } from "./backend/algorithms/watermark.ts";
 import { canvasToBlob } from "./shell/image-io.ts";
 import { setOpened } from "./resume-slate.ts";   // active session 持久层（P5：device 回执条，永不同步）
 import type { PaintingView } from "./backend/workpiece/painting-view.ts";
@@ -97,7 +98,11 @@ export async function thumbBlobFromBytes(merged: { data: Uint8ClampedArray; w: n
 //   （与 Ctrl+C 层复制的 alpha×mask 同口径，不是光裁 bbox）。仅 PNG 路径有意义（JPG flatten 无 alpha）。
 // #7（2026-08-28）：onAudit = 导出 alpha 护栏的回执口——**只在「PNG + 透明底」这一支**触发，
 //   把 α 统计交给调用方去说话（导出本身照常，护栏是提示不是拦截）。判据见 algorithms/alpha-audit.ts。
-export async function renderDocToImageBlob(doc: PaintingView, mime = "image/png", quality?: number, scope = "merged", cropRect?: { x: number; y: number; w: number; h: number } | null, defringe = false, bg = "transparent", selMask?: Uint8Array | null, onAudit?: (a: AlphaAudit) => void) {
+// #13（2026-08-28）：watermark = 已栅格化的水印块（straight RGBA，文字→字节在 watermark-raster.ts）。
+//   贴在**管线最末**：PNG 支在 defringe/铺底之后、编码之前；JPG 支在 flattenToBg 之后合进 flat。
+//   顺序不是随手排的——① defringe 只该管画本身的边（水印自带 α=0 边不参与回填）；② alpha 护栏统计
+//   必须先于水印跑（水印是大片半透明，混进统计会污染判据）；③ 铺底后再贴 = 水印永远在底色**之上**。
+export async function renderDocToImageBlob(doc: PaintingView, mime = "image/png", quality?: number, scope = "merged", cropRect?: { x: number; y: number; w: number; h: number } | null, defringe = false, bg = "transparent", selMask?: Uint8Array | null, onAudit?: (a: AlphaAudit) => void, watermark?: WatermarkRaster) {
   // S9：合成走 GL（doc-render，与 display 同源，含 clip + 组隔离）。C3（债 d）：全字节管线——
   //   合成字节 → 裁剪/铺底全在字节上做；canvas 只剩 JPEG 编码边界（提案 §4 壳域合法名单）。
   //   scope==="active"：仅当前节点（组照常整树合成）；剥掉节点**自身**的 clippingMask（基底不在导出里，
@@ -144,11 +149,13 @@ export async function renderDocToImageBlob(doc: PaintingView, mime = "image/png"
         defringeAlphaZero(plane.data, plane.w, plane.h);
       }
     }
+    if (watermark) compositeWatermark(plane.data, plane.w, plane.h, watermark);   // #13：最后一笔
     const png = await encodePngFromBytes(plane.data, plane.w, plane.h);
     return new Blob([png as unknown as BlobPart], { type: "image/png" });
   }
   // JPG 无 alpha 通道 → 必须落底：配置底色，透明/缺省 = 白（v0.9.14 前是硬编码白）。纯字节数学。
   const flat = flattenToBg(plane.data, bgRgb?.r ?? 255, bgRgb?.g ?? 255, bgRgb?.b ?? 255);
+  if (watermark) compositeWatermark(flat, plane.w, plane.h, watermark);   // #13：铺完底再贴（水印恒在底之上）
   // canvas 仅当 JPEG 编码器（壳域名单：jpg 编码）。全走 HTMLCanvasElement.toBlob，
   // 避开 Safari OffscreenCanvas.convertToBlob JPEG 返 null 的 bug。
   const c = document.createElement("canvas");
@@ -202,11 +209,11 @@ export async function shareOrDownloadBlob(blob: Blob, filename: string, mime?: s
 // ---- 剪贴板 IO ----
 
 /** 把 doc 合成图复制到剪贴板（PNG）。iPad Safari / 桌面都支持。 */
-export async function copyImageToClipboard(doc: PaintingView, scope = "merged", cropRect?: { x: number; y: number; w: number; h: number } | null, defringe = false, bg = "transparent", selMask?: Uint8Array | null, onAudit?: (a: AlphaAudit) => void) {
+export async function copyImageToClipboard(doc: PaintingView, scope = "merged", cropRect?: { x: number; y: number; w: number; h: number } | null, defringe = false, bg = "transparent", selMask?: Uint8Array | null, onAudit?: (a: AlphaAudit) => void, watermark?: WatermarkRaster) {
   // iOS Safari 要求 clipboard.write 在 user gesture 内"同步"触达；**不能**先 await blob 再 write
   // （那个 await 跨过 gesture 窗口 → NotAllowedError）。把 renderDocToImageBlob 的 Promise<Blob>
   // 直接交给 ClipboardItem（lazy promise 写法），复用 writeImageBlobToClipboard 同款路径。
-  const blobPromise = renderDocToImageBlob(doc, "image/png", undefined, scope, cropRect, defringe, bg, selMask, onAudit)
+  const blobPromise = renderDocToImageBlob(doc, "image/png", undefined, scope, cropRect, defringe, bg, selMask, onAudit, watermark)
     .then((blob) => { if (!blob) throw new Error("PNG generation failed"); return blob; });
   await writeImageBlobToClipboard(blobPromise);
 }

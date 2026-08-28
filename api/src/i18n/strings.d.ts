@@ -318,6 +318,24 @@ export declare const S: {
         readonly ja: "テクスチャ用フリンジ除去（透明部に縁色を延長、PNG のみ）";
         readonly tok: "pona e selo (kule pi poka li tawa insa pi ala, PNG taso)";
     };
+    readonly "tm.configWatermark": {
+        readonly zh: "水印";
+        readonly en: "Watermark";
+        readonly ja: "透かし";
+        readonly tok: "nimi lili";
+    };
+    readonly "tm.watermarkOn": {
+        readonly zh: "导出时加文字水印（右下角）";
+        readonly en: "Add a text watermark on export (bottom-right)";
+        readonly ja: "書き出し時に文字の透かしを入れる（右下）";
+        readonly tok: "o pana e nimi lili tawa poka anpa pi sitelen";
+    };
+    readonly "tm.watermarkPh": {
+        readonly zh: "水印文字，如 @你的名字";
+        readonly en: "Watermark text, e.g. @yourname";
+        readonly ja: "透かしの文字（例：@yourname）";
+        readonly tok: "nimi lili, sama @nimi sina";
+    };
     readonly "tm.alphaGuard": {
         readonly zh: "导出护栏：检测到 {n} 个可疑半透明像素（{pm}‰）——可能是软橡皮误擦或喷枪喷出界。图已导出，建议在黑底上看一眼";
         readonly en: "Export check: {n} suspicious semi-transparent pixels ({pm}‰) — could be a stray soft eraser or airbrush pass. The file was exported; take a look at it on a dark background";

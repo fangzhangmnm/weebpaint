@@ -1,4 +1,5 @@
 import { type AlphaAudit } from "./backend/algorithms/alpha-audit.ts";
+import { type WatermarkRaster } from "./backend/algorithms/watermark.ts";
 import type { PaintingView } from "./backend/workpiece/painting-view.ts";
 export declare function setCurrentSessionName(name: string): void;
 /** 合成字节 → 缩略图 blob（最长边 = maxSide）。PNG 保 alpha（容器 CSS 背景可独立调色）。
@@ -16,7 +17,7 @@ export declare function renderDocToImageBlob(doc: PaintingView, mime?: string, q
     y: number;
     w: number;
     h: number;
-} | null, defringe?: boolean, bg?: string, selMask?: Uint8Array | null, onAudit?: (a: AlphaAudit) => void): Promise<Blob>;
+} | null, defringe?: boolean, bg?: string, selMask?: Uint8Array | null, onAudit?: (a: AlphaAudit) => void, watermark?: WatermarkRaster): Promise<Blob>;
 export declare function prefersShare(): boolean;
 /**
  * 分享 / 保存合成图。移动端优先 navigator.share（→ 相册 / Files）；桌面直接下载到 Downloads。
@@ -30,7 +31,7 @@ export declare function copyImageToClipboard(doc: PaintingView, scope?: string, 
     y: number;
     w: number;
     h: number;
-} | null, defringe?: boolean, bg?: string, selMask?: Uint8Array | null, onAudit?: (a: AlphaAudit) => void): Promise<void>;
+} | null, defringe?: boolean, bg?: string, selMask?: Uint8Array | null, onAudit?: (a: AlphaAudit) => void, watermark?: WatermarkRaster): Promise<void>;
 /** 把任意 PNG blob（或 Promise<Blob>，Safari lazy 写法）复制到剪贴板。 */
 export declare function writeImageBlobToClipboard(blobOrPromise: Blob | Promise<Blob>): Promise<void>;
 /** 读剪贴板里的图片。返回 Blob 或 null（剪贴板里没图）。 */
