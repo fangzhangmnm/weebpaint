@@ -10,6 +10,7 @@ import { setMenuOpen } from "./settings-menu.ts";
 import { openConfirmSheet } from "./sheets.ts";
 import { triggerDownload } from "./session.ts";
 import { reportError } from "./error-badge.ts";
+import { raiseWindow } from "./surfaces.ts";
 import {
   timelapseStatus, timelapseStart, timelapsePause, timelapseResume, timelapseClear, timelapseSnapshotMp4,
 } from "./timelapse-session.ts";
@@ -42,7 +43,14 @@ export function initTimelapseUi(currentDocName: () => string): void {
   _renderChip(); _renderMenuState();
 }
 
-function _openPanel(): void { _moreOpen = false; els.tlPanel.classList.remove("hidden"); _renderPanel(); }
+// 开窗即置顶（surfaces window band；pointerdown 置顶由 transient-panels 的 registerWindow 统一挂）。
+// 2026-08-28（Claude Opus 5）：修 user 2026-08-23 反馈「录制窗被图层面板遮挡」。
+function _openPanel(): void {
+  _moreOpen = false;
+  els.tlPanel.classList.remove("hidden");
+  raiseWindow(els.tlPanel);
+  _renderPanel();
+}
 
 // 拖标题栏移动（同 colorPanel 手势；位置 session 态不持久化）
 function _wireDrag(): void {
