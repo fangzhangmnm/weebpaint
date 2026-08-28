@@ -1003,6 +1003,7 @@ export const S = {
   "br.resetPhrase": { zh: "还原笔刷", en: "RESET BRUSHES", ja: "ブラシをリセット", tok: "o sin e ilo sitelen" },
   "br.resetConsentPrompt": { zh: "这会用内置笔刷覆盖同名笔刷。输入「{phrase}」以确认。", en: "This overwrites same-named brushes with the built-ins. Type \"{phrase}\" to confirm.", ja: "同名のブラシを内蔵ブラシで上書きします。「{phrase}」と入力して確認してください。", tok: "ni li ante e ilo sitelen sama. o sitelen e \"{phrase}\" tawa ken." },
   "gs.createdTransient": { zh: "已新建画布 {w}×{h}（未保存·无家——保存时选择去处）", en: "New canvas {w}×{h} (unsaved, no home — choose where to save it later)", ja: "新しいキャンバス {w}×{h}（未保存・保存時に保存先を選択）", tok: "sitelen sin {w}×{h} (awen ala — o awen e ona kepeken tomo la)" },
+  "gm.transientAdopted": { zh: "已连接图库，这幅画已自动保存为「{name}」", en: "Gallery connected — this artwork was saved as \"{name}\"", ja: "ギャラリーに接続しました。この作品は「{name}」として保存されました", tok: "poki sitelen li wan. sitelen ni li awen kepeken nimi \"{name}\"" },
   "gm.forgetMsg": { zh: "只从这台设备的名册移除，不动图库本身的文件。", en: "Removes it from this device's list only; gallery files are untouched.", ja: "この端末の一覧から削除するだけで、ギャラリーのファイルには触れません。", tok: "ni li weka e nimi taso. lipu li awen pona" },
   "gm.forgotten": { zh: "已忘记 {label}", en: "Forgot {label}", ja: "{label} を一覧から削除しました", tok: "mi weka e {label} tan lipu" },
   "gm.forgetHint": { zh: "忘记（不动文件）", en: "Forget (files untouched)", ja: "一覧から削除（ファイルはそのまま）", tok: "o weka e nimi taso" },

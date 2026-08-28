@@ -4,7 +4,23 @@
 > 出处 = 完成状态总账 §2′ wave 1（user 0828 全量裁决）。已完结：清零/cloudless/encryption/wipe/P7/#22。
 > 本文 = 剩余件的**摊面 + 选项**（grill 时你划掉；标 ⚙ 的不需要 grill、拍板已够，直接排产）。
 
-## A. 必 grill（红线，你标的）
+## A. 裁决落账（user 2026-08-28 晚，逐条【】回复；edited by Claude Fable 5）
+
+- **A1 = a**（挂库 transient 自动安家=「有库新画自动创建身份」等价）→ **✅ 已落 v0.11.27**。
+- **A2 = 大 grill 开启**：user 提案「回到必有 store 模型——local-only **store**（只 IDB 无云）+ 无地=memory
+  降级 + 即使 local store 也**不应该有 gallery**；笔架 TS 数据结构为权威、collection 退为窄序列化接口、
+  reload 不丢即达标、**放弃文件笔架句柄**」。我方 grill 回应（transcript 2026-08-28）：三轴考古（IDB 不当
+  作品家=红线活/最小 IDB 四理由死三/browserless=memory backend 满足）+ **双店模型**成形（常驻 device
+  store[local-idb backend] + 可插拔 gallery store；gallery 可见性从 hasLiveStore 解耦成 backend-kind）+
+  两条反对（resume-slate 同步原子写别回滚=affordance 分工不是债；驱逐面回宽要点头）+ 切法提议
+  （数据结构/提案 .h 宣发前钉死，代码重构可宣发后撕书——A3 原则自适用）。**等 user 对双店模型与切法表态**。
+- **A3**：registry 序列化 = generic JSON dict 口径（旧 json 永不需要 migration；代码层改名随意）→ store agenda。
+- **A4 = a 同意**（本地版本戳+写前 backup；双版本 spam 要去重设计）；b 只读打开 park；瑞士奶酪同意 → store agenda。
+- **A5**：等 user 真机「一句话的事」——park 到真机 session。
+- **A6 = a**（app 层轮询）+ store 出**强制表态 reconcilePolicy**（逼消费者选而非无视）；多 store 口径=
+  轮询只属 gallery store（device store 无云）→ store agenda。
+
+## A′. 原摊面存档（grill 已过，仅考古用）
 
 ### A1. transient 挂库后的保存去向（#23，「必grill，红线」）
 现状：无库画 transient → 连接图库后留在编辑器（焚画守卫），但 Ctrl+S 仍走 settle→FSA 存文件，

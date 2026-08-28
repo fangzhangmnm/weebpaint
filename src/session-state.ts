@@ -28,6 +28,7 @@ import { readHandleFile, writeHandleBlob, handleMtime, hasWeebPaintTraces, suppo
 import { claimHomeAuthority, docHome, fileDirty, saveRoute } from "./doc-home.ts";
 import { activeGalleryId } from "./active-gallery.ts";   // P3：安家铸户口用当前挂载库 id（legacy="default" 零迁移）
 import { galleryDefaultName } from "./naming.ts";
+import { sessionNameConflict } from "./session-name.ts";   // A1 安家铸名预检
 import { crashStore, mintLuggageTag, type LuggageTag } from "./crash-store.ts";
 import { pathFolder } from "./gallery/gallery-path.ts";
 import { invalidateCachedThumb } from "./gallery/cloud-thumb-cache.ts";
@@ -494,6 +495,25 @@ function adoptAsNew(loaded: LoadedDoc, name: string) {
   //   导入件的快照在它下一次从图库被打开时封（那时字节已在）。要改成"导入即封"得先 await 一次保存，
   //   属于行为变更，攒着 escalate，不在清理批里夹带。
 }
+/** A1（user 2026-08-28 拍板 a）：挂库成功后，开着的 transient 画自动安家进新图库——
+ *  「有库时新画自动创建身份」既有拍板的延伸：连接图库的手势就是安家意图，不再问。
+ *  file 家不动（已有家）；无开画/gallery 家 = no-op。返回新身份名（null = 无事可做）。 */
+async function adoptTransientIntoGallery(): Promise<string | null> {
+  if (session.home?.kind !== "transient") return null;
+  let name = galleryDefaultName();
+  for (let i = 0; i < 3 && (await sessionNameConflict(name)); i++) name = galleryDefaultName();   // hex4 撞名重铸（首存 mode:"new" 仍兜底）
+  es.adopted(toFull(name), { create: true });   // es 接管：标脏 + 首存走 mode:"new"（撞名不静默覆盖）
+  _esRebound();
+  _dropLuggage();                               // transient 行李牌焚（同 saveAs 收编姿势）
+  _transientName = null;
+  _setActive(name);                             // home→gallery + 锁 + 回执条
+  _isLazyBlankSession = false; _recomputePhase();
+  updateSaveStatus();
+  await saveNow();                              // 首存落盘（tryPush best-effort）
+  void _captureCheckpoint(name, "new-doc");
+  return name;
+}
+
 /** revert 回滚：装入一个解好的 doc，身份**不变**（首存 mode:"existing"，就是要写回原文件）。
  *  **不封存 checkpoint** —— 否则刚回滚掉的状态立刻把快照覆盖了，只能 revert 一次。 */
 function adoptAsExisting(loaded: LoadedDoc, name: string) {
@@ -1125,6 +1145,7 @@ export const session = {
   // adopt 的两个意图显式分开（别再合成一个带 flag 的）：import=新身份 / revert=既有身份。
   adoptAsNew, adoptAsExisting,
   adoptAsTransient,   // P2：崩溃恢复的云关分支（不落看不见的图库；crash-banner 唯一调用方）
+  adoptTransientIntoGallery,   // A1：挂库后 transient 自动安家（gallery-manage-ui attach 收尾调）
   rename: renameCurrentSession, exit: exitCanvasToGallery, newDoc, open: openItem, push: pushItem, unload: unloadItem,
   /** 当前作品的 at-rest **密文**字节（原样，不解壳、不要密码）。非加密件 → null。
    *  先 saveNow()：at-rest 字节是「上次保存」的内容，不先落盘就会导出成旧版本。 */

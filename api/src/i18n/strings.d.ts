@@ -5415,6 +5415,12 @@ export declare const S: {
         readonly ja: "新しいキャンバス {w}×{h}（未保存・保存時に保存先を選択）";
         readonly tok: "sitelen sin {w}×{h} (awen ala — o awen e ona kepeken tomo la)";
     };
+    readonly "gm.transientAdopted": {
+        readonly zh: "已连接图库，这幅画已自动保存为「{name}」";
+        readonly en: "Gallery connected — this artwork was saved as \"{name}\"";
+        readonly ja: "ギャラリーに接続しました。この作品は「{name}」として保存されました";
+        readonly tok: "poki sitelen li wan. sitelen ni li awen kepeken nimi \"{name}\"";
+    };
     readonly "gm.forgetMsg": {
         readonly zh: "只从这台设备的名册移除，不动图库本身的文件。";
         readonly en: "Removes it from this device's list only; gallery files are untouched.";

@@ -19,6 +19,7 @@ import { requireStore, galleryBackend, signIn, isSignedIn, isAuthConfigured, _se
 import { getAllBrushes, getMeta, RACK_META_ID } from "../brushes.ts";
 import { preferences, PREF_REGISTRY, type PrefKey } from "../app-prefs.ts";
 import { docHome } from "../doc-home.ts";
+import { session } from "../session-state.ts";   // A1：attach 后 transient 自动安家
 import { triggerDownload } from "../session.ts";
 import { reportError } from "../error-badge.ts";
 import type { AppContext } from "../app-context.ts";
@@ -127,7 +128,15 @@ async function switchFlow(entry: GalleryEntry, opts: { askSeed: boolean }): Prom
     return;
   }
   if (seed) for (const [k, v] of Object.entries(seed.prefs)) preferences.set(k as PrefKey, v as never);
-  _status(t("gm.switched", { label: entry.label }), true);
+  // A1（user 0828 拍板 a）：开着的 transient 画自动安家进刚连上的图库（连接手势=安家意图，不再问）。
+  try {
+    const adopted = await session.adoptTransientIntoGallery();
+    if (adopted) { _status(t("gm.transientAdopted", { name: adopted }), true); }
+    else _status(t("gm.switched", { label: entry.label }), true);
+  } catch (e) {
+    reportError(new Error("[gallery-manage] transient adopt after attach failed (doc 仍开着未丢): " + String(e)), "error");
+    _status(t("gm.switched", { label: entry.label }), true);
+  }
   // 切库后落 gallery 页（Q4 拍板：切库意图=去看那个库；不写回执条，boot 恢复不受影响）。
   //   ⚠ 仅当没有开着的画（docHome=null）——2026-08-27 无痕事故：transient 脏画布被这行无门导航
   //   正常关闭焚毁（词典序②当前操作不丢）。有画开着 = 留在编辑器：画照画，库已挂上，图库自己去点。
