@@ -205,3 +205,10 @@ swap 失败清 _current）/ H embed 对账测试 / I sourcemap 回写（真构�
 **残余三件待 user**：①A picker 半边——已登录连接不弹 account picker=第二账号铸不出（要 store signIn 加
 prompt:"select_account" 口子，store 轮件）；②C 产品表态：加密动词=图库家专属，接受还是扩无库/文件家；
 ③I 深化：红线夹具跑单文件壳=wave4 当天件（已记 wave6 doc 待补）。第二档 J-Q=宣发后（user 未另裁维持）。
+
+**0828 夜批（edited by Claude Fable 5，v0.11.39 推 dev + store 0.9.0 发版收货）**：§8 残余三件裁决落地——
+①picker【加口子 同意】：store 0.9.0=signIn({prompt:"select_account"})（新政先放行后审，审版材料=api diff
+一处+pack 清单）；app=连接 sheet 已登录多一条「OneDrive · 换一个账号…」（redirect 回程续办铸第二账号）。
+②加密扩域【扩展到文件，可以保存加密文件；与 store 解耦、store 原生库支持不动】：文件家加密全闭环
+（原位打开容器/加密另存 .ora.zip/续存打包/三类快照全密文=at-rest 红线 file 家同守/恢复解锁/解除=另存明文
+指路）；transient=先安家。③「3」已向 user 解释=单文件壳夹具深化归 wave4。1246 测+F2 绿。真机批两条新增。
