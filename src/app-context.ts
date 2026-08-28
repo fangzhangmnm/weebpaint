@@ -45,7 +45,7 @@ export interface DialReactive {
   tool: string;
   color: string;
   canDraw: boolean;
-  pressureOff: boolean;   // 禁用笔压（per-doc desk：desk.pressureDisabled 绑定于此）
+  // （pressureOff 已 sunset 2026-08-28：不要压感 = 选「固定xx」笔，总账 §3 #12）
 }
 
 // ---- 句柄类（深源未入门，先描述消费方用到的接口；grow as needed）----

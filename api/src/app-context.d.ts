@@ -33,7 +33,6 @@ export interface DialReactive {
     tool: string;
     color: string;
     canDraw: boolean;
-    pressureOff: boolean;
 }
 export interface RackHandle {
     getRackToolKey(tool: string): string;

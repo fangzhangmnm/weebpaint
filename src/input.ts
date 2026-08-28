@@ -1620,15 +1620,13 @@ export class InputController {
 // 注：这里永远 return 真值。压感**是否**影响 size/opacity/flow 由每笔的 sizeCoeff / opaCoeff / flowCoeff
 // 决定（brush.ts 的 signedLerp，0=不响应）。v409 删了 pressureToSize/pressureToOpacity——那对字段
 // 从 v30 起就没人读了，这条注释在此之前一直是假的。
-// v0.6.15 禁用笔压（左栏 size 栏的 toggle）：开 = 忽略传感器，恒定 0.5（与鼠标路径同值）。
-//   SSoT = desk.pressureDisabled（per-doc desk，跟 ora 走；user 2026-07-25「显然是 editor state」），
-//   绑在 dialReactive.pressureOff。引擎侧 thunk 惰性读（每 pointer 事件求值），app boot 时接线。
-let _pressureOff: () => boolean = () => false;
-export function bindPressureDisabled(fn: () => boolean): void { _pressureOff = fn; }
-
+// 【sunset 2026-08-28】v0.6.15 的「禁用笔压」全局 toggle（desk.pressureDisabled ⇄ 这里的 _pressureOff
+//   thunk，开 = 恒压 0.5）已整条撤除，总账 §3 #12【分两支笔，笔压toggle sunset】。「不要压感」现在
+//   是**笔的属性**：选笔架里的「固定xx」（builtin-brushes.json 的 -fixed 变体，三个 coeff 归零）。
+//   鼠标分支保留——鼠标没有传感器，恒 0.5 是它的真值，不是开关。
 function effectivePressureFor(rec: PointerRec, ev: { pointerType?: string; pressure?: number }): number {
   let raw: number;
-  if (_pressureOff() || ev.pointerType === "mouse") {
+  if (ev.pointerType === "mouse") {
     raw = 0.5;
   } else {
     const r = typeof ev.pressure === "number" ? ev.pressure : null;

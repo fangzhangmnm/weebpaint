@@ -56,7 +56,6 @@ test("[editor-state] Serialize 往返 + 深拷贝解耦", () => {
   desk.refPanel.viewport = { tx: 5, ty: 6, scale: 2, rot: 90 };
   desk.viewport = { tx: 1, ty: 2, scale: 3, rot: 0 };
   desk.checkboard = true;
-  desk.pressureDisabled = true;   // v0.6.15 禁用笔压 = per-doc desk（跟 ora 走）
   const snap = desk.Serialize();
   // 深拷贝解耦：改 snap 不影响 live
   const decoupleProbe = desk.Serialize();
@@ -65,7 +64,6 @@ test("[editor-state] Serialize 往返 + 深拷贝解耦", () => {
   // 往返（用未被篡改的 snap）
   desk.reset();
   eq(desk.brushTool.size, 12, "reset 回默认");
-  eq(desk.pressureDisabled, false, "reset 回默认：笔压恢复启用");
   desk.Unserialize(snap);
   eq(desk.brushTool.size, 42, "Unserialize 复原 size");
   eq(desk.brushTool.color, "#abcdef", "复原 color");
@@ -73,7 +71,18 @@ test("[editor-state] Serialize 往返 + 深拷贝解耦", () => {
   eq(J(desk.refPanel.viewport), J({ tx: 5, ty: 6, scale: 2, rot: 90 }), "复原 refPanel.viewport");
   eq(J(desk.viewport), J({ tx: 1, ty: 2, scale: 3, rot: 0 }), "复原 viewport");
   eq(desk.checkboard, true, "复原 checkboard");
-  eq(desk.pressureDisabled, true, "复原 pressureDisabled（禁用笔压跟 ora 走）");
+});
+
+// 【sunset 2026-08-28】「禁用笔压」per-doc 开关随 toggle 一起撤（总账 §3 #12【分两支笔，笔压toggle sunset】）。
+//   守两件：① Serialize 不再吐这个键（不留兼容垫层）；② 老 ora 里残留的键被 Unserialize 静默忽略、不崩、
+//   也不复活成 desk 字段（mergeInto 只认 default 里存在的键）。「不要压感」= 笔架选「固定xx」那支。
+test("[editor-state] 笔压 toggle sunset：Serialize 不吐 pressureDisabled，老 ora 残留键被忽略", () => {
+  desk.reset();
+  assert(!("pressureDisabled" in desk.Serialize()), "Serialize 输出不该再有 pressureDisabled");
+  assert(!("pressureDisabled" in desk), "desk 门面不该再有 pressureDisabled 访问器");
+  desk.Unserialize({ pressureDisabled: true, brushTool: { size: 33 } });   // 老档形状
+  assert(!("pressureDisabled" in desk.Serialize()), "老档的 pressureDisabled 不许被 merge 回来");
+  eq(desk.brushTool.size, 33, "同一份老档里的其余字段照常复原（忽略是逐键的，不是整份丢弃）");
 });
 
 test("[editor-state] Unserialize 容错（缺字段留 default、多字段忽略）", () => {

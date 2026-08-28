@@ -9,8 +9,6 @@ export interface LeftDialOpts {
     onOpacity(frac: number): void;
     onBrushTap(): void;
     onBrushLongpress(): void;
-    getPressureDisabled(): boolean;
-    onTogglePressure(v: boolean): void;
 }
 export interface LeftDialHandle {
     flashSize(): void;

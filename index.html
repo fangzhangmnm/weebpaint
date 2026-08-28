@@ -461,11 +461,9 @@
       <!-- 笔指示按钮 + size/opacity 竖滑块 + size popup = <LeftDial> Vue 组件（src/ui/left-dial.ts）挂载于此。
            display:contents → 组件渲染的节点作为 .left-sidebar 的直接 flex 子项（保留原 gap/居中布局）。 -->
       <div id="leftDialMount" style="display:contents"></div>
-      <!-- v0.6.32 user：笔压开关独立按钮（undo/redo 上方）；图标=pen-pressure / pen-pressure-off
-           （20260728 交付批真图）；笔粗图标位恢复纯标签 -->
-      <button class="tool" id="pressureToggleBtn" type="button" data-i18n-title="ld.pressureOff" aria-pressed="false">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><use id="pressureToggleUse" href="#pen-pressure"/></svg>
-      </button>
+      <!-- v0.6.32 的笔压开关独立按钮已 sunset（2026-08-28，总账 §3 #12【分两支笔，笔压toggle sunset】）：
+           「不要压感」= 去笔架选「固定xx」那支（builtin-brushes.json 的 -fixed 变体）。
+           #pen-pressure / #pen-pressure-off 两个 symbol 暂留 sprite（无引用，等下一轮图标对账清）。 -->
       <button class="tool" id="undoButton" type="button" data-i18n-title="action.undo">
         <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow-undo"/></svg>
       </button>

@@ -182,5 +182,4 @@ export declare class InputController {
     cancelAllPointers(): void;
     clearKeyHolds(): void;
 }
-export declare function bindPressureDisabled(fn: () => boolean): void;
 export {};

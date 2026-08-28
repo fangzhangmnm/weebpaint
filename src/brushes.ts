@@ -98,6 +98,19 @@ export function newBrushId() {
 //   （human 2026-07-18 明确：不要删出厂笔的预设）。理由：出厂笔的参数是**被调过的手感意图**，
 //   写死才不会在某天有人改了下面这些默认值时跟着悄悄漂。
 //   下面这些默认值只服务「新建笔」（rack 只传 id/name/tool/folder）和缺字段的导入笔。
+//
+// **「固定」变体约定**（2026-08-28，user 0823 问「笔刷压感toggle还是是否有压感做成不同的笔刷？」
+//   → 0828 拍板【分两支笔，笔压toggle sunset】，总账 §3 #12）：
+//   - 全局「禁用笔压」toggle 已 sunset（原 desk.pressureDisabled，恒压 0.5）。「不要压感」现在是**选另一支笔**。
+//   - id = `<原 id>-fixed`，name = `固定<原名>`；args **逐字拷贝原笔**，只把三个压感 coeff
+//     (sizeCoeff/opaCoeff/flowCoeff) 置 0 —— 不发明任何新参数值（「关掉压感对粗细的影响就把
+//     sizeCoeff 设 0，别再引入第二个开关」，common/resolved-brush.ts 既有原则）。
+//   - **拆哪几支**（克制，不全量翻倍）：压感主导笔宽且非 flow 主导的那些 = `sizeCoeff ≥ 0.5 && flowCoeff < 1`。
+//     喷枪族/软橡皮/滤镜笔是 flow 主导（压感→流量**就是**喷枪本身），把 flowCoeff 归零会得到一支满流量
+//     糊块 = 另一支笔的设计题，要发明新 flow 值 → **不拆**，留人类裁决。像素三支本来就零压感 = 它们**就是**固定版。
+//   - 不变式由 test/builtin-brushes.test.ts 钉住（逐字段 == 原笔 except 三 coeff）。
+//   - ⚠ taper 是**压感包络**（brush.ts _stampParams 里 taper 乘的是 p）——coeff=0 后 taper 自然失效。
+//     变体仍逐字保留 taperIn/taperOut（不发明值），它们在固定笔上是惰性字段。
 export function makeBrush({
   id = newBrushId(),
   name,
