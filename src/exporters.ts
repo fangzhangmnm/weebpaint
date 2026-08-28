@@ -25,7 +25,6 @@ import { WEEBPAINT_VERSION } from "./version.ts";
 import { renderDocToImageBlob } from "./session.ts";
 import type { PaintingView } from "./backend/workpiece/painting-view.ts";
 import type { AlphaAudit } from "./backend/algorithms/alpha-audit.ts";
-import type { WatermarkRaster } from "./backend/algorithms/watermark.ts";
 
 export interface ExportOpts {
   scope?: string;
@@ -35,10 +34,6 @@ export interface ExportOpts {
   // #7 导出 alpha 护栏回执（2026-08-28）：仅「PNG + 透明底」会回调。字节照出——护栏是提示不是拦截，
   //   消费方（导出菜单）拿它决定要不要多说一句「黑底看一眼」。判据见 backend/algorithms/alpha-audit.ts。
   onAudit?: (a: AlphaAudit) => void;
-  // #13 导出自定义水印（2026-08-28，宣发需要）：**已栅格化**的水印块（straight RGBA）。
-  //   文字→字节的壳在 watermark-raster.ts，栅格化在调用方（导出菜单）做一次、四个去向共用；
-  //   exporter 只透传。project 格式（ora/psd）不加水印（图层工程 ≠ 成品图）。
-  watermark?: WatermarkRaster;
 }
 export interface Exporter {
   id: string;
@@ -87,9 +82,9 @@ registerExporter({
 });
 registerExporter({
   id: "png", label: "PNG", ext: "png", mime: "image/png", kind: "image",
-  encode: (doc, { scope = "merged", cropRect = null, defringe = false, bg = "transparent", onAudit, watermark } = {}) => renderDocToImageBlob(doc, "image/png", undefined, scope, cropRect, defringe, bg, undefined, onAudit, watermark) as Promise<Blob>,
+  encode: (doc, { scope = "merged", cropRect = null, defringe = false, bg = "transparent", onAudit } = {}) => renderDocToImageBlob(doc, "image/png", undefined, scope, cropRect, defringe, bg, undefined, onAudit) as Promise<Blob>,
 });
 registerExporter({
   id: "jpg", label: "JPG", ext: "jpg", mime: "image/jpeg", kind: "image",
-  encode: (doc, { scope = "merged", cropRect = null, bg = "transparent", watermark } = {}) => renderDocToImageBlob(doc, "image/jpeg", 0.92, scope, cropRect, false, bg, undefined, undefined, watermark) as Promise<Blob>,
+  encode: (doc, { scope = "merged", cropRect = null, bg = "transparent" } = {}) => renderDocToImageBlob(doc, "image/jpeg", 0.92, scope, cropRect, false, bg, undefined, undefined) as Promise<Blob>,
 });

@@ -73,9 +73,6 @@ export const S = {
   "tm.clipToSelection": { zh: "裁到选区", en: "Clip to selection", ja: "選択範囲に切り抜き", tok: "o kipisi tawa ma wile" },
   "tm.defringe":        { zh: "贴图防黑边（透明区回填边缘色，仅 PNG）", en: "Defringe for textures (extend edge colors under transparency, PNG only)", ja: "テクスチャ用フリンジ除去（透明部に縁色を延長、PNG のみ）", tok: "pona e selo (kule pi poka li tawa insa pi ala, PNG taso)" },
   // #13 导出自定义水印（2026-08-28，宣发需要）：扳手里的开关 + 文字；右下角、样式固定极简。
-  "tm.configWatermark": { zh: "水印", en: "Watermark", ja: "透かし", tok: "nimi lili" },
-  "tm.watermarkOn":     { zh: "导出时加文字水印（右下角）", en: "Add a text watermark on export (bottom-right)", ja: "書き出し時に文字の透かしを入れる（右下）", tok: "o pana e nimi lili tawa poka anpa pi sitelen" },
-  "tm.watermarkPh":     { zh: "水印文字，如 @你的名字", en: "Watermark text, e.g. @yourname", ja: "透かしの文字（例：@yourname）", tok: "nimi lili, sama @nimi sina" },
   // #7 导出 alpha 护栏（2026-08-28）：命中 = 琥珀 banner，字节照出（提示不是拦截）。
   //   判据见 backend/algorithms/alpha-audit.ts。
   "tm.alphaGuard":      { zh: "导出护栏：检测到 {n} 个可疑半透明像素（{pm}‰）——可能是软橡皮误擦或喷枪喷出界。图已导出，建议在黑底上看一眼", en: "Export check: {n} suspicious semi-transparent pixels ({pm}‰) — could be a stray soft eraser or airbrush pass. The file was exported; take a look at it on a dark background", ja: "書き出しチェック：疑わしい半透明ピクセルが {n} 個（{pm}‰）——消しゴムやエアブラシのはみ出しかもしれません。書き出しは完了しています。黒背景で確認してください", tok: "o lukin: nanpa {n} pi sike kule lili ({pm}‰) li nasa — ken la ilo weka anu ilo kon li pakala. sitelen li kama lipu. o lukin e ona lon monsi pimeja" },

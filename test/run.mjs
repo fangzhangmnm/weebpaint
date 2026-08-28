@@ -40,7 +40,6 @@ import "./fill-lockalpha.test.mjs";  // v0.9.12 lockAlpha 真 atop：α 不动/�
 import "./defringe.test.mjs";        // v0.9.13 导出贴图防黑边：α=0 回填边缘色 + PNG 往返保底
 import "./export-bg.test.mjs";       // v0.9.14 导出底色：flattenToBg 数学 + parseExportBg 防御收口
 import "./alpha-audit.test.mjs";     // #7 导出 alpha 护栏：正常/事故两类夹具床（判据与阈值的锚）
-import "./watermark.test.mjs";       // #13 导出自定义水印：合成器落点/边距/弃贴/over 数学 + 栅格壳降级返 null
 import "./background-sync-jobs.test.mjs";
 import "./undo-stack.test.mjs";             // T1 workpiece v2（ADR-0008）：令牌/collector/自反 swap/配额/双计数
 import "./layer-tiles.test.mjs";            // T2 像素组件：写时扣押（Krita memento）/verbs/computed 白名单+双捕获/no-op 守卫（pixel-tx-noop 后继）

@@ -20,13 +20,6 @@ export declare const PREF_REGISTRY: {
         readonly scope: "gallery";
         readonly def: boolean;
     };
-    readonly "export-watermark": {
-        readonly scope: "gallery";
-        readonly def: {
-            on: boolean;
-            text: string;
-        };
-    };
     readonly "show-fps": {
         readonly scope: "session";
         readonly def: boolean;

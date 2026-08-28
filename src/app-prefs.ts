@@ -27,7 +27,6 @@ export const PREF_REGISTRY = {
   // #13 导出自定义水印（2026-08-28，宣发需要）：**跟身份走**——「我的签名」换台机器也该是同一个，
   //   不是硬件耦合。无库（无地）时经 §9.7 cascade 自动落 device 层，机制现成零改。
   //   (edited by Claude Opus 5)
-  "export-watermark":     { scope: "gallery", def: { on: false, text: "" } as { on: boolean; text: string } },
   // （ora scope 三项 pixel-grid / long-press-pick / menu-tab 不在本表：per-doc 归 desk（Slice C），
   //   老的 collection 偏好按拍板不迁移——工厂默认起。）
   // session（不持久化；「不持久化档不设」的唯一例外 = show-fps，user 明允）

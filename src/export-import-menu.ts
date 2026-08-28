@@ -28,7 +28,6 @@ import { triggerDownload, shareOrDownloadBlob, copyImageToClipboard, readImageFr
 import { importImageAsLayer } from "./import-image.ts";
 import { desk } from "./workbench-state.ts";
 import { preferences } from "./app-prefs.ts";
-import { rasterWatermarkText } from "./watermark-raster.ts";
 import { reportError } from "./error-badge.ts";
 import { requireStore, storeAbsent } from "./app-store.ts";
 import { nextFreeExportName } from "./gallery/cloud-image-model.ts";
@@ -36,7 +35,6 @@ import { withBusy } from "./fullscreen-busy.ts";
 
 import type { AppContext } from "./app-context.ts";
 import type { AlphaAudit } from "./backend/algorithms/alpha-audit.ts";
-import type { WatermarkRaster } from "./backend/algorithms/watermark.ts";
 const errMsg = (e: unknown): string => String((e as { message?: unknown })?.message || e);
 let doc: AppContext["doc"], setStatus: AppContext["setStatus"], board: AppContext["board"];
 
@@ -63,23 +61,6 @@ function _isProjectFormat(fmt: string): boolean { return (getExporter(fmt)?.kind
 // 配置 popup 是 innerHTML 拼的：任何**用户自由输入**回填进模板前必须转义（水印文字 #13 是第一个）。
 const _esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-// #13 导出自定义水印（2026-08-28，宣发需要）：开关+文字 = gallery scope pref（跟身份走，见 app-prefs）。
-//   四个图片去向（file/clipboard/print/cloud）在**执行前栅格化一次**、共用同一块字节——
-//   字号跟导出宽走，所以裁到选区时喂选区宽，不是 doc 宽。
-//   栅格失败（无 OffscreenCanvas 等）= undefined = 静默不加水印，导出照常（水印永不挡导出）。
-//   项目格式（ora/psd）根本不走这条路 —— 图层工程不加水印。
-//   读面统一走 _wmPref()：持久层里的值是**外来数据**（跨设备同步/手改/老版本），形状不可信——
-//   normalize 一次，别让 popup 因为一个 null 就整个打不开。
-function _wmPref(): { on: boolean; text: string } {
-  const raw = preferences.get("export-watermark") as unknown;
-  const o = (raw && typeof raw === "object" ? raw : {}) as { on?: unknown; text?: unknown };
-  return { on: o.on === true, text: typeof o.text === "string" ? o.text : "" };
-}
-function _watermarkFor(planeWidth: number): WatermarkRaster | undefined {
-  const wm = _wmPref();
-  if (!wm.on) return undefined;
-  return rasterWatermarkText(wm.text, planeWidth) ?? undefined;
-}
 
 // #7 导出 alpha 护栏（2026-08-28，user 2026-08-23：软橡皮误擦 / 喷枪喷出界白底看不见，
 //   发到 discord 黑底才发现，已三次事故）。护栏 = **提示不是拦截**：字节照出、状态行多说一句。
@@ -211,11 +192,10 @@ export function initExportImportMenu(ctx: AppContext) {
     }
     const cropRect = _selCropRect();   // #16：仅导出选区范围（三种去向统一生效）
     _lastAudit = null;                 // #7：本次导出的护栏回执（四个去向共用，末尾统一说话）
-    const watermark = _watermarkFor(cropRect ? cropRect.w : doc.width);   // #13：四个去向共用一块（栅格一次）
     try {
       if (c.target === "clipboard") {
         // 剪贴板恒为 PNG（ClipboardItem image/png）——格式选择只作用于文件/分享路径；底色/防黑边同享（v0.9.14）
-        await copyImageToClipboard(doc, c.scope, cropRect, desk.export.defringePng, desk.export.bg, null, _auditSink, watermark);
+        await copyImageToClipboard(doc, c.scope, cropRect, desk.export.defringePng, desk.export.bg, null, _auditSink);
         setStatus(t("tm.copiedPngToClipboard", { scope: c.scope === "active" ? t("tm.scopeActiveLayer") : t("tm.scopeMerged") }));
         _alphaGuardNotice();
       } else if (c.target === "print" && !prefersShare()) {
@@ -225,7 +205,7 @@ export function initExportImportMenu(ctx: AppContext) {
         //   window.open 必须在此**手势同步期**就开好，不能等 encode 的 await（iOS transient-activation 严）。
         const win = window.open("", "_blank");
         if (exp.busyHint) setStatus(exp.busyHint, true);
-        const blob = await exp.encode(doc, { scope: c.scope, cropRect, defringe: desk.export.defringePng, bg: desk.export.bg, onAudit: _auditSink, watermark });
+        const blob = await exp.encode(doc, { scope: c.scope, cropRect, defringe: desk.export.defringePng, bg: desk.export.bg, onAudit: _auditSink });
         if (win) {
           await printImageInNewWindow(win, blob);
           setStatus(t("tm.printOpenedNewTab"));
@@ -241,7 +221,7 @@ export function initExportImportMenu(ctx: AppContext) {
         if (blocked) { setStatus(blocked, true); return; }
         const exp = getExporter(c.format) || getExporter("png");
         await withBusy(t("tm.exportingCloud"), async () => {
-          const blob = await exp.encode(doc, { scope: c.scope, cropRect, defringe: desk.export.defringePng, bg: desk.export.bg, onAudit: _auditSink, watermark });
+          const blob = await exp.encode(doc, { scope: c.scope, cropRect, defringe: desk.export.defringePng, bg: desk.export.bg, onAudit: _auditSink });
           await _exportBlobToCloud(blob, exp.ext);
         });
         _alphaGuardNotice();
@@ -249,7 +229,7 @@ export function initExportImportMenu(ctx: AppContext) {
         // 文件/分享——以及 #23：iOS/iPad 上「打印」也走这里（分享面板自带打印；PWA 里 window.open 打印脆弱）
         const exp = getExporter(c.target === "print" ? (c.format === "jpg" ? "jpg" : "png") : c.format) || getExporter("png");
         if (exp.busyHint) setStatus(exp.busyHint, true);
-        const blob = await exp.encode(doc, { scope: c.scope, cropRect, defringe: desk.export.defringePng, bg: desk.export.bg, onAudit: _auditSink, watermark });
+        const blob = await exp.encode(doc, { scope: c.scope, cropRect, defringe: desk.export.defringePng, bg: desk.export.bg, onAudit: _auditSink });
         const r = await shareOrDownloadBlob(blob, `${exportBaseName()}-${downloadStamp()}.${exp.ext}`, exp.mime);
         setStatus(r.method === "share" ? t("tm.sharePanelOpened") : r.method === "cancel" ? t("tm.shareCancelled") : t("tm.extDownloadedUpper", { ext: exp.ext.toUpperCase() }));
         if (r.method !== "cancel") _alphaGuardNotice();   // 用户取消分享 = 没导出，不啰嗦
@@ -321,7 +301,6 @@ export function initExportImportMenu(ctx: AppContext) {
     const tgt0 = proj0Ora ? "file" : (proj0 && (c.target === "clipboard" || c.target === "print")) ? "file" : (c.target || "file");
     const bg0 = desk.export.bg;
     const bgCustom0 = bg0 !== "transparent" && bg0 !== "#ffffff" && bg0 !== "#000000";
-    const wm0 = _wmPref();   // #13：水印开关+文字（gallery pref，非 desk）
     const fmtOptions = [...listExportersByKind("image"), ...listExportersByKind("project")].map((exp) =>
       `<option value="${exp.id}" ${c.format === exp.id ? "selected" : ""}>${exp.label}</option>`).join("");
     const applyLocks = (popup: HTMLElement) => {
@@ -330,8 +309,6 @@ export function initExportImportMenu(ctx: AppContext) {
       const tgtSel = popup.querySelector('select[name="tgt"]') as HTMLSelectElement;
       const clipEl = popup.querySelector('input[name="clipsel"]') as HTMLInputElement;
       const defrEl = popup.querySelector('input[name="defringe"]') as HTMLInputElement;
-      const wmOnEl = popup.querySelector('input[name="wmon"]') as HTMLInputElement;
-      const wmTxtEl = popup.querySelector('input[name="wmtext"]') as HTMLInputElement;
       const proj = _isProjectFormat(fmtSel.value);
       const projOra = proj && fmtSel.value !== "psd";   // v0.9.30：psd 开放 file/cloud 去向；ora（及其他 project 格式）仍锁 file
       if (projOra) { scopeSel.value = "all"; tgtSel.value = "file"; }
@@ -365,16 +342,6 @@ export function initExportImportMenu(ctx: AppContext) {
       // v0.9.13/14 联动：defringe 只对「PNG 且透明底」有意义（涂了底 α 全 255；JPG 无 alpha；项目格式不碰像素）
       defrEl.disabled = fmtSel.value !== "png" || !!bgEff;
       if (!defrEl.disabled) desk.export.defringePng = defrEl.checked;
-      // #13 水印：项目格式（ora/psd）不碰像素 → 整节灰掉、一个字都不写回（同底色节的联动写法）。
-      //   文字**非空才写**（半输入/清空不生效，保留现值——同自定义底色「非法=保留现值」的口径）；
-      //   开关照写：想临时关水印不必先清掉自己的签名。
-      wmOnEl.disabled = proj; wmTxtEl.disabled = proj;
-      if (!proj) {
-        const cur = _wmPref();
-        const txt = wmTxtEl.value.trim();
-        const next = { on: wmOnEl.checked, text: txt || cur.text };
-        if (next.on !== cur.on || next.text !== cur.text) preferences.set("export-watermark", next);
-      }
       _updateMenuSubLabels();
     };
     _openMenuConfigPopup(e.currentTarget as HTMLElement, `
@@ -413,11 +380,6 @@ export function initExportImportMenu(ctx: AppContext) {
         <div class="menu-config-title">${t("tm.configRange")}</div>
         <label><input type="checkbox" name="clipsel" ${c.clipSelection ? "checked" : ""} ${(proj0 || !doc.selection) ? "disabled" : ""} /> ${t("tm.clipToSelection")}${doc.selection ? "" : `（${t("tm.noSelectionNow")}）`}</label>
         <label><input type="checkbox" name="defringe" ${desk.export.defringePng ? "checked" : ""} ${(c.format !== "png" || !!parseExportBg(bg0)) ? "disabled" : ""} /> ${t("tm.defringe")}</label>
-      </div>
-      <div class="menu-config-section">
-        <div class="menu-config-title">${t("tm.configWatermark")}</div>
-        <label><input type="checkbox" name="wmon" ${wm0.on ? "checked" : ""} ${proj0 ? "disabled" : ""} /> ${t("tm.watermarkOn")}</label>
-        <label><input type="text" name="wmtext" maxlength="64" style="width:12em" placeholder="${_esc(t("tm.watermarkPh"))}" value="${_esc(wm0.text)}" ${proj0 ? "disabled" : ""} /></label>
       </div>
     `, applyLocks);
   });
