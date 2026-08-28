@@ -74,7 +74,7 @@ export class RenderTree {
   renderFrame(
     nodes: DocNode[], docW: number, docH: number, bg: Background | undefined,
     affine6: number[], canvasW: number, canvasH: number, scale: number, voidRgb: [number, number, number],
-    floats: FloatInput[], stampOverlay: OverlayInput | null, surrogate: SurrogateInput | null,
+    floats: FloatInput[], stampOverlay: OverlayInput | null, surrogates: readonly SurrogateInput[],
     liveSyncLeafId: number | null, screenGrid: ScreenGridBg | null = null,
   ): void {
     const room = this._room;
@@ -100,7 +100,9 @@ export class RenderTree {
     const updated = new Set<number>();
     for (const f of floats) updated.add(f.layerId);
     if (stampOverlay) updated.add(stampOverlay.layerId);
-    if (surrogate) updated.add(surrogate.layerId);
+    // 替身（adjust 平面 / stroke 影子叶；组液化 = N 个影子叶）恒 live，逐个标 updated。
+    const surrogateById = new Map<number, SurrogateInput>();
+    for (const s of surrogates) { surrogateById.set(s.layerId, s); updated.add(s.layerId); }
     if (liveSyncLeafId !== null) updated.add(liveSyncLeafId);
 
     const bgKind: BgKind = bg === "checker" ? "checker" : bg ? "color" : "none";
@@ -154,10 +156,11 @@ export class RenderTree {
 
     // sync 一叶（surrogate 叶从替身换源；surrogate/updated 恒 live，不会藏在段成员里）。
     const syncOne = (id: number) => {
-      if (surrogate && id === surrogate.layerId) {
+      const sur = surrogateById.get(id);
+      if (sur) {
         // 影子变体（C6 stroke 替身叶）：真 LayerPixels，走增量 sync；平面变体（adjust）全 bbox 重传。
-        if ("pixels" in surrogate) room.syncLeafSafe(id, surrogate.pixels, docW, docH);
-        else room.syncSurrogate(surrogate, docW, docH);
+        if ("pixels" in sur) room.syncLeafSafe(id, sur.pixels, docW, docH);
+        else room.syncSurrogate(sur, docW, docH);
         return;
       }
       const leaf = leafById.get(id);

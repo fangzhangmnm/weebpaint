@@ -64,7 +64,7 @@ function frame() {
   grp.opacity = 0.4 + 0.5 * (0.5 + 0.5 * Math.sin(t));        // 动起来让 fps 可量（仅改节点字段，不重传像素）
   clipA.opacity = 0.5 + 0.5 * Math.sin(t * 1.3);
   tree.markDirty();   // opacity 每帧变 → 按生产语义标脏（段全失效）＝诚实量「整树重合成」fps
-  tree.renderFrame(nodes, N, N, undefined, [1, 0, 0, 1, 0, 0], canvas.width, canvas.height, 1, [0.08, 0.08, 0.08], [], null, null, null);
+  tree.renderFrame(nodes, N, N, undefined, [1, 0, 0, 1, 0, 0], canvas.width, canvas.height, 1, [0.08, 0.08, 0.08], [], null, [], null);
   frames++;
   const dt = performance.now() - t0;
   if (dt >= 500) {

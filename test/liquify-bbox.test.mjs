@@ -27,7 +27,7 @@ describe("liquify · 写区不再被 content bbox 截断 (tile-era 修)", () => 
     const doc = mkDoc(64, 64);
     const eng = new LiquifyEngine();
     // size=R(液化 R=size)。footprint = cx±30。空层 content bbox=0 → 旧码在此早退。
-    eng.beginStroke(doc.layers[0], { size: 30, strength: 1, mode: "push", bleed: "edge" }, 10, 10, null);
+    eng.beginStroke([doc.layers[0]], { size: 30, strength: 1, mode: "push", bleed: "edge" }, 10, 10, null);
     eng.extendStroke(45, 10);
     const f = eng._stroke.dispField;
     // cx=45,R=30 → 右边界 75 夹到 doc 64；dispField 应长到 ~64（远超旧码的 content=0 → 1×1）

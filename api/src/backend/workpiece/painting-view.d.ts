@@ -111,6 +111,20 @@ export declare class PaintingView {
         leaf: ViewLeaf | null;
         reason: string | null;
     };
+    /**
+     * 像素笔的**写靶叶列表** = activeEditableLeaf 的复数推广（2026-08-28，液化对图层组）。
+     * - `allowGroup=false`（缺省）→ 与 activeEditableLeaf 逐字同义：组硬拒 / 隐藏软拒 / 单叶放行。
+     * - `allowGroup=true`（filter 声明了 supportsLayerGroup，唯一户 = 液化）→ 组 = 组内**全部叶**，
+     *   **含隐藏叶**（对齐 floating-transform.lift(group) 的「整组一起动」）；组自身或祖先隐藏仍按
+     *   hidden 软拒（盲改护栏）；空组按 "group" 拒（没叶可写，提示照旧「请选择一个图层」）。
+     */
+    activeStrokeLeaves({ allowGroup, allowHidden }?: {
+        allowGroup?: boolean;
+        allowHidden?: boolean;
+    }): {
+        leaves: ViewLeaf[];
+        reason: string | null;
+    };
     /** active 自身或任一祖先组隐藏？（变换类操作的盲改软拒。） */
     activeNodeHidden(): boolean;
     getReferenceLayer(): ViewNode | null;

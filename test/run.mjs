@@ -56,6 +56,7 @@ import "./store-absent.test.mjs";           // v0.8.7 B 骑士：null-store/内�
 import "./sw-strategy.test.mjs";
 import "./liquify-bbox.test.mjs";
 import "./liquify-docspace-mask.test.mjs";
+import "./liquify-group.test.mjs";        // 2026-08-28 液化对图层组：共享位移场逐叶重采样 + 一步 undo + 组能力门
 import "./timelapse.test.mjs";       // 宣发轮：取景框/平采样闸门/帧合成/mux↔demux round-trip/录制态自愈/编码器注入槽（spec=ai-docs/20260819-timelapse-spec.md）
 import "./timelapse-ora.test.mjs";   // timelapse×ora：entry 进出/顺序契约（thumbnail 恒最后）/DocState 整链 round-trip
 import "./resample-bytes.test.mjs"; // 字节重采样：面积平均严格box/alpha加权/限幅

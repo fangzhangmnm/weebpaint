@@ -19,7 +19,11 @@
 //               「预览是引擎自持物」成立）；显示走 surrogate 影子变体（per-tile 增量上传，句柄共享免费）；
 //               End 按 tile 句柄 diff 落账真层（undo 只含真变 tile）；Cancel 丢替身零回滚。
 //
-// deps 全函数面：原 input._endStroke/_abortStroke 摸过的六个点 + shadow 显示注入（setShadow）。
+// 多叶（2026-08-28，液化对图层组）：session 收 layers[]（其余笔类恒 1 叶），shadow 模式一叶一个
+// 替身、收口逐叶 commitTo；引擎拿 targets[]。「一次手势 = 一个令牌 = 一步 undo」不变——组液化
+// N 叶的像素改动全在同一个令牌里，ctrl-z 整组一起退。
+//
+// deps 全函数面：原 input._endStroke/_abortStroke 摸过的六个点 + shadow 显示注入（setShadows）。
 // commitStamps/invalidate/setShadow 是屏显侧（board）的注入——终态归 backend 自持（Gl2Port），C7/C8 收编。
 
 import type { BrushEngine } from "./brush.ts";
@@ -59,8 +63,9 @@ export interface StrokeSessionDeps {
   commitStamps(cs: StampCollect): boolean;
   /** board.invalidateAll —— 落层/回滚后的重渲通知 */
   invalidate(): void;
-  /** board.setStrokeShadow —— shadow 预览宿的显示注入（surrogate 影子变体；(null,null) 关） */
-  setShadow(layerId: number | null, pixels: LayerPixels | null): void;
+  /** board.setStrokeShadows —— shadow 预览宿的显示注入（surrogate 影子变体；空数组 = 关）。
+   *  组液化一次挂 N 个替身（一叶一个），board 侧按 layerId 换源。 */
+  setShadows(entries: readonly { layerId: number; pixels: LayerPixels }[]): void;
 }
 
 // begin 期策略（engine-registry PIXEL_STROKE_SPECS 的子集：session 只关心事务面）
@@ -161,30 +166,33 @@ export class StrokeShadow {
 
 export class StrokeSession {
   readonly engine: StrokeEngine;
-  readonly layer: ViewLeaf;
+  /** 本笔触写的真叶（恒 ≥1；组液化 = 组内全部叶，其余笔类恒 1 叶） */
+  readonly layers: readonly ViewLeaf[];
   /** 描边中原地写真层（draw/erase pixelMode）——board live-sync 判据 */
   readonly inPlace: boolean;
-  /** 引擎写靶：shadow 模式 = 替身叶（真叶描边期零写），否则真叶。引擎 beginStroke 必须喂它。 */
-  readonly target: ViewLeaf;
+  /** 引擎写靶（与 layers 同序同长）：shadow 模式 = 替身叶（真叶描边期零写），否则真叶。
+   *  引擎 beginStroke 必须喂它。 */
+  readonly targets: readonly ViewLeaf[];
   private readonly finalize: boolean;
   private readonly token: WriteToken;
   private readonly deps: StrokeSessionDeps;
-  private _shadow: StrokeShadow | null = null;
+  private _shadows: StrokeShadow[] = [];
   private _open = true;
 
-  constructor(deps: StrokeSessionDeps, engine: StrokeEngine, layer: ViewLeaf, spec: StrokeSessionSpec, preview: StrokePreview) {
+  constructor(deps: StrokeSessionDeps, engine: StrokeEngine, layers: readonly ViewLeaf[], spec: StrokeSessionSpec, preview: StrokePreview) {
+    if (!layers.length) throw new Error("StrokeSession: needs at least one target leaf");
     this.deps = deps;
     this.engine = engine;
-    this.layer = layer;
+    this.layers = layers;
     this.finalize = spec.finalize;
     this.inPlace = preview === "livesync";
     this.token = deps.begin(spec.historyType);
     if (preview === "shadow") {
-      this._shadow = new StrokeShadow(layer);
-      deps.setShadow(layer.id, this._shadow.pixels);
-      this.target = this._shadow as unknown as ViewLeaf;   // 引擎面同形（ViewLeaf 的引擎读写子集）
+      this._shadows = layers.map((l) => new StrokeShadow(l));
+      deps.setShadows(this._shadows.map((s) => ({ layerId: s.id, pixels: s.pixels })));
+      this.targets = this._shadows as unknown as ViewLeaf[];   // 引擎面同形（ViewLeaf 的引擎读写子集）
     } else {
-      this.target = layer;
+      this.targets = layers;
     }
   }
 
@@ -217,19 +225,28 @@ export class StrokeSession {
     const cs = (this.engine.endStroke() ?? null) as StampCollect | null;
     let gpuCommitted = false;
     if (cs && cs.stamps.length) gpuCommitted = this.deps.commitStamps(cs);
-    if (this._shadow) {
-      this._shadow.commitTo(this.layer);
-      this.deps.setShadow(null, null);
+    if (this._shadows.length) {
+      this._shadows.forEach((sh, i) => sh.commitTo(this.layers[i]));
+      this.deps.setShadows([]);
     }
-    const sel = (this.finalize && !gpuCommitted && this.deps.tokenChanged(this.layer.id)) ? this.deps.getSelection() : null;
-    if (sel) {
-      sel.applyMaskPostStroke(
-        this.layer as unknown as Parameters<Selection["applyMaskPostStroke"]>[0],
-        this.deps.tokenBeforeImage(this.layer.id));
+    if (this.finalize && !gpuCommitted) {
+      for (const layer of this.layers) {
+        if (!this.deps.tokenChanged(layer.id)) continue;
+        const sel = this.deps.getSelection();
+        if (!sel) break;
+        sel.applyMaskPostStroke(
+          layer as unknown as Parameters<Selection["applyMaskPostStroke"]>[0],
+          this.deps.tokenBeforeImage(layer.id));
+      }
     }
     this.token.commit();
-    if (this._shadow) { this._shadow.dispose(); this._shadow = null; }   // 令牌已关，释放不再进观察者
+    this._disposeShadows();   // 令牌已关，释放不再进观察者
     this.deps.invalidate();
+  }
+
+  private _disposeShadows() {
+    for (const sh of this._shadows) sh.dispose();
+    this._shadows = [];
   }
 
   // 取消（原 input._abortStroke）：引擎丢状态；shadow 模式真层从未被写 → 丢替身即无痕（零回滚）；
@@ -238,9 +255,9 @@ export class StrokeSession {
     if (!this._open) return;
     this._open = false;
     this.engine.cancelStroke();   // shape pixelMode 会 preSnap-restore 到替身——无害（替身随即丢弃）
-    if (this._shadow) this.deps.setShadow(null, null);
+    if (this._shadows.length) this.deps.setShadows([]);
     this.token.cancel();
-    if (this._shadow) { this._shadow.dispose(); this._shadow = null; }
+    this._disposeShadows();
     this.deps.invalidate();
   }
 }

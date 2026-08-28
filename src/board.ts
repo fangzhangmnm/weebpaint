@@ -146,7 +146,8 @@ export class Board {
   _activeSurrogateBx?: number;   // 替身 canvas 的 doc 左上（GL 上传 tiles 用）
   _activeSurrogateBy?: number;
   // C6 stroke 替身叶（StrokeShadow.pixels）：描边期活动层换源显示（surrogate 影子变体，增量 sync）。
-  _strokeShadow?: { layerId: number; pixels: LayerPixels } | null;
+  //   复数（2026-08-28 组液化）：一次可挂 N 个替身（组内一叶一个），空数组 = 无替身。
+  _strokeShadows: { layerId: number; pixels: LayerPixels }[] = [];
   _showFps?: boolean;
   _lastFrameT?: number | null;
   _fps?: number | null;
@@ -293,7 +294,7 @@ export class Board {
     // S8e：描边中每 move 都到这里——活动叶已在执行器 updated 集（liveSync 叶或 C6 stroke 影子替身），
     //   contentVersion 快路径只重传变更 tile；此时若 markContentDirty 会把全部段缓存每帧掀翻
     //   （S7 承诺的「液化每帧 sb0」被它打破）。描边中只请求重渲，抬笔 commit 的 invalidateAll 才全失效。
-    if (!this._liveSyncProvider?.() && !this._strokeShadow) this._glBoard?.markContentDirty();
+    if (!this._liveSyncProvider?.() && !this._strokeShadows.length) this._glBoard?.markContentDirty();
     // 通知挂在 doc 上的旁观者（如 reference live 镜像）。每个 brush stamp 都会触发，
     // 但 reference 端 markLiveDirty 仅置 flag + 走 rAF，不真合成，开销 ≪ 1ms。
     if (!Board._dispatchingDirty) {
@@ -430,7 +431,7 @@ export class Board {
     this._lassoProvider = fn;
   }
   // 颜色调整 live preview 走 surrogate **字节平面**（per-pixel JS 滤镜结果就地写入；v0.6.39 去 canvas 化）。
-  //   GL 模式：该替身经 _glSurrogate 上传成活动层 GPU tiles 显示（非破坏）。(layerId, bytes, bx, by) 启动；(null, null) 关。
+  //   GL 模式：该替身经 _glSurrogates 上传成活动层 GPU tiles 显示（非破坏）。(layerId, bytes, bx, by) 启动；(null, null) 关。
   //   invalidateAll → markContentDirty：关闭时下一帧（非 livePreview）syncAll 从真像素恢复 GPU。
   setActiveLayerSurrogate(layerId: number | null, bytes: { data: Uint8ClampedArray; w: number; h: number } | null, bx = 0, by = 0) {
     this._activeSurrogateLayerId = layerId;
@@ -442,22 +443,21 @@ export class Board {
 
   // C6 stroke 替身叶（液化/filterBrush/形状笔 pixelMode）：描边期活动层换源到 StrokeShadow.pixels
   //   （surrogate 影子变体——真 LayerPixels，未变 tile 与真叶共享句柄 → per-tile 增量上传）。
-  //   开关走 StrokeSession（deps.setShadow）；描边中不 markContentDirty（段缓存 sb0 承诺，见 markDocDirty），
-  //   收口后 session invalidate → 从真像素恢复。
-  setStrokeShadow(layerId: number | null, pixels: LayerPixels | null) {
-    this._strokeShadow = (layerId != null && pixels) ? { layerId, pixels } : null;
+  //   开关走 StrokeSession（deps.setShadows）；描边中不 markContentDirty（段缓存 sb0 承诺，见 markDocDirty），
+  //   收口后 session invalidate → 从真像素恢复。空数组 = 关。
+  setStrokeShadows(entries: readonly { layerId: number; pixels: LayerPixels }[]) {
+    this._strokeShadows = entries.slice();
     this.requestRender();
   }
 
-  // GL 渲染用：当前活动层替身（颜色调整平面 / stroke 影子叶）→ SurrogateInput（无替身=null）。
-  //   两者互斥（单令牌墙：adjust 面板挂令牌时不可能起笔，反之亦然）。
-  _glSurrogate(): SurrogateInput | null {
+  // GL 渲染用：当前活动层替身（颜色调整平面 / stroke 影子叶）→ SurrogateInput[]（无替身=空数组）。
+  //   两类互斥（单令牌墙：adjust 面板挂令牌时不可能起笔，反之亦然）；stroke 影子可有多个（组液化）。
+  _glSurrogates(): SurrogateInput[] {
     const b = this._activeSurrogateBytes;
     if (b && this._activeSurrogateLayerId != null && b.w && b.h) {
-      return { layerId: this._activeSurrogateLayerId, bytes: b, bx: this._activeSurrogateBx ?? 0, by: this._activeSurrogateBy ?? 0, w: b.w, h: b.h };
+      return [{ layerId: this._activeSurrogateLayerId, bytes: b, bx: this._activeSurrogateBx ?? 0, by: this._activeSurrogateBy ?? 0, w: b.w, h: b.h }];
     }
-    if (this._strokeShadow) return { layerId: this._strokeShadow.layerId, pixels: this._strokeShadow.pixels };
-    return null;
+    return this._strokeShadows.map((s) => ({ layerId: s.layerId, pixels: s.pixels }));
   }
 
   // 注：层合成全在 GL（render-tree 执行器）。旧 2D 规范合成器接缝（ensureCompositeCache/_layerCompositeOpts/
@@ -651,7 +651,7 @@ export class Board {
     const docBg = transparentBg ? null : "#ffffff";
     // live-sync：原地改真层的笔（draw/erase pixelMode）描边中把活动叶标 updated
     //   （执行器 contentVersion 快路径每帧只重传变更 tile）。液化/filterBrush/形状笔 pixelMode
-    //   改走 _glSurrogate 的影子变体（C6 stroke 替身叶，同一条增量 sync 路）。
+    //   改走 _glSurrogates 的影子变体（C6 stroke 替身叶，同一条增量 sync 路）。
     const liveSync = this._liveSyncProvider?.() ?? null;
     const stampOverlay = this._glStampOverlay();
     this._lastStampCount = this._showFps ? ((stampOverlay && !("kind" in stampOverlay)) ? stampOverlay.stamps.length : 0) : 0;   // HUD only（fill overlay 无 stamps）
@@ -660,7 +660,7 @@ export class Board {
       this._docTransformParams(),
       W, H, this.viewport.scale, this._voidColor, docBg,
       this._glFloatInputs(), stampOverlay,
-      liveSync as unknown as GLLeaf | null, this._glSurrogate(),
+      liveSync as unknown as GLLeaf | null, this._glSurrogates(),
       transparentBg ? { dotColor: this._voidDotColor, stepPx: 24 * this.dpr, radiusPx: 1.25 * this.dpr } : null,
     );
     this._reportGlResidencyDrops();
@@ -908,7 +908,7 @@ export class Board {
   compositeDisplayBytes(nodes: readonly unknown[], docW: number, docH: number): { data: Uint8ClampedArray; w: number; h: number } | null {
     if (!this._glBoard) return null;
     return this._glBoard.compositeToBytes(nodes as unknown as Parameters<GLBoard["compositeToBytes"]>[0], docW, docH,
-      this._glSurrogate(), this._glFillOverlay());
+      this._glSurrogates(), this._glFillOverlay());
   }
 
   // 吸管 composite 取色（S8c，spec:243-244）：GL 一次性合成（compositeOnce，不建缓存）+ 1px readback。
@@ -919,7 +919,7 @@ export class Board {
     const docBg = this._showCheckerboard ? this._voidColor : "#ffffff";   // 白纸=显示常量；透明显示=主题底色（吸到的≈眼睛看到的，点网格忽略）
     // v0.4.11（拍板#8）：调整预览开着时取替身（WYSIWYG——吸到的=眼睛看到的）。
     // v0.5.11（user 拍板）：fill 预览挂着时同款待遇——吸到的=预览色，不是底下真实像素。
-    return this._glBoard.pickColor(this.doc as unknown as GLDoc, docBg, ix, iy, this._glSurrogate(), this._glFillOverlay());
+    return this._glBoard.pickColor(this.doc as unknown as GLDoc, docBg, ix, iy, this._glSurrogates(), this._glFillOverlay());
   }
   // 套索 overlay：
   //   drawing 期间：画 polyline overlay

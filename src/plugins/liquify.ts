@@ -35,6 +35,11 @@ export class LiquifyFilter {
   }
   static defaults() { return { mode: "push" }; }
 
+  // 图层组（2026-08-28，user 0823 组会「液化能对图层组吗」）：整组一次液化。
+  //   语义对齐 floating-transform.lift(group)——组内所有叶（含隐藏）各自被**同一个位移场**重采样，
+  //   保持图层结构（不 flatten），共享一步 undo。见 liquify-engine.ts 头注。
+  static supportsLayerGroup = true;
+
   // v132 (user：「老版我 slider 拉 0.1」) strengthScale 直接对齐老手感
   //   推强度 / 距离比线性，0.x..1.0 都合理 → 1.0
   //   收/胀/旋 是径向变形，单 stamp 累积快 → 0.1（多笔触叠加可达更强）
@@ -62,7 +67,7 @@ export class LiquifyFilter {
   // region 模式没意义（液化天生是 stroke-based），所以不提供 bake / buildBody
 
   // Filter brush 契约：begin / extend / end / cancel / flushDirty
-  static beginBrushStroke(layer: BrushLayer, params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, pressure: number): LiquifyBrushState {
+  static beginBrushStroke(layers: readonly BrushLayer[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, pressure: number): LiquifyBrushState {
     const engine = new LiquifyEngine();
     const scale = (params.strengthScale as number) ?? 1;
     const settings = {
@@ -72,7 +77,7 @@ export class LiquifyFilter {
       bleed: (params.bleed as string) || "edge",          // v147 选区边界取样模式
       sample: (params.sample as string) || "bilinear",    // 采样核（v0.6.45 默认回 bilinear，真机裁决）
     };
-    engine.beginStroke(layer as unknown as ViewLeaf, settings, x, y, selection as unknown as Selection | null);
+    engine.beginStroke(layers as unknown as readonly ViewLeaf[], settings, x, y, selection as unknown as Selection | null);
     return { engine };
   }
 

@@ -22,7 +22,7 @@ function rig() {
   const undo = new UndoStack({ maxQuotaBytes: 1 << 30 });
   const wp2 = new PaintingWorkpiece({ undo, tree: { width: 64, height: 64 }, onTokenLeak: () => {} });
   const doc = new PaintingView(wp2);
-  const r = { undo, wp2, doc, layer: doc.layers[0], committed: [], gpuCommit: false, selection: null, shadow: null };
+  const r = { undo, wp2, doc, layer: doc.layers[0], committed: [], gpuCommit: false, selection: null, shadow: null, shadows: [] };
   r.deps = {
     begin: (label) => wp2.begin(label),
     tokenChanged: (id) => wp2.layerTiles.tokenChanged(id),
@@ -30,7 +30,7 @@ function rig() {
     getSelection: () => r.selection,
     commitStamps: (cs) => { r.committed.push(cs); return r.gpuCommit; },
     invalidate: () => {},
-    setShadow: (layerId, pixels) => { r.shadow = (layerId != null && pixels) ? { layerId, pixels } : null; },
+    setShadows: (entries) => { r.shadows = entries.slice(); r.shadow = entries.length ? entries[0] : null; },
   };
   _rigs.push(r);
   return r;
@@ -51,12 +51,12 @@ describe("stroke-shadow · 替身叶生命周期（真层描边期零写）", ()
     const r = rig();
     fill(r.layer, 0, 0, 8, 8, [0, 128, 0, 255]);   // 底料：左上绿块
     const eng = new BrushEngine();
-    const s = new StrokeSession(r.deps, eng, r.layer, SPEC, "shadow");
+    const s = new StrokeSession(r.deps, eng, [r.layer], SPEC, "shadow");
     assert(r.shadow && r.shadow.layerId === r.layer.id, "begin 即挂 board 替身（layerId 正确）");
     eq(r.shadow.pixels.sampleAt(2, 2)[1], 128, "替身内容 = 真层克隆（底料可见）");
-    eng.beginStroke(s.target, pixelBrush(), 8, 30, 1.0, "brush");
+    eng.beginStroke(s.targets[0], pixelBrush(), 8, 30, 1.0, "brush");
     s.extend(40, 30, 1.0, null);
-    assert(s.target.sampleAt(20, 30)[3] > 0, "描边写进替身");
+    assert(s.targets[0].sampleAt(20, 30)[3] > 0, "描边写进替身");
     eq(r.layer.sampleAt(20, 30)[3], 0, "真层描边期零写");
     const d0 = r.undo.depth();
     s.end();
@@ -75,10 +75,10 @@ describe("stroke-shadow · 替身叶生命周期（真层描边期零写）", ()
   it("cancel：丢替身零回滚，真层无痕、不占步、board 替身摘掉", () => {
     const r = rig();
     const eng = new BrushEngine();
-    const s = new StrokeSession(r.deps, eng, r.layer, SPEC, "shadow");
-    eng.beginStroke(s.target, pixelBrush(), 8, 8, 1.0, "brush");
+    const s = new StrokeSession(r.deps, eng, [r.layer], SPEC, "shadow");
+    eng.beginStroke(s.targets[0], pixelBrush(), 8, 8, 1.0, "brush");
     s.extend(30, 8, 1.0, null);
-    assert(s.target.sampleAt(16, 8)[3] > 0, "替身已有笔迹");
+    assert(s.targets[0].sampleAt(16, 8)[3] > 0, "替身已有笔迹");
     eq(r.layer.sampleAt(16, 8)[3], 0, "真层零写");
     const d0 = r.undo.depth();
     s.cancel();
@@ -90,8 +90,8 @@ describe("stroke-shadow · 替身叶生命周期（真层描边期零写）", ()
   it("no-op：替身零写 → end 不占步", () => {
     const r = rig();
     const eng = new BrushEngine();
-    const s = new StrokeSession(r.deps, eng, r.layer, SPEC, "shadow");
-    eng.beginStroke(s.target, resolveBrush({ size: 4, color: "#ff0000", spacing: 0.5 }), -99, -99, 0, "brush");
+    const s = new StrokeSession(r.deps, eng, [r.layer], SPEC, "shadow");
+    eng.beginStroke(s.targets[0], resolveBrush({ size: 4, color: "#ff0000", spacing: 0.5 }), -99, -99, 0, "brush");
     // buffered begin 不写像素；不 extend 直接抬笔（gpuCommit=false 且无 stamps 落 substrate）
     const d0 = r.undo.depth();
     s.end();
@@ -102,11 +102,11 @@ describe("stroke-shadow · 替身叶生命周期（真层描边期零写）", ()
     const r = rig();
     fill(r.layer, 0, 0, 8, 8, [200, 0, 0, 255]);
     const eng = new BrushEngine();   // 占位引擎（本锚直接操作替身面）
-    const s = new StrokeSession(r.deps, eng, r.layer, SPEC_FB, "shadow");
-    eng.beginStroke(s.target, pixelBrush(), 60, 60, 1.0, "brush");   // 引擎在别处起笔（不触底料）
+    const s = new StrokeSession(r.deps, eng, [r.layer], SPEC_FB, "shadow");
+    eng.beginStroke(s.targets[0], pixelBrush(), 60, 60, 1.0, "brush");   // 引擎在别处起笔（不触底料）
     // 模拟「内容被推走/擦空」：替身上把底料区写全透明 → 该 tile 在替身中被回收
-    s.target.putImageData(0, 0, new ImageData(8, 8));
-    eq(s.target.sampleAt(2, 2)[3], 0, "替身该区已空");
+    s.targets[0].putImageData(0, 0, new ImageData(8, 8));
+    eq(s.targets[0].sampleAt(2, 2)[3], 0, "替身该区已空");
     eq(r.layer.sampleAt(2, 2)[0], 200, "真层未动");
     s.end();
     eq(r.layer.sampleAt(2, 2)[3], 0, "收口后真层同步清空（删格路径）");
@@ -118,8 +118,8 @@ describe("stroke-shadow · 替身叶生命周期（真层描边期零写）", ()
     const r = rig();
     r.selection = Selection.fromGray8Region(0, 0, 32, 64, new Uint8Array(32 * 64).fill(255));   // 左半
     const eng = new BrushEngine();
-    const s = new StrokeSession(r.deps, eng, r.layer, SPEC, "shadow");
-    eng.beginStroke(s.target, pixelBrush(), 8, 8, 1.0, "brush");
+    const s = new StrokeSession(r.deps, eng, [r.layer], SPEC, "shadow");
+    eng.beginStroke(s.targets[0], pixelBrush(), 8, 8, 1.0, "brush");
     s.extend(56, 8, 1.0, null);   // 横穿选区边界（x=32）
     eq(r.layer.sampleAt(50, 8)[3], 0, "描边期真层零写（选区外也没写）");
     const d0 = r.undo.depth();
@@ -138,11 +138,11 @@ describe("stroke-shadow · 液化引擎全程替身（第一户集成锚）", ()
     fill(r.layer, 20, 20, 12, 12, [0, 0, 255, 255]);   // 蓝块
     const before = r.layer.pixels.getRegion(0, 0, 64, 64);
     const eng = new LiquifyEngine();
-    const s = new StrokeSession(r.deps, eng, r.layer, SPEC_FB, "shadow");
-    eng.beginStroke(s.target, { size: 16, strength: 2, mode: "push", bleed: "edge", sample: "bilinear" }, 22, 26, null);
+    const s = new StrokeSession(r.deps, eng, [r.layer], SPEC_FB, "shadow");
+    eng.beginStroke([s.targets[0]], { size: 16, strength: 2, mode: "push", bleed: "edge", sample: "bilinear" }, 22, 26, null);
     eng.extendStroke(30, 26);
     eng.extendStroke(38, 26);
-    const shadowBytes = s.target.pixels.getRegion(0, 0, 64, 64);
+    const shadowBytes = s.targets[0].pixels.getRegion(0, 0, 64, 64);
     let moved = false;
     for (let i = 0; i < shadowBytes.length && !moved; i++) if (shadowBytes[i] !== before[i]) moved = true;
     assert(moved, "液化确实改了替身像素");
@@ -168,8 +168,8 @@ describe("stroke-shadow · 液化引擎全程替身（第一户集成锚）", ()
     fill(r.layer, 20, 20, 12, 12, [0, 0, 255, 255]);
     const before = r.layer.pixels.getRegion(0, 0, 64, 64);
     const eng = new LiquifyEngine();
-    const s = new StrokeSession(r.deps, eng, r.layer, SPEC_FB, "shadow");
-    eng.beginStroke(s.target, { size: 16, strength: 2, mode: "push", bleed: "edge", sample: "bilinear" }, 22, 26, null);
+    const s = new StrokeSession(r.deps, eng, [r.layer], SPEC_FB, "shadow");
+    eng.beginStroke([s.targets[0]], { size: 16, strength: 2, mode: "push", bleed: "edge", sample: "bilinear" }, 22, 26, null);
     eng.extendStroke(34, 26);
     const d0 = r.undo.depth();
     s.cancel();

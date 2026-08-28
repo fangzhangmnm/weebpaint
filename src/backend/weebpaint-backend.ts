@@ -352,7 +352,7 @@ export class WeebPaintBackend implements WeebPaintBackendInterface {
   }
 
   // StrokeSession 的注入面（input.ts _strokeDeps 的 headless 化身）：屏显三口（commitStamps 走本
-  // backend 的栅格域、invalidate/setShadow 无屏 no-op——brush/eraser 档口只用 overlay/livesync 宿）。
+  // backend 的栅格域、invalidate/setShadows 无屏 no-op——brush/eraser 档口只用 overlay/livesync 宿）。
   private _strokeSessionDeps(): StrokeSessionDeps {
     return {
       begin: (label) => this._wp2.begin(label),
@@ -361,7 +361,7 @@ export class WeebPaintBackend implements WeebPaintBackendInterface {
       getSelection: () => this._view.selection,
       commitStamps: (cs) => this._commitStamps(cs),
       invalidate: () => {},
-      setShadow: () => {},
+      setShadows: () => {},
     };
   }
 
@@ -408,7 +408,7 @@ export class WeebPaintBackend implements WeebPaintBackendInterface {
     const engine = new BrushEngine();
     // 预览宿（census §3.4）：buffered=overlay（headless 下即「无」——描边活在 smoother，零 substrate 写）；
     // pixelMode=livesync（stroke 档合法的令牌内真层写）。session 构造即 wp2.begin 开令牌（fail-loud）。
-    const session = new StrokeSession(this._strokeSessionDeps(), engine, layer,
+    const session = new StrokeSession(this._strokeSessionDeps(), engine, [layer],
       { historyType: "stroke", finalize: true }, settings.pixelMode ? "livesync" : "overlay");
     const id = ++this._strokeSeq;
     this._stroke = { id, session, engine, settings, mode, smooth, begun: false };
@@ -424,7 +424,7 @@ export class WeebPaintBackend implements WeebPaintBackendInterface {
       const tt = Number.isFinite(t) ? t : null;
       if (!st.begun) {
         // 引擎 begin 迟到首点（strokeBegin 无坐标）；t = 事件钟起点锚（压感 LPF/平滑同一口钟，ADR-0009）。
-        st.engine.beginStroke(st.session.target, st.settings, x, y, p, st.mode, st.smooth, tt);
+        st.engine.beginStroke(st.session.targets[0], st.settings, x, y, p, st.mode, st.smooth, tt);
         st.begun = true;
       } else {
         st.session.extend(x, y, p, tt);

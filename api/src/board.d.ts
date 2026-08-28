@@ -169,10 +169,10 @@ export declare class Board {
     } | null;
     _activeSurrogateBx?: number;
     _activeSurrogateBy?: number;
-    _strokeShadow?: {
+    _strokeShadows: {
         layerId: number;
         pixels: LayerPixels;
-    } | null;
+    }[];
     _showFps?: boolean;
     _lastFrameT?: number | null;
     _fps?: number | null;
@@ -223,8 +223,11 @@ export declare class Board {
         w: number;
         h: number;
     } | null, bx?: number, by?: number): void;
-    setStrokeShadow(layerId: number | null, pixels: LayerPixels | null): void;
-    _glSurrogate(): SurrogateInput | null;
+    setStrokeShadows(entries: readonly {
+        layerId: number;
+        pixels: LayerPixels;
+    }[]): void;
+    _glSurrogates(): SurrogateInput[];
     _docTransformParams(): [number, number, number, number, number, number];
     _applyDocTransform(ctx: Ctx2D): void;
     resize(): void;
