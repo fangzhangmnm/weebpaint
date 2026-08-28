@@ -129,6 +129,9 @@ function renderCurrentGallery() {
       ? t("gm.current", { label: att.entry.label, src: att.entry.kind === "onedrive" ? t("gm.srcOneDrive") : t("gm.srcFolder") }) + (att.online ? "" : t("gm.offlineSuffix"))
       : isCloudEnabled() ? t("gm.currentLegacy") : t("gm.noneConnected");
   }
+  // P6 轻折叠（P5 注：无库语境该区折叠=不撒谎）：无库时 gallery scope 徽章藏起——那些行此刻
+  //   经 cascade 写落 device 层，挂着「这个图库」徽章才是撒谎。行本身保留（lang 无库也要能改）。
+  try { document.body.toggleAttribute("data-no-gallery", !isCloudEnabled()); } catch { /* node */ }
   applyCloudCapabilityGating();
 }
 

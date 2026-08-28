@@ -11,7 +11,7 @@ import { CLIENT_ID, SCOPES, AUTHORITY } from "./config.ts";
 import { zipReadEntry, zipPack, zipUnpack } from "./backend/zip.ts";
 import { pack7z, unpack7z } from "./sevenzip.ts";
 import { getPassword } from "./crypto-state.ts";
-import { wirePreferences, initPreferences } from "./app-prefs.ts";
+import { wirePreferences, initPreferences, setGalleryLayerLive } from "./app-prefs.ts";
 import { wireAppState, initAppState, appState } from "./app-state.ts";
 import { readSlate } from "./resume-slate.ts";   // activeFileName 守卫输入（P5：本机回执条真相）
 import { builtinBrushInitData } from "./brushes.ts";
@@ -122,6 +122,7 @@ function _wireCollections(): void {
   brushRackCollection = store.collection("brush-rack", { getInitData: rackSeed ? async () => rackSeed : builtinBrushInitData });
 }
 _wireCollections();   // boot 装配（此后每次换库经 _swapStoreForGallery 重灌）
+setGalleryLayerLive(!storeAbsent);   // P6 cascade 开关：absent = 无库起步（gallery scope 落 device 层）
 
 // ============ P3 热插拔 seam（只准 gallery-attachment-host 调）============
 /** 换当前 store 实例（next=null → null-store = 无库模式）。重灌 4+1 collections、重跑 init 门、
@@ -131,6 +132,7 @@ export async function _swapStoreForGallery(next: Store | null): Promise<void> {
   _isNull = next == null;
   store = _storeFull;
   _wireCollections();
+  setGalleryLayerLive(next != null);   // P6 cascade：无库 → gallery scope 读写落 device 层
   await Promise.all([initPreferences(), initAppState()]);   // wirePreferences 重调已重置 ready 门（app-prefs 不 import 本文件，无环）
   try { window.dispatchEvent(new Event("wp:gallery-changed")); } catch { /* node 测试环境无 window */ }
 }

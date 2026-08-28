@@ -20,6 +20,16 @@ export function detectStoreAbsent(): boolean {
     if (typeof location !== "undefined" && new URLSearchParams(location.search).has("nostore")) return true;
     if (typeof localStorage !== "undefined" && localStorage.getItem("weebpaint.nostore") === "1") return true;
   } catch { /* 环境无 location/localStorage（node）→ 视为在场（测试显式建 null store） */ }
+  // P6 无地探针（survey §5.1：Safari file:// 裸存储访问 = SecurityError；旧私隐模式 setItem 必炸）：
+  //   平台把持久化器官没收 → 缺席模式（Editor Only 纯内存），**不白屏**（0825 已知失败 §3.5 的降级路径）。
+  //   注意方向与上面相反：上面 catch=视为在场（node 无 DOM），这里 probe 真炸=确证器官没收 → 缺席。
+  if (typeof localStorage !== "undefined") {
+    try {
+      const k = "weebpaint.storage-probe";
+      localStorage.setItem(k, "1");
+      localStorage.removeItem(k);
+    } catch { return true; }
+  }
   return false;
 }
 

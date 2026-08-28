@@ -2785,3 +2785,5 @@ body[data-mode="gallery"] .board { display: none !important; }
 .gm-row .menu-item { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gm-x { flex: 0 0 auto; background: none; border: none; color: inherit; opacity: .55; cursor: pointer; padding: 0 8px; border-radius: 6px; }
 .gm-x:hover { opacity: 1; background: color-mix(in srgb, currentColor 12%, transparent); }
+/* P6 无库轻折叠：gallery scope 徽章在无库语境藏起（行经 cascade 落 device 层，挂图库徽章=撒谎） */
+body[data-no-gallery] svg.menu-scope-badge[data-i18n-title="menu.scopeGalleryTip"] { display: none; }

@@ -49,6 +49,10 @@ export function wirePreferences(local: Collection, synced: Collection): void {
   _local = local; _synced = synced;
   _ready = undefined;   // P3 热插拔：换库重灌 → 重置 ready 门（下一次 initPreferences 对新 collection 重跑 init）
 }
+// P6：gallery 层在不在（P5 §9.7 cascade 的开关）。无库模式（null-store）时 gallery scope 读写全落
+//   device 层——「无地用户的 lang 也有家」。app-store 在装配/换库时喂（本模块不 import app-store，防环）。
+let _galleryLive = true;
+export function setGalleryLayerLive(v: boolean): void { _galleryLive = v; }
 
 let _ready: Promise<void> | undefined;
 export function initPreferences(): Promise<void> {
@@ -70,13 +74,21 @@ export const preferences = {
     const { scope, def } = PREF_REGISTRY[k];
     if (scope === "device") return deviceKvGetJson(_dk(k), def) as PrefValue<K>;
     if (scope === "session") return (_session.has(k) ? _session.get(k) : def) as PrefValue<K>;
-    return _synced ? (_synced.getItem(k, def) as PrefValue<K>) : def;   // gallery：hydrate 前返 default（同旧约）
+    // gallery scope = P5 §9.7 cascade：gallery ?? device ?? 工厂默认（P6 真落地——P3 前恒有库没走过下半段）。
+    //   gallery 层**有项**才算数（hydrate 前 getEntry=undefined → device 兜底，同旧约的 default 语义超集）；
+    //   无库模式（_galleryLive=false）直接 device 层——无库改的设置真落盘，挂库后 gallery 层覆盖。
+    if (_galleryLive && _synced) {
+      const e = _synced.getEntry(k);          // CollectionEntry{id,uat,value} | undefined（墓碑=undefined）
+      if (e !== undefined) return e.value as PrefValue<K>;
+    }
+    return deviceKvGetJson(_dk(k), def) as PrefValue<K>;
   },
   set<K extends PrefKey>(k: K, v: PrefValue<K>): void {
     const { scope } = PREF_REGISTRY[k];
     if (scope === "device") { deviceKvSetJson(_dk(k), v); return; }
     if (scope === "session") { _session.set(k, v); return; }
-    _synced?.setItem(k, v);
+    if (_galleryLive && _synced) { _synced.setItem(k, v); return; }
+    deviceKvSetJson(_dk(k), v);   // 无库：写落 device 层（P5 §9.7「无地用户的 lang 也有家」）
   },
   /** gallery 层云端变更回灌钩（device/session 层无远端，不经此）。 */
   onChange(cb: (changedIds: string[]) => void): () => void { return _synced?.onChange(cb) ?? (() => undefined); },

@@ -1,13 +1,14 @@
 // P5 preferences 门面：scope 路由（device=device-kv / gallery=collection / session=RAM）+ 播种幂等。
 // created 2026-08-27 by Claude Fable 5. node 无 localStorage → device 层走内存降级（无地同路）。
 import { describe, it, assert, eq } from "./runner.mjs";
-import { preferences, PREF_REGISTRY, wirePreferences, seedDevicePrefsFromLegacy } from "../src/app-prefs.ts";
+import { preferences, PREF_REGISTRY, wirePreferences, seedDevicePrefsFromLegacy, setGalleryLayerLive } from "../src/app-prefs.ts";
 
 function fakeCollection(init = {}) {
   const m = new Map(Object.entries(init));
   return {
     init: async () => {},
     getItem: (k, def) => (m.has(k) ? m.get(k) : def),
+    getEntry: (k) => (m.has(k) ? { id: k, uat: 1, value: m.get(k) } : undefined),   // P6 cascade 用（entry 形状同库）
     setItem: (k, v) => { m.set(k, v); },
     onChange: () => () => {},
     flushLocal: async () => ({ ok: true }),
@@ -60,5 +61,25 @@ describe("preferences · legacy 播种（幂等）", () => {
     seedDevicePrefsFromLegacy();
     eq(preferences.get("color-theme"), "night", "★ 幂等：已有值不被 legacy 倒灌");
     preferences.set("color-theme", "auto");   // 复位共享内存层
+  });
+});
+
+describe("preferences · P6 gallery cascade（gallery ?? device ?? 工厂；P5 §9.7 真落地）", () => {
+  it("无库：gallery scope 读写落 device 层（lang 无库也有家）；挂回后 gallery 层覆盖、缺项仍兜底", () => {
+    const synced = fakeCollection();
+    wirePreferences(fakeCollection(), synced);
+    setGalleryLayerLive(false);                       // 无库模式（null-store）
+    eq(preferences.get("lang"), null, "工厂默认起步");
+    preferences.set("lang", "ja");                    // 无库写 → device 层
+    eq(preferences.get("lang"), "ja", "无库写读一致（真落盘 device）");
+    eq(synced._m.has("lang"), false, "★ 没写进 gallery collection（无库时它是内存假象）");
+    setGalleryLayerLive(true);                        // 挂上库（gallery 层空）
+    eq(preferences.get("lang"), "ja", "★ cascade：gallery 层缺项 → device 兜底可见");
+    synced._m.set("lang", "tok");                     // 库自带的 per-gallery 值
+    eq(preferences.get("lang"), "tok", "gallery 层有值 → 覆盖 device");
+    preferences.set("lang", "en");                    // 挂库时写 → gallery 层
+    eq(synced._m.get("lang"), "en", "有库写进 collection");
+    eq(preferences.get("lang"), "en");
+    preferences.set("lang", null); setGalleryLayerLive(false); preferences.set("lang", null); setGalleryLayerLive(true);   // 复位共享层
   });
 });
