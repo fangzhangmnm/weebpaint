@@ -10,6 +10,7 @@
 //
 // 设计定稿：ai-docs/20260729-crop-template-mode.md（裁剪模板模式）。
 
+import { embeddedText } from "./single-file.ts";   // P6 单文件内嵌读口
 import { t, type Key } from "./i18n/index.ts";
 import { reportError } from "./error-badge.ts";
 
@@ -46,10 +47,14 @@ export function loadCanvasTemplates(): Promise<void> {
   if (!_inflight) {
     _inflight = (async () => {
       try {
-        const url = new URL("./canvas-templates.json", document.baseURI).href;
-        const r = await fetch(url);
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        const j = await r.json();
+        // P6 单文件：内嵌优先（file:// 的 fetch 必死；常规 build 恒 null 走原路）。
+        const emb = embeddedText("canvas-templates.json");
+        const j = emb != null ? JSON.parse(emb) : await (await (async () => {
+          const url = new URL("./canvas-templates.json", document.baseURI).href;
+          const r = await fetch(url);
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r;
+        })()).json();
         if (!Array.isArray(j?.templates)) throw new Error("canvas-templates.json malformed");
         _adoptCanvasTemplates(j.templates as CanvasTemplate[]);
       } catch (e) {

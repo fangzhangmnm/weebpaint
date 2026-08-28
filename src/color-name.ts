@@ -16,6 +16,7 @@
 //   （**保持源序**——retro palette 的编号序就是身份）；色温出单条候选；普通查询 =
 //   前缀命中优先、子串命中殿后（有限 limit 时子串保底一半槽位）。
 
+import { embeddedText } from "./single-file.ts";   // P6 单文件内嵌读口
 import { lang } from "./i18n/index.ts";
 import { reportError } from "./error-badge.ts";
 import { srgbToOklab } from "./common/color-dist.ts";
@@ -50,10 +51,14 @@ async function _load(): Promise<void> {
   if (!_inflight) {
     _inflight = (async () => {
       try {
-        const url = new URL("./color-words.json", document.baseURI).href;
-        const r = await fetch(url);
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        const j = await r.json();
+        // P6 单文件：内嵌优先（file:// 的 fetch 必死；常规 build 恒 null 走原路）。
+        const emb = embeddedText("color-words.json");
+        const j = emb != null ? JSON.parse(emb) : await (async () => {
+          const url = new URL("./color-words.json", document.baseURI).href;
+          const r = await fetch(url);
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        })();
         if (!Array.isArray(j?.categories) || !Array.isArray(j?.words)) throw new Error("color-words.json malformed");
         _adoptColorWords(j);
       } catch (e) {

@@ -8,6 +8,7 @@
 // HOST-SEAM：crypto-container（store 底座）调 pack7z/unpack7z；浏览器走默认 loader，
 //   node 测试经 setSevenZipLoader 注入 node 版（require + fs），不碰浏览器路径。
 
+import { embeddedBlobUrl, embeddedBytes } from "./single-file.ts";   // P6 单文件内嵌读口
 import type { SevenZipModuleFactory } from "../vendor/7z-wasm/index.d.ts";
 
 interface SevenZipConfig {
@@ -31,7 +32,8 @@ async function _defaultBrowserLoader(): Promise<SevenZipConfig> {
   if (!(globalThis as unknown as { SevenZip?: SevenZipModuleFactory }).SevenZip) {
     await new Promise((resolve, reject) => {
       const s = document.createElement("script");
-      s.src = VENDOR_JS;
+      // P6 单文件：umd 走 blob classic script（survey §5.1：file:// blob classic ✅、外部文件封死）。
+      s.src = embeddedBlobUrl("7zz.umd.js", "text/javascript") ?? VENDOR_JS;
       s.onload = resolve;
       s.onerror = () => reject(new Error("7z-wasm script failed to load (offline and never cached?)"));
       document.head.appendChild(s);
@@ -39,6 +41,9 @@ async function _defaultBrowserLoader(): Promise<SevenZipConfig> {
   }
   const factory = (globalThis as unknown as { SevenZip?: SevenZipModuleFactory }).SevenZip;
   if (!factory) throw new Error("7z-wasm factory not mounted (window.SevenZip)");
+  // P6 单文件：wasm 直接 bytes（instantiate(ArrayBuffer) file:// ✅）；否则原路 fetch。
+  const embWasm = embeddedBytes("7zz.wasm");
+  if (embWasm) return { factory, wasmBinary: embWasm.buffer as ArrayBuffer };
   const resp = await fetch(VENDOR_WASM);
   if (!resp.ok) throw new Error("7z-wasm wasm failed to load: " + resp.status);
   const wasmBinary = await resp.arrayBuffer();

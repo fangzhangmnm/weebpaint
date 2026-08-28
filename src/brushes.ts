@@ -22,6 +22,7 @@
 //   shape / coeffs / pressureGamma / compositeMode /
 //   spacing / pixelMode / taper / hardness / 椭圆参数 / smooth
 
+import { embeddedText } from "./single-file.ts";   // P6 单文件内嵌读口
 import { t } from "./i18n/index.ts";
 import type { Brush, BrushRackData } from "./brush-types.ts";
 import { reportError } from "./error-badge.ts";
@@ -154,10 +155,14 @@ async function _loadBuiltinSpec(): Promise<BrushSpec[]> {
   if (!_builtinInflight) {
     _builtinInflight = (async () => {
       try {
-        const url = new URL("./builtin-brushes.json", document.baseURI).href;
-        const r = await fetch(url);
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        const json = await r.json();
+        // P6 单文件：内嵌优先（file:// 的 fetch 必死；常规 build 恒 null 走原路）。
+        const emb = embeddedText("builtin-brushes.json");
+        const json = emb != null ? JSON.parse(emb) : await (async () => {
+          const url = new URL("./builtin-brushes.json", document.baseURI).href;
+          const r = await fetch(url);
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        })();
         if (!Array.isArray(json)) throw new Error("builtin-brushes.json is not an array");
         _builtinSpec = json;
       } catch (e) {

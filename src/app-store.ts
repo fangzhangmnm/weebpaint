@@ -4,6 +4,7 @@
 //   （localSettings/syncedSettings 那两面已于 2026-07-13 删除 —— 全部 KV 化进 collection。别照旧注释找。）
 import { createStore, createOneDriveProvider, createFolderProvider, isCached, isDirty, requestStoragePersistence } from "@internal/store";
 import { detectStoreAbsent, createNullStore, createDormantAuth } from "./store-absent.ts";
+import { embeddedBlobUrl } from "./single-file.ts";   // P6 单文件内嵌读口（msal 逃生舱）
 import type { Store, Collection as _Coll } from "@internal/store";
 import { stripSessionExt, sessionFileName } from "./config.ts";
 import { storeUI } from "./store-ui.ts";
@@ -27,7 +28,8 @@ export const storeAbsent = detectStoreAbsent();
 type _Prov = ReturnType<typeof createOneDriveProvider>["provider"];
 type _Auth = ReturnType<typeof createOneDriveProvider>["auth"];
 function _assembleReal(): { provider: _Prov | null; auth: _Auth; store: Store } {
-  const od = createOneDriveProvider({ clientId: CLIENT_ID, scopes: SCOPES, authority: AUTHORITY, msalUrl: "./vendor/msal/msal-browser.min.js" });
+  // P6 单文件：msal 从内嵌走 blob URL（file:// MSAL 无戏，这条是 http://localhost 逃生舱用——verdicts §2.9）。
+  const od = createOneDriveProvider({ clientId: CLIENT_ID, scopes: SCOPES, authority: AUTHORITY, msalUrl: embeddedBlobUrl("msal-browser.min.js", "text/javascript") ?? "./vendor/msal/msal-browser.min.js" });
   return { provider: od.provider, auth: od.auth, store: _createRealStore(od.provider, () => od.auth.isSignedIn()) };
 }
 

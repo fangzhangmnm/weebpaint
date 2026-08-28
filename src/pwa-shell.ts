@@ -8,6 +8,7 @@
 //   （"encountered a problem"）。dev 用 network-first：在线永远先抓网（"改完即见"/强制更新不变），离线才回退缓存。
 //   完整设计 + 这个坑见 ai-docs/20260630-pwa-offline-dev-sw.md。
 
+import { isSingleFile } from "./single-file.ts";   // P6：单文件 = SW 全家放弃
 import { reportError } from "./error-badge.ts";
 
 export interface PwaShellDeps {
@@ -66,7 +67,8 @@ export class PwaShell {
     });
 
     // 注册 SW：prod 和 dev(/dev/)都装（worker 按 scope 分 cache-first / network-first）；只跳 localhost（dev server 无 SW 文件）。
-    if ("serviceWorker" in navigator && !LOCAL_DEV_HOSTS.has(location.hostname)) {
+    // P6 单文件形态 = SW 全家放弃（survey §5.3：file:// origin 'null' 注册必死；itch 域也没有 service-worker.js 可拉）。
+    if (!isSingleFile() && "serviceWorker" in navigator && !LOCAL_DEV_HOSTS.has(location.hostname)) {
       navigator.serviceWorker.addEventListener("message", (e: MessageEvent) => { if (e.data?.type === "asset-updated") this.show(); });
       navigator.serviceWorker.register("./service-worker.js").then((registration) => {
         this.reg = registration;
