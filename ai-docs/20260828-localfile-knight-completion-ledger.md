@@ -121,3 +121,21 @@ Azure localhost 白名单；encryption/wipe 两轮 store 发版的 exports 过�
 **§3 余**：#9/#17（UI整改轮=宣发后，你已裁）、#19（A3 generic-dict 口径已拍待store侧落）、#21（A4 本地版本戳=store 0.8.0 收口件，进行中）、#14（并入A5主菜单精简=等你真机一句话）、#15/#16/#25/#26/#28/#10/#11/#1（宣发后 park，你已裁）。
 **新增修**：galleryOnline 谓词根修（folder库无云 bug，六消费点）→ v0.11.29。
 **store 0.8.0 批一已推**：graph 实例化（pin 真并联+跨账号缓存投毒清除）/reconcilePolicy 表态/构造期 fail-fast——版本待 A4 落完审版。
+
+**0828 日间三批（edited by Claude Fable 5，v0.11.32-34 + store 0.8.0 发版收货）**：
+- **#21 A4 双 tab 本地互覆护栏 ✅**：store 0.8.0（rev 版本戳+guard="user-save"+撞版先备份对方字节再覆盖
+  +reportStoreError surface+每 tab 每名 5min 冷却防 spam；读-比-写毫秒 TOCTOU 窗=已知失败入册）。
+  **store 0.8.0 你已「过」放行 → 已 release + WeebPaint v0.11.33 收货**（reconcilePolicy:"app-driven" 表态一行）。
+- **#19 A3 generic-dict 口径 ✅**（v0.11.32）：registry spread 保未知字段契约测试 + 三条口径注释
+  （generic dict/kind 开放扩展位/持久化字段永不改名——homeAccountId 宣告 onedrive 域专属，未来 provider additive）。
+- **图库长驻轮询（A6）✅**（v0.11.32）：app 层 60s 前台定时器（可见+图库开着+galleryOnline 才 tick）。
+- **wave 6 夹具全落地 ✅**（v0.11.34）：tools/preflight/（F1 无痕首启+足迹扫 / F2 reload存活+CDP真崩恢复横幅
+  / F3 真IDB A4契约 / F4 还原出厂四分支 / F7 无库导出PNG）+ scripts/preflight.sh（上传前 3 轮 ritual）；
+  F6=既有 single-smoke。**F4 首跑抓修真 bug**：device-rack-slot IDB 连接缺 onversionchange 自让路 →
+  单 tab 还原出厂被自己连接卡 blocked（已修 v0.11.34）。**平时纪律（你拍板）**：playwright 重量批只在
+  上传前全量跑，平时 ad hoc 单夹具。
+- **待你裁决/知情汇总（宣发红线口径=需逐条「做/park」表态的全部余量）**：①#4 addGroup 行为变更
+  （选中组新建=兄弟非嵌套）过目；②#12 三条知情+喷枪类固定变体要不要发明 flow 值；③#2 液化隐藏叶跟动
+  +内存线性无上限；④#18 备份范围含图片杂物+autoCache residency 副作用；⑤A5 主菜单精简+#14（等你真机
+  「一句话」session）。除此五条外，wave1/2/6 技术余量=**零**；wave4（single html+itch）=宣发当天；
+  #9/#17 等 UI 整改与产品工具项=你已裁宣发后。
