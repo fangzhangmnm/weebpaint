@@ -507,6 +507,7 @@ export const S = {
   "gal.menu.newFromImage":{ zh: "从图片新建…", en: "New from image…", ja: "画像から新規…", tok: "sitelen sin tan sitelen ante…" },
   "gal.menu.newFromClipboard":{ zh: "从剪切板新建", en: "New from clipboard", ja: "クリップボードから新規", tok: "sitelen sin tan poki kipisi" },
   "gal.imageFile": { zh: "图片", en: "Image", ja: "画像", tok: "sitelen" },
+  "gal.otherFile": { zh: "文件（在 WeebPaint 外管理）", en: "File (managed outside WeebPaint)", ja: "ファイル（WeebPaint 外で管理）", tok: "lipu (lawa lon ilo ante)" },
   "gal.del.imageDetail": { zh: "移到回收站（可恢复）。这是图片素材，不是画作。", en: "Move to trash (recoverable). This is an image file, not an artwork.", ja: "ゴミ箱へ移動（復元可）。これは画像ファイルで、作品ではありません。", tok: "ni li tawa poki jaki (ken kama sin). ni li sitelen lipu taso." },
   "gal.menu.newFolder":   { zh: "新建文件夹…", en: "New folder…", ja: "新規フォルダ…", tok: "poki sin…" },
   "gal.menu.signIn":      { zh: "登录 OneDrive", en: "Sign in to OneDrive", ja: "OneDrive にサインイン", tok: "poki sewi \"OneDrive\" o sona e mi" },

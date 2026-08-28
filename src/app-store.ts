@@ -231,6 +231,13 @@ function itemToG(it: { path: string; syncState: string; lastModified?: number; s
 //   替代全树列举（JRP 开夹慢的根因）；连接态 store 自持、无 ctx。folderNames = immediate 子夹名。（映射 store.Item → app GItem。）
 // ---- 云盘图片条目（gallery 次级 tile + cloud-picker 共用形；spec 20260820 §2/§3，v0.9.34 图片进图库）----
 //   身份 = **全名 path**（含扩展名，直接就是 store.file 的 key——图片没有裸名/全名的 ora 代数）。
+/** 图库杂物条目（#24，user 0828 拍板「显示其他扩展名的文件，不提供打开」——诚实性：看似空夹其实有货）。 */
+export interface CloudOtherItem {
+  path: string;
+  name: string;           // basename（显示用）
+  size?: number;
+  lastModified?: number;
+}
 export interface CloudImageItem {
   path: string;           // 全路径含扩展名（= store.file key / 缩略图缓存 key）
   name: string;           // basename（显示用）
@@ -251,9 +258,15 @@ const _toImageItems = (items: { path: string; syncState: string; lastModified?: 
     // 素材收件箱语义：新的在前（lastModified 倒序，缺失退名字倒序；自然序见 natural-order.ts）
     .sort((a, b) => (b.lastModified ?? 0) - (a.lastModified ?? 0) || naturalCompare(b.name, a.name));
 
+const _toOtherItems = (items: { path: string; syncState: string; lastModified?: number; size?: number }[]): CloudOtherItem[] =>
+  items
+    .filter((it) => !isDocPath(it.path) && !isImagePath(it.path))
+    .map((it) => ({ path: it.path, name: it.path.split("/").pop() || it.path, size: it.size, lastModified: it.lastModified }))
+    .sort((a, b) => naturalCompare(a.name, b.name));
+
 export function watchFolder(
   folder: string,
-  cb: (snap: { path: string; items: ReturnType<typeof itemToG>[]; images: CloudImageItem[]; folderNames: string[] }) => void,
+  cb: (snap: { path: string; items: ReturnType<typeof itemToG>[]; images: CloudImageItem[]; others: CloudOtherItem[]; folderNames: string[] }) => void,
 ): () => void {
   const prefix = folder ? `${folder}/` : "";
   return requireStore().files.watchFolder(folder, (snap) => {
@@ -265,6 +278,8 @@ export function watchFolder(
       //   其余杂物（.md 等）不进图库（诚实性余账见 ai-docs/20260820-gallery-hidden-files-honesty-handoff.md）。
       items: snap.items.filter((it) => isDocPath(it.path)).map(itemToG).sort((a, b) => naturalCompare(b.name, a.name)),
       images: _toImageItems(snap.items),
+      // 杂物（#24 诚实性）：非画作非图片的可见文件（dot 项已被库级 is-hidden 滤掉）——展示不提供打开。
+      others: _toOtherItems(snap.items),
       // 文件夹 tile 自然序正排（store 列举顺序不保证；user 2026-08-21：10 要排在 2 后面）
       folderNames: snap.folders.map((f) => f.slice(prefix.length)).filter(Boolean).sort(naturalCompare),   // 全路径 → immediate 段
     });

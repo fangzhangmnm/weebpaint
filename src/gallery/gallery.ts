@@ -26,7 +26,7 @@ import {
   requireStore, galleryBackend,
   watchFolder, listGalleryTrash, openCloudImage,
 } from "../app-store.ts";
-import type { CloudImageItem } from "../app-store.ts";
+import type { CloudImageItem, CloudOtherItem } from "../app-store.ts";
 import { appEncryption } from "../encryption.ts";
 import { getOrFetchCloudThumb, invalidateCachedThumb, onThumbInvalidated } from "./cloud-thumb-cache.ts";
 import { getOrFetchImageThumb } from "./image-thumbs.ts";
@@ -70,6 +70,7 @@ const ICON = {
   conflictBoth: iconHtml("cloud-conflict"),
   lock: iconHtml("lock"),
   image: iconHtml("image"),   // 图片次级 tile 角标（v0.9.34）
+  file: iconHtml("file"),     // 杂物 tile（#24：非画作非图片，展示不提供打开）
 };
 
 // 锁态 → 反应式镜像（ThumbCell 解锁后原地重试解密，不靠重建组件）
@@ -290,7 +291,7 @@ function makeGallery(host: GalleryHost) {
       const folder = ref<string>(safeFolder());
       const loading = ref(false);
       // 当前文件夹的**单夹**快照（store.watchFolder 已切好片；不再客户端 sliceFolder 全表）。
-      const data = reactive<{ files: GItem[]; images: CloudImageItem[]; folderNames: string[] }>({ files: [], images: [], folderNames: [] });
+      const data = reactive<{ files: GItem[]; images: CloudImageItem[]; others: CloudOtherItem[]; folderNames: string[] }>({ files: [], images: [], others: [], folderNames: [] });
       const trash = ref<TrashGItem[]>([]);
       const openMenu = ref<string | null>(null);   // 当前展开的 tile 菜单 key
 
@@ -310,6 +311,7 @@ function makeGallery(host: GalleryHost) {
         if (view.value !== "files" || snap.path !== folder.value) return;
         data.files = snap.items as unknown as GItem[];
         data.images = snap.images;
+        data.others = snap.others;
         data.folderNames = snap.folderNames;
         _framedFolder = snap.path;
         loading.value = false;
@@ -321,7 +323,7 @@ function makeGallery(host: GalleryHost) {
         if (view.value !== "files") return;
         // kind:none：不订阅、空网格（图库页无库不可开——组件 boot 期在场但静默；挂库后 refresh 重订）。
         //   旧版靠 null-store 喂空帧装订阅，替身退役后这里显式表态（2026-08-27 single-html smoke 逮到）。
-        if (galleryBackend().kind === "none") { data.files = []; data.images = []; data.folderNames = []; loading.value = false; return; }
+        if (galleryBackend().kind === "none") { data.files = []; data.images = []; data.others = []; data.folderNames = []; loading.value = false; return; }
         loading.value = _framedFolder !== folder.value;
         _unsub = watchFolder(folder.value, (snap) => {
           if (snap.path !== folder.value) return;   // 双保险：换夹途中的旧帧丢弃（库内已 sanity-check，此处再挡）
@@ -400,10 +402,14 @@ function makeGallery(host: GalleryHost) {
         raw: im, path: im.path, name: im.name, size: im.size || 0, time: im.lastModified || 0,
         token: imageThumbToken(im),
       })));
+      // 杂物 tile（#24，2026-08-28 user 拍板「显示、不提供打开」——UI 不再对夹内容撒谎）。排最后。
+      const otherTiles = computed(() => data.others.map((o) => ({
+        path: o.path, name: o.name, size: o.size || 0, time: o.lastModified || 0,
+      })));
       const crumbs = computed(() => breadcrumb(folder.value));
       const isEmpty = computed(() => view.value === "trash"
         ? trashTiles.value.length === 0
-        : folderTiles.value.length === 0 && fileTiles.value.length === 0 && imageTiles.value.length === 0);
+        : folderTiles.value.length === 0 && fileTiles.value.length === 0 && imageTiles.value.length === 0 && otherTiles.value.length === 0);
       const emptyText = computed(() => view.value === "trash" ? t("gal.empty.trash")
         : folder.value ? t("gal.empty.folder", { f: folder.value }) : t("gal.empty.none"));
 
@@ -731,11 +737,11 @@ function makeGallery(host: GalleryHost) {
         rename: t("gal.rename"), moveTo: t("gal.moveTo"), copy: t("gal.copy"), pullLocal: t("gal.pullLocal"),
         pushCloud: t("gal.pushCloud"), unloadLocal: t("gal.unloadLocal"), encrypt: t("menu.encrypt"), decrypt: t("menu.decrypt"),
         toTrash: t("gal.toTrash"), deleted: t("gal.deleted"), restore: t("gal.restore"), purge: t("gal.purge"),
-        reupload: t("gal.reupload"), imageFile: t("gal.imageFile"),
+        reupload: t("gal.reupload"), imageFile: t("gal.imageFile"), otherFile: t("gal.otherFile"),
       };
       return {
         view, folder, loading, openMenu, isEmpty, emptyText, L,
-        folderTiles, fileTiles, imageTiles, trashTiles, crumbs,
+        folderTiles, fileTiles, imageTiles, otherTiles, trashTiles, crumbs,
         badgeIcon, fmtMeta, ICON, toggleMenu, menuUp, invalidateEncrypted, setFolder, hydrateFolder, enterFolder,
         openTile, openImageTile, deleteImage, rename, move, copy, push, reupload, unload, del, folderDelete, trashRestore, trashPurge, emptyTrash,
         encryptItem, decryptItem, onUnlock, requestUnlock,
@@ -814,6 +820,16 @@ function makeGallery(host: GalleryHost) {
             <button type="button" class="gallery-tile-menu-btn" :aria-label="L.more" @click.stop="toggleMenu('I:'+im.path)"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#more"/></svg></button>
             <div class="gallery-tile-menu-popup" :class="{ hidden: openMenu!=='I:'+im.path, up: menuUp }" @click.stop>
               <button type="button" class="danger" @click="deleteImage(im.raw)"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#trash-can"/></svg><span>{{ L.toTrash }}</span></button>
+            </div>
+          </div>
+          <div v-for="ot in otherTiles" :key="'O:'+ot.path" class="gallery-tile other-file">
+            <div class="gallery-tile-thumb" v-html="ICON.file"></div>
+            <div class="gallery-tile-name-row">
+              <div class="gallery-tile-name" :title="ot.path">{{ ot.name }}</div>
+              <div class="gallery-tile-meta">
+                <span class="gallery-tile-state-icon" :title="L.otherFile" v-html="ICON.file"></span>
+                <span>{{ fmtMeta({ time: ot.time, size: ot.size }) }}</span>
+              </div>
             </div>
           </div>
         </template>
