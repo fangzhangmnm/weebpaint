@@ -1241,14 +1241,21 @@ input[type="range"].color-ramp::-moz-range-thumb {
 .generic-sheet-input.hidden,
 #genericSheetMessage.hidden { display: none; }
 
+/* 内联重命名输入框。**必须与 .layer-name 等高**（2026-08-28）：行高由 .layer-vis 的 24px 撑着
+   （24 + row padding 3×2 + border 1×2 = 32px）。原先 `font: inherit` + padding + border 把 input
+   撑到 25.6px → 每次进出改名整行 32↔33.6 跳动、下方所有行跟着位移（实测 headless Chromium）。
+   所以钉死 height:24 + box-sizing:border-box + 与名字同字号。 */
 .layer-name-input {
   flex: 1;
   font: inherit;
+  font-size: 12px;      /* 同 .layer-name，进出改名字形不跳 */
+  height: 24px;
+  box-sizing: border-box;
   background: var(--bg-soft);
   color: var(--ink);
   border: 1px solid var(--accent);
   border-radius: 4px;
-  padding: 2px 6px;
+  padding: 0 6px;
   min-width: 0;
 }
 .layer-mode-badge {

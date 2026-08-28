@@ -233,16 +233,70 @@ describe("LayerTree · verbs 契约", () => {
     undo.clear();
   });
 
-  it("moveIntoGroup 跨级（不同父）无可比序 → 沿旧行为放组内顶", () => {
+  it("moveIntoGroup 跨级：整体在目标组上方 → 各自放组内顶", () => {
     const { undo, wp, tree } = mkGrouped();
-    // 根级建第二个组 g2（active=bg(1) 是叶 → 同级之上）
+    // 根级建第二个组 g2（active=bg(1) 是叶 → 同级之上）→ [bg(1), g2, g(10){11,12}]
     let t = wp.begin(); const g2 = tree.addGroup("g2"); t.commit();
-    // g(10) 内的 12、11 依次跨级移入 g2：各自 push 顶 → 结果 [12, 11]（不做跨级排序）
+    // g(10) 整段在 g2 上方 → 内部的 12、11 依次移入 g2 都判"上方"→ push 顶 → [12, 11]
     t = wp.begin();
     assert(tree.moveIntoGroup(12, g2.id), "12 跨级入 g2");
     assert(tree.moveIntoGroup(11, g2.id), "11 跨级入 g2");
     t.commit();
-    eq(tree.nodeById(g2.id).children.map((n) => n.id).join(","), "12,11", "跨级各自放顶（无可比序）");
+    eq(tree.nodeById(g2.id).children.map((n) => n.id).join(","), "12,11", "两者都在 g2 上方 → 各自放顶");
+    undo.clear();
+  });
+
+  // 2026-08-28（user 0825「移动图层组尽量保证顺序的时候如果是 nested 图层组计算错误」）：
+  // 上下判据从"同级 index"升级成"树路径字典序"——下面三条在旧实现下全红（跨级一律塞组内顶）。
+  it("moveIntoGroup nested：跨级但在目标组**下方** → 组内底（旧实现塞顶=红）", () => {
+    // [bot(1), outer(10){ inner(20){ a(21) }, b(22) }]
+    const { undo, wp, tree } = mkAny([
+      L(1, "bot"),
+      G(10, "outer", [G(20, "inner", [L(21, "a")]), L(22, "b")]),
+    ]);
+    const t = wp.begin(); assert(tree.moveIntoGroup(1, 20), "bot 跨两级入 inner"); t.commit();
+    eq(tree.nodeById(20).children.map((n) => n.id).join(","), "1,21", "bot 原在 outer 整段之下 → inner 内底");
+    undo.clear();
+  });
+
+  it("moveIntoGroup nested：跨级但在目标组**上方** → 组内顶", () => {
+    // [outer(10){ inner(20){ a(21) } }, top(2)]
+    const { undo, wp, tree } = mkAny([
+      G(10, "outer", [G(20, "inner", [L(21, "a")])]),
+      L(2, "top"),
+    ]);
+    const t = wp.begin(); assert(tree.moveIntoGroup(2, 20), "top 跨两级入 inner"); t.commit();
+    eq(tree.nodeById(20).children.map((n) => n.id).join(","), "21,2", "top 原在 outer 整段之上 → inner 内顶");
+    undo.clear();
+  });
+
+  it("moveIntoGroup nested：兄弟组之间搬运也保序（下方组的叶 → 目标组内底）", () => {
+    // [gA(30){ x(31) }, gB(40){ y(41) }]（gA 在下）
+    const { undo, wp, tree } = mkAny([
+      G(30, "gA", [L(31, "x")]),
+      G(40, "gB", [L(41, "y")]),
+    ]);
+    const t = wp.begin(); assert(tree.moveIntoGroup(31, 40), "x 从 gA 搬进 gB"); t.commit();
+    eq(tree.nodeById(40).children.map((n) => n.id).join(","), "31,41", "x 原在 y 下方 → gB 内底");
+    undo.clear();
+  });
+
+  it("addGroup：只含图层组的层级也能建兄弟组（user 0825）", () => {
+    // 根级只有一个组 → active 必然是组或组内的叶；选中组时新组必须落**同级**，不能往里钻
+    const { undo, wp, tree } = mkAny([G(10, "g", [L(11, "a")])], 10);
+    const t = wp.begin(); const g2 = tree.addGroup("g2"); t.commit();
+    assert(g2, "建组成功");
+    eq(tree.view().nodes.map((n) => n.id).join(","), "10," + g2.id, "新组是 g 的兄弟（根级两个组）");
+    eq(tree.nodeById(10).children.map((n) => n.id).join(","), "11", "没被塞进 g 里");
+    eq(tree.view().activeId, g2.id, "active = 新组");
+    undo.clear();
+  });
+
+  it("addGroup：选中组内的叶 → 新组落该组内（嵌套仍然可达）", () => {
+    const { undo, wp, tree } = mkAny([G(10, "g", [L(11, "a")])], 11);
+    const t = wp.begin(); const g2 = tree.addGroup("g2"); t.commit();
+    eq(tree.nodeById(10).children.map((n) => n.id).join(","), "11," + g2.id, "新组进 g，落在叶 a 之上");
+    eq(tree.view().nodes.length, 1, "根级仍只有 g");
     undo.clear();
   });
 
@@ -354,6 +408,40 @@ function mkGrouped(opts = {}) {
     },
   });
   for (const r of [r1, r11, r12]) wp.layerTiles.releaseTileset(r);
+  wp.attachTree(tree);
+  return { undo, wp, tree, tiles: wp.layerTiles };
+}
+
+// 任意形状树夹具（nested 用例用）：spec 用 L(id,name) / G(id,name,children) 写，
+// 本函数负责每张叶的 tileset 申领与净移交。activeId 默认 = 第一个 spec 节点。
+const L = (id, name) => ({ id, name });
+const G = (id, name, children) => ({ id, name, children });
+function mkAny(spec, activeId) {
+  const undo = new UndoStack({ maxQuotaBytes: 1 << 30 });
+  let tree = null;
+  const host = {
+    getPixels: (layerId) => { const l = tree?.leafById(layerId); return l ? wp.layerTiles.tilesetPixels(l.pixelsRef) : null; },
+    findLayerIdByPixels: () => null,
+    eachLayer: (cb) => {
+      const walk = (ns) => ns.forEach((n) => { if ("children" in n) walk(n.children); else cb(n.id, wp.layerTiles.tilesetPixels(n.pixelsRef)); });
+      if (tree) walk(tree.view().nodes);
+    },
+    replacePixels: (layerId, np) => { const l = tree?.leafById(layerId); if (l) wp.layerTiles.swapTilesetPixels(l.pixelsRef, np); },
+  };
+  const wp = new Wp({ undo, host, onTokenLeak: () => {} });
+  const refs = [];
+  const build = (ns) => ns.map((n) => {
+    if (n.children) return { id: n.id, name: n.name, visible: true, opacity: 1, mode: "source-over", clippingMask: false, children: build(n.children) };
+    const ref = wp.layerTiles.createTileset(new LayerPixels(64, 64));
+    refs.push(ref);
+    return { id: n.id, name: n.name, visible: true, opacity: 1, mode: "source-over", clippingMask: false, lockAlpha: false, pixelsRef: ref };
+  });
+  const nodes = build(spec);
+  tree = new LayerTree({
+    wp, tiles: wp.layerTiles,
+    initial: { nodes, activeId: activeId ?? spec[0].id, referenceLayerId: null, width: 64, height: 64 },
+  });
+  for (const r of refs) wp.layerTiles.releaseTileset(r);   // json 已收养
   wp.attachTree(tree);
   return { undo, wp, tree, tiles: wp.layerTiles };
 }

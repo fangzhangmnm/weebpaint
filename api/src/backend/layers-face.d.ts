@@ -74,7 +74,7 @@ export declare class LayersFace {
     clearLayer(id: number, o?: RunOpts): OpStatus;
     /** 焦点写（显式声明的不入 undo 写；undo/redo 的焦点还原由根快照天然给出）。 */
     setActive(id: number): boolean;
-    /** 新建空组（active 是组 → 嵌入；否则同级之上；active=新组）。命名归调用方（UI 惯例「组 N」）。 */
+    /** 新建空组（恒插 active **同级**之上，与 addLayer 同规则；active=新组）。命名归调用方（UI 惯例「组 N」）。 */
     addGroup(name?: string, statuses?: TreeStatuses, o?: RunOpts): {
         ok: boolean;
         groupId?: number;
@@ -87,7 +87,7 @@ export declare class LayersFace {
         bytes: Uint8ClampedArray;
         rect: Rect;
     } | null, statuses: TreeStatuses, o?: RunOpts): OpStatus;
-    /** 移入组（保持相对上下：同级下方→组内底、其余→组内顶，见 LayerTree.moveIntoGroup）。 */
+    /** 移入组（保持相对上下：原在组下方→组内底、在组上方→组内顶；跨级按树路径判，见 LayerTree.moveIntoGroup）。 */
     moveIntoGroup(id: number, gid: number, statuses: TreeStatuses, o?: RunOpts): OpStatus;
     /** 移出组（组同级；组内底→组下方、其余→组上方）。 */
     moveOutOfGroup(id: number, statuses: TreeStatuses, o?: RunOpts): OpStatus;
