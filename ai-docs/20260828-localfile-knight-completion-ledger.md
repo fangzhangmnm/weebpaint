@@ -149,3 +149,11 @@ Azure localhost 白名单；encryption/wipe 两轮 store 发版的 exports 过�
 **同批新需求**：Delete/Backspace=删除选区内容（浮层先收摊再删、无选区状态行提示不清层、不删图层——删层留面板正门）；
 文件粘贴=代码已覆盖（paste kind=file 路径），进真机批；**水印现状**=#13 图片导出水印已落（自定义文字白字+深描边，
 四去向共用，字体=系统栈 canvas 声明豁免）、视频/timelapse 无水印——建议图片保留、视频不做（宣发素材外部 ffmpeg 加）。
+
+**0828 深夜批（edited by Claude Fable 5，v0.11.36 推 dev）**：①**#13 勘误**——user 原意=**视频**导出水印，
+图片侧不要 → 图片水印整件撤除（watermark-raster/合成器/扳手UI/pref/i18n/测试全删，git 史留档）；
+视频水印维持不做（宣发素材外部 ffmpeg；终端用户需求等真出现再立案）。②**#12 喷枪 flow 悬案闭案**——
+「禁用笔压」机制 v0.11.30 已全拆、固定勾线=普通参数笔（三 coeff 置 0，零 toggle 零特殊 flag），现状即
+user 所要（「等宽勾线笔改成去掉笔压，不需要额外 toggle」）；喷枪不拆，无机制可喂。③液化 buffer 事实
+钉档：LayerPixels=稀疏 256² tile（构造零分配、写才 COW、shadow 起步共享真叶句柄）——内存墙若做，
+准确口径=实际触及 tile×叶数，非叶数×画布（方案 a 的 worst-case 估算过悲观，方案 b 对账才是准的）。
