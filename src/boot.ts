@@ -57,7 +57,7 @@ export async function bootRestoreSession(ctx: AppContext) {
     isDocLockedElsewhere: (name) => isDocLockedElsewhere(name),
     onLockedElsewhere: (name) => setStatus(t("mi.restoreLockedElsewhere", { name }), true),
     // 云端功能开关（2026-08-21，cloud-capability 接缝）：关 = 不自动恢复 + 不开图库，
-    //   停在 boot 的空白画布（app.ts 出生即 backend.blank 2048²；gallery overlay 默认 hidden，
+    //   停在 boot 的空白画布（app.ts 出生即 backend.blank 1024²（0828 对齐新建默认）；gallery overlay 默认 hidden，
     //   这里只补一句 status 说明为什么没开上次的画）。currentFile/标记零变更（关→开自愈）。
     hasGallery: () => hasGallery(),
     // P2（2026-08-26）：云关落点 = transient 家新画布（此前 home:null 裸奔：Ctrl+S 死路、崩溃全丢）。

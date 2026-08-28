@@ -66,7 +66,9 @@
          window.zip（非模块 eval 期），双保险。 -->
     <script defer src="./vendor/zip-js/zip-full.min.js"></script>
   </head>
-  <body>
+  <body role="application">
+  <!-- role=application：整页是画布应用非文档（a11y 语义同 canvas 类 app 惯例）；顺带降低浏览器
+       「阅读模式」把 app 当文章劫持的启发式命中（0821 user QA；无标准 opt-out API，此为尽力面，真机验）。 -->
     <!-- 图标 sprite：共享库子集 + WeebPaint 本地补丁，静态内联（1×1 + opacity:0 藏起来）。
          ⚠ sprite 根别改成 display:none —— 不渲染的子树里 <mask>/<clipPath> 静默失效，
          18 个靠遮罩留白的图标会全糊成一坨且不报错（v428 前就是这样）。理由详见
