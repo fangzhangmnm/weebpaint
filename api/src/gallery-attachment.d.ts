@@ -35,6 +35,7 @@ export interface AttachmentDeps {
     hasOpenGalleryDoc: () => boolean;
     requestPersist: () => void;
     setActiveGalleryId: (id: string | null) => void;
+    reportError: (e: unknown) => void;
 }
 export interface GalleryAttachment {
     state(): AttachmentState;

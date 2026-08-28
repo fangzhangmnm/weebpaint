@@ -17,7 +17,6 @@ import type { Collection } from "./app-store.ts";   // B2：类型经接缝转�
 export const APP_STATE_DEFAULTS = {
   // 跨设备（synced-app-state）：跟人/identity 走的跨文件持久态
   "current-directory": "" as string,          // 上次所在图库文件夹（Cold）
-  "blender-panel-url": "" as string,          // Blender 同步远端 URL（2026-07-14 决策：全账号同步，tailscale 稳定端点）（Cold）
   // 图库密码验证器 sentinel（v0.4.11，真机 2.3）：{v,salt,iv,ct} | null。**跟账号走**（synced）——
   //   重装/换设备后仍知道「图库已有密码」，创建流程变输入校验。语义见 password-verifier.ts。
   "gallery-password-verifier": null as { v: 1; salt: string; iv: string; ct: string } | null,
@@ -51,8 +50,6 @@ export const appState = {
   // ── 跨设备（synced-app-state）冷字段 ──
   get currentDirectory(): string { return getC<string>(_synced, "current-directory"); },
   set currentDirectory(v: string) { setC(_synced, "current-directory", v); },
-  get blenderPanelUrl(): string { return getC<string>(_synced, "blender-panel-url"); },
-  set blenderPanelUrl(v: string) { setC(_synced, "blender-panel-url", v); },
   get galleryPasswordVerifier(): { v: 1; salt: string; iv: string; ct: string } | null { return getC(_synced, "gallery-password-verifier"); },
   set galleryPasswordVerifier(v: { v: 1; salt: string; iv: string; ct: string } | null) { setC(_synced, "gallery-password-verifier", v); },
   // ── 序列化持久化相关（除字段外仅此二法，无应用逻辑）──

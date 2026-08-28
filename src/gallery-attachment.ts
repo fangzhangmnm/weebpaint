@@ -34,6 +34,7 @@ export interface AttachmentDeps {
   hasOpenGalleryDoc: () => boolean;                             // 收口开画 gate（session.name gate 同源；host 晚绑，未绑=恒 true 保守拒卸）
   requestPersist: () => void;                                   // persist 三件套③：attach 手势时刻申请（fire-and-forget）
   setActiveGalleryId: (id: string | null) => void;              // 「当前库 id」唯一真相（active-gallery.ts：锁名/回执条/安家铸户口共用）
+  reportError: (e: unknown) => void;                            // 簿记失败上报（残留审计 G：registry touch/relabel 非承重，失败不拦挂载但必须出声）
 }
 
 export interface GalleryAttachment {
@@ -75,14 +76,27 @@ export function createGalleryAttachment(deps: AttachmentDeps): GalleryAttachment
       if (deps.storeAbsent) throw new Error("store-absent mode: attach unavailable");
       if (_state.kind === "attached") throw new Error("attach while attached — detach first (green-gate)");
       if (opts?.gesture !== false) deps.requestPersist();   // 手势入口即调（popup/权限往返会耗尽 activation）；boot 静默不申请
+      // 残留审计 G（0828）：swap 之后、_state 之前原来夹着两个可 reject 的 registry IDB 写——写失败 =
+      //   hasLiveStore()=true 而 attachment 仍 detached（图库 UI 全开/卸载钮藏/绿灯门放行不 dispose/
+      //   下次 attach 泄漏前实例），破 `_storeFull≠null ⇔ attached` 不变量。修法：承重步（建店+换入+立状态）
+      //   一段完成；registry touch/relabel 是**簿记非承重**，失败只上报不拦挂载。
       const next = deps.buildStore(entry);
       _current = next;
-      await deps.swap(next);
+      try {
+        await deps.swap(next);
+      } catch (e) {
+        _current = null;                     // 换入失败：不留半截实例（swap 自身失败时店未上位）
+        throw e;
+      }
       deps.setActiveGalleryId(entry.id);
-      await deps.registry.touch(entry.id);
-      if (entry.kind === "folder" && entry.handle?.name) await deps.registry.relabel(entry.id, entry.handle.name);   // 标签尽力自愈
       _state = { kind: "attached", entry, online: opts?.online ?? true };
       _notify();
+      try {
+        await deps.registry.touch(entry.id);
+        if (entry.kind === "folder" && entry.handle?.name) await deps.registry.relabel(entry.id, entry.handle.name);   // 标签尽力自愈
+      } catch (e) {
+        deps.reportError(new Error("[attachment] registry bookkeeping failed (attach stands; boot lastActive may be stale): " + String(e)));   // lastActive 没记上=下次 boot 可能进无库（重连即愈），不值得拦本次挂载
+      }
     },
     async detach() {
       if (_state.kind === "detached") return { ok: true };      // 幂等

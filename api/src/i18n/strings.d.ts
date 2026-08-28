@@ -886,16 +886,16 @@ export declare const S: {
         readonly tok: "o awen (Ctrl+S) · {name} · awen ala";
     };
     readonly "save.synced": {
-        readonly zh: "已同步云端（上次保存时）· 点击检查是否有新版本 · {name}";
-        readonly en: "Synced to cloud (at last save) · tap to check for newer · {name}";
-        readonly ja: "クラウド同期済み（前回保存時）· タップで更新確認 · {name}";
-        readonly tok: "sitelen li lon poki sewi · sina luka la mi alasa e sin · {name}";
+        readonly zh: "已同步到图库（上次保存时）· 点击检查是否有新版本 · {name}";
+        readonly en: "Synced to gallery (at last save) · tap to check for newer · {name}";
+        readonly ja: "ギャラリー同期済み（前回保存時）· タップで更新確認 · {name}";
+        readonly tok: "sitelen li lon poki sitelen · sina luka la mi alasa e sin · {name}";
     };
     readonly "save.localOnly": {
-        readonly zh: "已存本地（IDB 易失，登录云端更安全） · {name}";
-        readonly en: "Saved locally (IDB is volatile; sign in for safety) · {name}";
-        readonly ja: "ローカル保存済み（IDBは揮発性、クラウド推奨） · {name}";
-        readonly tok: "sitelen li awen lon ilo ni taso · poki sewi li awen pona · {name}";
+        readonly zh: "已存本地（还没进图库——图库接通后会自动补推） · {name}";
+        readonly en: "Saved locally (not in the gallery yet; pushes when the gallery is reachable) · {name}";
+        readonly ja: "ローカル保存済み（ギャラリー未反映——接続時に自動送信） · {name}";
+        readonly tok: "sitelen li awen lon ilo ni taso · poki sitelen li kama la mi pana e ona · {name}";
     };
     readonly "save.localFileDirty": {
         readonly zh: "有未保存修改，Ctrl+S 写回 · {name}";
@@ -2752,16 +2752,16 @@ export declare const S: {
         readonly tok: "suli sama lupa";
     };
     readonly "ref.cloud": {
-        readonly zh: "从云盘选图";
-        readonly en: "Pick from cloud";
-        readonly ja: "クラウドから選ぶ";
-        readonly tok: "o kama jo tan poki sewi";
+        readonly zh: "从图库选图";
+        readonly en: "Pick from gallery";
+        readonly ja: "ギャラリーから選ぶ";
+        readonly tok: "o kama jo tan poki sitelen";
     };
     readonly "cp.title": {
-        readonly zh: "从云盘选图";
-        readonly en: "Pick an image from cloud";
-        readonly ja: "クラウドから画像を選ぶ";
-        readonly tok: "o kama jo e sitelen tan poki sewi";
+        readonly zh: "从图库选图";
+        readonly en: "Pick an image from the gallery";
+        readonly ja: "ギャラリーから画像を選ぶ";
+        readonly tok: "o kama jo e sitelen tan poki sitelen";
     };
     readonly "cp.root": {
         readonly zh: "根目录";
@@ -2776,10 +2776,10 @@ export declare const S: {
         readonly tok: "o tawa sewi";
     };
     readonly "cp.loading": {
-        readonly zh: "正在列出云端图片…";
-        readonly en: "Listing cloud images…";
-        readonly ja: "クラウドの画像を一覧中…";
-        readonly tok: "mi lukin e poki sewi…";
+        readonly zh: "正在列出图库图片…";
+        readonly en: "Listing gallery images…";
+        readonly ja: "ギャラリーの画像を一覧中…";
+        readonly tok: "mi lukin e poki sitelen…";
     };
     readonly "cp.empty": {
         readonly zh: "此文件夹没有图片";
@@ -3508,10 +3508,10 @@ export declare const S: {
         readonly tok: "o pana e poki ni tawa lipu JSON";
     };
     readonly "rack.refresh": {
-        readonly zh: "从云端刷新笔架";
-        readonly en: "Refresh rack from cloud";
-        readonly ja: "クラウドからブラシ棚を更新";
-        readonly tok: "o kama sama poki sewi";
+        readonly zh: "刷新笔架（从图库重新拉取）";
+        readonly en: "Refresh rack (re-pull from gallery)";
+        readonly ja: "ブラシ棚を更新（ギャラリーから再取得）";
+        readonly tok: "o kama sin e poki pi ilo sitelen";
     };
     readonly "rack.newBrush": {
         readonly zh: "新建笔刷";
@@ -3916,10 +3916,10 @@ export declare const S: {
         readonly tok: "mi pana ala: ilo sin li sitelen e ona. sina weka e awen. ilo ni en poki sewi li awen sama.";
     };
     readonly "ss.savedLocalIdb": {
-        readonly zh: "已存本地：{name}（IDB 易失，登录云端更安全）";
-        readonly en: "Saved locally: {name} (IndexedDB is volatile; sign in to the cloud for safety)";
-        readonly ja: "ローカルに保存しました：{name}（IndexedDB は消えやすいため、クラウドにサインインすると安全です）";
-        readonly tok: "awen lon ilo ni: {name}. ilo ni li ken weka e ijo. poki sewi li awen pona.";
+        readonly zh: "已存本地：{name}（还没到图库——图库接通后会自动补推）";
+        readonly en: "Saved locally: {name} (not in the gallery yet; pushes when the gallery is reachable)";
+        readonly ja: "ローカルに保存しました：{name}（ギャラリー未反映——接続時に自動送信）";
+        readonly tok: "awen lon ilo ni: {name}. poki sitelen li kama la mi pana e ona.";
     };
     readonly "ss.synced": {
         readonly zh: "已同步到云端：{name}";
@@ -3962,6 +3962,18 @@ export declare const S: {
         readonly en: "Push failed: {error}";
         readonly ja: "プッシュに失敗しました：{error}";
         readonly tok: "pana li pakala: {error}";
+    };
+    readonly "ss.encryptGalleryOnly": {
+        readonly zh: "加密目前只对图库里的画可用——先把画保存进图库";
+        readonly en: "Encryption is currently available for gallery artworks only — save it into a gallery first";
+        readonly ja: "暗号化は現在ギャラリー内の作品のみ対応——先にギャラリーへ保存してください";
+        readonly tok: "len li ken taso lon poki sitelen. o awen e sitelen lon poki sitelen.";
+    };
+    readonly "ss.renameNeedsHome": {
+        readonly zh: "这张画还没安家——保存进图库后就能重命名";
+        readonly en: "This artwork has no home yet — save it into a gallery to rename it";
+        readonly ja: "この作品はまだ保存先がありません——ギャラリーへ保存すると名前を変更できます";
+        readonly tok: "sitelen ni li jo ala e tomo. o awen e ona lon poki sitelen la sina ken ante e nimi.";
     };
     readonly "ss.openOrSaveBeforeEncrypt": {
         readonly zh: "先打开或保存一张画再加密";
@@ -4738,10 +4750,10 @@ export declare const S: {
         readonly tok: "ilo lipu";
     };
     readonly "tm.targetCloud": {
-        readonly zh: "云盘（画所在文件夹）";
-        readonly en: "Cloud (artwork's folder)";
-        readonly ja: "クラウド（作品のフォルダー）";
-        readonly tok: "poki sewi";
+        readonly zh: "图库（画所在文件夹）";
+        readonly en: "Gallery (artwork's folder)";
+        readonly ja: "ギャラリー（作品のフォルダー）";
+        readonly tok: "poki sitelen";
     };
     readonly "tm.exportedCloud": {
         readonly zh: "已导出到云盘：{name}";
@@ -4767,11 +4779,11 @@ export declare const S: {
         readonly ja: "クラウドへエクスポート中…";
         readonly tok: "mi pana tawa poki sewi…";
     };
-    readonly "tm.exportCloudUnavailable": {
-        readonly zh: "云盘不可用（store 缺席模式）——请用「文件」下载";
-        readonly en: "Cloud unavailable (store-absent mode) — use \"File\" download instead";
-        readonly ja: "クラウドは利用できません（store 不在モード）——「ファイル」でダウンロードしてください";
-        readonly tok: "poki sewi li ken ala. o kepeken nasin lipu.";
+    readonly "tm.exportNoGallery": {
+        readonly zh: "未连接图库——云盘去向需要先连接图库（文件菜单「连接图库…」）";
+        readonly en: "No gallery connected — the cloud destination needs a gallery (File menu → Connect gallery…)";
+        readonly ja: "ギャラリー未接続——クラウドへの書き出しには先にギャラリー接続が必要です";
+        readonly tok: "poki sitelen li lon ala. o wan e poki sitelen lon lipu nasin.";
     };
     readonly "tm.exportLocalDocNoCloud": {
         readonly zh: "本地文件模式没有云端身份，不导出到云盘——请用「文件」下载";
@@ -5880,8 +5892,8 @@ export declare const S: {
     readonly "st.filePulling": {
         readonly zh: "拉取中…";
         readonly en: "Pulling…";
-        readonly ja: "クラウドから取得中…";
-        readonly tok: "mi kama jo tan poki sewi…";
+        readonly ja: "取得中…";
+        readonly tok: "mi kama jo…";
     };
     readonly "st.cloudChecking": {
         readonly zh: "检查云端…";
@@ -7313,10 +7325,10 @@ export declare const S: {
         readonly tok: "ni li tawa ilo ni taso.";
     };
     readonly "menu.scopeGalleryTip": {
-        readonly zh: "跟这个图库走（随云同步到你的其他设备）";
-        readonly en: "Follows this gallery (syncs to your other devices via the cloud)";
-        readonly ja: "このギャラリーに紐づき、クラウド経由で他のデバイスにも同期されます";
-        readonly tok: "ni li tawa poki sitelen ni. ona li tawa ilo ante sina kepeken poki sewi.";
+        readonly zh: "跟这个图库走（打开同一图库处处一致）";
+        readonly en: "Follows this gallery (consistent wherever you open it)";
+        readonly ja: "このギャラリーに紐づき、同じギャラリーを開けばどこでも同じ設定になります";
+        readonly tok: "ni li tawa poki sitelen ni. poki sama la ijo sama.";
     };
     readonly "menu.cloudEnabled": {
         readonly zh: "启用云端功能";

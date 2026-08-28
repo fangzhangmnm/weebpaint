@@ -20,7 +20,7 @@ import { setMenuOpen } from "./settings-menu.ts";
 import { session } from "./session-state.ts";
 import { homeDisplayName } from "./doc-home.ts";
 import { downloadStamp } from "./naming.ts";
-import { isCloudEnabled } from "./cloud-capability.ts";
+import { hasGallery } from "./gallery-capability.ts";
 import { openChoiceSheet } from "./sheets.ts";
 import { runSaveAsFlow } from "./topbar-menu.ts";   // hub「复制一份到图库」= 原另存为（逻辑在 topbar-menu，红线原样）
 import { supportsSaveFilePicker, pickSaveOraFile, writeHandleBlob } from "./local-file-session.ts";
@@ -29,7 +29,7 @@ import { importImageAsLayer } from "./import-image.ts";
 import { desk } from "./workbench-state.ts";
 import { preferences } from "./app-prefs.ts";
 import { reportError } from "./error-badge.ts";
-import { requireStore, storeAbsent } from "./app-store.ts";
+import { galleryBackend, requireStore } from "./app-store.ts";
 import { nextFreeExportName } from "./gallery/cloud-image-model.ts";
 import { withBusy } from "./fullscreen-busy.ts";
 
@@ -89,7 +89,9 @@ export function exportBaseName(): string {
 //   - 无地本地文件：无地=零 store 身份（spec 20260819 §7），cloud 导出会建 store 条目，软拒。
 //   - 加密作品：加密模型承诺明文字节不落云端（v0.9.30 起）。
 function _cloudSinkBlocked(): string | null {
-  if (storeAbsent) return t("tm.exportCloudUnavailable");
+  // 残留审计 B（0828）：判据问「有库吗」不问「平台有没有 store」——无库模式（kind:none）与
+  //   storeAbsent 平台同判；旧判据只挡后者，无库 transient 选云盘会打进 requireStore() 硬抛。
+  if (galleryBackend().kind === "none") return t("tm.exportNoGallery");
   if (session.home?.kind === "file") return t("tm.exportLocalDocNoCloud");
   if (session.enc.encrypted) return t("tm.exportEncryptedNoCloud");
   return null;
@@ -277,7 +279,7 @@ export function initExportImportMenu(ctx: AppContext) {
         { label: t("tm.hubExportImage", { cfg }), value: "image", primary: true },
         { label: enc ? t("tm.hubSaveLocalOraPlain") : t("tm.hubSaveLocalOra"), value: "local" },
         // 云功能关 → 图库不可见，「复制一份到图库」一并收（cloud-capability v1.1 gating）
-        ...(isCloudEnabled() ? [{ label: t("tm.hubCopyToGallery"), value: "gallery" as const }] : []),
+        ...(hasGallery() ? [{ label: t("tm.hubCopyToGallery"), value: "gallery" as const }] : []),
       ],
     );
     if (choice === "image") await runConfiguredExport();
@@ -363,7 +365,7 @@ export function initExportImportMenu(ctx: AppContext) {
           <option value="file" ${tgt0 === "file" ? "selected" : ""}>${t("tm.targetFile")}</option>
           <option value="clipboard" ${tgt0 === "clipboard" ? "selected" : ""} ${proj0 ? "disabled" : ""}>${t("tm.targetClipboard")}</option>
           <option value="print" ${tgt0 === "print" ? "selected" : ""} ${proj0 ? "disabled" : ""}>${t("tm.targetPrint")}</option>
-          <option value="cloud" ${tgt0 === "cloud" ? "selected" : ""}>${t("tm.targetCloud")}</option>
+          <option value="cloud" ${tgt0 === "cloud" ? "selected" : ""} ${hasGallery() ? "" : "disabled"}>${t("tm.targetCloud")}</option>
         </select>
       </div>
       <div class="menu-config-section">

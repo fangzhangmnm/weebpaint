@@ -6,7 +6,7 @@
 // 依赖全是单例/leaf，直接 import：isSignedIn ← app-store.ts，session ← session-state.ts，els ← els.ts。
 import { els } from "./els.ts";
 import { isSignedIn } from "./app-store.ts";
-import { isCloudEnabled, galleryOnline } from "./cloud-capability.ts";
+import { hasGallery, galleryOnline } from "./gallery-capability.ts";
 import { session } from "./session-state.ts";
 import { assertNever, type DocHome } from "./doc-home.ts";
 import { t, tLatin } from "./i18n/index.ts";
@@ -53,7 +53,7 @@ function computeSaveState() {
   // 云功能关（2026-08-21）：云腿被短路（smart save 只走本地），云态徽章一律不呈现——
   //   排在 unpushed/synced 之前：关闭态谈「已同步/未推」都是谎（根本不会推）。saving/dirty 不受影响
   //   （saving=_pushInFlight 只由 saveAndPush 置，关闭态本就走不到）。
-  if (!isCloudEnabled()) return "cloud-off";
+  if (!hasGallery()) return "cloud-off";
   // ⚠ unpushed **不是**被 cutover 删掉的那批状态之一（saving/cloud-dirty/cloud-busy 是「在飞中」的过程态，
   //   删得对，别加回来）。这条是**终态**：已经存完了、而且云端那条腿确定没成——离线 / 冲突面选了取消 /
   //   deferred 落地未确认。v432 之前它没有任何渲染面，于是 push 失败后徽章照画云朵对勾、状态栏照报「已同步」，

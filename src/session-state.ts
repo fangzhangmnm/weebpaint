@@ -21,7 +21,7 @@ import { ORA_FORMAT_VERSION } from "./backend/ora-stack-xml.ts";
 import { flattenViewLeaves } from "./backend/workpiece/painting-view.ts";
 import { tLatin } from "./i18n/index.ts";
 import { requireStore, galleryBackend } from "./app-store.ts";
-import { galleryOnline } from "./cloud-capability.ts";   // 库在线 SSoT（0828：isSignedIn 是 MSAL 词，folder 库别问它）
+import { galleryOnline } from "./gallery-capability.ts";   // 库在线 SSoT（0828：isSignedIn 是 MSAL 词，folder 库别问它）
 import { appEncryption } from "./encryption.ts";
 import type { EncryptedBlob } from "./app-store.ts";   // 密文 at-rest 字节（branded）；B2：类型经接缝转口
 import { openInputSheet, openConfirmSheet, openChoiceSheet, lockSyncGate, settleSyncGate } from "./sheets.ts";
@@ -705,6 +705,10 @@ async function saveAndPush() {
 
 // ---- 加密 / 解除（对活动 doc；at-rest 字节换容器，内存态透明不动）----
 async function encryptCurrent() {
+  // 残留审计 C（0828）：DocHome 表态（save-status switch 范本）。加密动词现阶段=**图库家专属**
+  //   （at-rest 容器换壳走 store _file 面）；file/transient 家给诚实话，不再对已存盘的 file 家说
+  //   「先打开或保存」这种假话。（无库/文件家要不要扩加密 = 产品件，总账 §8 C 附带表态待 user。）
+  if (docHome()?.kind !== "gallery") { setStatus(t("ss.encryptGalleryOnly"), true); return; }
   const name = _activeName();   // 快照一次（TS 无法跨调用窄化；语义同旧局部变量读法）
   if (!name || _isLazyBlankSession) { setStatus(t("ss.openOrSaveBeforeEncrypt"), true); return; }
   const online = () => galleryOnline();   // 库在线 SSoT（folder=权限即在线；0828 修）
@@ -726,6 +730,7 @@ async function encryptCurrent() {
   });
 }
 async function decryptCurrent() {
+  if (docHome()?.kind !== "gallery") { setStatus(t("ss.encryptGalleryOnly"), true); return; }   // 同 encryptCurrent（残留审计 C）
   const name = _activeName();
   if (!name) { setStatus(t("ss.noDocOpen"), true); return; }
   const online = () => galleryOnline();   // 库在线 SSoT（folder=权限即在线；0828 修）
@@ -750,7 +755,11 @@ async function decryptCurrent() {
 
 // ---- rename（UI 循环 + es.rename）----
 async function renameCurrentSession({ suggested, reason }: { suggested?: string; reason?: string } = {}) {
-  if (_fileHome()) { setStatus(t("lf.renameNotSupported"), true); return; }   // 无地：改名=文件系统操作，v1 不做（另存为可收编入库）
+  // 残留审计 C（0828）：原来只挡 file 家，transient 漏网 → _activeName()! = null → requireStore 抛。
+  //   DocHome 三分表态：file=专句（改名=文件系统操作 v1 不做）；transient/无家=诚实指路（安家后可改）。
+  const home = docHome();
+  if (home?.kind === "file") { setStatus(t("lf.renameNotSupported"), true); return null; }
+  if (home?.kind !== "gallery") { setStatus(t("ss.renameNeedsHome"), true); return null; }
   editMode.applyPendingTransient();
   const oldName = _activeName()!;
   let candidate = suggested || oldName;

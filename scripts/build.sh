@@ -160,6 +160,9 @@ OUT="$OUT_DIR/weebpaint-$HASH.mjs"
 # 3. mv 到最终名（先 mv 后清，否则 find 误删 main-tmp）
 mv "$TMP_OUT"     "$OUT"
 mv "$TMP_OUT.map" "$OUT.map"
+# 残留审计 I（0828）：mv 之后 bundle 尾部的 sourceMappingURL 还指着 tmp 名 → 两档产物 sourcemap 全断
+#   （devtools 拿不到映射，线上排障退化裸 minified）。回写成最终名。
+sed -i "s|sourceMappingURL=$(basename "$TMP_OUT").map|sourceMappingURL=weebpaint-$HASH.mjs.map|" "$OUT"
 
 # 老 hashed bundle 清掉，不堆积
 find "$OUT_DIR" -maxdepth 1 -name 'weebpaint-*.mjs' -not -name "weebpaint-$HASH.mjs" -delete

@@ -28,7 +28,7 @@ import { els } from "./els.ts";
 import { openInputSheet, openConfirmSheet, openChoiceSheet, lockSyncGate } from "./sheets.ts";
 import { setMenuOpen } from "./settings-menu.ts";
 import { signIn, isSignedIn } from "./app-store.ts";   // auth 是公共面（cloud-auth-ui 同款直连；v415 红线针对的是 sync store，不含 auth）
-import { isCloudEnabled, galleryOnline } from "./cloud-capability.ts";
+import { hasGallery, galleryOnline } from "./gallery-capability.ts";
 import { galleryAttachment } from "./gallery-attachment-host.ts";
 import { sessionNameConflict } from "./session-name.ts";
 import { supportsFileSystemAccess, pickLocalOraFile } from "./local-file-session.ts";
@@ -71,7 +71,7 @@ function smartSaveAndPush() {
   // 非 gallery 家（file 家=写回文件 / 无 doc=「无文档不能保存」诚实提示 / transient=P2 前无产者）：
   //   一律交 saveAndPush 内部按家派发；「登录同步」只对 gallery 家有意义，不弹。
   if (session.home?.kind !== "gallery") { void session.saveAndPush(); return; }
-  if (!isCloudEnabled()) { void session.save({ commitPending: true }); return; }
+  if (!hasGallery()) { void session.save({ commitPending: true }); return; }
   // 库在线判据 = galleryOnline()（SSoT=attachment.online；0828 bug 修：folder 库挂着曾被 isSignedIn 误判无云）
   if (galleryOnline()) { void session.saveAndPush(); return; }
   // folder 库离线 = 权限掉——「登录」是 MSAL 词不适用；本地存 + 指路重连（横幅/图库页是正门）
@@ -233,9 +233,9 @@ export function initTopbarMenu(ctx: AppContext) {
   // gallery-first：进图库 = 关闭当前画作（active = null）+ refresh 后停 gallery
   // 云功能关（2026-08-21 gating ①）：图库入口短路（menuGallery 本体已由 settings-menu 隐藏，
   //   这里是 UI 触发点的兜底守卫——旧缓存 DOM / 竞态点击）。
-  document.getElementById("topGalleryBtn")?.addEventListener("click", () => { if (isCloudEnabled()) void session.exit(); });
+  document.getElementById("topGalleryBtn")?.addEventListener("click", () => { if (hasGallery()) void session.exit(); });
   // v0.5.21：图库回三条杠菜单（独立 pill 一日游——user：visually distracting）
-  els.menuGallery?.addEventListener("click", () => { if (!isCloudEnabled()) return; setMenuOpen(false); void session.exit(); });
+  els.menuGallery?.addEventListener("click", () => { if (!hasGallery()) return; setMenuOpen(false); void session.exit(); });
   // P3 无库模式单入口（VS Code Open Folder 姿态；显隐由 settings-menu gating 反相管）
   document.getElementById("menuConnectGallery")?.addEventListener("click", () => { setMenuOpen(false); void openGalleryConnectFlow(); });
   // v0.9.25 编辑器内新建（user 2026-08-20）：复用图库加号的三选 popup（新建/从图片/从剪切板），

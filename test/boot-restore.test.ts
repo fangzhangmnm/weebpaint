@@ -23,9 +23,9 @@ function ports(over: Partial<RestorePorts> = {}) {
     isDocLockedElsewhere: async () => false,
     onLockedElsewhere: (n) => log.push(`lockedElsewhere(${n})`),
     // 云端功能开关（2026-08-21）：默认开（= 现状行为）
-    isCloudEnabled: () => true,
+    hasGallery: () => true,
     openBlankCanvas: async () => { log.push("openBlankCanvas"); },
-    onCloudOff: () => log.push("cloudOff"),
+    onNoGallery: () => log.push("cloudOff"),
     openFreshCanvas: async () => { log.push("openFreshCanvas"); },
     ...over,
   };
@@ -82,9 +82,9 @@ test("★ 打开失败 → 持久的 currentFile 必须还在（纪律②：失�
     onCrashLoopSkipped: () => {},
     isDocLockedElsewhere: async () => false,
     onLockedElsewhere: () => {},
-    isCloudEnabled: () => true,
+    hasGallery: () => true,
     openBlankCanvas: async () => {},
-    onCloudOff: () => {},
+    onNoGallery: () => {},
     openFreshCanvas: async () => {},
   };
   eq(await restoreLastSession(p), "blank-failed");
@@ -191,13 +191,13 @@ test("无锁 + 崩溃标记在场 → 原崩溃断路行为一字不变（真崩
 
 // ── 云端功能开关（2026-08-21，cloud-capability 接缝）：关 = 不自动恢复、不落图库、零状态变更 ──
 
-test("★ 云关 → blank-cloud-off：restore/图库都不碰，落空白画布，内存名 safe default", async () => {
+test("★ 云关 → blank-no-gallery：restore/图库都不碰，落空白画布，内存名 safe default", async () => {
   let restoreCalled = false;
   const { p, log, mem } = ports({
-    isCloudEnabled: () => false,
+    hasGallery: () => false,
     restore: async () => { restoreCalled = true; return true; },
   });
-  eq(await restoreLastSession(p), "blank-cloud-off");
+  eq(await restoreLastSession(p), "blank-no-gallery");
   eq(restoreCalled, false, "★ 关闭态压根不去开 store 画");
   assert(!log.includes("openGallery"), "不落图库（gating ①把图库藏了，落过去=死路）");
   assert(log.includes("openBlankCanvas"), "落 plain 空白画布路径（云关无 store 家可安，非 lazyblank）");
@@ -208,11 +208,11 @@ test("★ 云关 → blank-cloud-off：restore/图库都不碰，落空白画布
 test("★ 云关的自愈红线：持久 currentFile 与断路标记一个都不动（关→开下次冷启动照常恢复）", async () => {
   let persisted: { kind: "doc"; path: string } | null = { kind: "doc", path: "X" };
   const { p, log, marker } = ports({
-    isCloudEnabled: () => false,
+    hasGallery: () => false,
     getResume: () => persisted,
     getRestoreAttempt: () => "STALE-MARKER",   // 陈旧标记也原样保留——本门不消费断路器语义
   });
-  eq(await restoreLastSession(p), "blank-cloud-off");
+  eq(await restoreLastSession(p), "blank-no-gallery");
   eq(persisted?.path, "X", "★ 持久名原样");
   eq(marker(), "STALE-MARKER", "★ 断路标记原样（不写不清）");
   assert(!log.some((l) => l.startsWith("marker=")), "标记 setter 没被碰过（没有任何持久写）");

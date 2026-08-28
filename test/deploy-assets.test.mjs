@@ -44,3 +44,15 @@ test("部署清单：runtime fetch 的根 asset 一个都不许漏（SW 预缓�
       `${asset} 不在 deploy.yml 的拷贝白名单里 → 线上 404（而且部署不会报错，静默）`);
   }
 });
+
+// 残留审计 H（0828）：single-html 的 embed 清单是 pack-single.mjs 手维护对象——此前与本测试**无对账**：
+//   新增 runtime-fetch 资产会被上面两条逼进 SW/deploy，却不会被逼进单文件 → file:// 下 fetch 必死、
+//   错误全走 log 档、single-smoke 只数键数 → 单文件带着空笔刷库/空模板全绿出货。这里把闭环补上：
+//   每个 runtime-fetch 的根资产，其 basename 必须出现在 pack-single.mjs 源文本里（embed 键或内联段）。
+test("部署清单：runtime fetch 的根 asset 必须同时进 pack-single 的内嵌清单（单文件不许静默残废）", () => {
+  const pack = read("scripts/pack-single.mjs");
+  for (const asset of fetched) {
+    const base = asset.split("/").pop();
+    assert(pack.includes(base), `${asset} 没进 scripts/pack-single.mjs（embed/内联都搜不到 ${base}）→ 单文件里这条 fetch 在 file:// 必死且静默`);
+  }
+});

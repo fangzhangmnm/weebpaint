@@ -114,7 +114,7 @@ export function requireStore(): AppStorePort {
   return _storeFull;
 }
 /** 有活店？店懒出生后的不变量：_storeFull≠null ⇔ attachment attached（无预建店无 boot 窗口）。
- *  P3 sunset：isCloudEnabled 的真相源。 */
+ *  P3 sunset：hasGallery 的真相源。 */
 export function hasLiveStore(): boolean { return _storeFull != null; }
 export type { Collection, EncryptedBlob } from "@internal/store";   // app 侧仅剩的两个库类型，经接缝转口
 export { wipeAppNamespace, scanAppNamespace } from "@internal/store";   // P7 深清口子（0.7.0）——maintenance 面经接缝转口（factory-reset.ts 消费）
@@ -166,8 +166,12 @@ export async function _swapStoreForGallery(next: Store | null): Promise<void> {
 export function requestGalleryPersist(): void {
   if (!storeAbsent) requestStoragePersistence().catch(() => { /* 降概率层，静默 */ });
 }
-/** 为 registry 条目建新 store 实例（不换当前——换是 _swapStoreForGallery 的事）。 */
-export function _buildStoreForGalleryEntry(entry: { kind: "onedrive" | "folder"; dbId: string; handle?: unknown }): Store {
+/** 为 registry 条目建新 store 实例（不换当前——换是 _swapStoreForGallery 的事）。
+ *  残留审计 A（0828，ledger §4 pin【必做】的 app 半边）：onedrive 条目带 homeAccountId → 建 **pinned
+ *  provider**（store 0.8.0 graph 实例化口子：token 钉死该账号，per-instance 缓存互不投毒）——
+ *  attach 账号 B 的库绝不再拿 active 账号 A 的 token 读写。auth 面维持模块单例（MSAL 实例库内共享）。
+ *  无 homeAccountId 的老条目沿用全局 provider（现状单账号语义不变）。forgetFlow 的临时店同走本函数=同修。 */
+export function _buildStoreForGalleryEntry(entry: { kind: "onedrive" | "folder"; dbId: string; handle?: unknown; homeAccountId?: string }): Store {
   if (storeAbsent) throw new Error("store-absent mode: cannot build gallery store");
   if (entry.kind === "folder") {
     if (!entry.handle) throw new Error("folder gallery entry has no handle");
@@ -176,7 +180,10 @@ export function _buildStoreForGalleryEntry(entry: { kind: "onedrive" | "folder";
   }
   if (!provider || !_auth) throw new Error("onedrive provider unavailable");
   const auth = _auth;
-  return _createRealStore(provider, () => auth.isSignedIn(), entry.dbId === "defaultStore" ? undefined : entry.dbId);
+  const prov = entry.homeAccountId
+    ? createOneDriveProvider({ clientId: CLIENT_ID, scopes: SCOPES, authority: AUTHORITY, msalUrl: embeddedBlobUrl("msal-browser.min.js", "text/javascript") ?? "./vendor/msal/msal-browser.min.js", homeAccountId: entry.homeAccountId }).provider
+    : provider;
+  return _createRealStore(prov, () => auth.isSignedIn(), entry.dbId === "defaultStore" ? undefined : entry.dbId);
 }
 
 // ============ auth（转发；_auth=null = 缺席平台，dormant 替身已退役 2026-08-27）============

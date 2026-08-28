@@ -18,17 +18,13 @@ test("[app-state] struct 冷字段直读写 collection（不落 RAM）+ 默认 +
 
   // 默认（DEFAULTS SSoT）
   eq(appState.currentDirectory, "", "默认 current-directory=空串");
-  eq(appState.blenderPanelUrl, "", "默认 blenderPanelUrl=空串");
 
   // set/get 往返
   appState.currentDirectory = "folder/a";
   eq(appState.currentDirectory, "folder/a", "current-directory 往返");
-  appState.blenderPanelUrl = "http://ts.local:9999";
-  eq(appState.blenderPanelUrl, "http://ts.local:9999", "blenderPanelUrl（synced）往返");
 
   // 冷字段直写 collection（不落 app-state RAM）：直读底层 collection 应见同值
   eq(synced.getItem("current-directory", "?"), "folder/a", "直写落 synced collection（无 RAM 缓存）");
-  eq(appState.blenderPanelUrl === synced.getItem("blender-panel-url", "?"), true, "blenderPanelUrl 落 synced-app-state");
 
   // ★ 播种纪元退役（2026-08-28 清零轮）：current-file/restore-attempt 真相 = resume-slate 回执条，
   //   local-app-state 全灭——struct 不再有这两个字段（编译期保证），synced 也永不见它们。

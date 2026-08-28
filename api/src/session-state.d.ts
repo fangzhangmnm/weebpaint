@@ -51,7 +51,7 @@ declare function decryptCurrent(): Promise<void>;
 declare function renameCurrentSession({ suggested, reason }?: {
     suggested?: string;
     reason?: string;
-}): Promise<string | null | undefined>;
+}): Promise<string | null>;
 declare function exitCanvasToGallery(): Promise<void>;
 declare function newDoc({ name, w, h, layer0Name, layer0Pixels }: {
     name: string;

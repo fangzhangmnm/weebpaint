@@ -11,6 +11,7 @@ import type { GalleryEntry } from "./gallery-registry.ts";
 import { galleryRegistry } from "./gallery-registry.ts";
 import { storeAbsent, _swapStoreForGallery, _buildStoreForGalleryEntry, requestGalleryPersist } from "./app-store.ts";
 import { setActiveGalleryId } from "./active-gallery.ts";
+import { reportError } from "./error-badge.ts";
 import type { Store } from "@internal/store";
 
 let _hasOpenGalleryDoc: () => boolean = () => true;   // 未接线默认保守（拒卸）
@@ -24,4 +25,5 @@ export const galleryAttachment = createGalleryAttachment({
   hasOpenGalleryDoc: () => _hasOpenGalleryDoc(),
   requestPersist: requestGalleryPersist,
   setActiveGalleryId,
+  reportError: (e) => reportError(e instanceof Error ? e : new Error(String(e)), "warning"),   // 簿记失败出声（残留审计 G）
 });

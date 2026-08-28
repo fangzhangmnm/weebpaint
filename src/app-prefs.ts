@@ -24,9 +24,11 @@ export const PREF_REGISTRY = {
   // gallery（跟身份/库走；P3 per-gallery，现 = synced collection）
   "lang":                 { scope: "gallery", def: null as string | null },
   "gen-ai":               { scope: "gallery", def: false as boolean },
-  // #13 导出自定义水印（2026-08-28，宣发需要）：**跟身份走**——「我的签名」换台机器也该是同一个，
-  //   不是硬件耦合。无库（无地）时经 §9.7 cascade 自动落 device 层，机制现成零改。
-  //   (edited by Claude Opus 5)
+  // Blender 同步远端 URL（0714 决策：全账号同步，tailscale 稳定端点）——残留审计 F（0828）：
+  //   原住 synced-app-state，无库 wireAppState(undefined) 时写入静默蒸发；迁本表 gallery scope =
+  //   有库照旧跨设备同步 + 无库经 §9.7 cascade 落 device 层（丢写根除）。旧 collection 值不迁移
+  //   （唯一用户重填一次）。
+  "blender-panel-url":    { scope: "gallery", def: "" as string },
   // （ora scope 三项 pixel-grid / long-press-pick / menu-tab 不在本表：per-doc 归 desk（Slice C），
   //   老的 collection 偏好按拍板不迁移——工厂默认起。）
   // session（不持久化；「不持久化档不设」的唯一例外 = show-fps，user 明允）

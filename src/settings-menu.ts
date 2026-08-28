@@ -19,7 +19,7 @@ import { wireInlineSelect } from "./inline-select.ts";
 import { openInputSheet } from "./sheets.ts";
 import { reportError } from "./error-badge.ts";   // 全 app 唯一错误汇拢点（CLAUDE.md）
 import { initInstallCapture, bindInstallButton } from "./install-prompt.ts";
-import { isCloudEnabled, CLOUD_CAPABILITY_EVENT } from "./cloud-capability.ts";
+import { hasGallery, GALLERY_CAPABILITY_EVENT } from "./gallery-capability.ts";
 import { galleryAttachment } from "./gallery-attachment-host.ts";   // P3：设置页只读显示当前库
 import { isAuthConfigured, isSignedIn } from "./app-store.ts";   // auth 公共面（cloud-auth-ui 同款直连）
 import { session } from "./session-state.ts";   // 云开关关闭前 flush（saveAndPush）用；只调不改
@@ -118,32 +118,32 @@ function applyGenAI(on: boolean) {
   preferences.set("gen-ai", !!on);
 }
 
-// ============ 图库能力区（P3 sunset 2026-08-27；接缝 = cloud-capability.ts）============
+// ============ 图库能力区（P3 sunset 2026-08-27；接缝 = gallery-capability.ts）============
 // toggle 已退役（§9.8：「关云」的真身 = 没挂图库；动词在 gallery 管理面）。设置页只读显示当前库
-//   （Q1 拍板：设置页管库内偏好，不管库的生死）。gating 消费面照旧（isCloudEnabled 换了真相源）。
+//   （Q1 拍板：设置页管库内偏好，不管库的生死）。gating 消费面照旧（hasGallery 换了真相源）。
 function renderCurrentGallery() {
   // 「当前图库」信息行已删（user 2026-08-28「位置奇怪」）→ 改两处就地显示：
   //   ① gallery 页大标题旁小字（#galleryTitleName，下对齐）②「回到图库」行尾简写截断（#menuGalleryName）。
   const att = galleryAttachment.state();
   const name = att.kind === "attached"
     ? att.entry.label + (att.online ? "" : t("gm.offlineSuffix"))
-    : isCloudEnabled() ? "OneDrive" : "";
+    : hasGallery() ? "OneDrive" : "";
   const titleEl = document.getElementById("galleryTitleName");
   if (titleEl) titleEl.textContent = name;
   const menuEl = document.getElementById("menuGalleryName");
   if (menuEl) { menuEl.textContent = name; menuEl.title = name; }
   // P6 轻折叠（P5 注：无库语境该区折叠=不撒谎）：无库时 gallery scope 徽章藏起——那些行此刻
   //   经 cascade 写落 device 层，挂着「这个图库」徽章才是撒谎。行本身保留（lang 无库也要能改）。
-  try { document.body.toggleAttribute("data-no-gallery", !isCloudEnabled()); } catch { /* node */ }
-  applyCloudCapabilityGating();
+  try { document.body.toggleAttribute("data-no-gallery", !hasGallery()); } catch { /* node */ }
+  applyGalleryCapabilityGating();
 }
 
 // gating 显隐的**唯一集中点**（v1.1，2026-08-21 headless 实锤修）：菜单项显隐机制是 `hidden` **属性**
 //   （styles.css:850 `.menu-item[hidden]{display:none}`）——v1 用 `.hidden` class 藏 menuGallery，
 //   而全仓没有全局 .hidden 规则、.menu-item 自身 display:flex 胜出 → 藏了个寂寞。此类显隐一律走属性。
-//   订阅 CLOUD_CAPABILITY_EVENT：将来任何地方切开关，这里一处重贴全部 UI。
-function applyCloudCapabilityGating() {
-  const on = isCloudEnabled();
+//   订阅 GALLERY_CAPABILITY_EVENT：将来任何地方切开关，这里一处重贴全部 UI。
+function applyGalleryCapabilityGating() {
+  const on = hasGallery();
   if (els.menuGallery) els.menuGallery.hidden = !on;                   // 图库入口（云账号 popup 等随图库一并不可达）
   const cloudImport = document.getElementById("layerImportCloudBtn");  // 图层面板「从云盘导入…」
   if (cloudImport) (cloudImport as HTMLButtonElement).hidden = !on;
@@ -151,7 +151,7 @@ function applyCloudCapabilityGating() {
   if (connect) (connect as HTMLButtonElement).hidden = on;
   document.getElementById("referencePanel")?.toggleAttribute("no-cloud", !on);   // 参考窗云盘选图钮（组件观察属性）
 }
-window.addEventListener(CLOUD_CAPABILITY_EVENT, renderCurrentGallery);   // 换库/卸库 → 当前库行 + gating 一并重贴
+window.addEventListener(GALLERY_CAPABILITY_EVENT, renderCurrentGallery);   // 换库/卸库 → 当前库行 + gating 一并重贴
 
 // v124 快捷键 sheet：从 KEYBOARD_SHORTCUTS 自动渲染（input.js 注册的唯一真理源）
 const _shortcutsSheet = document.getElementById("shortcutsSheet");

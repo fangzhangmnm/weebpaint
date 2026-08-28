@@ -25,17 +25,17 @@ export interface RestorePorts {
     isDocLockedElsewhere(name: string): Promise<boolean>;
     onLockedElsewhere(name: string): void;
     /** 关闭态恒 false（含容器未配置 auth）。 */
-    isCloudEnabled(): boolean;
+    hasGallery(): boolean;
     /** 云关落点（P1.5 起**只剩云关这一条路**用它）：plain 空白画布（无 store 家可安，无 session 绑定；
      *  P2 transient 接手后升级）。⚠ 纯 UI 落点，零数据变更：currentFile/标记一个都不碰。 */
     openBlankCanvas(): Promise<void>;
     /** 云关落点的提示文案（为什么没自动开上次的画）——与 openBlankCanvas 分离：落点共用、文案各表。 */
-    onCloudOff(): void;
+    onNoGallery(): void;
     /** 云开态的画布落点（P1.5）= **可画的新画布**（lazyblank：日期默认名、首笔自动安家进图库——
      *  瑞士奶酪：云开态不许存在「能画但存不了」的画布）。首次 + 失败/断路/锁 四条路共用；
      *  与 openBlankCanvas（云关 plain blank，无 store 家可安，P2 transient 接手）分开。
      *  内部自管身份（memory-only 日期名），故这些路径先 setNameMemoryOnly(null) 再调它不冲突。 */
     openFreshCanvas(): Promise<void>;
 }
-export type RestoreOutcome = "restored" | "fresh-first-boot" | "gallery-deliberate" | "blank-failed" | "blank-crash-loop" | "blank-locked-elsewhere" | "blank-cloud-off";
+export type RestoreOutcome = "restored" | "fresh-first-boot" | "gallery-deliberate" | "blank-failed" | "blank-crash-loop" | "blank-locked-elsewhere" | "blank-no-gallery";
 export declare function restoreLastSession(p: RestorePorts): Promise<RestoreOutcome>;

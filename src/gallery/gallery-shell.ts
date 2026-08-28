@@ -20,7 +20,7 @@
 //   直接 import（leaf/singleton）。
 
 import { session } from "../session-state.ts";
-import { isCloudEnabled } from "../cloud-capability.ts";
+import { hasGallery } from "../gallery-capability.ts";
 import { reportError } from "../error-badge.ts";
 import { els } from "../els.ts";
 import { readImageFromClipboard, triggerDownload } from "../session.ts";
@@ -31,7 +31,7 @@ import { uniqueBareName } from "./gallery-model.ts";   // 撞名后缀兜底（�
 import { galleryDefaultName } from "../naming.ts";     // P1 命名器官：yyyymmdd-hex4（v217 惯例）+ 禁「未命名」
 import { humanSize } from "./gallery-view-model.ts";   // 展示格式化（纯·KiB/MiB）；此前本模块私有一份逐字节拷贝，2026-08-21 收敛
 import { requireStore, galleryBackend, isCachedSyncState } from "../app-store.ts";
-import { galleryOnline } from "../cloud-capability.ts";
+import { galleryOnline } from "../gallery-capability.ts";
 import { anchorPopupToBtn } from "../anchored-popup.ts";
 import { wireInlineSelect } from "../inline-select.ts";
 import { applyTheme, themeLabel, THEMES, currentTheme } from "../theme.ts";
@@ -62,7 +62,7 @@ export async function setGalleryOpen(open: boolean) {
   if (open) {
     // 云功能关（cloud-capability v1.1）：图库整体停用——入口都已显隐/短路，这里是**中央兜底闸**
     //   （防未来新增调用点漏 gate；关=false 分支永不拦，回画布必须永远可行）。纯 UI gating 零数据变更。
-    if (!isCloudEnabled()) { setStatus(t("gs.cloudDisabledNoGallery"), true); return; }
+    if (!hasGallery()) { setStatus(t("gs.cloudDisabledNoGallery"), true); return; }
     // 进图库 = 用户离开编辑场景 → apply 所有 pending transient（套索浮层等）+ 保存。
     // implicit（QA 2026-08-21 P0）：这句是兜底保存，不是用户显式动作——boot 失败路径也会走到这里，
     //   无地模式下必须 no-op（saveNow 的 implicit 门），否则会在无用户手势时静默写用户磁盘文件
@@ -196,7 +196,7 @@ export async function uniqueNameFor(stem: string) {
 // ---- #18 全库备份（2026-08-28）：逻辑内核 = ./library-backup.ts（纯·可测），这里只装端口 + 说人话。----
 //   路线：store 的唯一列举面是 watchFolder（订阅当前夹）→ 逐夹一次性快照 + 递归拿全库清单。
 //   **只读**：每件只走 getEncryptedBlob()（加密件给密文原样，明文永不落备份包）→ 回落 open()。
-//   进图库即有库（setGalleryOpen 的 isCloudEnabled 闸 = hasLiveStore），故此路径 requireStore() 合法。
+//   进图库即有库（setGalleryOpen 的 hasGallery 闸 = hasLiveStore），故此路径 requireStore() 合法。
 //   ⚠ 诚实交代一个副作用：store 配了 autoCacheOpenedFile → 备份读纯云端件会顺手把它留成本地副本
 //     （residency 变了，内容/同步态没变）。这是「备份要包含纯云端件」的固有代价——不读就备不到它。
 async function runFullLibraryBackup(): Promise<void> {

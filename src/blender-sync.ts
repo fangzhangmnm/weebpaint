@@ -15,6 +15,7 @@
 // 不碰 store 红线：只调 session.markEdited() 公共 API（同 import-image.ts），其余持久化全走库。
 
 import type { AppContext } from "./app-context.ts";
+import { preferences } from "./app-prefs.ts";   // blender-panel-url（gallery scope+无库 cascade，残留审计 F）
 import { reportError } from "./error-badge.ts";
 import { session } from "./session-state.ts";
 import type { ViewLeaf } from "./backend/workpiece/painting-view.ts";
@@ -25,13 +26,13 @@ import { encodePngFromBytes } from "./backend/png-codec.ts";
 import { requireEditableLeaf } from "./editable-leaf.ts";
 import { setMenuOpen } from "./settings-menu.ts";
 import { desk } from "./workbench-state.ts";
-import { appState } from "./app-state.ts";
 import { BTPClient, BTPError } from "../vendor/btp/v1/index.js";
 import { t } from "./i18n/index.ts";
 import { iconHtml } from "./ui/icon.ts";
 
 // 面板 show/position 随文档走 → desk.blenderPanel（.ora 序列化）。
-// 远端 URL 是账号级设置（tailscale 稳定端点，跨设备同步）→ appState.blenderPanelUrl，不随文档走。
+// 远端 URL 是账号级设置（tailscale 稳定端点，跨设备同步）→ preferences "blender-panel-url"（gallery scope，
+//   无库经 cascade 落 device——残留审计 F 迁移 0828），不随文档走。
 const errMsg = (e: unknown): string => String((e as { message?: unknown })?.message || e);
 
 // ─── 图标：走内联 sprite（见 src/ui/icon.ts）───
@@ -93,19 +94,19 @@ export function initBlenderSync(c: AppContext) {
   window.addEventListener("wp:applyEditorState", () => applyBlenderPanelFromEditorState());
 }
 
-// boot fixup 相（app.ts，await prefsReady 后）：把 appState.blenderPanelUrl 的**真值**刷进输入框。
+// boot fixup 相（app.ts，await prefsReady 后）：把偏好真值刷进输入框。
 //   拆了 TLA 门后 buildPanel() 在 collection hydrate 之前跑 → :476 那次读到的是 ""（DEFAULTS）。
 //   只刷 URL、不碰面板显隐（那归 wp:applyEditorState / desk）。**不写盘**。
 export function reconcileBlenderUrlFromPrefs(): void {
   if (!built || !remoteUrl) return;
-  remoteUrl.value = appState.blenderPanelUrl || "";
+  remoteUrl.value = preferences.get("blender-panel-url") || "";
 }
 
 // 文档加载/新建后应用该 doc 保存的面板状态：只写 DOM，绝不回写 desk。
 // URL 是账号级（appState 跨设备同步），顺带刷新——可能在别的设备上改过。
 function applyBlenderPanelFromEditorState() {
   if (!built) return;
-  remoteUrl.value = appState.blenderPanelUrl || "";
+  remoteUrl.value = preferences.get("blender-panel-url") || "";
   const show = desk.blenderPanel.show;
   panel.classList.toggle("hidden", !show);
   if (show) {
@@ -489,8 +490,8 @@ function buildPanel() {
   // 引用
   connBtn = q("#btpConnBtn");
   remoteUrl = q("#btpRemoteUrl");
-  remoteUrl.value = appState.blenderPanelUrl || "";
-  remoteUrl.addEventListener("change", () => { appState.blenderPanelUrl = remoteUrl.value.trim(); });
+  remoteUrl.value = preferences.get("blender-panel-url") || "";
+  remoteUrl.addEventListener("change", () => { preferences.set("blender-panel-url", remoteUrl.value.trim()); });
   nameInput = q("#btpName");
   texList = q("#btpTexList");
   sizeW = q("#btpSizeW");

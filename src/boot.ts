@@ -11,7 +11,7 @@ import { session } from "./session-state.ts";
 import { readSlate, setRestoreAttempt } from "./resume-slate.ts";
 import { restoreLastSession } from "./boot-restore.ts";
 import { isDocLockedElsewhere } from "./instance-locks.ts";
-import { isCloudEnabled } from "./cloud-capability.ts";
+import { hasGallery } from "./gallery-capability.ts";
 import { appState } from "./app-state.ts";   // P5：只读（回执条播种源）
 import type { AppContext } from "./app-context.ts";
 
@@ -37,7 +37,7 @@ export function initRackBoot(ctx: AppContext) {
 // 三态启动恢复（P1.5 拍板；P5 起持久层 = resume-slate 回执条，2026-08-28 播种纪元退役后=唯一真相）：
 //   首次→新画布 / 上次图库→图库 / 上次的画→自动恢复（失败保留 opened 不清，下次冷启动能 retry）。
 // ⚠ 调用方仍先 `await prefsReady`（app.ts）：不为回执条（同步读），是等 boot attach 收口——
-//   isCloudEnabled 门要在挂库决策落定后才读得对。
+//   hasGallery 门要在挂库决策落定后才读得对。
 export async function bootRestoreSession(ctx: AppContext) {
   const { setGalleryOpen, updateSaveStatus, setStatus } = ctx;
   // 编排本身在 boot-restore.ts（零 app 依赖 → 可测）。这里只接线。
@@ -59,12 +59,12 @@ export async function bootRestoreSession(ctx: AppContext) {
     // 云端功能开关（2026-08-21，cloud-capability 接缝）：关 = 不自动恢复 + 不开图库，
     //   停在 boot 的空白画布（app.ts 出生即 backend.blank 2048²；gallery overlay 默认 hidden，
     //   这里只补一句 status 说明为什么没开上次的画）。currentFile/标记零变更（关→开自愈）。
-    isCloudEnabled: () => isCloudEnabled(),
+    hasGallery: () => hasGallery(),
     // P2（2026-08-26）：云关落点 = transient 家新画布（此前 home:null 裸奔：Ctrl+S 死路、崩溃全丢）。
     //   settle 安家仪式 / T-crash 盲快照 / 三键挽留 随 transient 家生效（user 拍板「关gallery进
     //   local first则要么双击打开进文件要么新画布」）。
     openBlankCanvas: async () => { session.beginTransientBlank(); },
-    onCloudOff: () => setStatus(t("mi.bootCloudOff")),
+    onNoGallery: () => setStatus(t("mi.bootCloudOff")),
     // P1.5：云开态画布落点 = lazyblank 可画新画布（session 自管日期身份，首笔自动安家）。
     openFreshCanvas: async () => { session.beginLazyBlank(); },
   });
