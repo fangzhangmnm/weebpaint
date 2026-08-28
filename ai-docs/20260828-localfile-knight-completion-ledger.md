@@ -219,3 +219,8 @@ file:// 上云逃生舱 helper 落地（v0.11.40）；**itch 内嵌实锤修**�
 （全仓零使用）。上传前 ritual 干净 3 轮全绿（v0.11.42，log=tmp/preflight-20260828-173609.log），
 itch 包 sha 与 standalone 一致。**user 实测：itch 内嵌画→保存弹下载 ✓，上传通 ✓**。prod=v0.11.39。
 余：iframe 自动重放归位（荐维持 park）、桌面 popup 撤案、#4 后半、两粒沙——四个一句话。
+
+**宣发后首批队列（user 2026-08-28 晚拍板「宣发完了之后马上慢慢做」）**：桌面 MSAL popup（store auth）+
+UI 整改轮（#9/#17 + #4 后半：图层组拖拽/移动列表按显示排序/移出=移动菜单 ../）。iframe 自动重放=维持
+park（依赖无头 multiplayer 未建）。悬余两问：boot 落地画布 2048² 硬编码（app.ts:135，canvas-first 前的
+化石，新建对话框默认已是 1024²——是否对齐 1024 待 user）；两粒沙（duplicate 图层组/禁 reading mode）待裁。
