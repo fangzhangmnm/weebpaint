@@ -55,19 +55,16 @@ describe("gallery-registry · mintOneDrive / seedLegacyOneDrive（defaultStore �
     eq(a2.label, "OneDrive · a-renamed@example.com");
     eq((await r.list()).length, 2);
   });
-  it("播种幂等（dedup 不靠标记）；cloudEnabled=false → lastActive=null", async () => {
+  it("播种幂等（dedup 不靠标记）；登录态即激活（cloud-enabled 键已随播种纪元退役 2026-08-28）", async () => {
     const r = createGalleryRegistry(mapKV());
-    await r.seedLegacyOneDrive({ homeAccountId: "acct-A", username: "a@example.com", cloudEnabled: true });
-    await r.seedLegacyOneDrive({ homeAccountId: "acct-A", username: "a@example.com", cloudEnabled: true });   // 重复调
+    await r.seedLegacyOneDrive({ homeAccountId: "acct-A", username: "a@example.com" });
+    await r.seedLegacyOneDrive({ homeAccountId: "acct-A", username: "a@example.com" });   // 重复调
     const [e] = await r.list();
     eq((await r.list()).length, 1);
     eq(e.dbId, "defaultStore");
-    assert(e.lastActive !== null, "开云用户播种即激活");
-    const r2 = createGalleryRegistry(mapKV());
-    await r2.seedLegacyOneDrive({ homeAccountId: "acct-C", username: "c@x.com", cloudEnabled: false });
-    eq((await r2.list())[0].lastActive, null);          // 关云 → 无激活库（P5 §9.8 收编）
-    await r2.seedLegacyOneDrive({ homeAccountId: "", username: "", cloudEnabled: true });
-    eq((await r2.list()).length, 1);                    // 空账号不播
+    assert(e.lastActive !== null, "播种即激活（下次 boot 领养）");
+    await r.seedLegacyOneDrive({ homeAccountId: "", username: "" });
+    eq((await r.list()).length, 1);                     // 空账号不播
   });
 });
 

@@ -8,7 +8,7 @@
 import { t } from "./i18n/index.ts";
 import { reportError } from "./error-badge.ts";
 import { session } from "./session-state.ts";
-import { readSlate, setRestoreAttempt, seedSlateFromLegacy } from "./resume-slate.ts";
+import { readSlate, setRestoreAttempt } from "./resume-slate.ts";
 import { restoreLastSession } from "./boot-restore.ts";
 import { isDocLockedElsewhere } from "./instance-locks.ts";
 import { isCloudEnabled } from "./cloud-capability.ts";
@@ -34,16 +34,12 @@ export function initRackBoot(ctx: AppContext) {
   });
 }
 
-// 三态启动恢复（P1.5 拍板；P5 起持久层 = resume-slate 回执条）：
+// 三态启动恢复（P1.5 拍板；P5 起持久层 = resume-slate 回执条，2026-08-28 播种纪元退役后=唯一真相）：
 //   首次→新画布 / 上次图库→图库 / 上次的画→自动恢复（失败保留 opened 不清，下次冷启动能 retry）。
-// ⚠ 调用方仍先 `await prefsReady`（app.ts）：**只为播种**（legacy collection 键 → 回执条，幂等一次）；
-//   播种期过后（存量设备都升上来）可拆此时序依赖——回执条本身是同步读。
+// ⚠ 调用方仍先 `await prefsReady`（app.ts）：不为回执条（同步读），是等 boot attach 收口——
+//   isCloudEnabled 门要在挂库决策落定后才读得对。
 export async function bootRestoreSession(ctx: AppContext) {
   const { setGalleryOpen, updateSaveStatus, setStatus } = ctx;
-  // P5 播种（幂等）：legacy 的 appState.currentFile（三态字符串）+ restoreAttempt → 回执条。
-  //   此后 slate 是唯一真相；legacy 键停写只读（collection 里的值从此只出不进）。
-  try { seedSlateFromLegacy({ currentFile: appState.currentFile, restoreAttempt: appState.restoreAttempt }); }
-  catch (e) { reportError(new Error("[boot] slate seeding failed (fresh-boot fallback): " + String(e)), "log"); }
   // 编排本身在 boot-restore.ts（零 app 依赖 → 可测）。这里只接线。
   await restoreLastSession({
     getResume: () => readSlate().opened,

@@ -9,20 +9,12 @@
 //
 // 【自愈红线】判定是**纯读**，零数据变更；开关动词（连接/卸下）在 gallery-manage-ui，数据安全在
 //   attachment 器官的绿灯门里，与本模块无关。
-//
-// cloudPrefEnabled：退役遗产的**播种源**——只供 gallery-registry 播种读（false → lastActive=null，
-//   即「关着云」播成「没挂库」）。UI 不再有 toggle；pref 键物理清理挂 P7 还原出厂设置。
+// （cloudPrefEnabled 播种源已随 cloud-enabled 键物理退役 2026-08-28——判死缓执行完毕。）
 
-import { preferences } from "./app-prefs.ts";
 import { hasLiveStore } from "./app-store.ts";
 
 /** 能力变更广播（window 事件；消费方自己重读 isCloudEnabled()）。P3 起由换库事件驱动。 */
 export const CLOUD_CAPABILITY_EVENT = "wp:cloud-capability-changed";
-
-/** 退役 pref 的播种源读口（见头注释；除播种外别再消费）。 */
-export function cloudPrefEnabled(): boolean {
-  return preferences.get("cloud-enabled");
-}
 
 /** 图库能力真状态：有活店 = true（folder 库不需要登录也是有库）；无库模式/absent = false。 */
 export function isCloudEnabled(): boolean {

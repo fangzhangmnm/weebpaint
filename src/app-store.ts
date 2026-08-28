@@ -117,9 +117,10 @@ export function requireStore(): AppStorePort {
 export function hasLiveStore(): boolean { return _storeFull != null; }
 export type { Collection, EncryptedBlob } from "@internal/store";   // app 侧仅剩的两个库类型，经接缝转口
 
-// ============ 设置/状态 collection（4 个）注入 ============
+// ============ 设置/状态 collection（synced×2 + brush-rack）注入 ============
 // app-prefs/app-state **不 import 本文件**（防 i18n→app-store→store-ui→i18n 成环）；由此处建好 store 后惰性注入。
-//   synced 变体上云 + scaffold；{local:true} 变体 local-only（设备本地、不碰云）。boot 门 await init* 后才读写。
+//   全部 synced（上云 + scaffold）。{local:true} cloudless 变体已清零退役（2026-08-28，user 拍板宣发前删干净）。
+//   boot 门 await init* 后才读写。
 //   P3：抽成 _wireCollections（换库重灌复用；wirePreferences 重调会自动重置 ready 门）。
 // ---- brush-rack collection（逐 brush 一 item + 一条 .meta）：持久化 + 云同步唯一入口，红线在库内。----
 //   getInitData（brushes.ts 域构造）：仅当这份 collection 的 json 不存在（新库）时 fetch builtin-brushes.json。
@@ -136,13 +137,13 @@ function _wireCollections(): void {
     // kind:none——prefs/state 引擎自带 Collection|undefined 位（gallery scope 经 cascade 落 device 层）；
     //   笔架 = **内存 collection 器官**（无地全功能：内置笔可用、session 内可编辑、reload 失——
     //   显式选择，不再是 null-store 替身的副作用；将来「笔架=文件家公民」另案）。
-    wirePreferences(undefined, undefined);
-    wireAppState(undefined, undefined);
+    wirePreferences(undefined);
+    wireAppState(undefined);
     brushRackCollection = createMemoryCollection({ getInitData: rackSeed ? async () => rackSeed : builtinBrushInitData });
     return;
   }
-  wirePreferences(s.collection("local-user-preference", { local: true }), s.collection("synced-user-preference"));
-  wireAppState(s.collection("synced-app-state"), s.collection("local-app-state", { local: true }));
+  wirePreferences(s.collection("synced-user-preference"));
+  wireAppState(s.collection("synced-app-state"));
   brushRackCollection = s.collection("brush-rack", { getInitData: rackSeed ? async () => rackSeed : builtinBrushInitData });
 }
 _wireCollections();   // eval 装配 = kind:none（内存笔架 + prefs/state undefined 对）；attach 经 _swapStoreForGallery 重灌
@@ -199,7 +200,6 @@ export const getAuthState = () => _auth?.getAuthState() ?? { signedIn: false as 
 //   订阅走 auth.onAuthChanged 回调，window 事件是 WeebPaint 自己的 UI 约定）。缺席平台无 auth，天然不发。
 _auth?.onAuthChanged(() => { try { window.dispatchEvent(new Event("wp:auth-changed")); } catch { /* node 测试环境无 window */ } });
 
-// 上次登录 flag（设备级 auth flag → local-app-state collection，经 appState struct）。boot 门 init 后才读写。
 
 // ---- gallery 数据：统一列举（local ∪ cloud，每项带 syncState）。reconcile 已进库（watchFolder 惰性 per-folder）。----
 // 扩展名路由（spec 20260820 §2/§3）：库零内容格式知识——扩展名知识全在 gallery/cloud-image-model.ts（纯模块，可测）。

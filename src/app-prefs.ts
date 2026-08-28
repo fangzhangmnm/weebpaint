@@ -9,7 +9,6 @@
 //   · ora     → desk（per-doc；Slice C 迁入，不经本门面）
 // SSoT 拍板（§4/§7）：gallery 层 collection=持久层权威（LWW/防抖/reconcile 全归库）；device 层
 //   device-kv 即真相（同步读 → 「注入前读返 DEFAULTS」的时序枷锁对 device 键消失）。
-// cloud-enabled = 过渡态（§9.8：P3 由 registry attached-gallery 收编取代）。
 //
 // ⚠ 仍刻意不 import app-store（防成环，同旧版）：gallery collection 由 app-store 惰性注入
 //   （wirePreferences）；注入前 gallery 键读返 default（boot 安全）。
@@ -22,7 +21,6 @@ export const PREF_REGISTRY = {
   "color-theme":          { scope: "device", def: "auto" as string },            // 环境耦合（OLED/暗房），一键可切
   "single-finger-draw":   { scope: "device", def: false as boolean },            // 硬件耦合：同人 iPad 开/台式关（VS Code machine-scope 先例）
   "stylus-smooth-params": { scope: "device", def: {} as Record<string, number> },// 数位板/笔硬件调参
-  "cloud-enabled":        { scope: "device", def: true as boolean },             // ⚠ 过渡态（§9.8：P3 registry 收编后退役）
   // gallery（跟身份/库走；P3 per-gallery，现 = synced collection）
   "lang":                 { scope: "gallery", def: null as string | null },
   "gen-ai":               { scope: "gallery", def: false as boolean },
@@ -40,13 +38,12 @@ export const PREF_DEFAULTS = Object.fromEntries(
 ) as { [K in PrefKey]: PrefValue<K> };
 
 // ── 引擎 ────────────────────────────────────────────────────────────────
-let _local: Collection | undefined;    // legacy 无云 collection：P5 起零消费者（device 键播种源；store handoff ② 后随库退役）
-let _synced: Collection | undefined;   // gallery 层引擎（P3 起换成「当前 gallery 的 collection」——本门面是唯一改点）
+let _synced: Collection | undefined;   // gallery 层引擎（P3 起=「当前 gallery 的 collection」——本门面是唯一改点）
 const _session = new Map<string, unknown>();
 const _dk = (k: string) => `pref:${k}`;
 
-export function wirePreferences(local: Collection | undefined, synced: Collection | undefined): void {
-  _local = local; _synced = synced;   // undefined 对 = kind:none（无库：gallery scope 经 cascade 落 device 层）
+export function wirePreferences(synced: Collection | undefined): void {
+  _synced = synced;     // undefined = kind:none（无库：gallery scope 经 cascade 落 device 层）
   _ready = undefined;   // P3 热插拔：换库重灌 → 重置 ready 门（下一次 initPreferences 对新 collection 重跑 init）
 }
 // P6：gallery 层在不在（P5 §9.7 cascade 的开关）。无库模式（null-store）时 gallery scope 读写全落
@@ -56,16 +53,16 @@ export function setGalleryLayerLive(v: boolean): void { _galleryLive = v; }
 
 let _ready: Promise<void> | undefined;
 export function initPreferences(): Promise<void> {
-  return (_ready ??= Promise.all([_local?.init() ?? Promise.resolve(), _synced?.init() ?? Promise.resolve()]).then(() => undefined));
+  return (_ready ??= (_synced?.init() ?? Promise.resolve()).then(() => undefined));
 }
 export function preferencesReady(): Promise<void> { return _ready ?? Promise.resolve(); }
 /** 导航前屏障（gallery 层；device 层同步写无需 flush）：写完就 reload/关页的路径必须 await。 */
 export function flushPreferences(): Promise<void> {
-  return Promise.all([_local?.flushLocal() ?? Promise.resolve(), _synced?.flushLocal() ?? Promise.resolve()]).then(() => undefined);
+  return (_synced?.flushLocal() ?? Promise.resolve()).then(() => undefined);
 }
 /** 前台/online 重拉云端（gallery 层 per-key LWW）。 */
 export function refreshPreferences(): Promise<void> {
-  return Promise.all([_local?.reconcileWithRemote() ?? Promise.resolve(), _synced?.reconcileWithRemote() ?? Promise.resolve()]).then(() => undefined);
+  return (_synced?.reconcileWithRemote() ?? Promise.resolve()).then(() => undefined);
 }
 
 // ── 唯一门面 ─────────────────────────────────────────────────────────────
@@ -93,24 +90,5 @@ export const preferences = {
   /** gallery 层云端变更回灌钩（device/session 层无远端，不经此）。 */
   onChange(cb: (changedIds: string[]) => void): () => void { return _synced?.onChange(cb) ?? (() => undefined); },
 };
-
-// ── 一次性播种（幂等；app.ts fixup 相调，collection hydrate 之后）───────────
-// device 键从 legacy collection 迁入：device-kv 没有值 && collection 里有非默认值 → 拷。
-// 旧居：color-theme/menu-tab/cloud-enabled 在 _local；single-finger-draw/stylus-smooth-params 在 _synced。
-const _LEGACY_HOME: Partial<Record<PrefKey, () => Collection | undefined>> = {
-  "color-theme": () => _local, "cloud-enabled": () => _local,
-  "single-finger-draw": () => _synced, "stylus-smooth-params": () => _synced,
-};
-export function seedDevicePrefsFromLegacy(): void {
-  for (const [k, home] of Object.entries(_LEGACY_HOME) as [PrefKey, () => Collection | undefined][]) {
-    try {
-      if (deviceKvGetJson<unknown>(_dk(k), undefined as unknown) !== undefined) continue;   // 已有 → 不覆盖
-      const c = home();
-      if (!c) continue;
-      const legacy = c.getItem<unknown>(k, undefined as unknown);
-      if (legacy !== undefined && JSON.stringify(legacy) !== JSON.stringify(PREF_REGISTRY[k].def)) {
-        deviceKvSetJson(_dk(k), legacy);
-      }
-    } catch { /* 播种失败=落默认，非数据事故（legacy 值仍在 collection 里） */ }
-  }
-}
+// （播种纪元退役 2026-08-28 清零轮：legacy collection→device-kv 的一次性播种已随 {local:true} 全灭——
+//   user 拍板「宣发前删干净，不留 backward compatibility」。cloud-enabled 键同日死缓执行=物理删除。）

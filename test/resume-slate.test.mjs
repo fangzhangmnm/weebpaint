@@ -2,7 +2,7 @@
 // created 2026-08-27 by Claude Fable 5. node 无 localStorage → device-kv 走内存层（这正是无地降级路径本身）。
 import { describe, it, assert, eq } from "./runner.mjs";
 import { deviceKvGet, deviceKvSet, deviceKvGetJson, deviceKvSetJson } from "../src/device-kv.ts";
-import { readSlate, setOpened, setRestoreAttempt, seedSlateFromLegacy } from "../src/resume-slate.ts";
+import { readSlate, setOpened, setRestoreAttempt } from "../src/resume-slate.ts";
 
 describe("device-kv · 无地降级（node 无 localStorage = Safari file:// 同路）", () => {
   it("读写 roundtrip（内存层）；null=删", () => {
@@ -44,23 +44,4 @@ describe("resume-slate · 回执条（三态 typed + 崩溃标记同记录）", 
     eq(readSlate("g-sis").opened.path, "妹妹的画");
   });
 });
-
-describe("resume-slate · legacy 播种（三态字符串 → union，幂等）", () => {
-  it("null=首次 / \"\"=图库 / 名=画 三态映射", () => {
-    seedSlateFromLegacy({ currentFile: null, restoreAttempt: null }, "g-s1");
-    eq(readSlate("g-s1").opened, null);
-    seedSlateFromLegacy({ currentFile: "", restoreAttempt: null }, "g-s2");
-    eq(readSlate("g-s2").opened.kind, "gallery");
-    seedSlateFromLegacy({ currentFile: "夏音", restoreAttempt: "夏音" }, "g-s3");
-    eq(readSlate("g-s3").opened.path, "夏音");
-    eq(readSlate("g-s3").restoreAttempt, "夏音", "崩溃标记一并迁（升级当口的断路语义不丢）");
-  });
-  it("★ 幂等：已有回执条（含播种过的）→ 绝不覆盖（回执条是唯一真相后 legacy 不再有发言权）", () => {
-    seedSlateFromLegacy({ currentFile: "画A", restoreAttempt: null }, "g-s4");
-    seedSlateFromLegacy({ currentFile: "画B", restoreAttempt: null }, "g-s4");
-    eq(readSlate("g-s4").opened.path, "画A");
-    setOpened({ kind: "gallery" }, "g-s4");
-    seedSlateFromLegacy({ currentFile: "画C", restoreAttempt: null }, "g-s4");
-    eq(readSlate("g-s4").opened.kind, "gallery", "用户后续动作不被 legacy 倒灌");
-  });
-});
+// （legacy 播种测试已随 seedSlateFromLegacy 退役删除，2026-08-28 清零轮。）

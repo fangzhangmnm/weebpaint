@@ -80,8 +80,7 @@ import { galleryRegistry } from "./gallery-registry.ts";     // P3 名册器官�
 import { setAttachmentGate, galleryAttachment } from "./gallery-attachment-host.ts";   // P3 挂载器官（收口开画 gate + 笔架重挂接线在 rack 构造后）
 import { bootAttachFromRegistry } from "./gallery-connect.ts";      // P3 boot 静默重挂（prefsReady 链头）
 import { docHome } from "./doc-home.ts";
-import { cloudPrefEnabled } from "./cloud-capability.ts";
-import { initPreferences, refreshPreferences, flushPreferences, seedDevicePrefsFromLegacy } from "./app-prefs.ts";   // boot 门 + 前台/online 拉云对齐 user-preference（lang/theme/手势）+ 导航前屏障
+import { initPreferences, refreshPreferences, flushPreferences } from "./app-prefs.ts";   // boot 门 + 前台/online 拉云对齐 user-preference（lang/手势）+ 导航前屏障
 import { hydrateSmoothFromPrefs } from "./smooth-config.ts";   // boot 门后合并 synced 平滑调参进 SMOOTH
 import { initAppState, appState, flushAppState } from "./app-state.ts";  // boot 门 + 前台/online 拉云对齐 app-state（current-dir/file/blenderUrl）+ 导航前屏障
 import { initTileJobs } from "./tile-jobs.ts";
@@ -512,7 +511,6 @@ function _seedGalleryRegistry(): void {
     galleryRegistry.seedLegacyOneDrive({
       homeAccountId: acct.homeAccountId,
       username: acct.username || acct.name || "",
-      cloudEnabled: cloudPrefEnabled(),                       // 关云用户 → lastActive=null（P5 §9.8 收编入口）
     }).catch((e) => reportError(new Error("[gallery-registry] seed failed (soft): " + String(e)), "log"));
   } catch (e) { reportError(new Error("[gallery-registry] seed failed (soft): " + String(e)), "log"); }
 }
@@ -567,7 +565,6 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 //   若这里调了会 setItem 的路径（applyPixelGrid / gallery.setFolder），就等于「读完立刻回写」，
 //   会把 uat 盖成 now → per-item LWW 退化成「最后冷启动的设备赢」= v406-v408 的 P0-1。
 void prefsReady.then(() => {
-  seedDevicePrefsFromLegacy();   // ⓪ P5 播种（幂等一次）：device 键从 legacy collection 迁 device-kv
   hydrateSmoothFromPrefs();      // ① 手感热路径：平滑调参合并进 SMOOTH（P5 device 层；eval 期是 SMOOTH_DEFAULTS）
   renderSettingsFromPrefs();     // ② longPressPick / singleFingerDraw / pixel-grid / show-fps（不写盘）
   reconcileThemeFromPrefs();     // ③ P5：播种后重读 device-kv，不符就地换（主题=css，无 reload；播种期后恒 no-op）

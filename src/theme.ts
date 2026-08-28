@@ -1,4 +1,4 @@
-// 职责（单一）：主题切换（auto/日/夜）——data-theme attr + board void 色 + 菜单标签 + 持久化（local-user-preference）。
+// 职责（单一）：主题切换（auto/日/夜）——data-theme attr + board void 色 + 菜单标签 + 持久化（device-kv，P5 起）。
 //
 // 主题 = **一个 css**：换主题只改 `data-theme` attr + board void 色，无 reload、随时可换（对比 i18n 的 setLang 是 reload 制）。
 // SSoT = preferences device 层（device-kv；P5 2026-08-27——原 collection+boot 快照双源塌成一份）。
@@ -52,9 +52,8 @@ export function cycleTheme() { return THEMES[(THEMES.indexOf(theme) + 1) % THEME
 export function currentTheme(): string { return theme; }
 // （currentTheme 已删 v415：零调用者。）
 
-// fixup 相对账（P5 起只为**播种后再读**：legacy collection 值刚被 seedDevicePrefsFromLegacy 迁入
-//   device-kv 时，boot 早读可能还是默认值 → 这里重读一次，不符就地换（主题=css，无 reload）。
-//   播种期过后（存量设备升完）本函数天然恒 no-op，可拆）。
+// fixup 相对账（播种纪元退役 2026-08-28 后天然恒 no-op：device-kv 同步读 boot 即权威。
+//   留着当自愈护栏（成本一次读），别再加播种类输入。）
 export function reconcileThemeFromPrefs(): void {
   const th = readTheme();
   if (th !== theme) renderTheme(th);
@@ -63,9 +62,8 @@ export function reconcileThemeFromPrefs(): void {
 export function initTheme(ctx: AppContext) {
   board = ctx.board;
   renderTheme(readTheme());   // boot：device-kv 同步读=已是权威（与 <head> guard 同源）；播种补读见 reconcileThemeFromPrefs
-  // ⚠ 不订 onChange：local-user-preference 是 {local:true}=cloudless，collection 的 fireChanged 只在 sync() 里调，
-  //   而 sync() 对 cloudless 直接 return → **永不触发**。v406-v408 这里挂过一个 onChange，是结构上不可达的死代码。
-  //   主题不跨设备（设计如此），同 tab 内的改动 applyTheme 已经贴过了。
+  // ⚠ 不订任何 collection onChange：主题是 device 层（device-kv），不跨设备（设计如此），
+  //   同 tab 内的改动 applyTheme 已经贴过了。
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     if (theme === "auto") requestAnimationFrame(applyThemeColorsToBoard);
   });

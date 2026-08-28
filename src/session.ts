@@ -37,12 +37,9 @@ type FileShareNavigator = Navigator & {
 
 
 // gallery-first: 空字符串 = 没活动 session（在 gallery）。
-// active session = appState.currentFile（local-app-state，device-local v438；非 null → boot 自动 open）。
-//   null/未设 → 返 ""（停 gallery，等用户选）。try/catch 兜 pre-init（collection 未 hydrate 时 setItem 抛）。
-// P5（2026-08-27）：持久层 = **resume-slate 器官**（device-kv，per-gallery 回执条）。
-//   三态（P1.5 拍板）改由 tagged union 表达：null=首次→新画布 / {kind:"gallery"}=上次图库 /
-//   {kind:"doc",path}=上次这张画。legacy 的 appState.currentFile/restoreAttempt 停写只读
-//   （boot 播种源，见 resume-slate.seedSlateFromLegacy）。
+// 持久层 = **resume-slate 器官**（device-kv，per-gallery 回执条；播种纪元 2026-08-28 退役后=唯一真相）。
+//   三态（P1.5 拍板）由 tagged union 表达：null=首次→新画布 / {kind:"gallery"}=上次图库 /
+//   {kind:"doc",path}=上次这张画。
 //   崩溃环标记解除逻辑（开画成功清 restoreAttempt）在 slate.setOpened 内（同记录原子写）。
 export function setCurrentSessionName(name: string) {
   try { setOpened(name ? { kind: "doc", path: name } : { kind: "gallery" }); } catch {}

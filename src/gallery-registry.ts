@@ -26,7 +26,7 @@ export interface GalleryEntry {
   dbId: string;                  // store databaseId：legacy OneDrive = "defaultStore"（既有缓存/dirty 零迁移）；新铸 = `gallery-<id>`
   homeAccountId?: string;        // kind=onedrive：账号引用（多账号=多条目；结构支持、UX 不打磨）
   handle?: DirHandleLike;        // kind=folder：FSA 句柄
-  lastActive: number | null;     // null = 未激活/已卸下（cloud-enabled=false 播种落这里）
+  lastActive: number | null;     // null = 未激活/已卸下
   createdAt: number;
 }
 
@@ -48,9 +48,8 @@ export interface GalleryRegistry {
   relabel(id: string, label: string): Promise<void>;   // attach 时派生刷新（尽力自愈）；非用户编辑面
   forget(id: string): Promise<void>;             // 只删条目不动源；缓存库 GC 挂深清（P7）
   lastActive(): Promise<GalleryEntry | null>;
-  /** 播种（幂等，靠 dedup 不靠标记；每次 auth 变化调都安全）：既有登录态 → legacy OneDrive 条目；
-   *  cloud-enabled=false → lastActive=null（P5 §9.8 判死缓的收编入口）。 */
-  seedLegacyOneDrive(p: { homeAccountId: string; username: string; cloudEnabled: boolean }): Promise<void>;
+  /** 播种（幂等，靠 dedup 不靠标记；每次 auth 变化调都安全）：既有登录态 → legacy OneDrive 条目即激活。 */
+  seedLegacyOneDrive(p: { homeAccountId: string; username: string }): Promise<void>;
 }
 
 const mintId = () => "g" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -123,7 +122,7 @@ export function createGalleryRegistry(kv: RegistryKV): GalleryRegistry {
       await kv.put({
         id, kind: "onedrive", label: oneDriveLabel(p.username), homeAccountId: p.homeAccountId,
         dbId: legacyFree ? LEGACY_DB : `gallery-${id}`,   // 既有用户的数据物理在 defaultStore——条目认领它（id 同取 "default"），零迁移
-        lastActive: p.cloudEnabled ? Date.now() : null,        // 关云用户 → null（= 无激活库；P5 §9.8）
+        lastActive: Date.now(),
         createdAt: Date.now(),
       });
     },

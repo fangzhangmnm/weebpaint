@@ -49,13 +49,4 @@ export function setRestoreAttempt(name: string | null, galleryId: string = activ
   const cur = readSlate(galleryId);
   _write({ ...cur, restoreAttempt: name }, galleryId);
 }
-
-/** 一次性播种（幂等）：从 legacy 双态迁入——currentFile 三态字符串（null=首次/""=图库/名=画）+
- *  restoreAttempt。已有回执条（含播种过的空条）→ 不覆盖。boot 在 collection hydrate 后调一次。 */
-export function seedSlateFromLegacy(legacy: { currentFile: string | null; restoreAttempt: string | null }, galleryId: string = activeGalleryId()): void {
-  if (deviceKvGetJson<ResumeSlate | null>(_key(galleryId), null) != null) return;   // 已有条 → 不动
-  const opened: ResumeOpened = legacy.currentFile == null ? null
-    : legacy.currentFile === "" ? { kind: "gallery" }
-    : { kind: "doc", path: legacy.currentFile };
-  _write({ opened, restoreAttempt: legacy.restoreAttempt ?? null }, galleryId);
-}
+// （seedSlateFromLegacy 已退役 2026-08-28 清零轮：播种纪元结束，回执条是唯一真相。）

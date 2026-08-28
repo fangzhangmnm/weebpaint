@@ -1054,7 +1054,7 @@ async function _forkAfterEscape(origName: string): Promise<void> {
   throw new Error("[session] fork name collision twice - giving up");
 }
 
-// setName(name)：改活动身份（内存 + 持久 appState.currentFile 两轨齐动）。
+// setName(name)：改活动身份（内存 + resume-slate 回执条两轨齐动）。
 // setName(name, { persist: false })：**只动内存**——给 boot 加载失败用。
 //   幽灵 path 纪律（feedback-phantom-current-path）：加载失败要把内存名降回 safe default（防 save 走 rename
 //   路径把"加载失败的 path"当 oldName 删掉），但**持久的 currentFile 必须留着**，好让用户下次冷启动重试。
