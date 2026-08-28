@@ -78,6 +78,7 @@ import "./drag-value.test.mjs";   // 拖动核纯状态机（v0.7.8）：shift �
 import "./brush-settings-model.test.mjs";
 import "./brush-rack-view.test.mjs";
 import "./brush-rack-reactive.test.mjs";   // ★笔架↔collection 绑定回归（v415 漏接过）
+import "./builtin-brushes.test.ts";        // 出厂笔数据契约 + 「固定」变体 = 原笔逐字拷贝仅三 coeff 归零（2026-08-28 笔压 toggle sunset）
 import "./pointer-route.test.mjs";
 import "./stroke-input-smooth.test.mjs";
 import "./stroke-smoother.test.mjs";

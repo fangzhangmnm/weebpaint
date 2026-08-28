@@ -1443,30 +1443,6 @@ export declare const S: {
         readonly ja: "筆の太さ";
         readonly tok: "suli linja";
     };
-    readonly "ld.pressureOff": {
-        readonly zh: "禁用笔压（恒定 0.5）";
-        readonly en: "Disable pen pressure (constant 0.5)";
-        readonly ja: "筆圧を無効化（0.5 固定）";
-        readonly tok: "o weka e wawa luka (0.5 sama ale)";
-    };
-    readonly "ld.pressureOn": {
-        readonly zh: "启用笔压";
-        readonly en: "Enable pen pressure";
-        readonly ja: "筆圧を有効化";
-        readonly tok: "o kama sin e wawa luka";
-    };
-    readonly "status.pressureOff": {
-        readonly zh: "已禁用笔压（恒定 0.5）";
-        readonly en: "Pen pressure disabled (constant 0.5)";
-        readonly ja: "筆圧を無効化しました（0.5 固定）";
-        readonly tok: "wawa luka li weka (0.5 sama ale)";
-    };
-    readonly "status.pressureOn": {
-        readonly zh: "已恢复笔压";
-        readonly en: "Pen pressure restored";
-        readonly ja: "筆圧を有効化しました";
-        readonly tok: "wawa luka li kama sin";
-    };
     readonly "ld.opacity": {
         readonly zh: "不透明度";
         readonly en: "Opacity";

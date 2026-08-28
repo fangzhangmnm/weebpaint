@@ -16,7 +16,7 @@
 import { WEEBPAINT_VERSION } from "./version.ts";
 import { initI18n, t, reconcileLangFromPrefs } from "./i18n/index.ts";   // 本地化：<html lang> + 静态 HTML data-i18n 填充
 import { Board } from "./board.ts";
-import { InputController, bindPressureDisabled } from "./input.ts";
+import { InputController } from "./input.ts";
 import { makeCurrentBrush } from "./resolved-brush.ts";   // 当前笔派生 computed + 引擎桥（手感数学在 resolveBrush，同文件）
 import { registerPanel, openExclusive, closeExclusive, getCurrentExclusive } from "./panel-state.ts";
 import { WeebPaintBackend } from "./backend/weebpaint-backend.ts";
@@ -204,31 +204,11 @@ const leftDial = mountLeftDial(els.leftDialMount, {
   onOpacity: (frac) => setOpacity(frac),
   onBrushTap: () => { const id = RACK_PANEL_BY_TOOL[editMode.current()]; if (id) openExclusive(id); },
   onBrushLongpress: () => { const b = rack.findToolBrush(_leftDial()); if (b) { closeExclusive(); rack.openBrushSettings(b.id); } },
-  // v0.6.15 禁用笔压（per-doc desk：desk.pressureDisabled ⇄ dialReactive.pressureOff）：开 = 恒定 0.5
-  getPressureDisabled: () => dialReactive.pressureOff,
-  onTogglePressure: (v) => { desk.pressureDisabled = v; setStatus(t(v ? "status.pressureOff" : "status.pressureOn")); },
 });
-bindPressureDisabled(() => dialReactive.pressureOff);   // 引擎 thunk（每 pointer 事件读；载入/重置经 applyBoundFromGroups 自动回灌）
-// v0.6.32 笔压独立按钮（user：undo/redo 上方；原笔粗图标位 v0.6.16 方案退役）。
-//   SSoT 不变：desk.pressureDisabled ⇄ dialReactive.pressureOff；换文档 applyEditorState 回灌后重派生。
-{
-  const btn = document.getElementById("pressureToggleBtn")!;
-  const use = document.getElementById("pressureToggleUse")!;
-  const sync = () => {
-    const off = dialReactive.pressureOff;
-    btn.setAttribute("aria-pressed", off ? "true" : "false");
-    btn.title = t(off ? "ld.pressureOn" : "ld.pressureOff");
-    use.setAttribute("href", off ? "#pen-pressure-off" : "#pen-pressure");
-  };
-  btn.addEventListener("click", () => {
-    const v = !dialReactive.pressureOff;
-    desk.pressureDisabled = v;
-    setStatus(t(v ? "status.pressureOff" : "status.pressureOn"));
-    sync();
-  });
-  window.addEventListener("wp:applyEditorState", sync);
-  sync();
-}
+// 【sunset 2026-08-28】v0.6.15/v0.6.32 的「禁用笔压」全局 toggle（独立按钮 + per-doc desk.pressureDisabled
+//   + input.ts 恒压 0.5 thunk）整条撤除——user 0823 问「笔刷压感toggle还是是否有压感做成不同的笔刷？」
+//   0828 拍板【分两支笔，笔压toggle sunset】（总账 §3 #12）。「不要压感」= 笔架里选「固定xx」那支
+//   （builtin-brushes.json 的 -fixed 变体，三个压感 coeff 归零）。新变体到达路径 = ☰「还原内置笔刷…」。
 // 键盘 [ ] 调粗接线（需 board/leftDial，已建好）。
 // disposer 收进 __wpBootTeardown（v417）：真 app 永不调（监听活到页面结束）；**测试**要靠它拆。
 //   app.ts 是纯 top-level 副作用模块、ESM 缓存下只能 import 一次，boot smoke（test/app-boot.test.mjs）

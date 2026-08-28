@@ -299,10 +299,7 @@ export const S = {
   // ── 左侧笔刷 dial（left-dial.ts）切片 3a ──
   "ld.brush":        { zh: "当前笔刷（tap 切换 / 长按编辑）", en: "Current brush (tap to switch / long-press to edit)", ja: "現在のブラシ（タップで切替 / 長押しで編集）", tok: "ilo sitelen ni · luka la ante · luka awen la nasin" },
   "ld.size":         { zh: "笔粗",     en: "Brush size",   ja: "筆の太さ", tok: "suli linja" },
-  "ld.pressureOff":  { zh: "禁用笔压（恒定 0.5）", en: "Disable pen pressure (constant 0.5)", ja: "筆圧を無効化（0.5 固定）", tok: "o weka e wawa luka (0.5 sama ale)" },
-  "ld.pressureOn":   { zh: "启用笔压", en: "Enable pen pressure", ja: "筆圧を有効化", tok: "o kama sin e wawa luka" },
-  "status.pressureOff": { zh: "已禁用笔压（恒定 0.5）", en: "Pen pressure disabled (constant 0.5)", ja: "筆圧を無効化しました（0.5 固定）", tok: "wawa luka li weka (0.5 sama ale)" },
-  "status.pressureOn":  { zh: "已恢复笔压", en: "Pen pressure restored", ja: "筆圧を有効化しました", tok: "wawa luka li kama sin" },
+  // （ld.pressureOff/On + status.pressureOff/On 已随「禁用笔压」toggle 一起 sunset，2026-08-28 总账 §3 #12）
   "ld.opacity":      { zh: "不透明度", en: "Opacity",      ja: "不透明度", tok: "wawa kule" },
   // ── 笔架 sheet（rack-sheet.ts）切片 3a ──
   "rs.rackEmpty":    { zh: "笔架是空的——内置笔刷可能还没加载好（离线时会自动重试）。", en: "The rack is empty \u2014 the built-in brushes may not have loaded yet (it retries automatically when offline).", ja: "ブラシ棚が空です \u2014 内蔵ブラシがまだ読み込めていない可能性があります（オフライン時は自動で再試行します）。", tok: "poki pi ilo sitelen li jo e ala. ilo pi tan open li kama ala lon tenpo ni. mi alasa sin e ona." },

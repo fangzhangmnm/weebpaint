@@ -26,9 +26,6 @@ export interface LeftDialOpts {
   onOpacity(frac: number): void;
   onBrushTap(): void;
   onBrushLongpress(): void;
-  // v0.6.14 禁用笔压 toggle（size 栏下方；开 = 恒定 0.5，见 input.ts setPressureDisabled）
-  getPressureDisabled(): boolean;
-  onTogglePressure(v: boolean): void;
 }
 export interface LeftDialHandle {
   flashSize(): void;              // 外部 [ ] 键盘调粗后闪 popup
@@ -93,17 +90,11 @@ export function mountLeftDial(el: HTMLElement, opts: LeftDialOpts): LeftDialHand
       function brushUp() { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } }
       function brushClick() { if (lpFired) { lpFired = false; return; } opts.onBrushTap(); }
 
-      // 禁用笔压 toggle：SSoT = desk.pressureDisabled（绑 dialReactive.pressureOff，反应式）——
-      //   computed 直读，doc 载入/重置回灌自动跟随；点按经 opts 写回 desk。
-      const pressureOff = computed(() => opts.getPressureDisabled());
-      function togglePressure() { opts.onTogglePressure(!pressureOff.value); }
-
       // i18n：t() 在 setup 调（§5a），模板引 L.*。
-      const L = { brush: t("ld.brush"), size: t("ld.size"), opacity: t("ld.opacity"), pressureOff: t("ld.pressureOff"), pressureOn: t("ld.pressureOn") };
+      const L = { brush: t("ld.brush"), size: t("ld.size"), opacity: t("ld.opacity") };
       return {
         size, opacity, sizePos, sizePosMax, opaPct, brushName, canDraw, popup,
         sizeSlider, opaSlider, onSizeInput, onOpaInput, brushDown, brushUp, brushClick, L,
-        pressureOff, togglePressure,
       };
     },
     template: `
@@ -114,7 +105,7 @@ export function mountLeftDial(el: HTMLElement, opts: LeftDialOpts): LeftDialHand
       </button>
       <input ref="sizeSlider" id="sizeSlider" class="left-sidebar-slider" type="range" min="0" :max="sizePosMax" step="1"
         :value="sizePos" :disabled="!canDraw" orient="vertical" :aria-label="L.size" @input="onSizeInput" />
-      <!-- v0.6.32：笔压 toggle 迁出（独立按钮在 undo/redo 上方，app.ts 接线）；笔粗图标位恢复纯标签 -->
+      <!-- 笔粗图标位 = 纯标签（v0.6.32 迁出的笔压 toggle 已于 2026-08-28 整条 sunset：不要压感 = 选「固定xx」笔） -->
       <span class="left-sidebar-label" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><use href="#brush-width"/></svg>
       </span>

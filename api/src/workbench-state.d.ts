@@ -174,7 +174,6 @@ declare function freshGroups(): {
     pixelGrid: boolean;
     longPressPick: boolean;
     menuTab: string;
-    pressureDisabled: boolean;
 };
 export type EditorGroups = ReturnType<typeof freshGroups>;
 interface EngineBind {
@@ -188,8 +187,6 @@ interface EngineBind {
     setColor(v: string): void;
     getPickMode(): string;
     setPickMode(v: string): void;
-    getPressureOff(): boolean;
-    setPressureOff(v: boolean): void;
 }
 export declare function bindEditorReactive(b: EngineBind): void;
 export declare const desk: {
@@ -346,7 +343,6 @@ export declare const desk: {
     pixelGrid: boolean;
     longPressPick: boolean;
     menuTab: string;
-    pressureDisabled: boolean;
     Serialize(): EditorGroups;
     Unserialize(json: unknown): void;
     reset(): void;
