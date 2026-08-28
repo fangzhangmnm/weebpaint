@@ -193,3 +193,9 @@ T-crash 快照带 mp4 ✓、标题栏画名 ✓、云端 .trash/.backup 时刻�
 4. **两粒沙未做未 park**（0821 low/very-low）：duplicate 图层组（low）；禁用浏览器 reading mode
    （very low）。待裁：做/park。
 5. 非代码件：0823「宣发讨论记忆封存 zip」——由宣发分仓（20260821 宣发仓）实质承接，user 侧自理，视为 OBE。
+
+## 8. 架构自查裁决台账（2026-08-28；报告=ai-docs/20260828-cloud-native-residue-audit.md）
+
+第一档 A-I（宣发前建议）/ 第二档 J-Q（宣发后）/ 三档=合理妥协不动。**全部待 user 逐条「做/park」**；
+A 已有既有裁决背书（§4 pin【必做】——app 侧接线是它没做完的另一半，此前误记全达成，本日勘误）。
+产品表态件：C 附带「加密动词=图库家专属」接受与否。
