@@ -9,8 +9,9 @@ export interface Filter {
     bleedRadius?(params: FilterParams): number;
     defaults?(): FilterParams;
     buildBody?(container: HTMLElement, state: unknown, onChange: () => void): void;
+    supportsLayerGroup?: boolean;
     bake(srcData: Uint8ClampedArray, dstData: Uint8ClampedArray, params: FilterParams, mask: Uint8Array | null, w: number, h: number): void;
-    beginBrushStroke?(layer: BrushLayer, params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, p: number): ColorBrushState;
+    beginBrushStroke?(layers: readonly BrushLayer[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, p: number): ColorBrushState;
     extendBrushStamp?(state: ColorBrushState, x: number, y: number, p: number): void;
     endBrushStroke?(state: ColorBrushState): void;
     flushDirty?(state: ColorBrushState): DirtyRect | null;

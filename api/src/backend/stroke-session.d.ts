@@ -26,8 +26,12 @@ export interface StrokeSessionDeps {
     commitStamps(cs: StampCollect): boolean;
     /** board.invalidateAll —— 落层/回滚后的重渲通知 */
     invalidate(): void;
-    /** board.setStrokeShadow —— shadow 预览宿的显示注入（surrogate 影子变体；(null,null) 关） */
-    setShadow(layerId: number | null, pixels: LayerPixels | null): void;
+    /** board.setStrokeShadows —— shadow 预览宿的显示注入（surrogate 影子变体；空数组 = 关）。
+     *  组液化一次挂 N 个替身（一叶一个），board 侧按 layerId 换源。 */
+    setShadows(entries: readonly {
+        layerId: number;
+        pixels: LayerPixels;
+    }[]): void;
 }
 export interface StrokeSessionSpec {
     /** 令牌事务标签（wp2.begin(label)） */
@@ -67,17 +71,19 @@ export declare class StrokeShadow {
 }
 export declare class StrokeSession {
     readonly engine: StrokeEngine;
-    readonly layer: ViewLeaf;
+    /** 本笔触写的真叶（恒 ≥1；组液化 = 组内全部叶，其余笔类恒 1 叶） */
+    readonly layers: readonly ViewLeaf[];
     /** 描边中原地写真层（draw/erase pixelMode）——board live-sync 判据 */
     readonly inPlace: boolean;
-    /** 引擎写靶：shadow 模式 = 替身叶（真叶描边期零写），否则真叶。引擎 beginStroke 必须喂它。 */
-    readonly target: ViewLeaf;
+    /** 引擎写靶（与 layers 同序同长）：shadow 模式 = 替身叶（真叶描边期零写），否则真叶。
+     *  引擎 beginStroke 必须喂它。 */
+    readonly targets: readonly ViewLeaf[];
     private readonly finalize;
     private readonly token;
     private readonly deps;
-    private _shadow;
+    private _shadows;
     private _open;
-    constructor(deps: StrokeSessionDeps, engine: StrokeEngine, layer: ViewLeaf, spec: StrokeSessionSpec, preview: StrokePreview);
+    constructor(deps: StrokeSessionDeps, engine: StrokeEngine, layers: readonly ViewLeaf[], spec: StrokeSessionSpec, preview: StrokePreview);
     get open(): boolean;
     /** 投喂一个输入事件（x,y 为 doc 坐标；t = 事件 timeStamp，手感数学的唯一时钟） */
     extend(x: number, y: number, pressure: number, t?: number | null): void;
@@ -86,5 +92,6 @@ export declare class StrokeSession {
     /** GPU stamp overlay 拉取（brush/形状笔有；liquify/filterBrush 无 → null，走 shadow/live-sync） */
     collectStamps(): StampCollect | null;
     end(): void;
+    private _disposeShadows;
     cancel(): void;
 }

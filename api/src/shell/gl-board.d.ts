@@ -42,12 +42,12 @@ export declare class GLBoard {
         ty: number;
     }[]): boolean;
     rasterizeStampsToBytes(stamps: Parameters<RasterService["rasterizeStampsToBytes"]>[0], shape: Parameters<RasterService["rasterizeStampsToBytes"]>[1], bx: number, by: number, bw: number, bh: number): Uint8ClampedArray | null;
-    compositeToBytes(nodes: DocNode[], docW: number, docH: number, surrogate?: SurrogateInput | null, overlay?: OverlayInput | null): {
+    compositeToBytes(nodes: DocNode[], docW: number, docH: number, surrogates?: readonly SurrogateInput[], overlay?: OverlayInput | null): {
         data: Uint8ClampedArray;
         w: number;
         h: number;
     } | null;
-    pickColor(doc: GLDoc, docBg: string | null, x: number, y: number, surrogate?: SurrogateInput | null, overlay?: OverlayInput | null): [number, number, number, number] | null;
+    pickColor(doc: GLDoc, docBg: string | null, x: number, y: number, surrogates?: readonly SurrogateInput[], overlay?: OverlayInput | null): [number, number, number, number] | null;
     warpToBytes(src: Parameters<RasterService["warpToBytes"]>[0], srcW: number, srcH: number, hinv: number[], mode: number, bx: number, by: number, bw: number, bh: number): {
         data: Uint8ClampedArray;
         w: number;
@@ -55,7 +55,7 @@ export declare class GLBoard {
         dstX: number;
         dstY: number;
     } | null;
-    render(doc: GLDoc, affine6: number[], canvasW: number, canvasH: number, scale: number, voidColor: string, docBg: string | null, floats?: FloatInput[], stampOverlay?: OverlayInput | null, liveSyncLeaf?: DocLeaf | null, surrogate?: SurrogateInput | null, gridBg?: {
+    render(doc: GLDoc, affine6: number[], canvasW: number, canvasH: number, scale: number, voidColor: string, docBg: string | null, floats?: FloatInput[], stampOverlay?: OverlayInput | null, liveSyncLeaf?: DocLeaf | null, surrogates?: readonly SurrogateInput[], gridBg?: {
         dotColor: string;
         stepPx: number;
         radiusPx: number;

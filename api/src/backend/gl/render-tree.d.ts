@@ -18,7 +18,7 @@ export declare class RenderTree {
     constructor(room: GlRoom);
     markDirty(): void;
     handleContextRestored(): void;
-    renderFrame(nodes: DocNode[], docW: number, docH: number, bg: Background | undefined, affine6: number[], canvasW: number, canvasH: number, scale: number, voidRgb: [number, number, number], floats: FloatInput[], stampOverlay: OverlayInput | null, surrogate: SurrogateInput | null, liveSyncLeafId: number | null, screenGrid?: ScreenGridBg | null): void;
+    renderFrame(nodes: DocNode[], docW: number, docH: number, bg: Background | undefined, affine6: number[], canvasW: number, canvasH: number, scale: number, voidRgb: [number, number, number], floats: FloatInput[], stampOverlay: OverlayInput | null, surrogates: readonly SurrogateInput[], liveSyncLeafId: number | null, screenGrid?: ScreenGridBg | null): void;
     private _planSig;
     private _segValid;
     private _invalidateSegs;

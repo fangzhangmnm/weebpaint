@@ -55,6 +55,12 @@ export interface Filter {
   bleedRadius?(params: FilterParams): number;
   defaults?(): FilterParams;
   buildBody?(container: HTMLElement, state: unknown, onChange: () => void): void;
+  // 能力声明（2026-08-28）：active 是图层组时，本 filter 能不能一次吃下整组的叶？
+  //   true  = beginBrushStroke 会收到组内全部叶（含隐藏），自负「所有叶同待遇」的语义（液化=共享位移场）。
+  //   缺省/false = 只吃单叶；input 侧照旧硬拒组（st.groupNoDraw）。
+  //   色彩类 filter（attachColorBrushBehavior）**不该**声明 true——逐叶 blur 再合成 ≠ 合成后 blur，
+  //   那是另一种语义，要做得先设计，不能靠这个开关顺手拿到。
+  supportsLayerGroup?: boolean;
   bake(
     srcData: Uint8ClampedArray,
     dstData: Uint8ClampedArray,
@@ -63,9 +69,10 @@ export interface Filter {
     w: number,
     h: number,
   ): void;
-  // attachColorBrushBehavior 注入的 runtime brush 方法（color-brush 类 filter）
+  // attachColorBrushBehavior 注入的 runtime brush 方法（color-brush 类 filter）。
+  // layers = 写靶叶列表（单叶恒 [leaf]；组液化 = 组内全部叶）——见 supportsLayerGroup。
   beginBrushStroke?(
-    layer: BrushLayer,
+    layers: readonly BrushLayer[],
     params: FilterParams,
     brushSettings: BrushSettings,
     selection: BrushSelection | null,
@@ -191,7 +198,13 @@ export function makeSectionTitle(text: string): HTMLDivElement {
 //
 // 跟 liquify（位移场）那种 filter 不同；位移场 filter 自己写完整 brush 方法。
 export function attachColorBrushBehavior(FilterClass: Filter): void {
-  FilterClass.beginBrushStroke = function(layer: BrushLayer, params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, p: number): ColorBrushState {
+  FilterClass.beginBrushStroke = function(layers: readonly BrushLayer[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, p: number): ColorBrushState {
+    // 色彩类 filter 是单叶语义（见 Filter.supportsLayerGroup 注释）——多叶传进来 = 上游路由错了，
+    // 响亮拒绝而不是静默只处理第一叶（家规：不许静默吞）。
+    if (layers.length !== 1) {
+      throw new Error(`Filter ${FilterClass.id}: color-brush behavior is single-leaf (got ${layers.length} targets)`);
+    }
+    const layer = layers[0];
     const state: ColorBrushState = {
       layer, params, brushSettings, selection, FilterClass,
       lastX: x, lastY: y, pendingDist: 0, dirty: null,

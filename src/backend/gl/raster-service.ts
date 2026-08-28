@@ -99,9 +99,10 @@ export class RasterService {
   }
 
   // export/吸管专用一次性合成（spec:157）：不建缓存、不失效、不碰 display。caller 负责 returnFBO。
-  //   surrogate（v0.4.11，拍板#8）：调整预览的替身叶换源——吸管 WYSIWYG（导出路径不传，仍取真像素）。
+  //   surrogates（v0.4.11，拍板#8）：调整预览的替身叶换源——吸管 WYSIWYG（导出路径不传，仍取真像素）。
+  //     复数（2026-08-28 组液化）：一次可挂 N 个 stroke 影子叶。
   //   overlay（v0.5.11）：fill 预览挂着时吸管也要 WYSIWYG——同款待遇；导出路径不传，预览不漏进导出。
-  compositeOnce(nodes: DocNode[], docW: number, docH: number, bg?: Background, surrogate: SurrogateInput | null = null, overlay: OverlayInput | null = null): PooledFBO {
+  compositeOnce(nodes: DocNode[], docW: number, docH: number, bg?: Background, surrogates: readonly SurrogateInput[] = [], overlay: OverlayInput | null = null): PooledFBO {
     const room = this._room;
     if (overlay) room.setStampOverlay(overlay, docW, docH);   // 须在 toPlanNodes 前（plan 的 overlay 标记读 room 装置）
     const leafById = new Map<number, DocLeaf>();
@@ -114,14 +115,17 @@ export class RasterService {
     const builds = [...plan.builds.values()];
     room.pool.reserve(room.pool.allocatedCount
       + residentMissTiles(residentIds(plan.liveLeaves, builds), (id) => leafById.get(id)?.pixels, (cpuId) => room.bridge.hasLive(cpuId)));
-    let surrogateSynced = false;   // 同叶重复 sync：真叶走身份快路径免费；平面替身重传不免费，闸一次
+    const surrogateById = new Map<number, SurrogateInput>();
+    for (const s of surrogates) surrogateById.set(s.layerId, s);
+    const surrogateSynced = new Set<number>();   // 同叶重复 sync：真叶走身份快路径免费；平面替身重传不免费，闸一次
     const syncOne = (id: number) => {
-      if (surrogate && id === surrogate.layerId) {
-        if (surrogateSynced) return;
-        surrogateSynced = true;
+      const sur = surrogateById.get(id);
+      if (sur) {
+        if (surrogateSynced.has(id)) return;
+        surrogateSynced.add(id);
         // 影子变体（C6 stroke 替身叶）增量 sync；平面变体（adjust）全 bbox 重传。
-        if ("pixels" in surrogate) room.syncLeafSafe(id, surrogate.pixels, docW, docH);
-        else room.syncSurrogate(surrogate, docW, docH);
+        if ("pixels" in sur) room.syncLeafSafe(id, sur.pixels, docW, docH);
+        else room.syncSurrogate(sur, docW, docH);
         return;
       }
       const leaf = leafById.get(id); if (leaf) room.syncLeafSafe(id, leaf.pixels, docW, docH);
@@ -148,20 +152,20 @@ export class RasterService {
 
   // S9 字节合成面（v0.6.39 去 canvas 化）：compositeOnce → 整幅 readPixels 直接返回 straight 字节
   //   （merge-down / collapse / stamp-all 等「字节进出」op 用——硬原则：字节进出不走 canvas）。
-  //   surrogate/overlay（v0.9.18 timelapse 采帧 WYSIWYG）：与 pickColor 同款待遇——调整替身/fill 预览
+  //   surrogates/overlay（v0.9.18 timelapse 采帧 WYSIWYG）：与 pickColor 同款待遇——调整替身/fill 预览
   //   显示什么就合成什么。**save/export 路径不传**（预览不漏进落盘物，原语义零变化）。
   compositeToBytes(nodes: DocNode[], docW: number, docH: number,
-                   surrogate: SurrogateInput | null = null, overlay: OverlayInput | null = null): { data: Uint8ClampedArray; w: number; h: number } {
-    const fbo = this.compositeOnce(nodes, docW, docH, undefined, surrogate, overlay);
+                   surrogates: readonly SurrogateInput[] = [], overlay: OverlayInput | null = null): { data: Uint8ClampedArray; w: number; h: number } {
+    const fbo = this.compositeOnce(nodes, docW, docH, undefined, surrogates, overlay);
     const px = this._room.glctx.readPixels(fbo, 0, 0, docW, docH);
     this._room.glctx.returnFBO(fbo);
     return { data: new Uint8ClampedArray(px.buffer), w: docW, h: docH };
   }
 
   // S8 吸管（spec:243-244）：一次性合成 + 单像素 readPixels（合成组无 CPU tile → 必须走 GPU 读）。
-  //   surrogate 非空 = 调整预览中取替身（WYSIWYG，拍板#8）。
-  pickColor(nodes: DocNode[], docW: number, docH: number, bg: Background | undefined, x: number, y: number, surrogate: SurrogateInput | null = null, overlay: OverlayInput | null = null): [number, number, number, number] {
-    const fbo = this.compositeOnce(nodes, docW, docH, bg, surrogate, overlay);
+  //   surrogates 非空 = 调整预览中取替身（WYSIWYG，拍板#8）。
+  pickColor(nodes: DocNode[], docW: number, docH: number, bg: Background | undefined, x: number, y: number, surrogates: readonly SurrogateInput[] = [], overlay: OverlayInput | null = null): [number, number, number, number] {
+    const fbo = this.compositeOnce(nodes, docW, docH, bg, surrogates, overlay);
     const px = this._room.glctx.readPixels(fbo, x, y, 1, 1);
     this._room.glctx.returnFBO(fbo);
     return [px[0], px[1], px[2], px[3]];

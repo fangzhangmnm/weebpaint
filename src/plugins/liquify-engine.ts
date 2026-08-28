@@ -14,15 +14,22 @@
 //
 // 数据结构：
 //   _stroke = {
-//     layer, settings,
-//     lastX, lastY,
-//     dirty,
-//     startSnap: layer.snapshotImageData(),  // { bboxX, bboxY, bboxW, bboxH, imageData }（只读物化，非 undo 包）
-//     dispField: {                       // 和 layer.bbox 同步（ensureBbox 后 _regrow）
+//     layers: [{ layer, startSnap, splinePlane }, ...],   // 一叶一份源；≥1
+//     settings, lastX, lastY, dirty,
+//     dispField: {                       // 笔触扫过区域（_growDispField 只扩不缩，夹在 doc 内）
 //       bboxX, bboxY, bboxW, bboxH,
 //       data: Float32Array(2 * W * H),   // 交错 [dx0,dy0,dx1,dy1,...]
 //     },
 //   }
+//
+// 图层组（2026-08-28）：**一个位移场，逐叶各自重采样**——语义对齐 floating-transform.lift(group)
+//   （组 → 组内所有叶各一 float、共享一个 gizmo，含隐藏叶、不 flatten、一步 undo）。
+//   位移场只由笔触几何 + 笔刷参数决定，与层内容无关 → 天然可共享；每叶各自持 startSnap 与写靶。
+//   数学上等价于「合成后再液化」：warp 是 gather（dst[p] = src[p − d(p)]），逐像素合成与 gather
+//   可交换 → comp(W(A), W(B)) = W(comp(A, B))（插值核带来的差异限于亚像素级）。
+//   热路径分工：位移场累加 + 选区 mask/bleed march（贵的那部分）**每像素只解一次**，
+//   每叶只多付「一次重采样」；空叶（startSnap 无像素）根本不进源表，连 tile 都不分配。
+//   代价：一叶一份 startSnap（笔触全程驻留）——大组 = N 张内容框物化，内存随叶数线性涨。
 //
 // 五种 mode（reconstruct = 新增，path A 几乎免费）：
 //   push (推):       dispField += vel * f * strength
@@ -73,15 +80,22 @@ interface LayerSnapshot {
 //   判定基底 = doc 空间（不再 tie layer.bbox）——内容被推出旧内容包围盒的像素照常按选区裁剪。
 interface MaskPlane { x: number; y: number; w: number; h: number; data: Uint8Array }
 
-interface LiquifyStroke {
+// 一个写靶叶的源（组液化 = N 份，共享同一个 dispField）。
+interface LiquifyLeafState {
   layer: ViewLeaf;
+  startSnap: LayerSnapshot;
+  splinePlane: SplinePlane | null;   // sample="spline" 时 startSnap 的 B 样条系数平面（beginStroke 一次性预滤波）
+}
+
+interface LiquifyStroke {
+  layers: LiquifyLeafState[];   // ≥1；单叶液化 = 长度 1，组液化 = 组内所有叶（含隐藏）
+  docW: number;
+  docH: number;
   settings: LiquifySettings;
   bleed: string;
   lastX: number;
   lastY: number;
   dirty: [number, number, number, number] | null;
-  startSnap: LayerSnapshot;
-  splinePlane: SplinePlane | null;   // sample="spline" 时 startSnap 的 B 样条系数平面（beginStroke 一次性预滤波）
   dispField: DispField;
   selection: Selection | null;
   mask: MaskPlane | null;   // selection 非空时非空；覆盖 dispField bbox；平面外查 selection.sampleAt
@@ -103,32 +117,51 @@ export class LiquifyEngine {
   //   "clip"   — 设墙：源落选区外 → 保留 dest 原像素（无位移），什么都不进
   //   "edge"   — (默认) 沿 dest→source 射线 march 到刚离开选区的边界点采样
   //              → 边界像素沿拉拽方向被无限拉长，无外部内容、无中轴接缝（见 ai-docs/20260528-liquify-blur.md）
-  beginStroke(layer: ViewLeaf, settings: LiquifySettings, x: number, y: number, selection: Selection | null) {
-    const lbW = Math.max(1, layer.bboxW);
-    const lbH = Math.max(1, layer.bboxH);
+  // layers = 写靶叶列表（单叶液化传 [leaf]；组液化传组内全部叶，含隐藏——对齐 transform 的
+  //   「整组一起动」）。所有叶共享一个 dispField / 一个 selection mask 平面。
+  beginStroke(layers: readonly ViewLeaf[], settings: LiquifySettings, x: number, y: number, selection: Selection | null) {
+    if (!layers.length) throw new Error("LiquifyEngine.beginStroke: needs at least one target leaf");
     const bleed = settings.bleed || "edge";
+    // dispField 起始 bbox = 各叶内容 bbox 的并集（组内叶内容框各不相同）；全空 → 占位 1×1 全 0。
+    let ux0 = Infinity, uy0 = Infinity, ux1 = -Infinity, uy1 = -Infinity;
+    for (const L of layers) {
+      if (L.bboxW <= 0 || L.bboxH <= 0) continue;
+      if (L.bboxX < ux0) ux0 = L.bboxX;
+      if (L.bboxY < uy0) uy0 = L.bboxY;
+      if (L.bboxX + L.bboxW > ux1) ux1 = L.bboxX + L.bboxW;
+      if (L.bboxY + L.bboxH > uy1) uy1 = L.bboxY + L.bboxH;
+    }
+    const fbX = Number.isFinite(ux0) ? ux0 : layers[0].bboxX;
+    const fbY = Number.isFinite(uy0) ? uy0 : layers[0].bboxY;
+    const lbW = Math.max(1, Number.isFinite(ux1) ? ux1 - fbX : 0);
+    const lbH = Math.max(1, Number.isFinite(uy1) ? uy1 - fbY : 0);
     // S8（charter H7 根治）：mask 是 **doc-space 平面**，初始覆盖 dispField 起始 bbox，随
     //   _growDispField 同步增长；平面外的查询（位移源可能落在扫过区之外）直查 selection tile。
     const mask: MaskPlane | null = selection
-      ? { x: layer.bboxX, y: layer.bboxY, w: lbW, h: lbH, data: selection.materializeMaskRegion(layer.bboxX, layer.bboxY, lbW, lbH) }
+      ? { x: fbX, y: fbY, w: lbW, h: lbH, data: selection.materializeMaskRegion(fbX, fbY, lbW, lbH) }
       : null;
-    const snap = layer.snapshotImageData();
     this._stroke = {
-      layer,
+      // 一叶一份 startSnap = 该叶当前像素的只读物化（笔触全程只读源头）
+      // spline 采样核：startSnap 不变 → 一次性预滤波，全笔触复用（一次 O(n) IIR，snapshot 级开销）
+      layers: layers.map((layer) => {
+        const snap = layer.snapshotImageData();
+        return {
+          layer,
+          startSnap: snap,
+          splinePlane: (settings.sample === "spline" && snap.imageData)
+            ? prefilterToSplinePlane(snap.imageData.data, snap.bboxW, snap.bboxH)
+            : null,
+        };
+      }),
+      docW: layers[0].docW,
+      docH: layers[0].docH,
       settings,
       bleed,
       lastX: x,
       lastY: y,
       dirty: null,
-      // startSnap = layer 当前像素的只读物化（笔触全程只读源头）
-      startSnap: snap,
-      // spline 采样核：startSnap 不变 → 一次性预滤波，全笔触复用（一次 O(n) IIR，snapshot 级开销）
-      splinePlane: (settings.sample === "spline" && snap.imageData)
-        ? prefilterToSplinePlane(snap.imageData.data, snap.bboxW, snap.bboxH)
-        : null,
-      // dispField 和 layer bbox 对齐；空层 bbox=0 时占位 1×1 全 0
       dispField: {
-        bboxX: layer.bboxX, bboxY: layer.bboxY,
+        bboxX: fbX, bboxY: fbY,
         bboxW: lbW, bboxH: lbH,
         data: new Float32Array(2 * lbW * lbH),
       },
@@ -145,7 +178,6 @@ export class LiquifyEngine {
     const R = Math.max(2, s.size);
     const strength = Math.max(0, Math.min(2, s.strength));
     const cx = x, cy = y;
-    const layer = st.layer;
 
     // 1) footprint 夹到 **doc 边界**（不是 layer.bbox）。tile era：layer.ensureBbox 已是 no-op、
     //    layer.bbox 是「现有内容」包围盒、扩不动——靠它夹会把推出旧内容边的像素截掉（degeneration，
@@ -154,8 +186,8 @@ export class LiquifyEngine {
     const fx1 = Math.ceil(cx + R),  fy1 = Math.ceil(cy + R);
     const x0 = Math.max(0, fx0);
     const y0 = Math.max(0, fy0);
-    const x1 = Math.min(layer.docW, fx1);
-    const y1 = Math.min(layer.docH, fy1);
+    const x1 = Math.min(st.docW, fx1);
+    const y1 = Math.min(st.docH, fy1);
     const w = x1 - x0, h = y1 - y0;
     if (w <= 0 || h <= 0) {
       // 全在 doc 外
@@ -176,10 +208,6 @@ export class LiquifyEngine {
     const fw = f.bboxW;
     const fbX = f.bboxX, fbY = f.bboxY;
 
-    const ss = st.startSnap;
-    const ssX = ss.bboxX, ssY = ss.bboxY;
-    const ssW = ss.bboxW, ssH = ss.bboxH;
-    const ssData = ss.imageData ? ss.imageData.data : null;
     const sampleNearest = st.settings.sample === "nearest";
     const sampleBilinear = st.settings.sample === "bilinear";   // v0.6.61：不再是缺省核，需显式选
     // v124 (user：「预览的时候没有 apply 选区」) selection mask —— S8 起 doc-space（charter H7）。
@@ -204,9 +232,22 @@ export class LiquifyEngine {
       return cellIn(ix, iy) && cellIn(ix + 1, iy) && cellIn(ix, iy + 1) && cellIn(ix + 1, iy + 1);
     };
 
-    // 目标 footprint 像素（要 putImageData 回 layer 的）
-    const dst = new ImageData(w, h);
-    const ddat = dst.data;
+    // 写靶源表（逐事件建一次；空叶——笔前无任何像素——直接不入表：无源可推，重采样恒为透明黑
+    //   = 原样，跳过连 tile 都不分配）。位移场与选区 mask/bleed 判定**与层内容无关** → 每像素
+    //   只解一次源坐标，组内 N 叶复用（每叶只付一次重采样）。
+    //   源坐标不落中间平面（Float32 存取会把 float64 的 srcX/srcY round-trip 掉——单叶像素
+    //   必须与组化前逐位一致，别为省一层循环换掉精度）。
+    const srcs: { data: Uint8ClampedArray; sx: number; sy: number; sw: number; sh: number;
+                  spline: SplinePlane | null; layer: ViewLeaf; ddat: Uint8ClampedArray; dst: ImageData }[] = [];
+    for (const ls of st.layers) {
+      const ss = ls.startSnap;
+      if (!ss.imageData) continue;
+      const dst = new ImageData(w, h);
+      srcs.push({
+        data: ss.imageData.data, sx: ss.bboxX, sy: ss.bboxY, sw: ss.bboxW, sh: ss.bboxH,
+        spline: ls.splinePlane, layer: ls.layer, ddat: dst.data, dst,
+      });
+    }
 
     for (let py = 0; py < h; py++) {
       for (let px = 0; px < w; px++) {
@@ -240,52 +281,54 @@ export class LiquifyEngine {
           }
         }
 
-        // (b) 从 startSnap 重采样（用累积 dispField，**不**从 layer）
+        // (b) 解出源采样位置（默认 = 位移后位置）；累积 dispField，**不**从 layer 迭代
         const tdx = fdata[fIdx];
         const tdy = fdata[fIdx + 1];
-        const idx = (py * w + px) * 4;
-        if (ssData) {
-          // 源采样位置（默认 = 位移后位置）。
-          let srcX = wx - tdx, srcY = wy - tdy;
-          if (maskData) {
-            // v124 dest 在选区外 → 不液化，原像素直采（commit 时 applyMaskPostStroke 兜底）
-            if (!inMask(wx, wy)) {
+        let srcX = wx - tdx, srcY = wy - tdy;
+        if (maskData) {
+          // v124 dest 在选区外 → 不液化，原像素直采（commit 时 applyMaskPostStroke 兜底）
+          if (!inMask(wx, wy)) {
+            srcX = wx; srcY = wy;
+          } else if (bleed !== "import" && !srcFootprintIn(srcX, srcY)) {
+            // v147 dest 在选区内但位移源的 bilinear footprint 触及选区外 → 按 bleed 模式处理
+            if (bleed === "clip") {
+              // 设墙：保留 dest 原像素，外部什么都不进
               srcX = wx; srcY = wy;
-            } else if (bleed !== "import" && !srcFootprintIn(srcX, srcY)) {
-              // v147 dest 在选区内但位移源的 bilinear footprint 触及选区外 → 按 bleed 模式处理
-              if (bleed === "clip") {
-                // 设墙：保留 dest 原像素，外部什么都不进
-                srcX = wx; srcY = wy;
-              } else {
-                // edge：沿 dest→source 射线 march 到刚离开选区的边界点（无中轴接缝）
-                const len = Math.hypot(tdx, tdy);
-                if (len >= 1e-3) {
-                  const dirX = -tdx / len, dirY = -tdy / len;
-                  const maxK = Math.min(Math.ceil(len), 4096);
-                  // 关键（v147 修斑马）：只走**整数 cell**，srcX/Y 落整数格 →
-                  // 下面 bilinear 退化成 point sample，绝不把 2×2 footprint 里的
-                  // 选区外像素混进来。否则边界点是浮点，bilinear 跨界混样 +
-                  // 浮点抖动 → 选区内外差大时高频条纹（斑马）。wx/wy 本就是整数=dest。
-                  let sxi = wx, syi = wy;             // dest（整数，已知 in-mask）
-                  for (let k = 1; k <= maxK; k++) {
-                    const rxi = Math.round(wx + dirX * k);
-                    const ryi = Math.round(wy + dirY * k);
-                    if (!inMask(rxi, ryi)) break;     // 越界：sxi/syi 是最后一个 in-mask 整数 cell
-                    sxi = rxi; syi = ryi;
-                  }
-                  srcX = sxi; srcY = syi;
-                } else {
-                  srcX = wx; srcY = wy;
+            } else {
+              // edge：沿 dest→source 射线 march 到刚离开选区的边界点（无中轴接缝）
+              const len = Math.hypot(tdx, tdy);
+              if (len >= 1e-3) {
+                const dirX = -tdx / len, dirY = -tdy / len;
+                const maxK = Math.min(Math.ceil(len), 4096);
+                // 关键（v147 修斑马）：只走**整数 cell**，srcX/Y 落整数格 →
+                // 下面 bilinear 退化成 point sample，绝不把 2×2 footprint 里的
+                // 选区外像素混进来。否则边界点是浮点，bilinear 跨界混样 +
+                // 浮点抖动 → 选区内外差大时高频条纹（斑马）。wx/wy 本就是整数=dest。
+                let sxi = wx, syi = wy;             // dest（整数，已知 in-mask）
+                for (let k = 1; k <= maxK; k++) {
+                  const rxi = Math.round(wx + dirX * k);
+                  const ryi = Math.round(wy + dirY * k);
+                  if (!inMask(rxi, ryi)) break;     // 越界：sxi/syi 是最后一个 in-mask 整数 cell
+                  sxi = rxi; syi = ryi;
                 }
+                srcX = sxi; srcY = syi;
+              } else {
+                srcX = wx; srcY = wy;
               }
             }
           }
-          // v0.6.36 采样核切换（liquify 是 center-at-integer 约定：位移 0 → 整数坐标 → 三种核都
-          //   退化成精确点采样，v147 边缘 march 的"整数 cell 无斑马"性质三核通用）。
-          //   spline/bicubic 的 4×4 footprint 比 srcFootprintIn 的 2×2 检查宽 2px——选区边缘 bleed
-          //   判定偏保守地沿用 2×2（误差 ≤ 边界 2px 内的轻微掺样，接受）。
-          if (st.splinePlane) {
-            sampleSplinePremult(st.splinePlane, srcX - ssX, srcY - ssY, ddat, idx);
+        }
+        // (c) 逐叶从各自 startSnap 重采样（同一个 srcX/srcY——组内所有叶共享位移场）
+        // v0.6.36 采样核切换（liquify 是 center-at-integer 约定：位移 0 → 整数坐标 → 三种核都
+        //   退化成精确点采样，v147 边缘 march 的"整数 cell 无斑马"性质三核通用）。
+        //   spline/bicubic 的 4×4 footprint 比 srcFootprintIn 的 2×2 检查宽 2px——选区边缘 bleed
+        //   判定偏保守地沿用 2×2（误差 ≤ 边界 2px 内的轻微掺样，接受）。
+        const idx = (py * w + px) * 4;
+        for (let li = 0; li < srcs.length; li++) {
+          const S = srcs[li];
+          const ddat = S.ddat, ssData = S.data, ssX = S.sx, ssY = S.sy, ssW = S.sw, ssH = S.sh;
+          if (S.spline) {
+            sampleSplinePremult(S.spline, srcX - ssX, srcY - ssY, ddat, idx);
           } else if (sampleNearest) {
             const nx = Math.round(srcX - ssX), ny = Math.round(srcY - ssY);
             if (nx >= 0 && nx < ssW && ny >= 0 && ny < ssH) {
@@ -299,10 +342,10 @@ export class LiquifyEngine {
             bicubicSamplePremult(ssData, ssW, ssH, srcX - ssX, srcY - ssY, ddat, idx);
           }
         }
-        // 空 startSnap → ddat 默认 0（透明黑），液化空层无源可推 = 不变
+        // 组内空叶不在 srcs 里 → 一个字节都不写（无源可推 = 原样）
       }
     }
-    layer.putImageData(x0, y0, dst);   // doc 坐标写回 tile
+    for (let li = 0; li < srcs.length; li++) srcs[li].layer.putImageData(x0, y0, srcs[li].dst);   // doc 坐标写回 tile
 
     // dirty bbox 累积
     if (st.dirty) {
@@ -318,7 +361,7 @@ export class LiquifyEngine {
   }
 
   endStroke() {
-    // 释放 startSnap（一张 ImageData 可能 16MB）+ dispField（最多 32MB）
+    // 释放各叶 startSnap（一张 ImageData 可能 16MB；组液化 = N 张）+ dispField（最多 32MB）
     this._stroke = null;
   }
 

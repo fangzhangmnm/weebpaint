@@ -27,11 +27,11 @@ export declare class RasterService {
         dstX: number;
         dstY: number;
     } | null;
-    compositeOnce(nodes: DocNode[], docW: number, docH: number, bg?: Background, surrogate?: SurrogateInput | null, overlay?: OverlayInput | null): PooledFBO;
-    compositeToBytes(nodes: DocNode[], docW: number, docH: number, surrogate?: SurrogateInput | null, overlay?: OverlayInput | null): {
+    compositeOnce(nodes: DocNode[], docW: number, docH: number, bg?: Background, surrogates?: readonly SurrogateInput[], overlay?: OverlayInput | null): PooledFBO;
+    compositeToBytes(nodes: DocNode[], docW: number, docH: number, surrogates?: readonly SurrogateInput[], overlay?: OverlayInput | null): {
         data: Uint8ClampedArray;
         w: number;
         h: number;
     };
-    pickColor(nodes: DocNode[], docW: number, docH: number, bg: Background | undefined, x: number, y: number, surrogate?: SurrogateInput | null, overlay?: OverlayInput | null): [number, number, number, number];
+    pickColor(nodes: DocNode[], docW: number, docH: number, bg: Background | undefined, x: number, y: number, surrogates?: readonly SurrogateInput[], overlay?: OverlayInput | null): [number, number, number, number];
 }

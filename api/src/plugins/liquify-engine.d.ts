@@ -29,15 +29,20 @@ interface MaskPlane {
     h: number;
     data: Uint8Array;
 }
-interface LiquifyStroke {
+interface LiquifyLeafState {
     layer: ViewLeaf;
+    startSnap: LayerSnapshot;
+    splinePlane: SplinePlane | null;
+}
+interface LiquifyStroke {
+    layers: LiquifyLeafState[];
+    docW: number;
+    docH: number;
     settings: LiquifySettings;
     bleed: string;
     lastX: number;
     lastY: number;
     dirty: [number, number, number, number] | null;
-    startSnap: LayerSnapshot;
-    splinePlane: SplinePlane | null;
     dispField: DispField;
     selection: Selection | null;
     mask: MaskPlane | null;
@@ -45,7 +50,7 @@ interface LiquifyStroke {
 export declare class LiquifyEngine {
     _stroke: LiquifyStroke | null;
     constructor();
-    beginStroke(layer: ViewLeaf, settings: LiquifySettings, x: number, y: number, selection: Selection | null): void;
+    beginStroke(layers: readonly ViewLeaf[], settings: LiquifySettings, x: number, y: number, selection: Selection | null): void;
     extendStroke(x: number, y: number): void;
     endStroke(): void;
     isActive(): boolean;

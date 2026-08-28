@@ -72,17 +72,17 @@ export class GLBoard {
   //   （C1：canvas 包装面 compositeToCanvas 撤出 src/gl——屏显域 canvas 归壳，board.ts 自包字节。）
   //   surrogate/overlay（v0.9.18 timelapse 采帧 WYSIWYG，同 pickColor 待遇）：save/export 不传，语义不变。
   compositeToBytes(nodes: DocNode[], docW: number, docH: number,
-                   surrogate: SurrogateInput | null = null, overlay: OverlayInput | null = null): { data: Uint8ClampedArray; w: number; h: number } | null {
+                   surrogates: readonly SurrogateInput[] = [], overlay: OverlayInput | null = null): { data: Uint8ClampedArray; w: number; h: number } | null {
     if (this._glctx.isLost) return null;
-    return this._raster.compositeToBytes(nodes, docW, docH, surrogate, overlay);
+    return this._raster.compositeToBytes(nodes, docW, docH, surrogates, overlay);
   }
 
   // S8 吸管：一次性合成（compositeOnce，不建缓存）+ 1px readback。bg 语义同 render 的 docBg。
-  pickColor(doc: GLDoc, docBg: string | null, x: number, y: number, surrogate: SurrogateInput | null = null, overlay: OverlayInput | null = null): [number, number, number, number] | null {
+  pickColor(doc: GLDoc, docBg: string | null, x: number, y: number, surrogates: readonly SurrogateInput[] = [], overlay: OverlayInput | null = null): [number, number, number, number] | null {
     if (this._glctx.isLost) return null;
     const bg: Background | undefined = docBg === "checker" ? "checker"
       : docBg ? [...hexToRgb(docBg), 1] as [number, number, number, number] : undefined;
-    return this._raster.pickColor(doc.layers, doc.width, doc.height, bg, x, y, surrogate, overlay);
+    return this._raster.pickColor(doc.layers, doc.width, doc.height, bg, x, y, surrogates, overlay);
   }
 
   // 给自由变换 commit 用：warp 源 → straight RGBA **字节**（_bakeDown typed-array source-over 落层，
@@ -94,7 +94,7 @@ export class GLBoard {
   // 渲染一帧。affine6 = board _applyDocTransform 的 device-px 6 参；canvasW/H = device px。
   // liveSyncLeaf 只取 id（标 updated，像素变更由 contentVersion 快路径自己发现）。
   // gridBg 非空 = 透明显示模式（docBg 应为 null）：present 时整屏「主题底(voidColor)+点网格」，doc 真透明叠上。
-  render(doc: GLDoc, affine6: number[], canvasW: number, canvasH: number, scale: number, voidColor: string, docBg: string | null, floats: FloatInput[] = [], stampOverlay: OverlayInput | null = null, liveSyncLeaf: DocLeaf | null = null, surrogate: SurrogateInput | null = null, gridBg: { dotColor: string; stepPx: number; radiusPx: number } | null = null): void {
+  render(doc: GLDoc, affine6: number[], canvasW: number, canvasH: number, scale: number, voidColor: string, docBg: string | null, floats: FloatInput[] = [], stampOverlay: OverlayInput | null = null, liveSyncLeaf: DocLeaf | null = null, surrogates: readonly SurrogateInput[] = [], gridBg: { dotColor: string; stepPx: number; radiusPx: number } | null = null): void {
     if (this._glctx.isLost) return;
     const bg: Background | undefined = docBg === "checker" ? "checker"
       : docBg ? [...hexToRgb(docBg), 1] as [number, number, number, number] : undefined;
@@ -104,7 +104,7 @@ export class GLBoard {
     this._tree.renderFrame(
       doc.layers, doc.width, doc.height, bg,
       affine6, canvasW, canvasH, scale, hexToRgb(voidColor),
-      floats, stampOverlay, surrogate, liveSyncLeaf ? liveSyncLeaf.id : null, screenGrid,
+      floats, stampOverlay, surrogates, liveSyncLeaf ? liveSyncLeaf.id : null, screenGrid,
     );
   }
 }

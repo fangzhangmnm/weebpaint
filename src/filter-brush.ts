@@ -8,11 +8,15 @@
 //     （或包装现有 LiquifyEngine）
 //
 // Filter 必须实现的（brush 模式）：
-//   beginBrushStroke(layer, params, brushSettings, selection, x, y, pressure) → state
+//   beginBrushStroke(layers, params, brushSettings, selection, x, y, pressure) → state
 //   extendBrushStamp(state, x, y, pressure)              每个 pointermove 调，filter 自管 spacing
 //   endBrushStroke(state)                                释放
 //   cancelBrushStroke?(state)                            可选，取消（abort 路径）
 //   flushDirty?(state) → [x0,y0,x1,y1] | null            可选，告诉 board dirty bbox
+//
+// layers（2026-08-28）= 写靶叶**列表**：单叶恒 [leaf]；active 是图层组且 filter 声明
+//   supportsLayerGroup 时 = 组内全部叶（含隐藏）。引擎只做传递，语义归 filter
+//   （液化 = 一个位移场逐叶重采样；色彩类 filter 见 filters.ts 的 fail-loud 单叶断言）。
 
 import type { ViewLeaf } from "./backend/workpiece/painting-view.ts";
 import type { Selection } from "./backend/selection.ts";
@@ -21,7 +25,8 @@ import type { Selection } from "./backend/selection.ts";
 // 故此处只描述本引擎会 dispatch 的子集；handle/params 对引擎是不透明的）。
 interface BrushFilter {
   id?: string;
-  beginBrushStroke(layer: ViewLeaf, params: unknown, brushSettings: unknown, selection: Selection | null, x: number, y: number, pressure: number): unknown;
+  supportsLayerGroup?: boolean;
+  beginBrushStroke(layers: readonly ViewLeaf[], params: unknown, brushSettings: unknown, selection: Selection | null, x: number, y: number, pressure: number): unknown;
   extendBrushStamp(state: unknown, x: number, y: number, pressure: number): void;
   endBrushStroke?(state: unknown): void;
   cancelBrushStroke?(state: unknown): void;
@@ -37,12 +42,16 @@ export class FilterBrushEngine {
     this._Filter = null;
   }
 
-  beginStroke(layer: ViewLeaf, Filter: BrushFilter, params: unknown, brushSettings: unknown, selection: Selection | null, x: number, y: number, pressure: number) {
+  beginStroke(layers: readonly ViewLeaf[], Filter: BrushFilter, params: unknown, brushSettings: unknown, selection: Selection | null, x: number, y: number, pressure: number) {
     if (!Filter || !Filter.beginBrushStroke) {
       throw new Error(`Filter ${Filter && Filter.id} does not support brush mode`);
     }
+    if (!layers.length) throw new Error(`Filter ${Filter.id}: no target leaf`);
+    if (layers.length > 1 && !Filter.supportsLayerGroup) {
+      throw new Error(`Filter ${Filter.id} does not support layer groups (got ${layers.length} targets)`);
+    }
     this._Filter = Filter;
-    this._handle = Filter.beginBrushStroke(layer, params, brushSettings, selection, x, y, pressure);
+    this._handle = Filter.beginBrushStroke(layers, params, brushSettings, selection, x, y, pressure);
   }
 
   extendStroke(x: number, y: number, pressure: number) {

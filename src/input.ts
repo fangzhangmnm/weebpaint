@@ -52,6 +52,8 @@ type Doc = PaintingView;
 // filterBrush 当前激活态：Filter 是 filter-brush.ts 的 BrushFilter（未 export，对 input 不透明）+ params。
 //   beginStroke 调用点再断言到引擎签名；这里 Filter/params 对 input 不透明 → unknown。
 interface FilterBrushState { Filter: unknown; params: unknown; }
+// filter 的组能力声明（filters.ts 的 Filter.supportsLayerGroup；对 input 只需这一位）。
+interface GroupCapableFilter { supportsLayerGroup?: boolean }
 
 // 活动笔画 = StrokeSession（C5：事务生命周期迁 stroke-session.ts——令牌开合/GPU commit/选区
 //   finalize/记账编排都在 session；input 只做手势路由 + 投喂 (x,y,p,t)。液化 = filterBrush 的
@@ -406,7 +408,7 @@ export class InputController {
     getSelection: () => this.doc.selection,
     commitStamps: (cs) => this.board.commitBrushStroke(cs),
     invalidate: () => this.board.invalidateAll(),
-    setShadow: (layerId, pixels) => this.board.setStrokeShadow(layerId, pixels),
+    setShadows: (entries) => this.board.setStrokeShadows(entries),
   };
 
   constructor(board: Board, doc: Doc, opts: InputOpts = {}) {
@@ -611,7 +613,9 @@ export class InputController {
     const _paintIntent = _isDrawRole
       || (role === "hold" && isPixelStroke(toolToRole(effectiveTool(tool, this.altDown))));
     if (_paintIntent) {
-      const { reason } = this.doc.activeEditableLeaf();
+      // 复数谓词（2026-08-28）：声明了 supportsLayerGroup 的 filter brush（= 液化）吃得下整组 →
+      //   组不再是硬拒；隐藏组/空组仍照拒，其余笔类（allowGroup=false）语义逐字不变。
+      const { reason } = this.doc.activeStrokeLeaves({ allowGroup: this._filterBrushAllowsGroup() });
       if (reason === "group" || reason === "hidden") {
         const msg = reason === "group" ? t("st.groupNoDraw") : t("st.hiddenNoDraw");
         if (e.pointerType === "touch") {
@@ -959,7 +963,7 @@ export class InputController {
     //   就地写）；形状笔 pixelMode=shadow（参数重算——每帧 restore+重画改在替身叶上，真层只在
     //   收口一刻被令牌写，cancel 丢替身零回滚）。
     const preview = !settings.pixelMode ? "overlay" : (rec.role === "shapeBrush" ? "shadow" : "livesync");
-    this._activeStroke = new StrokeSession(this._strokeDeps, eng, layer, spec, preview);
+    this._activeStroke = new StrokeSession(this._strokeDeps, eng, [layer], spec, preview);
 
     const { x: dx, y: dy } = this.board.screenToDoc(rec.smX!, rec.smY!);
     const pressure = effectivePressureFor(rec, e);
@@ -971,7 +975,7 @@ export class InputController {
     const scale = this.board.viewport.scale || 1;
     // v249：时间常数指数追踪 + 死区。{tau, deadzone}。
     const smooth = buffered ? _resolveSmooth(settings, scale) : {};
-    eng.beginStroke(this._activeStroke.target, settings, dx, dy, pressure, mode, smooth, e.timeStamp);
+    eng.beginStroke(this._activeStroke.targets[0], settings, dx, dy, pressure, mode, smooth, e.timeStamp);
     const bbox = eng.flushDirty();
     if (bbox) this.board.markDocDirty(bbox[0], bbox[1], bbox[2], bbox[3]);
     this.board.requestRender();
@@ -1009,7 +1013,7 @@ export class InputController {
 
   // GL live-sync 接缝：描边中原地改真层的笔（draw/erase pixelMode）→ 返回活动叶，board 每帧把它
   //   重传 GPU 才能显 live 预览。buffered 笔走 GPU stamp overlay、液化/filterBrush/形状笔 pixelMode
-  //   走 stroke 替身（board.setStrokeShadow，C6）→ 都返 null。
+  //   走 stroke 替身（board.setStrokeShadows，C6）→ 都返 null。
   liveMutatedLeaf(): ViewLeaf | null {
     const as = this._activeStroke;
     if (!as || !as.inPlace) return null;
@@ -1020,6 +1024,19 @@ export class InputController {
   // ---- Filter brush (v132) ----
   // 一笔 = 1 个 "stroke" history entry（schema 同笔触）
   // brushSettings 从 getResolvedBrush() 拿（沿用当前画笔 size / hardness / spacing / opacity）
+  // 组液化（2026-08-28，user 0823「液化能对图层组吗」）：当前 filter brush 吃不吃得下整组？
+  //   唯一户 = 液化（LiquifyFilter.supportsLayerGroup）。真正的「哪些叶 / 拒不拒」判定在
+  //   doc.activeStrokeLeaves（单一决策点，含隐藏组软拒与空组拒）。
+  _filterBrushAllowsGroup(): boolean {
+    if (this.editMode?.current() !== "filterBrush") return false;
+    return !!(this.getFilterBrushState()?.Filter as GroupCapableFilter | undefined)?.supportsLayerGroup;
+  }
+
+  // filterBrush 的写靶叶列表：组（且 filter 吃得下组）→ 组内全部叶（含隐藏）；否则 → [active 叶]。
+  _filterBrushTargets(): ViewLeaf[] {
+    return this.doc.activeStrokeLeaves({ allowGroup: this._filterBrushAllowsGroup() }).leaves;
+  }
+
   // filter + params 从 getFilterBrushState() 拿（app.js 在进入 filter brush 模式时 set）
   _beginFilterBrush(rec: PointerRec) {
     const fbState = this.getFilterBrushState();
@@ -1027,16 +1044,19 @@ export class InputController {
     if (!fbState || !fbState.Filter || !brushSettings || !this.doc.activeLayer) {
       rec.role = null; return;
     }
-    const layer = this.doc.activeLayer as ViewLeaf;   // 组已被上游硬拒，此处确为叶
+    // 写靶叶列表：叶 → [叶]；组（仅当 filter 声明 supportsLayerGroup，见 _filterBrushAllowsGroup）
+    //   → 组内全部叶（含隐藏，对齐 transform 的「整组一起动」）。空列表已被上游拦掉。
+    const layers = this._filterBrushTargets();
+    if (!layers.length) { rec.role = null; return; }
     const spec = pixelStrokeSpec(rec.role as string)!;   // filterBrush → "stroke" 事务，finalize:false
     // filterBrush 在 beginStroke 时已吃了 selection，stamp 内 mask 外保留 pre → 无需 post-stroke finalize（spec.finalize=false）
     // C6：预览宿=shadow——液化/滤镜笔改写替身叶（census §6.1 第一户），真层只在收口一刻被令牌写。
-    this._activeStroke = new StrokeSession(this._strokeDeps, this.filterBrush, layer, spec, "shadow");
+    this._activeStroke = new StrokeSession(this._strokeDeps, this.filterBrush, layers, spec, "shadow");
     const { x: dx, y: dy } = this.board.screenToDoc(rec.smX!, rec.smY!);
     const pressure = effectivePressureFor(rec, { pressure: rec.lastP ?? 1 });
     try {
       // fbState.Filter 对 input 不透明（BrushFilter 未 export）→ 在引擎接缝处断言到 beginStroke 入参类型。
-      this.filterBrush.beginStroke(this._activeStroke.target, fbState.Filter as Parameters<FilterBrushEngine["beginStroke"]>[1], fbState.params, brushSettings, this.doc.selection, dx, dy, pressure);
+      this.filterBrush.beginStroke(this._activeStroke.targets, fbState.Filter as Parameters<FilterBrushEngine["beginStroke"]>[1], fbState.params, brushSettings, this.doc.selection, dx, dy, pressure);
     } catch (e) {
       reportError(new Error("[filter brush] begin failed: " + String(e)), "log");
       const s = this._activeStroke;

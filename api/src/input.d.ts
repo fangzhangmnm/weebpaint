@@ -142,6 +142,8 @@ export declare class InputController {
     collectActiveStamps(): ReturnType<BrushEngine["collectStamps"]>;
     abortActiveStroke(): void;
     liveMutatedLeaf(): ViewLeaf | null;
+    _filterBrushAllowsGroup(): boolean;
+    _filterBrushTargets(): ViewLeaf[];
     _beginFilterBrush(rec: PointerRec): void;
     _beginLasso(rec: PointerRec, e?: PointerEvent): void;
     _endLasso(rec: PointerRec): void;

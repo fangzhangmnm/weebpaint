@@ -287,7 +287,7 @@ input.shapeBrush.setViewportRotProvider(() => board.viewport.rot);
 board.setStrokeActiveHint(() => input.isStrokeActive());
 // GL live-sync：原地改真层的笔（draw/erase pixelMode）描边中把活动层每帧重传 GPU 才显预览。
 //   buffered 笔走 GPU stamp overlay；液化/filterBrush/形状笔 pixelMode 走 stroke 替身
-//   （StrokeSession→board.setStrokeShadow，C6）——此处都返 null。仅 GL 模式生效（board 内部门控）。
+//   （StrokeSession→board.setStrokeShadows，C6）——此处都返 null。仅 GL 模式生效（board 内部门控）。
 board.setLiveSyncProvider(() => input.liveMutatedLeaf());
 // 自由变换 commit 烤定走 GPU warp（board.glWarpBakeFn）；lasso 仍 GL-blind，经 provider 拿。
 input.lasso.setWarpBakeProvider(() => board.glWarpBakeFn());

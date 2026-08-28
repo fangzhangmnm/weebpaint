@@ -168,7 +168,7 @@ export class ShapeBrushEngine {
     this._st = null;
   }
 
-  // GPU stamp overlay 拉取口（live 预览）。pixelMode 走 stroke 替身显示（C6，board.setStrokeShadow），无 stamps。
+  // GPU stamp overlay 拉取口（live 预览）。pixelMode 走 stroke 替身显示（C6，board.setStrokeShadows），无 stamps。
   collectStamps(): StampCollect | null {
     if (!this._st || this._st.settings.pixelMode) return null;
     return this._st.cs;
