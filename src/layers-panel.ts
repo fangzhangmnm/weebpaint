@@ -113,7 +113,16 @@ export function toggleLayersPanel(force?: boolean) {
   els.layersBtn.setAttribute("aria-pressed", show ? "true" : "false");
   // 开关状态随文档走：写进 desk（setter 自动标记 workspace dirty）。
   desk.layersPanel.enabled = show;
-  if (show) { raiseWindow(els.layersPanel); renderLayersPanel(); }
+  if (show) {
+    // 兜底回屏（0828）：无论坐标从哪条路粘上来，用户点开面板的瞬间它必须在视口内。
+    const r = els.layersPanel.getBoundingClientRect();
+    if (r.width > 0 && (r.right < 48 || r.left > window.innerWidth - 48 || r.bottom < PANEL_MIN_TOP || r.top > window.innerHeight - 48)) {
+      els.layersPanel.style.left = Math.max(0, Math.min(window.innerWidth - r.width, r.left)) + "px";
+      els.layersPanel.style.right = "auto";
+      els.layersPanel.style.top = Math.max(PANEL_MIN_TOP, Math.min(window.innerHeight - r.height, r.top)) + "px";
+    }
+    raiseWindow(els.layersPanel); renderLayersPanel();
+  }
 }
 
 // doc 的 desk 加载/重置后，把面板开关 + 位置**只读地**应用到 DOM（绝不回写 desk → 不误标 dirty）。
@@ -121,15 +130,23 @@ export function toggleLayersPanel(force?: boolean) {
 function applyLayersPanelFromEditorState() {
   // 换文档/重置 desk：悬着的 renameId 是**上一个 doc** 的层 id，必须清（否则新 doc 的同号层被当成正在改名）。
   layersUi.renameId = null;
-  const pos = desk.layersPanel.position;   // {left,top,width?,height?} | null（null = 自动摆放，不动位置）
+  const pos = desk.layersPanel.position;   // {left,top,width?,height?} | null（null = 自动摆放，回 CSS 默认位）
   if (pos) {
-    els.layersPanel.style.left = pos.left + "px";
-    els.layersPanel.style.right = "auto";
-    els.layersPanel.style.top = Math.max(PANEL_MIN_TOP, pos.top) + "px";   // 陈旧持久化位置也不许钻顶（v0.4.11）
-    // #13：宽/列表高随文档走；大屏存的尺寸小屏恢复也夹进视口
+    // 0828 iPad 实锤「图层窗离奇失踪」：desk 坐标是**别的窗口几何**存的（回收站恢复的旧画/跨设备
+    //   同步件），此处原来 left 裸应用、top 只夹顶不夹底 → 面板整个出屏。与 color-panel 同款全夹取。
     els.layersPanel.style.width = pos.width ? Math.max(200, Math.min(window.innerWidth - 24, pos.width)) + "px" : "";
     _userListH = typeof pos.height === "number" ? pos.height : null;
+    const w = els.layersPanel.offsetWidth || pos.width || 264;    // 面板可能还 hidden（offsetWidth=0）→ 存值/默认兜底
+    const h = els.layersPanel.offsetHeight || 240;
+    els.layersPanel.style.left = Math.max(0, Math.min(window.innerWidth - w, pos.left)) + "px";
+    els.layersPanel.style.right = "auto";
+    els.layersPanel.style.top = Math.max(PANEL_MIN_TOP, Math.min(window.innerHeight - h, pos.top)) + "px";
   } else {
+    // 同实锤第二刀（「新画也看不到」）：原来 null 分支不清 left/top —— 上一张画的出屏坐标粘在
+    //   单例 DOM 内联样式上，污染此后每张画（含新画）直到刷新。null = 回 CSS 默认位，必须清干净。
+    els.layersPanel.style.left = "";
+    els.layersPanel.style.right = "";
+    els.layersPanel.style.top = "";
     els.layersPanel.style.width = "";
     _userListH = null;
   }

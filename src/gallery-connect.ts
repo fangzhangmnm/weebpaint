@@ -10,6 +10,7 @@ import type { GalleryEntry, DirHandleLike } from "./gallery-registry.ts";
 import { galleryRegistry } from "./gallery-registry.ts";
 import { galleryAttachment } from "./gallery-attachment-host.ts";
 import { storeAbsent, _swapStoreForGallery, signIn, getActiveAccount, isSignedIn } from "./app-store.ts";
+import { deviceKvGet, deviceKvSet } from "./device-kv.ts";
 import { reportError } from "./error-badge.ts";
 
 // ---- FSA 权限（folder 库）----
@@ -46,12 +47,33 @@ export async function mintFolderByPicker(): Promise<MintResult | null> {
   return _withCreated(() => galleryRegistry.mintFolder(handle as DirHandleLike));
 }
 
-/** OneDrive（手势）：signIn 走 account picker——选哪个账号铸哪个账号的库（多账号=多条目，结构支持）。 */
+/** OneDrive（手势）。**redirect 事实**（2026-08-28 iPad 实锤「点两次」破案）：signIn = loginRedirect =
+ *  整页跳走，本函数后半段死在跳转点——回来后 seed 只写 registry、没人 attach，第二次点才靠
+ *  「再跳一次 → boot 领养」侥幸出库。修法两半：
+ *  ① 已登录 → **不再 signIn**，直接用 active 账号同步续 mint（零跳转，connect 一次到位）；
+ *  ② 未登录 → redirect 前落「待续连接」标记（device-kv + 时间戳），回程 auth-changed 由
+ *    resumePendingOneDriveConnect 续办 mint+attach（gallery-manage-ui 接线）。 */
 export async function mintOneDriveByAccount(): Promise<MintResult | null> {
-  await signIn();
+  if (!isSignedIn()) {
+    markPendingOneDriveConnect();
+    await signIn();                       // loginRedirect：正常情况下页面已离开，下面代码不会跑到
+  }
   const acct = getActiveAccount() as { homeAccountId?: string; username?: string; name?: string } | null;
   if (!acct?.homeAccountId) return null;
+  clearPendingOneDriveConnect();          // 已拿到账号（silent/罕见非跳转路径）：标记用不上了
   return _withCreated(() => galleryRegistry.mintOneDrive(acct.homeAccountId as string, acct.username || acct.name || ""));
+}
+
+// ── 待续连接标记（P3 iOS redirect 续办；形制=device-kv 标量 + TTL，不是 crash-store 的字节记录）──
+const PENDING_CONNECT_KEY = "pending-onedrive-connect-at";
+const PENDING_CONNECT_TTL_MS = 10 * 60_000;   // 用户在微软页取消/走神：过期作废，绝不隔天幽灵自动连库
+export function markPendingOneDriveConnect(): void { deviceKvSet(PENDING_CONNECT_KEY, String(Date.now())); }
+export function clearPendingOneDriveConnect(): void { deviceKvSet(PENDING_CONNECT_KEY, null); }
+/** 读并判新鲜；不清除（清除归续办成功/作废方调 clear——读写分离防半路丢标记）。 */
+export function hasFreshPendingOneDriveConnect(): boolean {
+  const raw = deviceKvGet(PENDING_CONNECT_KEY);
+  const at = raw ? Number(raw) : NaN;
+  return Number.isFinite(at) && Date.now() - at < PENDING_CONNECT_TTL_MS;
 }
 
 /** 挂载既有条目（手势上下文；调用方保证已过绿灯门 detach）。folder 缺权限当场 request 一次。 */

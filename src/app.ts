@@ -40,7 +40,7 @@ import { initTheme, reconcileThemeFromPrefs } from "./theme.ts";
 import { initLayersPanel, renderLayersPanel, LAYER_MODE_LABEL } from "./layers-panel.ts";
 import { initDocOps } from "./doc-ops.ts";
 import { initCloudAuthUI, updateCloudAuthUI } from "./gallery/cloud-auth-ui.ts";
-import { initGalleryManageUI } from "./gallery/gallery-manage-ui.ts";
+import { initGalleryManageUI, resumePendingOneDriveConnect } from "./gallery/gallery-manage-ui.ts";
 import { initSettingsMenu, applyCheckerboard, renderSettingsFromPrefs } from "./settings-menu.ts";   // setMenuOpen→各菜单模块
 import { initFiltersAdjust } from "./filters-adjust.ts";
 import { initToolbar, RACK_PANEL_BY_TOOL, closeTransientMenus } from "./toolbar.ts";
@@ -504,6 +504,7 @@ window.addEventListener("wp:auth-changed", () => {
   // P3 离线态翻牌：OneDrive 库的 online = 登录态（token 掉=离线不算 logoff；重新登上=接通）。
   const att = galleryAttachment.state();
   if (att.kind === "attached" && att.entry.kind === "onedrive") galleryAttachment.setOnline(isSignedIn());
+  void resumePendingOneDriveConnect();                      // iPad redirect 回程：把跳转前没办完的首次连接续办掉（幂等）
   if (!els.galleryFull.classList.contains("hidden")) gallery.refresh();
 });
 // 在线 / 离线变化时刷新云端 UI（标签 / 按钮可见性）。

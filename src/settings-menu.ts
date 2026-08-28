@@ -217,6 +217,9 @@ function _applyMenuTab() {
 }
 
 export function initSettingsMenu(ctx: AppContext) {
+  // 0828 iPad 实锤：boot 静默探号在后台，attach 时 isSignedIn 还 false → 名字行落「已离线」尾巴，
+  //   setOnline(true) 后没人重画 → 长挂假离线。attachment 一变就重画（attach/detach/翻牌全覆盖）。
+  galleryAttachment.onChange(() => renderCurrentGallery());
   ({ state, board, setStatus, updateSaveStatus } = ctx);
 
   // v0.9.26 PWA 安装入口（user 2026-08-20）：capture 要尽早挂（事件发在监听前就收不到了）；

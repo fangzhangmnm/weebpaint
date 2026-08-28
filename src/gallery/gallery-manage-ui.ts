@@ -14,7 +14,7 @@ import { openChoiceSheet, openConfirmSheet } from "../sheets.ts";
 import { galleryAttachment } from "../gallery-attachment-host.ts";
 import { galleryRegistry } from "../gallery-registry.ts";
 import type { GalleryEntry } from "../gallery-registry.ts";
-import { mintFolderByPicker, mintOneDriveByAccount, attachGallery, ensureFolderPermission, canPickFolderGallery, type MintResult } from "../gallery-connect.ts";
+import { mintFolderByPicker, mintOneDriveByAccount, attachGallery, ensureFolderPermission, canPickFolderGallery, hasFreshPendingOneDriveConnect, clearPendingOneDriveConnect, type MintResult } from "../gallery-connect.ts";
 import { requireStore, galleryBackend, signIn, isSignedIn, isAuthConfigured, _seedNextRackInitData, _buildStoreForGalleryEntry, brushRackCollection } from "../app-store.ts";
 import { getAllBrushes, getMeta, RACK_META_ID } from "../brushes.ts";
 import { preferences, PREF_REGISTRY, type PrefKey } from "../app-prefs.ts";
@@ -149,6 +149,23 @@ async function switchFlow(entry: GalleryEntry, opts: { askSeed: boolean }): Prom
 
 /** 编辑器无库单入口（topbar 文件菜单）也走同一条连接流程。 */
 export const openGalleryConnectFlow = (): Promise<void> => connectFlow();
+
+/** redirect 回程续办（app.ts wp:auth-changed 接线；2026-08-28 iPad「点两次」修）：
+ *  跳转前落的「待续连接」标记还新鲜 + 已登录 → 续走 mint+switchFlow，把首次连接一次办完。
+ *  已经挂上库（boot 领养赢了竞态/别的入口先到）→ 目的已达，只清标记。幂等：标记清了就不会重入。 */
+export async function resumePendingOneDriveConnect(): Promise<void> {
+  if (!hasFreshPendingOneDriveConnect()) return;
+  if (!isSignedIn()) return;                          // 回程未成号（用户取消）：标记留给 TTL 作废
+  clearPendingOneDriveConnect();
+  if (galleryAttachment.state().kind === "attached") return;
+  try {
+    const minted = await mintOneDriveByAccount();     // 已登录：零跳转同步路径
+    if (!minted) return;
+    await switchFlow(minted.entry, { askSeed: minted.created });
+  } catch (e) {
+    reportError(new Error("[gallery-manage] resume connect failed: " + String(e)), "error");
+  }
+}
 
 async function connectFlow(): Promise<void> {
   // iOS/手势红线（sheets.ts 头注释）：signIn popup / FSA picker 都要活着的 user activation——

@@ -478,9 +478,6 @@
           <button class="gallery-icon-btn hidden" id="cloudRefreshBtn" type="button" data-i18n-title="cloud.refresh">
             <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#refresh"/></svg>
           </button>
-          <button class="gallery-icon-btn" id="galleryTrashBtn" type="button" data-i18n-title="nav.trash" data-i18n-aria="nav.trash">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#trash-can"/></svg>
-          </button>
           <button class="gallery-icon-btn" id="galleryAddBtn" type="button" data-i18n-title="gal.chrome.add" aria-haspopup="true" aria-expanded="false">
             <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#new"/></svg>
           </button>
@@ -515,6 +512,10 @@
     <!-- 图库菜单 popup：版本号 + 强制更新 + 文件无关设置（动作代理到主菜单 handler） -->
     <div class="menu-panel hidden" id="galleryMenuPopup" role="menu">
       <div class="menu-item-info version-slim" id="galleryMenuVersion">—</div>
+      <!-- 回收站入口（user 0828：从 header 图标行收进菜单；图标=restore-trash「从垃圾桶取货」——入口语义是找回，不是删除） -->
+      <button class="menu-item menu-item-with-icon" id="galleryMenuTrash" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#restore-trash"/></svg>
+        <span class="menu-item-label" data-i18n="nav.trash">回收站</span>
+      </button>
       <button class="menu-item menu-item-with-icon" id="galleryMenuForceUpdate" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#refresh"/></svg>
         <span class="menu-item-label" data-i18n="menu.forceReset">强制更新</span>
       </button>
@@ -1532,6 +1533,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-121eb82ec149.mjs"></script>
+    <script type="module" src="./dist/weebpaint-c712cc56787c.mjs"></script>
   </body>
 </html>

@@ -11,8 +11,17 @@ export interface MintResult {
 }
 /** 本地文件夹 picker（手势）：选哪就是哪（VS Code 姿态）；同夹二挂 isSameEntry 复用 id。用户取消 = null。 */
 export declare function mintFolderByPicker(): Promise<MintResult | null>;
-/** OneDrive（手势）：signIn 走 account picker——选哪个账号铸哪个账号的库（多账号=多条目，结构支持）。 */
+/** OneDrive（手势）。**redirect 事实**（2026-08-28 iPad 实锤「点两次」破案）：signIn = loginRedirect =
+ *  整页跳走，本函数后半段死在跳转点——回来后 seed 只写 registry、没人 attach，第二次点才靠
+ *  「再跳一次 → boot 领养」侥幸出库。修法两半：
+ *  ① 已登录 → **不再 signIn**，直接用 active 账号同步续 mint（零跳转，connect 一次到位）；
+ *  ② 未登录 → redirect 前落「待续连接」标记（device-kv + 时间戳），回程 auth-changed 由
+ *    resumePendingOneDriveConnect 续办 mint+attach（gallery-manage-ui 接线）。 */
 export declare function mintOneDriveByAccount(): Promise<MintResult | null>;
+export declare function markPendingOneDriveConnect(): void;
+export declare function clearPendingOneDriveConnect(): void;
+/** 读并判新鲜；不清除（清除归续办成功/作废方调 clear——读写分离防半路丢标记）。 */
+export declare function hasFreshPendingOneDriveConnect(): boolean;
 /** 挂载既有条目（手势上下文；调用方保证已过绿灯门 detach）。folder 缺权限当场 request 一次。 */
 export declare function attachGallery(entry: GalleryEntry): Promise<void>;
 /** boot 静默重挂（app.ts prefsReady 链头，fixup/restore 之前）。店懒出生（2026-08-27）后只剩一问：

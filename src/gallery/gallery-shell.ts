@@ -455,6 +455,11 @@ export function initGalleryShell(ctx: AppContext) {
     setStatus(t("gs.created", { name, w, h }));
   });
 
+  // 回收站入口（0828 收进菜单；header 图标已撤，els.galleryTrashBtn 两处 ?. 兼容空缺）。
+  document.getElementById("galleryMenuTrash")?.addEventListener("click", () => {
+    els.galleryMenuPopup.classList.add("hidden");
+    _switchView("trash");
+  });
   // 图库菜单 popup 内动作代理到主菜单已有 handler（.click() 即触发，不重复逻辑/状态）。
   els.galleryMenuForceUpdate?.addEventListener("click", () => {
     els.galleryMenuPopup.classList.add("hidden");
