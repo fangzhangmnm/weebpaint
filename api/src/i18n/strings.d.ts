@@ -5235,6 +5235,12 @@ export declare const S: {
         readonly ja: "OneDrive · 別のアカウントで…";
         readonly tok: "OneDrive · kepeken jan ante…";
     };
+    readonly "gm.fileProtoCloudHelp": {
+        readonly zh: "单文件直接双击打开（file://）时，微软登录用不了——需要一个本地 http 环境。逃生舱：在这个文件所在的文件夹打开命令行，运行\n\n    python -m http.server 8000\n\n然后用浏览器打开 http://localhost:8000/{file} 再连接 OneDrive。（本地文件夹图库不受影响，可以直接用。）";
+        readonly en: "Opened directly from disk (file://), Microsoft sign-in cannot work — it needs a local http origin. Escape hatch: open a terminal in this file's folder and run\n\n    python -m http.server 8000\n\nthen open http://localhost:8000/{file} in your browser and connect OneDrive there. (Local folder galleries are unaffected.)";
+        readonly ja: "ファイルを直接開いた状態（file://）では Microsoft サインインは使えません——ローカル http 環境が必要です。このファイルのフォルダーでターミナルを開き、\n\n    python -m http.server 8000\n\nを実行し、ブラウザで http://localhost:8000/{file} を開いてから OneDrive に接続してください。（ローカルフォルダーのギャラリーはそのまま使えます。）";
+        readonly tok: "lipu li open tan ilo la sina ken ala kepeken OneDrive. o open e ilo toki lon poki pi lipu ni. o kepeken: python -m http.server 8000. o open e http://localhost:8000/{file}. poki lipu li ken awen.";
+    };
     readonly "gm.srcFolder": {
         readonly zh: "本地文件夹";
         readonly en: "Local folder";

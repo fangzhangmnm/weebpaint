@@ -171,12 +171,20 @@ async function connectFlow(): Promise<void> {
   // iOS/手势红线（sheets.ts 头注释）：signIn popup / FSA picker 都要活着的 user activation——
   //   必须在 onPick（点击同步栈）起跳，不能等 `await openChoiceSheet` 回来再调。
   let mintP: Promise<MintResult | null> | null = null;
+  // 逃生舱 helper（0825 拍板→0828「和 single html 一起」落地）：file:// 下微软登录无解（redirect 需要
+  //   http origin）——OneDrive 选项不起跳，改弹「怎么开本地服务器」的文字指路。folder 图库不受影响。
+  const fileProto = typeof location !== "undefined" && location.protocol === "file:";
   const src = await openChoiceSheet<"od" | "od-switch" | "folder">(t("gm.connectTitle"), "", [
-    ...(isAuthConfigured() ? [{ label: t("gm.srcOneDrive"), value: "od" as const, primary: true, onPick: () => { mintP = mintOneDriveByAccount(); } }] : []),
+    ...(isAuthConfigured() ? [{ label: t("gm.srcOneDrive"), value: "od" as const, primary: true, onPick: () => { if (!fileProto) mintP = mintOneDriveByAccount(); } }] : []),
     // 已登录才给「换一个账号」（0.9.0 口子）：铸第二账号入口——redirect 走微软账号选择页，回程续办。
     ...(isAuthConfigured() && isSignedIn() ? [{ label: t("gm.srcOneDriveSwitch"), value: "od-switch" as const, onPick: () => { mintP = mintOneDriveSwitchAccount(); } }] : []),
     ...(canPickFolderGallery() ? [{ label: t("gm.srcFolder"), value: "folder" as const, onPick: () => { mintP = mintFolderByPicker(); } }] : []),
   ]);
+  if (src === "od" && fileProto) {
+    const fn = (() => { try { return decodeURIComponent(location.pathname.split("/").pop() || "weebpaint-single.html"); } catch { return "weebpaint-single.html"; } })();
+    await openConfirmSheet(t("gm.connectTitle"), t("gm.fileProtoCloudHelp", { file: fn }));
+    return;
+  }
   if (src == null || mintP == null) return;
   try {
     const minted = await (mintP as Promise<MintResult | null>);   // TS 看不见 onPick 副作用的窄化补丁
