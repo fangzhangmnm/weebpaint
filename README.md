@@ -76,6 +76,10 @@ Open https://weebpaint.com/ in the browser, then:
 - **Windows / Mac (Chrome / Edge):** install icon in the address bar, or menu → "Install WeebPaint".
 - **Mac (Safari 17+):** File → "Add to Dock".
 
+## FAQ
+
+- **No pen pressure on Windows:** enable **Windows Ink** in your tablet driver (Huion / XP-Pen / Wacom panel), then fully restart the browser — browsers only receive pen pressure through Windows Ink. This doesn't conflict with Clip Studio or Photoshop: they can keep using WinTab.
+
 ## Roadmap
 
 Planned, in no particular order:
