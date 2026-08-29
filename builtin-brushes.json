@@ -2,6 +2,11 @@
   {
     "id": "default-brush-pencil",
     "name": "铅笔",
+    "names": {
+      "zh": "铅笔",
+      "en": "Pencil",
+      "ja": "鉛筆"
+    },
     "tool": "brush",
     "args": {
       "size": 6,
@@ -24,6 +29,11 @@
   {
     "id": "default-brush-ink",
     "name": "勾线",
+    "names": {
+      "zh": "勾线",
+      "en": "Ink",
+      "ja": "ペン入れ"
+    },
     "tool": "brush",
     "args": {
       "size": 8,
@@ -46,6 +56,11 @@
   {
     "id": "default-brush-ink-fixed",
     "name": "固定勾线",
+    "names": {
+      "zh": "固定勾线",
+      "en": "Fixed ink",
+      "ja": "固定ペン入れ"
+    },
     "tool": "brush",
     "args": {
       "size": 8,
@@ -68,6 +83,11 @@
   {
     "id": "default-brush-fill",
     "name": "平涂",
+    "names": {
+      "zh": "平涂",
+      "en": "Flat",
+      "ja": "ベタ塗り"
+    },
     "tool": "brush",
     "args": {
       "size": 50,
@@ -90,6 +110,11 @@
   {
     "id": "default-airbrush-big",
     "name": "喷枪",
+    "names": {
+      "zh": "喷枪",
+      "en": "Airbrush",
+      "ja": "エアブラシ"
+    },
     "tool": "brush",
     "args": {
       "size": 300,
@@ -112,6 +137,11 @@
   {
     "id": "default-airbrush-small",
     "name": "喷枪笔",
+    "names": {
+      "zh": "喷枪笔",
+      "en": "Airbrush pen",
+      "ja": "エアブラシペン"
+    },
     "tool": "brush",
     "args": {
       "size": 32,
@@ -134,6 +164,11 @@
   {
     "id": "default-eraser-hard",
     "name": "硬橡皮",
+    "names": {
+      "zh": "硬橡皮",
+      "en": "Hard eraser",
+      "ja": "硬い消しゴム"
+    },
     "tool": "eraser",
     "args": {
       "size": 30,
@@ -156,6 +191,11 @@
   {
     "id": "default-eraser-soft",
     "name": "软橡皮",
+    "names": {
+      "zh": "软橡皮",
+      "en": "Soft eraser",
+      "ja": "柔らかい消しゴム"
+    },
     "tool": "eraser",
     "args": {
       "size": 125,
@@ -178,6 +218,11 @@
   {
     "id": "default-filter-big",
     "name": "大滤镜笔",
+    "names": {
+      "zh": "大滤镜笔",
+      "en": "Big filter",
+      "ja": "フィルター（大）"
+    },
     "tool": "filterBrush",
     "args": {
       "size": 300,
@@ -200,6 +245,11 @@
   {
     "id": "default-filter-small",
     "name": "小滤镜笔",
+    "names": {
+      "zh": "小滤镜笔",
+      "en": "Small filter",
+      "ja": "フィルター（小）"
+    },
     "tool": "filterBrush",
     "args": {
       "size": 32,
@@ -222,6 +272,11 @@
   {
     "id": "default-brush-pixel",
     "name": "像素笔",
+    "names": {
+      "zh": "像素笔",
+      "en": "Pixel pen",
+      "ja": "ピクセルペン"
+    },
     "tool": "brush",
     "args": {
       "size": 1,
@@ -245,6 +300,11 @@
   {
     "id": "default-eraser-pixel",
     "name": "像素橡皮",
+    "names": {
+      "zh": "像素橡皮",
+      "en": "Pixel eraser",
+      "ja": "ピクセル消しゴム"
+    },
     "tool": "eraser",
     "args": {
       "size": 1,
@@ -268,6 +328,11 @@
   {
     "id": "default-brush-bristle",
     "name": "刷子",
+    "names": {
+      "zh": "刷子",
+      "en": "Bristle",
+      "ja": "刷毛"
+    },
     "tool": "brush",
     "args": {
       "size": 100,
@@ -292,6 +357,11 @@
   {
     "id": "default-selpen-hard",
     "name": "硬圆",
+    "names": {
+      "zh": "硬圆",
+      "en": "Hard round",
+      "ja": "ハード円"
+    },
     "tool": "selPen",
     "args": {
       "size": 30,
@@ -314,6 +384,11 @@
   {
     "id": "default-selpen-ink",
     "name": "勾线",
+    "names": {
+      "zh": "勾线",
+      "en": "Ink",
+      "ja": "ペン入れ"
+    },
     "tool": "selPen",
     "args": {
       "size": 8,
@@ -336,6 +411,11 @@
   {
     "id": "default-selpen-pixel",
     "name": "像素",
+    "names": {
+      "zh": "像素",
+      "en": "Pixel",
+      "ja": "ピクセル"
+    },
     "tool": "selPen",
     "args": {
       "size": 1,

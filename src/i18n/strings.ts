@@ -1297,6 +1297,11 @@ export const S = {
   "name.groupN":         { zh: "组 {n}", en: "Group {n}", ja: "グループ {n}" },
   "name.moveToNewLayer": { zh: "移到新层", en: "Moved to new layer", ja: "新規レイヤーへ移動" },
   "name.copyLayer":      { zh: "复制层", en: "Copied layer", ja: "コピーレイヤー" },
+  // 出厂笔的多语言名**不在这里**——SSoT = builtin-brushes.json 的 names 字段（数据契约；
+  // user 2026-08-28 拍板：不烤在别处，避免第二份出厂笔知识靠测试对齐）。机制见 brushes.ts。
+  // 默认文件夹「我的常用」是**持久化身份**不是文案（brushes.ts DEFAULT_FOLDER 注：改身份会
+  // 跨语言分裂）——它不自愈改名，只在显示层翻译（rack-sheet 的 folder tab）。
+  "bn.folderDefault":          { zh: "我的常用", en: "Favorites", ja: "よく使う" },
   // 状态行（input.ts）
   "st.groupNoDraw":     { zh: "当前选中的是图层组，请选择一个图层再绘制", en: "A layer group is selected — pick a layer to draw", ja: "グループが選択されています。描くにはレイヤーを選んでください" },
   "st.hiddenNoDraw":    { zh: "当前图层已隐藏，无法绘制", en: "The current layer is hidden — cannot draw", ja: "現在のレイヤーは非表示のため描けません" },

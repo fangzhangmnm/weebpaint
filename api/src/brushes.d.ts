@@ -34,6 +34,13 @@ interface MakeBrushArgs {
     stabilization?: number;
     defaultOpa?: number;
 }
+export interface BrushSpec {
+    id: string;
+    name: string;
+    names?: Partial<Record<string, string>>;
+    tool: string;
+    args?: Partial<MakeBrushArgs>;
+}
 interface LegacyBrush {
     size?: BrushSizeLegacy;
     flow?: {
@@ -79,6 +86,12 @@ export declare function orderBrushesByMeta(brushes: Brush[], meta: RackMeta): Br
 export declare function getAllBrushes(coll: CollectionLike): Brush[];
 export declare function getMeta(coll: CollectionLike): RackMeta;
 export declare function migrateBrush(b: LegacyBrush): LegacyBrush;
+export declare function specDisplayName(spec: Pick<BrushSpec, "name" | "names">): string;
+export declare function staleBuiltinNameFixes(brushes: Brush[], specs: BrushSpec[]): {
+    brush: Brush;
+    name: string;
+}[];
+export declare function builtinSpecs(): Promise<BrushSpec[]>;
 export declare function brushToJSON(brush: Brush): string;
 export declare function brushFromJSON(text: string): LegacyBrush;
 export declare function findBrush(rack: BrushRackData, id: string): Brush | null;

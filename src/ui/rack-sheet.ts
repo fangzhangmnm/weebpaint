@@ -48,9 +48,11 @@ export function mountRackSheet(el: HTMLElement, opts: RackSheetOpts): RackSheetH
       }
       // 直接调注入回调（闭包）——比 $emit→root-prop 映射简单可靠。
       // i18n：t() 在 setup 调（§5a），模板引 L.*。
-      const L = { rackEmpty: t("rs.rackEmpty"), resetRack: t("rs.resetRack"), empty: t("rs.empty"), edit: t("rs.edit") };
+      const L = { rackEmpty: t("rs.rackEmpty"), resetRack: t("rs.resetRack"), empty: t("rs.empty"), edit: t("rs.edit"), defaultFolder: t("bn.folderDefault") };
+      // 默认文件夹「我的常用」是持久化身份不翻译（brushes.ts DEFAULT_FOLDER 注）——tab 显示层翻译。
+      function folderLabel(f: string): string { return f === opts.defaultFolder ? L.defaultFolder : f; }
       return {
-        brushes, rackEmpty, folders, effectiveFolder, tiles, activeId, tileStyle,
+        brushes, rackEmpty, folders, effectiveFolder, tiles, activeId, tileStyle, folderLabel,
         selectFolder: opts.onSelectFolder, selectBrush: opts.onSelectBrush,
         editBrush: opts.onEditBrush, reset: opts.onReset, L,
       };
@@ -71,7 +73,7 @@ export function mountRackSheet(el: HTMLElement, opts: RackSheetOpts): RackSheetH
       <template v-else>
         <div class="brush-rack-folders">
           <button v-for="f in folders" :key="f" type="button" class="brush-rack-folder"
-            :aria-pressed="f === effectiveFolder" @click="selectFolder(f)">{{ f }}</button>
+            :aria-pressed="f === effectiveFolder" @click="selectFolder(f)">{{ folderLabel(f) }}</button>
         </div>
         <div class="brush-rack-grid">
           <div v-for="b in tiles" :key="b.id" class="brush-rack-tile" role="button" :tabindex="0"

@@ -90,6 +90,7 @@ export declare class BrushRackController {
     _loadPromise: Promise<BrushRackData> | null;
     load(): Promise<BrushRackData>;
     _load(): Promise<BrushRackData>;
+    _healBuiltinNames(): Promise<void>;
     _healTimer: ReturnType<typeof setTimeout> | null;
     _healAttempt: number;
     _healOnline: (() => void) | null;

@@ -23,7 +23,7 @@
 //   spacing / pixelMode / taper / hardness / 椭圆参数 / smooth
 
 import { embeddedText } from "./standalone-html.ts";   // P6 单文件内嵌读口
-import { t } from "./i18n/index.ts";
+import { t, lang } from "./i18n/index.ts";
 import type { Brush, BrushRackData } from "./brush-types.ts";
 import { reportError } from "./error-badge.ts";
 
@@ -62,9 +62,13 @@ interface MakeBrushArgs {
 }
 
 // builtin-brushes.json 的单条 spec（id/name/tool + 其余 makeBrush 参数收在 args）。
-interface BrushSpec {
+// names（2026-08-28 起）：出厂笔多语言名**进数据契约本身**（user 拍板：不烤在 i18n SSoT 等
+//   别的地方——那是第二份出厂笔知识，得靠测试对齐）。backward compatible：`name` 保持中文
+//   原样（旧代码/旧客户端只读 name，照旧工作）；names 是新增可选字段，缺了就回落 name。
+export interface BrushSpec {
   id: string;
   name: string;
+  names?: Partial<Record<string, string>>;   // { zh, en, ja, ... } — 键开放（将来加语言不改码）
   tool: string;
   args?: Partial<MakeBrushArgs>;
 }
@@ -352,8 +356,42 @@ export function migrateBrush(b: LegacyBrush): LegacyBrush {
   return b;
 }
 
+// ── 出厂笔名的语言层（2026-08-28 紧急 patch；user 报案：英文界面新号笔架全中文名）──
+// 名字的多语言 SSoT = builtin-brushes.json 自己的 names 字段（数据契约，见 BrushSpec 注——
+// user 拍板不烤在别处）；这里只做解析。语言化在 specToBrush 唯一咽喉点生效：播种新号 /
+// restoreBuiltins / 瞬态显示统一拿当前语言名。已存在账号里的旧语言名走 staleBuiltinNameFixes
+// 自愈护栏（user 拍板「工厂笔跟着界面自动改名」）。持久化 Brush 记录契约**不动**（name 仍是
+// 纯字符串）；文件夹「我的常用」是身份不改名（见 DEFAULT_FOLDER 注），只在显示层翻译。
+// 出厂笔 spec 的当前语言名。fallback 链与 i18n 同构：请求语言 → en → name（=zh 原文）。
+export function specDisplayName(spec: Pick<BrushSpec, "name" | "names">): string {
+  return spec.names?.[lang()] ?? spec.names?.en ?? spec.name;
+}
+// 名字自愈护栏：default-* 的笔、名字仍是**任一语言的出厂名**（= 用户从没改过名）、
+// 且不等于当前语言名 → 报一条改名。用户改过的名字不在集合里，永不碰。幂等：稳态零改。
+// 已知取舍：同一账号两台设备用不同界面语言会互相把出厂笔名改来改去（各自 boot 时改成本地语言）——
+// 罕见且无损（改的都是出厂名，用户一改名就永久豁免），比名字锁死单语言强。
+export function staleBuiltinNameFixes(brushes: Brush[], specs: BrushSpec[]): { brush: Brush; name: string }[] {
+  const byId = new Map(specs.map((s) => [s.id, s]));
+  const fixes: { brush: Brush; name: string }[] = [];
+  for (const b of brushes) {
+    if (typeof b?.id !== "string" || !b.id.startsWith("default-")) continue;
+    const spec = byId.get(b.id);
+    if (!spec) continue;
+    const factoryNames = new Set([spec.name, ...Object.values(spec.names ?? {})]);
+    if (!factoryNames.has(b.name)) continue;   // 用户改过名 → 豁免
+    const want = specDisplayName(spec);
+    if (b.name !== want) fixes.push({ brush: b, name: want });
+  }
+  return fixes;
+}
+// 自愈护栏的 spec 入口（controller 用）：加载失败 → 空数组（这轮不愈，下次 boot 重试——
+// _loadBuiltinSpec 失败不留缓存的既有语义）。
+export async function builtinSpecs(): Promise<BrushSpec[]> {
+  return _loadBuiltinSpec();
+}
+
 function specToBrush(spec: BrushSpec): Brush {
-  return makeBrush({ id: spec.id, name: spec.name, tool: spec.tool, ...spec.args });
+  return makeBrush({ id: spec.id, name: specDisplayName(spec), tool: spec.tool, ...spec.args });
 }
 
 // 单 brush export / import

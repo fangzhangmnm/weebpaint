@@ -7015,6 +7015,11 @@ export declare const S: {
         readonly en: "Copied layer";
         readonly ja: "コピーレイヤー";
     };
+    readonly "bn.folderDefault": {
+        readonly zh: "我的常用";
+        readonly en: "Favorites";
+        readonly ja: "よく使う";
+    };
     readonly "st.groupNoDraw": {
         readonly zh: "当前选中的是图层组，请选择一个图层再绘制";
         readonly en: "A layer group is selected — pick a layer to draw";

@@ -22,7 +22,7 @@ import { reactive, shallowRef } from "../vendor/vue/vue.esm-browser.prod.js";
 import {
   defaultBrushForTool, brushesByTool, findBrush, newBrushId, brushFromJSON,
   makeBrush, loadBuiltinBrushes, getAllBrushes, getMeta, metaAppend, metaRemove, metaMove,
-  metaPrependBuiltins, RACK_META_ID, DEFAULT_FOLDER,
+  metaPrependBuiltins, RACK_META_ID, DEFAULT_FOLDER, staleBuiltinNameFixes, builtinSpecs,
   type RackMeta,
 } from "./brushes.ts";
 // resolveRef 内联（brush ref 解析：先 id 后 name 兜底；折 folder-merge 依赖）。
@@ -128,8 +128,26 @@ export class BrushRackController {
     //   历史上被空 seed / emergency-only 腌坏的库，或用户把笔全删了）→ 自动补回内置笔。
     //   只在**完全空**时触发，不会跟「用户故意删掉某几支内置笔」打架。
     await this._healEmptyRack();
+    await this._healBuiltinNames();
     this.applyToolState(this.d.editMode().current());
     return this.get();
+  }
+
+  // ---- 出厂笔名自愈护栏（2026-08-28，user 拍板「工厂笔跟着界面自动改名」）----
+  // 场景：播种发生在语言 A（历史上恒中文），界面语言是 B → 出厂笔一架 A 语名。
+  //   default-* 且名字仍是任一语言出厂名（= 用户没改过）→ 改写成当前语言名；改过名的永不碰。
+  //   多语言名的 SSoT = builtin-brushes.json 的 names 字段（数据契约；user 拍板不烤在别处）；
+  //   spec 加载失败（离线首开）→ 这轮不愈，下次 boot 重试。幂等（稳态零写）；
+  //   每次 load/rebind（含 P3 换库）跑一遍。判定逻辑在 brushes.ts staleBuiltinNameFixes。
+  async _healBuiltinNames(): Promise<void> {
+    const specs = await builtinSpecs();
+    const fixes = staleBuiltinNameFixes(this._brushesRef.value, specs);
+    if (!fixes.length) return;
+    this._bulkWrite = true;   // 批量写压住 onChange，收尾统一刷一次（resetBuiltin 同款）
+    try {
+      for (const f of fixes) this.d.collection.setItem(f.brush.id, { ...f.brush, name: f.name });
+    } finally { this._bulkWrite = false; }
+    this._syncFromCollection();
   }
 
   // ---- 空笔架自愈（会话内持续重试）----
