@@ -4,7 +4,7 @@
 
 ![WeebPaint banner](README.files/banner-960x200.png)
 
-WeebPaint is an open-source painting and illustration app that runs in the browser — on iPad, Android tablets, and desktops. Brush feel and fill tools are tuned on anime workflows; pixel art, hand-painted textures, and light image editing use the same toolset. No account, no installation, no server.
+WeebPaint is an open-source painting and illustration app that runs in the browser — on iPad, Android tablets, and desktops. Brush feel and fill tools are tuned on anime workflows; pixel art, hand-painted textures, and light image editing use the same toolset. No account, no installation, no server — and a cloud-synced gallery you control.
 
 - **Use it:** https://weebpaint.com/
 - **Single-file version:** one .html file that runs from a double-click — [GitHub Releases](https://github.com/fangzhangmnm/weebpaint/releases) or [itch.io](https://fangzhangmnm.itch.io/weebpaint).

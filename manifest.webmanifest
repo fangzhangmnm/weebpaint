@@ -1,14 +1,14 @@
 {
   "name": "WeebPaint",
   "short_name": "WeebPaint",
-  "description": "iPad 上的轻量绘画 PWA：压感、自定义笔刷、图层、液化、选区。OneDrive 同步，飞机模式可用。",
+  "description": "A free, open-source drawing app for anime and illustration. Runs in your browser. No account, no install — and a cloud-synced gallery you control.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#f6f4ef",
   "theme_color": "#f6f4ef",
-  "lang": "zh-CN",
+  "lang": "en",
   "file_handlers": [
     { "action": "./", "accept": { "image/openraster": [".ora"] } }
   ],

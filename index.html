@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="auto">
+<html lang="en" data-theme="auto">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
@@ -52,6 +52,19 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="WeebPaint" />
     <title>WeebPaint</title>
+    <!-- SEO/分享卡片元数据（文案 SSoT=宣发拍板 2026-08-29，动文案须 user 过目）。
+         · lang 静态值=en（宣发阶段英文 default；boot 后 i18n 会按用户语言改写 <html lang>，真用户不受影响）。
+         · canonical 写死 prod 绝对地址：同一份 index.html 部署到 / 和 /dev/ 两处，
+           /dev/ 上这行自动变成「正主在 /」的声明——dev 不隐瞒但不当 SSoT，不必 robots 屏蔽。
+         · og:image 指线上 icon-512（分享卡片小方图），爬虫按需取，不进包不进 SW precache。 -->
+    <meta name="description" content="WeebPaint — a free, open-source drawing app for anime and illustration. Runs in your browser. No account, no install — and a cloud-synced gallery you control." />
+    <link rel="canonical" href="https://weebpaint.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="WeebPaint" />
+    <meta property="og:description" content="A free, open-source drawing app for anime and illustration. Runs in your browser. No account, no install — and a cloud-synced gallery you control." />
+    <meta property="og:url" content="https://weebpaint.com/" />
+    <meta property="og:image" content="https://weebpaint.com/icon-512.png" />
+    <meta name="twitter:card" content="summary" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <!-- 标签页图标走手绘像素档（32×32 逐像素画的，详 ai-docs/20260821-icon-tiers.md）。icon.svg 内嵌的是 192 栅格，
          留给 manifest 的 sizes=any 用；若挂在这里浏览器会优先取它再缩到 16，糊成一团。 -->
@@ -69,6 +82,14 @@
   <body role="application">
   <!-- role=application：整页是画布应用非文档（a11y 语义同 canvas 类 app 惯例）；顺带降低浏览器
        「阅读模式」把 app 当文章劫持的启发式命中（0821 user QA；无标准 opt-out API，此为尽力面，真机验）。 -->
+    <!-- 静态简介（sr-only 常驻，不占布局不闪屏）：raw-HTML 爬虫（多数 AI bot 不跑 JS）能读到的唯一成句
+         正文——否则它们只看到 app shell 里散落的 UI 兜底串；顺带给页面一个 h1（a11y，读屏可达）。
+         文案 SSoT=宣发拍板 2026-08-29，动文案须 user 过目。 -->
+    <section style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap">
+      <h1>WeebPaint</h1>
+      <p>WeebPaint — a free, open-source drawing app for anime and illustration. Runs in your browser. No account, no install — and a cloud-synced gallery you control.</p>
+      <p><a href="https://github.com/fangzhangmnm/weebpaint">Source code on GitHub</a></p>
+    </section>
     <!-- 图标 sprite：共享库子集 + WeebPaint 本地补丁，静态内联（1×1 + opacity:0 藏起来）。
          ⚠ sprite 根别改成 display:none —— 不渲染的子树里 <mask>/<clipPath> 静默失效，
          18 个靠遮罩留白的图标会全糊成一坨且不报错（v428 前就是这样）。理由详见
