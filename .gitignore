@@ -54,3 +54,9 @@ private/
 dist/weebpaint-standalone.html
 dist/weebpaint-standalone-*.html
 dist/weebpaint-itch*.zip
+
+# 止血（2026-08-28 user:「weebpaint先止血」）：sourcemap 不再入 git——
+# 每版 ~2MB(压后) 进历史是 .git 429MB 的最大出血点（历史累计 .map=255MB）。
+# 本地 build.sh 照常产 map（dev 调试不受影响）；Pages/prod 上 map 404=静默无害，
+# 代价=prod devtools 只见 minified。历史清理提案见 ai-docs/20260828-git-history-slim-proposal.md
+dist/*.mjs.map
