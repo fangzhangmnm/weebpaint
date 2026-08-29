@@ -2,7 +2,8 @@
 # created 2026-08-28 by Claude Fable 5
 # push prod ritual（user 2026-08-28 拍板成文）。
 # ⚠ 家规硬规则 #5：跑本脚本 = push prod，**必须先获得人类明确指令**——AI 永不自行运行。
-# 步骤：全量测试 → standalone 重打 + smoke → 版本号命名的两份交付物 → main 快进 prod。
+# 步骤：全量测试 → standalone 重打 + smoke → 版本号命名的两份交付物 → main 快进 prod
+#       → GH release 挂 standalone（gh 可用时；user 2026-08-28 拍板自动化，edited by Claude Fable 5）。
 # 交付物（gitignored，本地件）：dist/weebpaint-standalone-<vX.Y.Z>.html（可下载单文件）、
 #   dist/weebpaint-itch-<vX.Y.Z>.zip（内含 index.html，itch「浏览器可玩」上传用）。
 #   itch 上传是人类手动动作——脚本只备货并提示。
@@ -23,3 +24,18 @@ git push origin main:prod
 echo "[push-prod] ✓ prod 已快进到 main（$FULLVER）"
 echo "[push-prod] ✓ dist/weebpaint-standalone-$VER.html"
 echo "[push-prod] ✓ dist/weebpaint-itch-$VER.zip   ← itch 手动上传这份（SharedArrayBuffer 保持关）"
+# GH release：单文件版自动挂 release（与 itch zip 同一份构建，GH 放裸 html）。
+# release 失败只警告不炸 ritual——prod 此刻已经推完，别让收尾步骤谎报整场失败。
+if command -v gh >/dev/null 2>&1; then
+  if gh release view "$VER" >/dev/null 2>&1; then
+    echo "[push-prod] ⚠ GH release $VER 已存在，跳过（重传资产：gh release upload $VER \"dist/weebpaint-standalone-$VER.html\" --clobber）"
+  elif gh release create "$VER" --target prod "dist/weebpaint-standalone-$VER.html" \
+        --title "$VER" \
+        --notes "Single-file offline build. Download the .html and open it in a browser. Same build as the itch.io upload."; then
+    echo "[push-prod] ✓ GH release $VER 已挂 standalone"
+  else
+    echo "[push-prod] ⚠ GH release 创建失败——手动补：gh release create $VER --target prod \"dist/weebpaint-standalone-$VER.html\" --title $VER"
+  fi
+else
+  echo "[push-prod] ⚠ gh CLI 不可用——release 没发。手动补：gh release create $VER --target prod \"dist/weebpaint-standalone-$VER.html\" --title $VER"
+fi
