@@ -31,7 +31,9 @@ Procreate 级绘画 PWA。UI 中文。iPad 是手感的最终裁判。
 > as-of v326 / 2026-06-26。`main` 分支 = dev 渠道：push 后 GH Actions 把 main 的 `dist/` + 源原样部署到 `/dev/` 路径。`prod` 是**另一条分支**，push prod 前必问 human（家族总规则 #5）。
 > **push prod = `bash scripts/push-prod.sh`**（2026-08-28 user 拍板成文）：全量测试 → standalone 重打+smoke →
 > 出两份**带版本号**交付物（`dist/weebpaint-standalone-<vX.Y.Z>.html` / `dist/weebpaint-itch-<vX.Y.Z>.zip`，
-> gitignored）→ main 快进 prod。itch 上传归人类手动（SharedArrayBuffer 保持关）。
+> gitignored）→ main 快进 prod → **itch 自动上传**（user 2026-08-29 拍板进 ritual；`scripts/push-itch.sh`
+> 走 butler 同 channel 原地更新=同一条 upload 记录/统计延续；首次需 `tools/butler/butler login` 一次 +
+> itch 后台勾「played in the browser」一次；SharedArrayBuffer 保持关。edited by Claude Fable 5 2026-08-29）。
 
 每次push dev 走这 4 步（**成对 commit**：先源、后 bundle）：
 1. **bump 版本**：`./bump.sh vN-YYYY-MM-DD`（N 单调+1，日期=发版日；唯一版本号在 `src/version.ts`，esbuild inline 进 bundle、SW/index.html 都读它）。

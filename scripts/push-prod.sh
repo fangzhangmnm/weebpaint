@@ -6,7 +6,8 @@
 #       → GH release 挂 standalone（gh 可用时；user 2026-08-28 拍板自动化，edited by Claude Fable 5）。
 # 交付物（gitignored，本地件）：dist/weebpaint-standalone-<vX.Y.Z>.html（可下载单文件）、
 #   dist/weebpaint-itch-<vX.Y.Z>.zip（内含 index.html，itch「浏览器可玩」上传用）。
-#   itch 上传是人类手动动作——脚本只备货并提示。
+#   itch 上传走 butler 进 ritual（user 2026-08-29 拍板；scripts/push-itch.sh，同 channel 原地更新
+#   保同一条记录；首次需 butler login + itch 后台一次性勾选，详该脚本头注释。edited by Claude Fable 5 2026-08-29）。
 set -euo pipefail
 cd "$(dirname "$0")/.."
 FULLVER=$(grep -o '"v[0-9][^"]*"' src/version.ts | head -1 | tr -d '"')
@@ -23,7 +24,7 @@ cp dist/weebpaint-standalone.html tmp/itch-pack/index.html
 git push origin main:prod
 echo "[push-prod] ✓ prod 已快进到 main（$FULLVER）"
 echo "[push-prod] ✓ dist/weebpaint-standalone-$VER.html"
-echo "[push-prod] ✓ dist/weebpaint-itch-$VER.zip   ← itch 手动上传这份（SharedArrayBuffer 保持关）"
+echo "[push-prod] ✓ dist/weebpaint-itch-$VER.zip（SharedArrayBuffer 保持关）"
 # GH release：单文件版自动挂 release（与 itch zip 同一份构建，GH 放裸 html）。
 # release 失败只警告不炸 ritual——prod 此刻已经推完，别让收尾步骤谎报整场失败。
 if command -v gh >/dev/null 2>&1; then
@@ -38,4 +39,11 @@ if command -v gh >/dev/null 2>&1; then
   fi
 else
   echo "[push-prod] ⚠ gh CLI 不可用——release 没发。手动补：gh release create $VER --target prod \"dist/weebpaint-standalone-$VER.html\" --title $VER"
+fi
+# itch 上传（user 2026-08-29 拍板进 ritual）：butler 同 channel 原地更新，记录/统计不换条目。
+# 失败只警告不炸——理由同 GH release：prod 此刻已推完，收尾步骤别谎报整场失败。
+if bash scripts/push-itch.sh "$VER"; then
+  echo "[push-prod] ✓ itch 已推（butler → fangzhangmnm/weebpaint:html）"
+else
+  echo "[push-prod] ⚠ itch 上传失败/未开通——手动补：bash scripts/push-itch.sh $VER"
 fi

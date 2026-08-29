@@ -29,6 +29,7 @@ debug/
 # v122 r2: tools/esbuild 跨 OS 不通用且 10MB；build.sh 没找到会自动 curl 一份。
 # 重命名自 vendor/esbuild：tools/ = 构建工具（gitignored）；vendor/ = 运行时 lib（commit 进 git）。
 tools/esbuild/
+tools/butler/
 
 # v122 build 中间产物
 dist/main-tmp.mjs
