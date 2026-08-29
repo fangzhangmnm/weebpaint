@@ -7,11 +7,14 @@
 #   带不过来）——首推后 user 需在 itch 后台一次性：勾「This file will be played in the browser」+
 #   处理旧手传条目（隐藏/删）。SharedArrayBuffer 是页面级设置，butler push 不影响，保持关。
 # 认证（一次性）：`tools/butler/butler login`（浏览器授权，本机留凭据）；CI 可用 BUTLER_API_KEY。
+# 两个 channel（user 2026-08-29 拍板：itch 页要「浏览器可玩」+「可下载」两个条目）：
+#   html       = 浏览器可玩 embed（后台勾「played in the browser」，一次性）
+#   standalone = 下载条目（后台**不勾** playable；butler 管的下载给到用户是 zip，内含 weebpaint-standalone.html）
 # 用法：bash scripts/push-itch.sh [vX.Y.Z]   # 不给版本则读 src/version.ts
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-ITCH_TARGET="fangzhangmnm/weebpaint:html"
+USERGAME="fangzhangmnm/weebpaint"
 BUTLER="./tools/butler/butler"
 
 # 没 butler 自动 curl 一份（模式同 build.sh 的 esbuild；tools/ = 构建工具，gitignored 不进 git）
@@ -39,9 +42,20 @@ fi
 ZIP="dist/weebpaint-itch-$VER.zip"
 [ -f "$ZIP" ] || { echo "[push-itch] 找不到 $ZIP（先跑 push-prod.sh 备货）"; exit 1; }
 
-if "$BUTLER" push "$ZIP" "$ITCH_TARGET" --userversion "$VER"; then
-  echo "[push-itch] ✓ 已推 $ITCH_TARGET（$VER）。首次推完记得 itch 后台勾「played in the browser」。"
+if "$BUTLER" push "$ZIP" "$USERGAME:html" --userversion "$VER"; then
+  echo "[push-itch] ✓ 已推 $USERGAME:html（浏览器可玩，$VER）"
 else
   echo "[push-itch] ✗ butler push 失败。若是未登录：跑一次 $BUTLER login（浏览器授权）后重跑：bash scripts/push-itch.sh $VER" >&2
+  exit 1
+fi
+
+STANDALONE="dist/weebpaint-standalone-$VER.html"
+[ -f "$STANDALONE" ] || { echo "[push-itch] ✗ 找不到 $STANDALONE（先跑 push-prod.sh 备货）" >&2; exit 1; }
+rm -rf tmp/itch-standalone && mkdir -p tmp/itch-standalone
+cp "$STANDALONE" tmp/itch-standalone/weebpaint-standalone.html   # 内名不带版本号=补丁 diff 更省；版本在 build 标签上
+if "$BUTLER" push tmp/itch-standalone "$USERGAME:standalone" --userversion "$VER"; then
+  echo "[push-itch] ✓ 已推 $USERGAME:standalone（下载版，$VER）"
+else
+  echo "[push-itch] ✗ standalone channel 推送失败（html 已推成功）——重试：bash scripts/push-itch.sh $VER" >&2
   exit 1
 fi
