@@ -113,61 +113,64 @@ canvas {
 }
 canvas:active { cursor: grabbing; }
 :host([pick]) canvas, :host([pick]) canvas:active { cursor: crosshair; }
-/* gizmo 尺寸一档缩小（user 0830「resize 太大，其他一起小一点」）：把手 14、＋ 24、chips 12px 图标 */
+/* gizmo 尺寸 = 家族浮窗标准件（user 0830「按 Layers 的大小来」）：把手 22×22 满铺（同 styles.css
+   .float-panel-resize 的双斜纹渐变），＋ 28，chips 14px 图标。 */
 .plus {
-  position: absolute; top: 3px; right: 3px; z-index: 3;
-  width: 24px; height: 24px; padding: 0; border: none; border-radius: 50%;
+  position: absolute; top: 4px; right: 4px; z-index: 3;
+  width: 28px; height: 28px; padding: 0; border: none; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: color-mix(in srgb, var(--bg, #202124) 72%, transparent);
   color: var(--ink, #e8eaed); cursor: pointer;   /* 纯菜单钮（0830 user：＋兼拖把很奇怪，拖归左上角点阵把手） */
   user-select: none; -webkit-user-select: none;
   transition: opacity 0.35s;
 }
-.plus svg { width: 14px; height: 14px; pointer-events: none; }
+.plus svg { width: 16px; height: 16px; pointer-events: none; }
 .plus:hover { background: color-mix(in srgb, var(--bg, #202124) 90%, transparent); }
 /* 拖动把手（user 0830「左上角加一点小点一样的拖动区域…三角形布局，没有按钮式高亮，参考 resize」）：
-   与右下斜纹 resize 把手同形制——点阵裁成左上三角、无底无框，只靠 opacity 呼吸。gizmo 纹理非 icon。 */
+   与右下 resize 把手同形制同尺寸——点阵裁成左上三角、无底无框，只靠 opacity 呼吸。gizmo 纹理非 icon。 */
 .move {
-  position: absolute; left: 1px; top: 1px; width: 14px; height: 14px; z-index: 3;
+  position: absolute; left: 0; top: 0; width: 22px; height: 22px; z-index: 3;
   cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
   color: var(--ink-soft, #9aa0a6); opacity: 0.55;
+  border-top-left-radius: inherit;
   transition: opacity 0.35s;
 }
 .move:hover { opacity: 1; }
 .move:active { cursor: grabbing; }
 .move::after {
-  content: ""; position: absolute; inset: 2px;
-  background-image: radial-gradient(circle, currentColor 0.9px, transparent 1.3px);
-  background-size: 3.4px 3.4px; background-position: 0.3px 0.3px;
+  content: ""; position: absolute; inset: 3px;
+  background-image: radial-gradient(circle, currentColor 1.1px, transparent 1.6px);
+  background-size: 4px 4px;
   clip-path: polygon(0 0, 100% 0, 0 100%);
 }
+/* resize 把手 = styles.css .float-panel-resize 原样（家族标准件：22 满铺双斜纹渐变） */
 .grip {
-  position: absolute; right: 1px; bottom: 1px; width: 14px; height: 14px;
+  position: absolute; right: 0; bottom: 0; width: 22px; height: 22px;
   cursor: nwse-resize; touch-action: none; z-index: 2;
-  color: var(--ink-soft, #9aa0a6); opacity: 0.55;
+  opacity: 0.55;
+  background: linear-gradient(135deg,
+    transparent 0 45%, var(--ink-soft, #9aa0a6) 45% 52%,
+    transparent 52% 66%, var(--ink-soft, #9aa0a6) 66% 73%,
+    transparent 73%);
+  border-bottom-right-radius: inherit;
   transition: opacity 0.35s;
 }
 .grip:hover { opacity: 1; }
-.grip::after {
-  content: ""; position: absolute; inset: 2px;
-  background: repeating-linear-gradient(-45deg, currentColor 0 1.2px, transparent 1.2px 3.6px);
-  clip-path: polygon(100% 0, 100% 100%, 0 100%);
-}
 .chips {
-  position: absolute; left: 50%; bottom: 3px; transform: translateX(-50%); z-index: 2;
-  display: flex; align-items: center; gap: 1px;
+  position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%); z-index: 2;
+  display: flex; align-items: center; gap: 2px;
   background: color-mix(in srgb, var(--bg, #202124) 72%, transparent);
-  border-radius: 10px; padding: 0 3px;
+  border-radius: 12px; padding: 1px 4px;
   color: var(--ink, #e8eaed);
   cursor: default;   /* 计数文本不出 I-beam；按钮各自 pointer */
   transition: opacity 0.35s;
 }
 .chips.hidden { display: none; }
 .chip { background: transparent; border: none; color: inherit; padding: 2px; cursor: pointer; display: flex; }
-.chip svg { width: 12px; height: 12px; }
-.chip-count { font-size: 10px; min-width: 22px; text-align: center; color: var(--ink-soft, #9aa0a6); }
-/* gizmo 显隐两档（user 0830「鼠标移走时 gizmos 都隐藏，不影响观察画面」）：
-   .away = 能悬停的设备指针离窗 → 全隐（进窗即现）；.idle = 闲置淡至 .35（触屏无悬停只有这档，
+.chip svg { width: 14px; height: 14px; }
+.chip-count { font-size: 11px; min-width: 26px; text-align: center; color: var(--ink-soft, #9aa0a6); }
+/* gizmo 显隐两档（user 0830「鼠标移走时 gizmos 都隐藏」；「12.12 iPad 看起来还行不干扰」→ 触屏档维持）：
+   .away = 能悬停的设备指针离窗 → 全隐（进窗即现）；.idle = 闲置 2.5s 淡至 .35（触屏无悬停只有这档，
    全隐会让 chips 变盲操作）。菜单弹层不在其列。 */
 :host(.idle) .plus, :host(.idle) .grip, :host(.idle) .chips, :host(.idle) .move { opacity: 0.35; }
 :host(.away) .plus, :host(.away) .grip, :host(.away) .chips, :host(.away) .move { opacity: 0; }
