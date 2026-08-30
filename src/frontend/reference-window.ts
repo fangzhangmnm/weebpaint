@@ -128,11 +128,14 @@ canvas:active { cursor: grabbing; }
 .plus:hover { background: color-mix(in srgb, var(--bg, #202124) 90%, transparent); }
 /* 拖动把手（user 0830「左上角加一点小点一样的拖动区域…三角形布局，没有按钮式高亮，参考 resize」）：
    与右下 resize 把手同形制同尺寸——点阵裁成左上三角、无底无框，只靠 opacity 呼吸。gizmo 纹理非 icon。 */
+/* 两把手在暗图（三次元相片）上看不清（user 0830）→ 与 ＋ 同款「半透明主题底 + 主色 gizmo」：
+   元素本身裁成三角形底板（clip-path），纹理走 ::after 用 currentColor=--ink。浅主题=白底黑点、暗主题=黑底白点。 */
 .move {
   position: absolute; left: 0; top: 0; width: 22px; height: 22px; z-index: 3;
   cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
-  color: var(--ink-soft, #9aa0a6); opacity: 0.55;
-  border-top-left-radius: inherit;
+  color: var(--ink, #e8eaed); opacity: 0.85;
+  background: color-mix(in srgb, var(--bg, #202124) 72%, transparent);
+  clip-path: polygon(0 0, 100% 0, 0 100%);
   transition: opacity 0.35s;
 }
 .move:hover { opacity: 1; }
@@ -141,21 +144,24 @@ canvas:active { cursor: grabbing; }
   content: ""; position: absolute; inset: 3px;
   background-image: radial-gradient(circle, currentColor 1.1px, transparent 1.6px);
   background-size: 4px 4px;
-  clip-path: polygon(0 0, 100% 0, 0 100%);
 }
-/* resize 把手 = styles.css .float-panel-resize 原样（家族标准件：22 满铺双斜纹渐变） */
+/* resize 把手：斜纹沿 styles.css .float-panel-resize 家族标准件；19（user 0830：视觉上斜纹比点阵显大，稍小一点） */
 .grip {
-  position: absolute; right: 0; bottom: 0; width: 22px; height: 22px;
+  position: absolute; right: 0; bottom: 0; width: 19px; height: 19px;
   cursor: nwse-resize; touch-action: none; z-index: 2;
-  opacity: 0.55;
-  background: linear-gradient(135deg,
-    transparent 0 45%, var(--ink-soft, #9aa0a6) 45% 52%,
-    transparent 52% 66%, var(--ink-soft, #9aa0a6) 66% 73%,
-    transparent 73%);
-  border-bottom-right-radius: inherit;
+  color: var(--ink, #e8eaed); opacity: 0.85;
+  background: color-mix(in srgb, var(--bg, #202124) 72%, transparent);
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
   transition: opacity 0.35s;
 }
 .grip:hover { opacity: 1; }
+.grip::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(135deg,
+    transparent 0 45%, currentColor 45% 52%,
+    transparent 52% 66%, currentColor 66% 73%,
+    transparent 73%);
+}
 .chips {
   position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%); z-index: 2;
   display: flex; align-items: center; gap: 2px;

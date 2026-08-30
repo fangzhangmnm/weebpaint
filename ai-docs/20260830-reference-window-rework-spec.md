@@ -73,7 +73,9 @@ Thumbnails/thumbnail.png              ← spec 强制，恒最后（byte-range �
   ⑪gizmo 整套缩一档（把手 14 / ＋ 24 / chips 12px 图标）——**v0.12.13 被 user 打回**（「Layers 那么大
   reference 那么小…按这个大小来」）：改为**家族浮窗标准件尺寸**——resize 把手 = styles.css `.float-panel-resize`
   原样（22 满铺双斜纹渐变），move 把手 22 满铺三角点阵，＋ 28，chips 14；⑫iPad 显隐维持 12.12 的闲置淡 .35
-  （user 先问「ipad 没法隐藏吗」，随即「12.12 iPad 看起来还行不干扰」→ 不改）。长按吸色 = 手指专属（与画布「单指长按吸色」同口径，
+  （user 先问「ipad 没法隐藏吗」，随即「12.12 iPad 看起来还行不干扰」→ 不改）；⑬**v0.12.14** 两把手暗图对比
+  （user「三次元相片上显示不佳…半透明白底黑 gizmos 就和加号一样」）：把手元素裁三角形半透明主题底板 +
+  currentColor=--ink 纹理，与 ＋ 同款；resize 把手 22→19（斜纹视觉比点阵显大）。长按吸色 = 手指专属（与画布「单指长按吸色」同口径，
   笔不触发，防停笔误吸）。
 
 ## 4. 渲染
