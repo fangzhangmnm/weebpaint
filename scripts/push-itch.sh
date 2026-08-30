@@ -33,6 +33,19 @@ if [ ! -x "$BUTLER" ]; then
   "$BUTLER" -V
 fi
 
+# 【跟 prod 铁律】（user 2026-08-30 拍板「itch ritual 跟 prod 不跟 main」；edited by Claude Fable 5 2026-08-30）
+#   itch 是生产渠道，与 prod 同步：main=dev，dev 上的改动在 push prod 之前不许流进 itch。
+#   守卫 = 当前 HEAD 必须就是 prod（push-prod.sh 里 main:prod 快进后天然满足；从领先的 main 单独跑会被拒）。
+git fetch origin prod --quiet 2>/dev/null || true
+PROD_SHA=$(git rev-parse origin/prod 2>/dev/null || git rev-parse prod 2>/dev/null || true)
+HEAD_SHA=$(git rev-parse HEAD)
+[ -n "$PROD_SHA" ] || { echo "[push-itch] ✗ 找不到 prod 分支（origin/prod 或本地 prod）——itch 跟 prod，没 prod 不推" >&2; exit 1; }
+if [ "$HEAD_SHA" != "$PROD_SHA" ]; then
+  echo "[push-itch] ✗ HEAD ($HEAD_SHA) ≠ prod ($PROD_SHA)——itch 跟 prod 不跟 main（dev）。" >&2
+  echo "[push-itch]   正道 = 人类拍板后跑 push-prod.sh（快进 prod 后自动推 itch）；或 checkout prod 后再跑本脚本。" >&2
+  exit 1
+fi
+
 VER="${1:-}"
 if [ -z "$VER" ]; then
   FULLVER=$(grep -o '"v[0-9][^"]*"' src/version.ts | head -1 | tr -d '"')
