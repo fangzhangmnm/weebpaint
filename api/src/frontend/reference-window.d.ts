@@ -22,6 +22,7 @@ export interface RefLabels {
     prev?: string;
     next?: string;
     menu?: string;
+    move?: string;
     resize?: string;
     resizeAria?: string;
 }
@@ -33,6 +34,18 @@ export type RefItem = {
 } | {
     kind: "live";
     vp: RefViewport | null;
+};
+export declare const REF_ICON_IDS: {
+    readonly folder: "folder";
+    readonly paste: "paste";
+    readonly cloud: "cloud";
+    readonly pip: "picture-in-picture";
+    readonly oneToOne: "one-to-one";
+    readonly trash: "trash-can";
+    readonly x: "x";
+    readonly plus: "new";
+    readonly prev: "chevron-left";
+    readonly next: "chevron-right";
 };
 export declare class WpReferenceWindow extends HTMLElement {
     static get observedAttributes(): string[];

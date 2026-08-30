@@ -536,7 +536,8 @@ export const S = {
   "ref.closeWin":    { zh: "关闭参考窗", en: "Close reference window", ja: "参考ウィンドウを閉じる", tok: "o pini e lupa lukin" },
   "ref.prevRef":     { zh: "上一张参考", en: "Previous reference", ja: "前の参考", tok: "sitelen pi tenpo pini" },
   "ref.nextRef":     { zh: "下一张参考", en: "Next reference", ja: "次の参考", tok: "sitelen kama" },
-  "ref.menu":        { zh: "参考菜单（按住拖动窗口）", en: "Reference menu (hold to drag window)", ja: "参考メニュー（長押しでウィンドウ移動）", tok: "lipu wile (o awen la o tawa e lupa)" },
+  "ref.menu":        { zh: "参考菜单", en: "Reference menu", ja: "参考メニュー", tok: "lipu wile" },
+  "ref.move":        { zh: "拖动窗口", en: "Drag to move window", ja: "ドラッグでウィンドウ移動", tok: "luka la o tawa e lupa" },
   "ref.oneToOne":    { zh: "1:1 像素", en: "1:1 pixels", ja: "1:1 ピクセル", tok: "suli lon: wan sama wan" },
 
   // ── 云盘图片 picker（<wp-cloud-picker>，spec 20260820）─────────────────────
@@ -552,7 +553,7 @@ export const S = {
   "ref.resize":      { zh: "拖动调整大小", en: "Drag to resize", ja: "ドラッグでサイズ変更", tok: "luka la suli li ante" }, 
   "ref.picking":     { zh: "吸色（参考）", en: "Picking color (reference)", ja: "スポイト（参考）", tok: "kama jo e kule (sitelen lukin)" }, // C9：原 reference.ts 硬编码中文 → 组件事件化后补 key
   "ref.pick":        { zh: "选个图当参考", en: "Pick an image as reference", ja: "参考用の画像を選択", tok: "o wile e sitelen lukin" },
-  "ref.hintPlus":    { zh: "＋ 导入 / 更多操作（按住拖动窗口）", en: "＋ import / more (hold to drag window)", ja: "＋ 読み込み / その他（長押しで移動）", tok: "＋: o kama jo (o awen la o tawa)" },
+  "ref.hintPlus":    { zh: "＋ 导入 / 更多操作 · 左上角点阵 = 拖动窗口", en: "＋ import / more · top-left dots = drag window", ja: "＋ 読み込み / その他 · 左上のドット = ウィンドウ移動", tok: "＋: o kama jo · sike lili: o tawa e lupa" },
   "ref.hintGesture": { zh: "单指拖移 / 双指 pinch + 旋转 / 双击适应 / 长按吸色", en: "Drag / pinch + rotate / double-tap to fit / long-press to pick color", ja: "ドラッグ / ピンチ+回転 / ダブルタップでフィット / 長押しでスポイト", tok: "luka wan: tawa · luka tu: suli / sike · luka pi tenpo tu: suli pona · o awen la kama jo e kule" }, // ── index.html 静态 chrome（切片 5b-2：lasso icon tooltips + rack/settings 头 + 各对话框）──
   // 套索工具栏（icon 按钮 tooltip；文字按钮=glyph 切片 4 不在此）
   "la.stack":        { zh: "套索 / 选区", en: "Lasso / selection", ja: "投げ縄 / 選択", tok: "ilo pi ma wile" }, 

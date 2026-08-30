@@ -49,6 +49,10 @@ def text_path(text, box, font='cjk'):
 SPECS = [
     # 2026-08-21 图标收货：cut/copy-picture 真图入库后 stopgap 曾清零（历史见 git）。
     # （device 已 2026-08-28 收货真图标——甲方 0827 拍板候选 1 号「显示器·T 座」，stopgap 条目退役。）
+    # 2026-08-30 参考窗整改批（登记见 ../20260708 SVG Icons/TODO.md 待画）：库里没有 → 字形顶位。
+    ("chevron-left",  "‹",   (3, 3, 18, 18, 'sans'), "参考窗翻页 chip ‹（stopgap 字形；库裸 chevron 曾 sunset，待美工裁小尺寸版）"),
+    ("chevron-right", "›",   (3, 3, 18, 18, 'sans'), "参考窗翻页 chip ›（stopgap 字形）"),
+    ("one-to-one",    "1:1", (2, 5, 20, 14, 'sans'), "参考窗菜单「1:1 像素」（stopgap 字形；待像素隐喻真图）"),
 ]
 syms = []
 for sid, text, box, note in SPECS:

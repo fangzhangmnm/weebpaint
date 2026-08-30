@@ -208,7 +208,7 @@ export function initSideWindows(ctx: AppContext) {
     load: t("ref.load"), paste: t("ref.paste"), cloud: t("ref.cloud"), live: t("ref.live"),
     oneToOne: t("ref.oneToOne"),
     del: t("ref.delete"), delConfirm: t("ref.deleteConfirm"), closeWin: t("ref.closeWin"),
-    prev: t("ref.prevRef"), next: t("ref.nextRef"), menu: t("ref.menu"),
+    prev: t("ref.prevRef"), next: t("ref.nextRef"), menu: t("ref.menu"), move: t("ref.move"),
     resize: t("ref.resize"), resizeAria: t("ref.resizeAria"),
   };
 

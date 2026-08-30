@@ -30,7 +30,7 @@ export type RefLiveSource = HTMLCanvasElement | OffscreenCanvas | ImageBitmap;
 export interface RefLabels {
   load?: string; paste?: string; cloud?: string; live?: string; oneToOne?: string;
   del?: string; delConfirm?: string; closeWin?: string;
-  prev?: string; next?: string; menu?: string; resize?: string; resizeAria?: string;
+  prev?: string; next?: string; menu?: string; move?: string; resize?: string; resizeAria?: string;
 }
 // 多参考 item（组件运行时形；持久化映射在宿主 side-windows）。vp=null → 首次显示时 fit。
 export type RefItem =
@@ -40,7 +40,6 @@ export type RefItem =
 const REF_LONG_PRESS_MS = 450;                // 长按吸色延迟（对齐 input.ts）
 const REF_LONG_PRESS_CANCEL_SQ = 64;          // 8px²：长按期间移动超此 → 取消，回 pan
 const LIVE_THROTTLE_MS = 300;                 // S9：live 全量合成节流；到期 timer 补帧收尾
-const PLUS_DRAG_SLOP = 6;                     // ＋ 拖把：位移超此 = 拖窗，未超 = 点开菜单
 const IDLE_DIM_MS = 2500;                     // 闲置淡出（.35 透明度）
 const NEAREST_MIN_SCALE = 2;                  // 放大 nearest 阈值（像素画 friendly；与编辑器手感对齐可调）
 // 缩放护栏（user 0830）：放大顶 50×；缩小只护到「眼睛能看到」——长边显示 ≥16px 即可
@@ -59,27 +58,30 @@ interface ResizeDragState { id: number; sx: number; sy: number; w0: number; h0: 
 interface GestureStartState { midX: number; midY: number; dist: number; angle: number; vp: RefViewport; }
 interface PointerPos { x: number; y: number; }
 
-// 图标：家族 sprite 烤入（id 注记 = 对账 key）。stroke 属性同 sprite 头（1.7/round/round）。
-const SVG_ATTRS = `viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"`;
-const ICON_FOLDER = `<svg ${SVG_ATTRS}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`;
-const ICON_PIP = `<svg ${SVG_ATTRS}><rect x="3" y="4" width="18" height="14" rx="2"/><rect x="12" y="10" width="7" height="5" rx="1"/></svg>`;
-const ICON_X = `<svg ${SVG_ATTRS}><path d="M6.5 6.5 L17.5 17.5 M17.5 6.5 L6.5 17.5"/></svg>`;
-const ICON_CLOUD = `<svg ${SVG_ATTRS}><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>`;   // sprite#cloud
-const ICON_PLUS = `<svg ${SVG_ATTRS}><path d="M12 5v14M5 12h14"/></svg>`;                                  // = sprite#new（纯加号，同几何；对账 id=new）
-// chips 翻页小箭头：库里裸 chevron-left 曾因小尺寸渲染差被 sunset（改 back=带杆整箭头），chips 14px 容不下
-//   带杆版 → 先烤裸 chevron 当 stopgap，已登记图标库 TODO.md（2026-08-30）等美工裁。
-const ICON_CHEV_L = `<svg ${SVG_ATTRS}><path d="M14.5 5.5 L8 12 L14.5 18.5"/></svg>`;
-const ICON_CHEV_R = `<svg ${SVG_ATTRS}><path d="M9.5 5.5 L16 12 L9.5 18.5"/></svg>`;
-// = sprite#paste 原几何烤入（对账 id=paste；mask id 在 shadow 内自作用域）
-const ICON_PASTE = `<svg ${SVG_ATTRS}><mask id="icPaC"><rect width="24" height="24" fill="#fff" stroke="none"/><g transform="translate(6.76 3.85) scale(0.860)" fill="#000" stroke="#000" stroke-width="3.14" stroke-linejoin="round"><path d="M4 5.6a1.7 1.7 0 0 1 1.7-1.7h6.6l4 4v11.5a1.7 1.7 0 0 1-1.7 1.7H5.7A1.7 1.7 0 0 1 4 20.8z"/></g></mask><g mask="url(#icPaC)"><mask id="icPbTC"><rect width="24" height="24" fill="#fff"/><rect x="6" y="1" width="6" height="4.2" rx="1.2" fill="#000" stroke="#000" stroke-width="2.4"/></mask><g mask="url(#icPbTC)"><rect x="2" y="3.3" width="14" height="17" rx="2"/></g><rect x="6" y="1" width="6" height="4.2" rx="1.2"/></g><g transform="translate(6.76 3.85) scale(0.860)" stroke-width="1.98"><path d="M4 5.6a1.7 1.7 0 0 1 1.7-1.7h6.6l4 4v11.5a1.7 1.7 0 0 1-1.7 1.7H5.7A1.7 1.7 0 0 1 4 20.8z"/><path d="M12.3 3.9V8h4"/><path d="M6.6 12.4h7.2M6.6 15.4h5"/></g></svg>`;
-// = sprite#trash-can 原几何烤入（对账 id=trash-can）
-const ICON_TRASH = `<svg ${SVG_ATTRS}><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 9.5v9"/><path d="M14 9.5v9"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`;
-// 1:1 像素：库无此图形 → 两格错位（像素隐喻）stopgap，已登记图标库 TODO.md（2026-08-30）
-const ICON_ONE_TO_ONE = `<svg ${SVG_ATTRS}><rect x="4" y="4" width="7" height="7"/><rect x="13" y="13" width="7" height="7" fill="currentColor" stroke="none"/></svg>`;
+// ══ 图标：零手抄（user 0830「svg 风格从 svg icons 取作 SSoT，不要在别处乱塞」）══
+// <use href="#id"> 穿不过 shadow 边界，此前的做法是把几何烤进组件——一烤就漂（手画 chevron/1:1 事故）。
+// 现在：构造时从宿主文档的内联 sprite（assets/icons.svg + icons-local.svg，皆图标库提取物/烤字 stopgap）
+// **clone `<symbol>` 内容**进 shadow；文档里没这个 id → 按库协议出虚线占位（icon-missing 同形），
+// 且 test/reference-icons.test.mjs 逐 id 对 index.html 守着——组件里不存在任何自绘几何。
+export const REF_ICON_IDS = {
+  folder: "folder", paste: "paste", cloud: "cloud", pip: "picture-in-picture", oneToOne: "one-to-one",
+  trash: "trash-can", x: "x", plus: "new", prev: "chevron-left", next: "chevron-right",
+} as const;
+function iconMarkup(id: string): string {
+  const sym = (typeof document !== "undefined") ? document.querySelector(`svg symbol[id="${id}"]`) : null;
+  if (!sym) {
+    // icon-missing 占位（库协议同形：虚线方框），不静默空白
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2" aria-hidden="true" data-icon-missing="${id}"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`;
+  }
+  const attrs = ["viewBox", "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin"]
+    .map((a) => { const v = sym.getAttribute(a); return v != null ? `${a}="${v}"` : ""; })
+    .filter(Boolean).join(" ");
+  return `<svg ${attrs} aria-hidden="true" data-icon="${id}">${sym.innerHTML}</svg>`;
+}
 
 // chrome 全 overlay（borderless）：窗体只有 1px 边框+阴影当边界 affordance（无边界在同款点阵底上
-// 根本看不见窗在哪），内容满铺。
-const TEMPLATE = `<style>
+// 根本看不见窗在哪），内容满铺。模板在构造时刻生成（图标从宿主 sprite clone，见 iconMarkup）。
+function buildTemplate(): string { return `<style>
 :host {
   position: fixed;
   top: 60px; left: 16px;
@@ -116,11 +118,26 @@ canvas:active { cursor: grabbing; }
   width: 30px; height: 30px; padding: 0; border: none; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: color-mix(in srgb, var(--bg, #202124) 72%, transparent);
-  color: var(--ink, #e8eaed); cursor: pointer;   /* 主语义=点开菜单；真拖起来才换 grabbing（.dragging） */
-  touch-action: none; user-select: none; -webkit-user-select: none;
+  color: var(--ink, #e8eaed); cursor: pointer;   /* 纯菜单钮（0830 user：＋兼拖把很奇怪，拖归左上角点阵把手） */
+  user-select: none; -webkit-user-select: none;
   transition: opacity 0.35s;
 }
-.plus.dragging { cursor: grabbing; }
+/* 拖动把手（user 0830「左上角加一点小点一样的拖动区域」）：与右下角斜纹 resize 把手对称的点阵纹理
+   （gizmo 纹理，非 icon——CSS 画，不进图标库）。 */
+.move {
+  position: absolute; left: 2px; top: 2px; width: 22px; height: 22px; z-index: 3;
+  cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+  color: var(--ink-soft, #9aa0a6); opacity: 0.55; border-radius: 6px;
+  background: color-mix(in srgb, var(--bg, #202124) 60%, transparent);
+  transition: opacity 0.35s;
+}
+.move:hover { opacity: 1; }
+.move:active { cursor: grabbing; }
+.move::after {
+  content: ""; position: absolute; inset: 5px;
+  background-image: radial-gradient(circle, currentColor 1.1px, transparent 1.6px);
+  background-size: 4px 4px;
+}
 .plus svg { width: 18px; height: 18px; pointer-events: none; }
 .plus:hover { background: color-mix(in srgb, var(--bg, #202124) 90%, transparent); }
 .grip {
@@ -148,7 +165,7 @@ canvas:active { cursor: grabbing; }
 .chip { background: transparent; border: none; color: inherit; padding: 2px; cursor: pointer; display: flex; }
 .chip svg { width: 14px; height: 14px; }
 .chip-count { font-size: 11px; min-width: 26px; text-align: center; color: var(--ink-soft, #9aa0a6); }
-:host(.idle) .plus, :host(.idle) .grip, :host(.idle) .chips { opacity: 0.35; }
+:host(.idle) .plus, :host(.idle) .grip, :host(.idle) .chips, :host(.idle) .move { opacity: 0.35; }
 .menu {
   position: absolute; top: 38px; right: 4px; z-index: 4;
   min-width: 170px; padding: 4px;
@@ -182,23 +199,24 @@ canvas:active { cursor: grabbing; }
 </style>
 <canvas></canvas>
 <div class="empty"><slot name="empty"><p>＋ 导入参考图</p></slot></div>
-<button class="plus" part="plus" type="button" aria-haspopup="true">${ICON_PLUS}</button>
+<div class="move" part="move"></div>
+<button class="plus" part="plus" type="button" aria-haspopup="true">${iconMarkup(REF_ICON_IDS.plus)}</button>
 <div class="grip" part="grip"></div>
 <div class="chips hidden">
-  <button class="chip" data-page="-1" type="button">${ICON_CHEV_L}</button>
+  <button class="chip" data-page="-1" type="button">${iconMarkup(REF_ICON_IDS.prev)}</button>
   <span class="chip-count">1/1</span>
-  <button class="chip" data-page="1" type="button">${ICON_CHEV_R}</button>
+  <button class="chip" data-page="1" type="button">${iconMarkup(REF_ICON_IDS.next)}</button>
 </div>
 <div class="menu hidden" role="menu">
-  <button class="mi" data-mi="load" type="button" role="menuitem">${ICON_FOLDER}<span></span></button>
-  <button class="mi" data-mi="paste" type="button" role="menuitem">${ICON_PASTE}<span></span></button>
-  <button class="mi" data-mi="cloud" type="button" role="menuitem">${ICON_CLOUD}<span></span></button>
-  <button class="mi" data-mi="live" type="button" role="menuitem">${ICON_PIP}<span></span></button>
-  <button class="mi" data-mi="onetoone" type="button" role="menuitem">${ICON_ONE_TO_ONE}<span></span></button>
+  <button class="mi" data-mi="load" type="button" role="menuitem">${iconMarkup(REF_ICON_IDS.folder)}<span></span></button>
+  <button class="mi" data-mi="paste" type="button" role="menuitem">${iconMarkup(REF_ICON_IDS.paste)}<span></span></button>
+  <button class="mi" data-mi="cloud" type="button" role="menuitem">${iconMarkup(REF_ICON_IDS.cloud)}<span></span></button>
+  <button class="mi" data-mi="live" type="button" role="menuitem">${iconMarkup(REF_ICON_IDS.pip)}<span></span></button>
+  <button class="mi" data-mi="onetoone" type="button" role="menuitem">${iconMarkup(REF_ICON_IDS.oneToOne)}<span></span></button>
   <hr>
-  <button class="mi" data-mi="delete" type="button" role="menuitem">${ICON_TRASH}<span></span></button>
-  <button class="mi" data-mi="close" type="button" role="menuitem">${ICON_X}<span></span></button>
-</div>`;
+  <button class="mi" data-mi="delete" type="button" role="menuitem">${iconMarkup(REF_ICON_IDS.trash)}<span></span></button>
+  <button class="mi" data-mi="close" type="button" role="menuitem">${iconMarkup(REF_ICON_IDS.x)}<span></span></button>
+</div>`; }
 
 export class WpReferenceWindow extends HTMLElement {
   static get observedAttributes() { return ["open", "no-cloud"]; }   // no-cloud：宿主云功能关 → 藏云盘选图项
@@ -246,7 +264,7 @@ export class WpReferenceWindow extends HTMLElement {
       if (this._clampIntoViewport()) this._emitRect();
     });
     const root = this.attachShadow({ mode: "open" });
-    root.innerHTML = TEMPLATE;
+    root.innerHTML = buildTemplate();
     this._canvas = root.querySelector("canvas")!;
     this._emptyEl = root.querySelector(".empty")!;
     this._plusEl = root.querySelector(".plus")!;
@@ -318,6 +336,7 @@ export class WpReferenceWindow extends HTMLElement {
       if (aria || title) b.setAttribute("aria-label", aria || title!);
     };
     setTitle(".plus", l.menu);
+    setTitle(".move", l.move);
     setTitle('[data-page="-1"]', l.prev);
     setTitle('[data-page="1"]', l.next);
     setTitle(".grip", l.resize, l.resizeAria);
@@ -525,18 +544,19 @@ export class WpReferenceWindow extends HTMLElement {
   }
 
   private _bind(root: ShadowRoot) {
-    // ＋ = 菜单 + 拖把（chat-head 形制）：按住超 slop = 拖窗；松手未超 = toggle 菜单。
-    this._plusEl.addEventListener("pointerdown", (e) => {
+    // ＋ = 纯菜单钮（0830：兼拖把「很奇怪」→ 拖归左上角点阵把手 .move）
+    this._plusEl.addEventListener("click", () => this._toggleMenu());
+    // 拖动把手（左上角点阵）：拖整窗，钳在视口内
+    const move = root.querySelector(".move") as HTMLElement;
+    move.addEventListener("pointerdown", (e) => {
       const r = this.getBoundingClientRect();
       this._panelDrag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, ol: r.left, ot: r.top, moved: false };
-      try { this._plusEl.setPointerCapture(e.pointerId); } catch {}
+      try { move.setPointerCapture(e.pointerId); } catch {}
       e.preventDefault();
     });
-    this._plusEl.addEventListener("pointermove", (e) => {
+    move.addEventListener("pointermove", (e) => {
       const d = this._panelDrag;
       if (!d || e.pointerId !== d.id) return;
-      if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < PLUS_DRAG_SLOP) return;
-      if (!d.moved) this._plusEl.classList.add("dragging");
       d.moved = true;
       const w = this.offsetWidth, h = this.offsetHeight;
       const left = clamp(d.ol + (e.clientX - d.sx), 0, window.innerWidth - w);
@@ -545,15 +565,14 @@ export class WpReferenceWindow extends HTMLElement {
       this.style.top = top + "px";
       this._emitRect();
     });
-    this._plusEl.addEventListener("pointerup", (e) => {
-      const d = this._panelDrag;
-      if (!d || e.pointerId !== d.id) return;
-      try { this._plusEl.releasePointerCapture(e.pointerId); } catch {}
-      this._panelDrag = null;
-      this._plusEl.classList.remove("dragging");
-      if (!d.moved) this._toggleMenu();
-    });
-    this._plusEl.addEventListener("pointercancel", () => { this._panelDrag = null; this._plusEl.classList.remove("dragging"); });
+    const endMove = (e: PointerEvent) => {
+      if (this._panelDrag && e.pointerId === this._panelDrag.id) {
+        try { move.releasePointerCapture(e.pointerId); } catch {}
+        this._panelDrag = null;
+      }
+    };
+    move.addEventListener("pointerup", endMove);
+    move.addEventListener("pointercancel", endMove);
 
     // 菜单项
     this._menuEl.addEventListener("click", (e) => {

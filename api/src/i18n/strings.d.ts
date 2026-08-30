@@ -2770,10 +2770,16 @@ export declare const S: {
         readonly tok: "sitelen kama";
     };
     readonly "ref.menu": {
-        readonly zh: "参考菜单（按住拖动窗口）";
-        readonly en: "Reference menu (hold to drag window)";
-        readonly ja: "参考メニュー（長押しでウィンドウ移動）";
-        readonly tok: "lipu wile (o awen la o tawa e lupa)";
+        readonly zh: "参考菜单";
+        readonly en: "Reference menu";
+        readonly ja: "参考メニュー";
+        readonly tok: "lipu wile";
+    };
+    readonly "ref.move": {
+        readonly zh: "拖动窗口";
+        readonly en: "Drag to move window";
+        readonly ja: "ドラッグでウィンドウ移動";
+        readonly tok: "luka la o tawa e lupa";
     };
     readonly "ref.oneToOne": {
         readonly zh: "1:1 像素";
@@ -2854,10 +2860,10 @@ export declare const S: {
         readonly tok: "o wile e sitelen lukin";
     };
     readonly "ref.hintPlus": {
-        readonly zh: "＋ 导入 / 更多操作（按住拖动窗口）";
-        readonly en: "＋ import / more (hold to drag window)";
-        readonly ja: "＋ 読み込み / その他（長押しで移動）";
-        readonly tok: "＋: o kama jo (o awen la o tawa)";
+        readonly zh: "＋ 导入 / 更多操作 · 左上角点阵 = 拖动窗口";
+        readonly en: "＋ import / more · top-left dots = drag window";
+        readonly ja: "＋ 読み込み / その他 · 左上のドット = ウィンドウ移動";
+        readonly tok: "＋: o kama jo · sike lili: o tawa e lupa";
     };
     readonly "ref.hintGesture": {
         readonly zh: "单指拖移 / 双指 pinch + 旋转 / 双击适应 / 长按吸色";

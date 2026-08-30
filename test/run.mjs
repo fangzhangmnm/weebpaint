@@ -61,6 +61,7 @@ import "./timelapse.test.mjs";       // 宣发轮：取景框/平采样闸门/�
 import "./timelapse-ora.test.mjs";   // timelapse×ora：entry 进出/顺序契约（thumbnail 恒最后）/DocState 整链 round-trip
 import "./ora-references.test.mjs";       // 0830 多参考 format 2：manifest round-trip/兜底链/停写非点 weebpaint/
 import "./reference-transcode.test.mjs";  // 0830 参考图压缩政策纯函数（1024² 面积/豁免/拍平白底）
+import "./reference-icons.test.mjs";      // 0830 参考窗图标 SSoT：id 全在 sprite + 组件零自绘几何
 import "./resample-bytes.test.mjs"; // 字节重采样：面积平均严格box/alpha加权/限幅
 import "./png-codec.test.mjs"; // PNG 接缝（UPNG 内脏）：低α无损roundtrip/pHYs
 import "./password-verifier.test.mjs";

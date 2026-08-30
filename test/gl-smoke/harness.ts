@@ -1519,30 +1519,31 @@ async function referenceComponentCheck(add: Add): Promise<void> {
     const mid3 = cctx.getImageData(cv.width >> 1, cv.height >> 1, 1, 1).data;
     add("component:chip 翻页→回图页+发 itemschange", !el.live && itemsEv === 1 && mid3[0] > 200, `live=${el.live} ev=${itemsEv} [${mid3[0]},${mid3[1]},${mid3[2]}]`);
 
-    // ＋ 拖把（0830 user「参考窗口怎么拖动」）：按住 ＋ 移动超 slop → 窗动、菜单不开；轻点 → 菜单开
+    // 拖动把手（0830 user：左上角点阵拖动区；＋退回纯菜单）：拖 .move → 窗动、菜单不开；点 ＋ → 菜单开
     {
-      const plus = el.shadowRoot!.querySelector(".plus") as HTMLElement;
-      const pr = plus.getBoundingClientRect();
+      const move = el.shadowRoot!.querySelector(".move") as HTMLElement;
+      const mr = move.getBoundingClientRect();
       const r0 = el.getBoundingClientRect();
-      const px0 = pr.left + pr.width / 2, py0 = pr.top + pr.height / 2;
+      const mx0 = mr.left + mr.width / 2, my0 = mr.top + mr.height / 2;
       const mk = (type: string, x: number, y: number) => new PointerEvent(type, { pointerId: 11, pointerType: "mouse", clientX: x, clientY: y, bubbles: true, cancelable: true, isPrimary: true });
-      plus.dispatchEvent(mk("pointerdown", px0, py0));
-      plus.dispatchEvent(mk("pointermove", px0 - 40, py0 + 30));
-      plus.dispatchEvent(mk("pointermove", px0 - 60, py0 + 50));
-      plus.dispatchEvent(mk("pointerup", px0 - 60, py0 + 50));
+      move.dispatchEvent(mk("pointerdown", mx0, my0));
+      move.dispatchEvent(mk("pointermove", mx0 + 40, my0 + 30));
+      move.dispatchEvent(mk("pointermove", mx0 + 60, my0 + 50));
+      move.dispatchEvent(mk("pointerup", mx0 + 60, my0 + 50));
       await nextFrames(2);
       const r1 = el.getBoundingClientRect();
       const menuHidden = el.shadowRoot!.querySelector(".menu")!.classList.contains("hidden");
-      add("component:＋按住拖=拖窗且不开菜单", Math.abs((r1.left - r0.left) + 60) < 2 && Math.abs((r1.top - r0.top) - 50) < 2 && menuHidden,
+      add("component:点阵把手拖=拖窗且不开菜单", Math.abs((r1.left - r0.left) - 60) < 2 && Math.abs((r1.top - r0.top) - 50) < 2 && menuHidden,
         `Δ=${(r1.left - r0.left).toFixed(0)},${(r1.top - r0.top).toFixed(0)} menuHidden=${menuHidden}`);
-      const pr2 = plus.getBoundingClientRect();
-      const px2 = pr2.left + pr2.width / 2, py2 = pr2.top + pr2.height / 2;
-      plus.dispatchEvent(mk("pointerdown", px2, py2));
-      plus.dispatchEvent(mk("pointerup", px2, py2));
+      const plus = el.shadowRoot!.querySelector(".plus") as HTMLElement;
+      plus.click();
       const menuOpen = !el.shadowRoot!.querySelector(".menu")!.classList.contains("hidden");
-      add("component:＋轻点=开菜单", menuOpen);
-      plus.dispatchEvent(mk("pointerdown", px2, py2));
-      plus.dispatchEvent(mk("pointerup", px2, py2));   // 再点收起，回到已知态
+      add("component:＋点击=开菜单", menuOpen);
+      plus.click();   // 再点收起，回到已知态
+      // 图标 SSoT：组件不再自绘——smoke 页没有宿主 sprite → 必须是虚线占位（data-icon-missing），不是自绘几何
+      const missing = el.shadowRoot!.querySelectorAll("[data-icon-missing]").length;
+      const drawn = el.shadowRoot!.querySelectorAll("[data-icon]").length;
+      add("component:图标零自绘（无 sprite 时全占位）", missing > 0 && drawn === 0, `missing=${missing} drawn=${drawn}`);
     }
 
     // 视口护栏（0830 反馈）：越界持久化位置回灌 → 钳回屏内（右/下边也兜）
