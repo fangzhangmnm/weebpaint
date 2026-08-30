@@ -44,6 +44,7 @@ export declare const isAuthConfigured: () => boolean;
 export declare const initAuth: () => Promise<void> | Promise<import("@internal/store").AuthState>;
 export declare const signIn: (opts?: {
     prompt?: "select_account";
+    mode?: "popup" | "redirect";
 } | undefined) => Promise<unknown>;
 export declare const signOut: () => Promise<void>;
 export declare const isSignedIn: () => boolean;

@@ -18,5 +18,5 @@ export declare class SharpenBlurFilter {
     static buildBody(container: HTMLElement, state: unknown, onChange: () => void): void;
     static bake(srcData: Uint8ClampedArray, dstData: Uint8ClampedArray, p: FilterParams, mask: Uint8Array | null, w: number, h: number): void;
     static _gaussianBlur3(src: Uint8ClampedArray, dst: Uint8ClampedArray, w: number, h: number): void;
-    static _boxBlur3(src: Uint8ClampedArray, dst: Uint8ClampedArray, w: number, h: number, mask: Uint8Array | null): void;
+    static _boxBlur3Premul(src: Float32Array, dst: Float32Array, w: number, h: number, mask: Uint8Array | null): void;
 }

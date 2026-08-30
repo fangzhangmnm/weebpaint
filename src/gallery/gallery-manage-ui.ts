@@ -21,7 +21,7 @@ import { iconHtml } from "../ui/icon.ts";
 import { galleryAttachment } from "../gallery-attachment-host.ts";
 import { galleryRegistry } from "../gallery-registry.ts";
 import type { GalleryEntry } from "../gallery-registry.ts";
-import { mintFolderByPicker, mintOneDriveByAccount, mintOneDriveSwitchAccount, attachGallery, ensureFolderPermission, canPickFolderGallery, hasFreshPendingOneDriveConnect, clearPendingOneDriveConnect, galleryFlow, type MintResult } from "../gallery-connect.ts";
+import { mintFolderByPicker, mintOneDriveByAccount, mintOneDriveSwitchAccount, oneDriveInteractMode, attachGallery, ensureFolderPermission, canPickFolderGallery, hasFreshPendingOneDriveConnect, clearPendingOneDriveConnect, galleryFlow, type MintResult } from "../gallery-connect.ts";
 import { requireStore, signIn, signOut, isSignedIn, isAuthConfigured, _seedNextRackInitData, _buildStoreForGalleryEntry, brushRackCollection } from "../app-store.ts";
 import { getAllBrushes, getMeta, RACK_META_ID } from "../brushes.ts";
 import { preferences, PREF_REGISTRY, type PrefKey } from "../app-prefs.ts";
@@ -264,10 +264,16 @@ async function onOneDrivePick(): Promise<void> {
     await openConfirmSheet(t("gm.connectTitle"), t("gm.fileProtoCloudHelp", { file: fn }));
     return;
   }
-  // 永远弹账号选择页（select_account redirect：页面即离开；点击同步栈起跳保手势）。回程由
+  // 永远弹账号选择页（select_account；点击同步栈起跳保手势）。桌面 = popup：选完账号弹回，
+  //   minted 直接续 switchFlow（全程不离页）；移动 = redirect：页面即离开，回程由
   //   resumePendingOneDriveConnect 续办 mint+switchFlow——选了同账号由「已是当前图库」短路。
-  try { await mintOneDriveSwitchAccount(); }
-  catch (e) { reportError(new Error("[gallery-manage] connect failed: " + String(e)), "error"); }
+  try {
+    const minted = await mintOneDriveSwitchAccount();
+    if (minted) await switchFlow(minted.entry, { askSeed: minted.created });
+  } catch (e) {
+    if (String(e).includes("user_cancelled")) return;   // 用户自己关了登录弹窗：无事发生，静默即诚实
+    reportError(new Error("[gallery-manage] connect failed: " + String(e)), "error");
+  }
 }
 async function onFolderPick(): Promise<void> {
   _closePopup();
@@ -375,10 +381,14 @@ async function reconnectFlow(): Promise<void> {
   if (att.kind !== "attached") return;
   try {
     if (att.entry.kind === "onedrive") {
-      // signIn = loginRedirect **整页跳走**（0.11.37 实锤），不是 popup——旧版无条件 signIn 在
-      //   「已登录但旗死锁」（案卷 20260830 §BUG A）时=白跳微软一整圈、回程重掷竞态骰子的死循环（§BUG B）。
-      //   已登录 → 原地翻牌即可；未登录才真跳（回程由 boot attach 的 online 收口接住）。
-      if (!isSignedIn()) { await signIn(); return; }   // redirect：页面即离开，后续代码不跑
+      // 旧版无条件 signIn 在「已登录但旗死锁」（案卷 20260830 §BUG A）时=白跳微软一整圈、回程
+      //   重掷竞态骰子的死循环（§BUG B）。已登录 → 原地翻牌即可；未登录才真登录——
+      //   桌面 popup（store 0.10.0）：弹回即续，向下直接翻牌+补推；移动 redirect：页面即离开，
+      //   回程由 boot attach 的 online 收口接住。
+      if (!isSignedIn()) {
+        if (oneDriveInteractMode() === "popup") await signIn({ mode: "popup" });
+        else { await signIn(); return; }   // redirect：页面即离开，后续代码不跑
+      }
       galleryAttachment.setOnline(true);
     } else {
       galleryAttachment.setOnline(await ensureFolderPermission(att.entry, { request: true }));
@@ -389,6 +399,7 @@ async function reconnectFlow(): Promise<void> {
       _status(t("gm.reconnected"));
     }
   } catch (e) {
+    if (String(e).includes("user_cancelled")) return;   // 用户自己关了登录弹窗：无事发生，静默即诚实
     reportError(new Error("[gallery-manage] reconnect failed: " + String(e)), "error");
   }
 }

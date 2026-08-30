@@ -13,8 +13,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@internal/store": "file:./vendor-pkgs/internal-store-0.9.0.tgz",
-    "@internal/encryption": "file:./vendor-pkgs/internal-encryption-0.1.0.tgz"
+    "@internal/encryption": "file:./vendor-pkgs/internal-encryption-0.1.0.tgz",
+    "@internal/store": "file:vendor-pkgs/internal-store-0.10.0.tgz"
   },
   "devDependencies": {
     "playwright": "^1.61.1",

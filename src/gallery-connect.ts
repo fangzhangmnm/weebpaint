@@ -53,30 +53,54 @@ export async function mintFolderByPicker(): Promise<MintResult | null> {
   return _withCreated(() => galleryRegistry.mintFolder(handle as DirHandleLike));
 }
 
-/** OneDrive（手势）。**redirect 事实**（2026-08-28 iPad 实锤「点两次」破案）：signIn = loginRedirect =
+/** 登录交互形态（user 2026-08-25 拍板「桌面主场 MSAL popup 做、iOS redirect」、0830 确认直做；
+ *  store 0.10.0 收货）：iOS/iPadOS（含伪装 MacIntel 的 iPadOS：多点触控判据）与 Android 的弹窗
+ *  拦截/PWA 兼容性差 → redirect；其余（桌面浏览器）→ popup——全程不离页，画布/表单状态零丢失，
+ *  不再需要「待续标记 + 回程续办」舞步（redirect 舞步保留给移动端与回程兜底）。 */
+export function oneDriveInteractMode(): "popup" | "redirect" {
+  const ua = navigator.userAgent;
+  const isIOS = /iP(hone|ad|od)/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  return isIOS || /Android/.test(ua) ? "redirect" : "popup";
+}
+
+/** OneDrive（手势）。**redirect 事实**（2026-08-28 iPad 实锤「点两次」破案）：signIn 缺省 = loginRedirect =
  *  整页跳走，本函数后半段死在跳转点——回来后 seed 只写 registry、没人 attach，第二次点才靠
  *  「再跳一次 → boot 领养」侥幸出库。修法两半：
  *  ① 已登录 → **不再 signIn**，直接用 active 账号同步续 mint（零跳转，connect 一次到位）；
- *  ② 未登录 → redirect 前落「待续连接」标记（device-kv + 时间戳），回程 auth-changed 由
- *    resumePendingOneDriveConnect 续办 mint+attach（gallery-manage-ui 接线）。 */
+ *  ② 未登录 → 桌面 popup：弹回即续（同函数直落 mint，不离页）；移动 redirect：跳转前落
+ *    「待续连接」标记（device-kv + 时间戳），回程 auth-changed 由 resumePendingOneDriveConnect
+ *    续办 mint+attach（gallery-manage-ui 接线）。 */
 export async function mintOneDriveByAccount(): Promise<MintResult | null> {
   if (!isSignedIn()) {
-    markPendingOneDriveConnect();
-    await signIn();                       // loginRedirect：正常情况下页面已离开，下面代码不会跑到
+    if (oneDriveInteractMode() === "popup") {
+      await signIn({ mode: "popup" });    // 弹回即续（取消/被拦 = reject，交上层甄别）
+    } else {
+      markPendingOneDriveConnect();
+      await signIn();                     // loginRedirect：正常情况下页面已离开，下面代码不会跑到
+    }
   }
-  const acct = getActiveAccount() as { homeAccountId?: string; username?: string; name?: string } | null;
-  if (!acct?.homeAccountId) return null;
-  clearPendingOneDriveConnect();          // 已拿到账号（silent/罕见非跳转路径）：标记用不上了
-  return _withCreated(() => galleryRegistry.mintOneDrive(acct.homeAccountId as string, acct.username || acct.name || ""));
+  return _mintByActiveAccount();
 }
 
-/** 换一个账号连接（0.9.0 口子，user 0828「加口子」）：强制微软账号选择页。必在点击同步栈调
- *  （signIn=loginRedirect 页面即离开）；回程由 resumePendingOneDriveConnect 用新 active 账号续办
- *  mint+attach——多账号「铸第二账号」的唯一入口（P3 §1.10）。 */
+/** 换一个账号连接（0.9.0 口子，user 0828「加口子」）：强制微软账号选择页——多账号「铸第二账号」
+ *  的唯一入口（P3 §1.10）。桌面 popup：账号选择页开在弹窗里，选完即续 mint（不离页）；
+ *  移动 redirect：必在点击同步栈调（页面即离开），回程由 resumePendingOneDriveConnect 续办。 */
 export async function mintOneDriveSwitchAccount(): Promise<MintResult | null> {
+  if (oneDriveInteractMode() === "popup") {
+    await signIn({ prompt: "select_account", mode: "popup" });
+    return _mintByActiveAccount();
+  }
   markPendingOneDriveConnect();
   await signIn({ prompt: "select_account" });   // redirect：正常情况下页面已离开
   return null;                                  // 罕见非跳转路径：本次不续（标记在，下次 auth-changed 兜）
+}
+
+/** signIn 已落账号后的同步续 mint（popup 弹回 / 已登录快路 / 罕见非跳转路径共用尾巴）。 */
+async function _mintByActiveAccount(): Promise<MintResult | null> {
+  const acct = getActiveAccount() as { homeAccountId?: string; username?: string; name?: string } | null;
+  if (!acct?.homeAccountId) return null;
+  clearPendingOneDriveConnect();          // 已拿到账号：标记用不上了（popup 路本就没落过，幂等）
+  return _withCreated(() => galleryRegistry.mintOneDrive(acct.homeAccountId as string, acct.username || acct.name || ""));
 }
 
 // ── 待续连接标记（P3 iOS redirect 续办；形制=device-kv 标量 + TTL，不是 crash-store 的字节记录）──
