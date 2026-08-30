@@ -140,10 +140,16 @@ canvas:active { cursor: grabbing; }
 }
 .move:hover { opacity: 1; }
 .move:active { cursor: grabbing; }
+/* 显式 6 点（3-2-1 三角排布，pitch 5.5）：离底板斜边 ≥3px，不出半颗点（user 0830「白的应该超过裁切一点」） */
 .move::after {
-  content: ""; position: absolute; inset: 3px;
-  background-image: radial-gradient(circle, currentColor 1.1px, transparent 1.6px);
-  background-size: 4px 4px;
+  content: ""; position: absolute; inset: 0;
+  background-image:
+    radial-gradient(circle at 4px 4px,     currentColor 1.2px, transparent 1.7px),
+    radial-gradient(circle at 9.5px 4px,   currentColor 1.2px, transparent 1.7px),
+    radial-gradient(circle at 15px 4px,    currentColor 1.2px, transparent 1.7px),
+    radial-gradient(circle at 4px 9.5px,   currentColor 1.2px, transparent 1.7px),
+    radial-gradient(circle at 9.5px 9.5px, currentColor 1.2px, transparent 1.7px),
+    radial-gradient(circle at 4px 15px,    currentColor 1.2px, transparent 1.7px);
 }
 /* resize 把手：斜纹沿 styles.css .float-panel-resize 家族标准件；19（user 0830：视觉上斜纹比点阵显大，稍小一点） */
 .grip {
@@ -155,12 +161,14 @@ canvas:active { cursor: grabbing; }
   transition: opacity 0.35s;
 }
 .grip:hover { opacity: 1; }
+/* 斜纹位置：标准件是 45–52 / 66–73%，但本把手裁成三角后斜边正落在 135° 渐变线的 50% 位——第一道纹会被
+   腰斩成细丝（user 0830 抓到）。整体往角落挪 13%：58–65 / 79–86%，斜边外留 ~2px 底板白边。 */
 .grip::after {
   content: ""; position: absolute; inset: 0;
   background: linear-gradient(135deg,
-    transparent 0 45%, currentColor 45% 52%,
-    transparent 52% 66%, currentColor 66% 73%,
-    transparent 73%);
+    transparent 0 58%, currentColor 58% 65%,
+    transparent 65% 79%, currentColor 79% 86%,
+    transparent 86%);
 }
 .chips {
   position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%); z-index: 2;
