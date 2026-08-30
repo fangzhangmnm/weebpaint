@@ -113,59 +113,64 @@ canvas {
 }
 canvas:active { cursor: grabbing; }
 :host([pick]) canvas, :host([pick]) canvas:active { cursor: crosshair; }
+/* gizmo 尺寸一档缩小（user 0830「resize 太大，其他一起小一点」）：把手 14、＋ 24、chips 12px 图标 */
 .plus {
-  position: absolute; top: 4px; right: 4px; z-index: 3;
-  width: 30px; height: 30px; padding: 0; border: none; border-radius: 50%;
+  position: absolute; top: 3px; right: 3px; z-index: 3;
+  width: 24px; height: 24px; padding: 0; border: none; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: color-mix(in srgb, var(--bg, #202124) 72%, transparent);
   color: var(--ink, #e8eaed); cursor: pointer;   /* 纯菜单钮（0830 user：＋兼拖把很奇怪，拖归左上角点阵把手） */
   user-select: none; -webkit-user-select: none;
   transition: opacity 0.35s;
 }
-/* 拖动把手（user 0830「左上角加一点小点一样的拖动区域」）：与右下角斜纹 resize 把手对称的点阵纹理
-   （gizmo 纹理，非 icon——CSS 画，不进图标库）。 */
+.plus svg { width: 14px; height: 14px; pointer-events: none; }
+.plus:hover { background: color-mix(in srgb, var(--bg, #202124) 90%, transparent); }
+/* 拖动把手（user 0830「左上角加一点小点一样的拖动区域…三角形布局，没有按钮式高亮，参考 resize」）：
+   与右下斜纹 resize 把手同形制——点阵裁成左上三角、无底无框，只靠 opacity 呼吸。gizmo 纹理非 icon。 */
 .move {
-  position: absolute; left: 2px; top: 2px; width: 22px; height: 22px; z-index: 3;
+  position: absolute; left: 1px; top: 1px; width: 14px; height: 14px; z-index: 3;
   cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
-  color: var(--ink-soft, #9aa0a6); opacity: 0.55; border-radius: 6px;
-  background: color-mix(in srgb, var(--bg, #202124) 60%, transparent);
+  color: var(--ink-soft, #9aa0a6); opacity: 0.55;
   transition: opacity 0.35s;
 }
 .move:hover { opacity: 1; }
 .move:active { cursor: grabbing; }
 .move::after {
-  content: ""; position: absolute; inset: 5px;
-  background-image: radial-gradient(circle, currentColor 1.1px, transparent 1.6px);
-  background-size: 4px 4px;
+  content: ""; position: absolute; inset: 2px;
+  background-image: radial-gradient(circle, currentColor 0.9px, transparent 1.3px);
+  background-size: 3.4px 3.4px; background-position: 0.3px 0.3px;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
 }
-.plus svg { width: 18px; height: 18px; pointer-events: none; }
-.plus:hover { background: color-mix(in srgb, var(--bg, #202124) 90%, transparent); }
 .grip {
-  position: absolute; right: 2px; bottom: 2px; width: 22px; height: 22px;
+  position: absolute; right: 1px; bottom: 1px; width: 14px; height: 14px;
   cursor: nwse-resize; touch-action: none; z-index: 2;
   color: var(--ink-soft, #9aa0a6); opacity: 0.55;
   transition: opacity 0.35s;
 }
 .grip:hover { opacity: 1; }
 .grip::after {
-  content: ""; position: absolute; inset: 3px;
-  background: repeating-linear-gradient(-45deg, currentColor 0 1.6px, transparent 1.6px 5px);
+  content: ""; position: absolute; inset: 2px;
+  background: repeating-linear-gradient(-45deg, currentColor 0 1.2px, transparent 1.2px 3.6px);
   clip-path: polygon(100% 0, 100% 100%, 0 100%);
 }
 .chips {
-  position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%); z-index: 2;
-  display: flex; align-items: center; gap: 2px;
+  position: absolute; left: 50%; bottom: 3px; transform: translateX(-50%); z-index: 2;
+  display: flex; align-items: center; gap: 1px;
   background: color-mix(in srgb, var(--bg, #202124) 72%, transparent);
-  border-radius: 12px; padding: 1px 4px;
+  border-radius: 10px; padding: 0 3px;
   color: var(--ink, #e8eaed);
   cursor: default;   /* 计数文本不出 I-beam；按钮各自 pointer */
   transition: opacity 0.35s;
 }
 .chips.hidden { display: none; }
 .chip { background: transparent; border: none; color: inherit; padding: 2px; cursor: pointer; display: flex; }
-.chip svg { width: 14px; height: 14px; }
-.chip-count { font-size: 11px; min-width: 26px; text-align: center; color: var(--ink-soft, #9aa0a6); }
+.chip svg { width: 12px; height: 12px; }
+.chip-count { font-size: 10px; min-width: 22px; text-align: center; color: var(--ink-soft, #9aa0a6); }
+/* gizmo 显隐两档（user 0830「鼠标移走时 gizmos 都隐藏，不影响观察画面」）：
+   .away = 能悬停的设备指针离窗 → 全隐（进窗即现）；.idle = 闲置淡至 .35（触屏无悬停只有这档，
+   全隐会让 chips 变盲操作）。菜单弹层不在其列。 */
 :host(.idle) .plus, :host(.idle) .grip, :host(.idle) .chips, :host(.idle) .move { opacity: 0.35; }
+:host(.away) .plus, :host(.away) .grip, :host(.away) .chips, :host(.away) .move { opacity: 0; }
 .menu {
   position: absolute; top: 38px; right: 4px; z-index: 4;
   min-width: 170px; padding: 4px;
@@ -608,6 +613,16 @@ export class WpReferenceWindow extends HTMLElement {
       e.stopPropagation(); e.preventDefault();
     }, { capture: true });
     root.addEventListener("pointermove", () => this._pokeIdle(), { capture: true, passive: true });
+    // 能悬停的设备（鼠标 / 带悬停的笔；iPad 触屏主指针 = hover:none 走 idle 档）：指针离窗全隐、进窗即现。
+    //   拖窗/resize/手势进行中不隐（capture 期指针可能在窗外）。
+    const hoverCapable = typeof matchMedia === "function" && matchMedia("(hover: hover)").matches;
+    if (hoverCapable) {
+      this.addEventListener("pointerenter", () => this.classList.remove("away"));
+      this.addEventListener("pointerleave", () => {
+        if (this._panelDrag || this._resizeDrag || this._pointers.size > 0) return;
+        this.classList.add("away");
+      });
+    }
 
     // 翻页 chips
     this._chipsEl.addEventListener("click", (e) => {
