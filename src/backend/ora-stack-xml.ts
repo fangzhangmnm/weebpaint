@@ -81,8 +81,10 @@ export function canvasModeFromOra(op: string): string {
 
 // 私有扩展 schema 版本（0.10.0 起写入 weebpaint:format；与 app 版本解耦，只在**格式**变更时 bump）：
 //   1 = 首个显式版本（= 改名前隐式格式：id/clipping/active/lock-alpha/reference/wrote-with + sidecar 三件）。
+//   2 = reference 整改批（2026-08-30 spec，user 拍板）：多参考 `.weebpaint/references/` + refPanels
+//       manifest；timelapse.mp4 迁 `.weebpaint/`；非点 `weebpaint/` 停写。读端零迁移（兜底链见 ora.ts）。
 //   旧文件无此属性 → 读端按 0 处理（完全可读）。读到 > ORA_FORMAT_VERSION → 上层警告 + 覆盖守卫（session-state）。
-export const ORA_FORMAT_VERSION = 1;
+export const ORA_FORMAT_VERSION = 2;
 
 // ---- 写：doc 树 → stack.xml 字符串 ----
 

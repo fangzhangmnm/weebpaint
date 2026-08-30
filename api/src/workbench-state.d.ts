@@ -39,6 +39,14 @@ declare function freshGroups(): {
         position: PanelPos | null;
         viewport: EditorViewport;
     };
+    refPanels: {
+        index: number;
+        items: Array<{
+            kind: "image" | "live";
+            src?: string;
+            vp: EditorViewport;
+        }>;
+    };
     blenderPanel: {
         show: boolean;
         position: PanelPos | null;
@@ -206,6 +214,22 @@ export declare const desk: {
         enabled: boolean;
         position: PanelPos | null;
     };
+    get refPanels(): {
+        index: number;
+        items: Array<{
+            kind: "image" | "live";
+            src?: string;
+            vp: EditorViewport;
+        }>;
+    };
+    set refPanels(v: {
+        index: number;
+        items: Array<{
+            kind: "image" | "live";
+            src?: string;
+            vp: EditorViewport;
+        }>;
+    });
     refPanel: {
         enabled: boolean;
         position: PanelPos | null;

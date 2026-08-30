@@ -503,6 +503,9 @@ export class Board {
     this.canvas.width = tw;
     this.canvas.height = th;
     if (this._glCanvas) { this._glCanvas.width = tw; this._glCanvas.height = th; }   // GL canvas 跟随 device px
+    // 点网格 y 相位（0830 参考窗小点对齐主画布）：GL 网格原点在画布**左下**（gl_FragCoord），CSS
+    //   fixed 背景原点在视口**左上**——相位差 = 画布 CSS 高 mod 24。参考窗 :host 背景消费此变量。
+    try { document.documentElement.style.setProperty("--void-grid-phase-y", `${h % 24}px`); } catch { /* dom-shim */ }
     this._gridSig = "";   // 尺寸变 → 强制重算栅格 div
     this._clampPan();     // #27：屏幕尺寸/旋转变小后画布可能整体落屏外，同一约束一并夹回
     this.requestRender();

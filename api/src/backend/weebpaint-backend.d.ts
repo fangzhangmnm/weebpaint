@@ -42,7 +42,10 @@ export interface BackendOpenResult {
     sidecar: {
         editorState?: unknown;
         legacyState?: unknown;
-        referencePng?: Uint8Array;
+        references?: ({
+            bytes: Uint8Array;
+            mime: string;
+        } | null)[];
         wroteWith: string | null;
     };
 }
@@ -79,7 +82,10 @@ export declare class WeebPaintBackend implements WeebPaintBackendInterface {
     private _guard;
     encodeOra(opts?: {
         editorSidecar?: object;
-        referencePng?: Uint8Array;
+        references?: ({
+            bytes: Uint8Array;
+            mime: string;
+        } | null)[];
         timelapse?: {
             json: string;
             mp4: Uint8Array;

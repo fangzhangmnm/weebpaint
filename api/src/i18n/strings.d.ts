@@ -2716,28 +2716,64 @@ export declare const S: {
         readonly tok: "o wan e lipu ale tawa lipu sin";
     };
     readonly "ref.load": {
-        readonly zh: "从文件载入";
-        readonly en: "Load from file";
-        readonly ja: "ファイルから読み込む";
+        readonly zh: "导入图片…";
+        readonly en: "Import image…";
+        readonly ja: "画像を読み込む…";
         readonly tok: "o kama jo e sitelen";
     };
     readonly "ref.live": {
-        readonly zh: "实时镜像主画布";
-        readonly en: "Live mirror of canvas";
-        readonly ja: "キャンバスをライブミラー";
-        readonly tok: "sama supa sitelen lon tenpo ale";
-    };
-    readonly "ref.fit": {
-        readonly zh: "适应窗口";
-        readonly en: "Fit to window";
-        readonly ja: "ウィンドウに合わせる";
-        readonly tok: "suli sama lupa";
+        readonly zh: "画布镜像";
+        readonly en: "Canvas mirror";
+        readonly ja: "キャンバスミラー";
+        readonly tok: "sama supa sitelen";
     };
     readonly "ref.cloud": {
-        readonly zh: "从图库选图";
-        readonly en: "Pick from gallery";
-        readonly ja: "ギャラリーから選ぶ";
+        readonly zh: "从图库选图…";
+        readonly en: "Pick from gallery…";
+        readonly ja: "ギャラリーから選ぶ…";
         readonly tok: "o kama jo tan poki sitelen";
+    };
+    readonly "ref.paste": {
+        readonly zh: "粘贴剪贴板";
+        readonly en: "Paste clipboard";
+        readonly ja: "クリップボードを貼り付け";
+        readonly tok: "o pana e sitelen awen";
+    };
+    readonly "ref.delete": {
+        readonly zh: "删除这张参考";
+        readonly en: "Delete this reference";
+        readonly ja: "この参考を削除";
+        readonly tok: "o weka e sitelen lukin ni";
+    };
+    readonly "ref.deleteConfirm": {
+        readonly zh: "再点一下确认删除";
+        readonly en: "Tap again to confirm";
+        readonly ja: "もう一度タップで確認";
+        readonly tok: "o luka sin la weka";
+    };
+    readonly "ref.closeWin": {
+        readonly zh: "关闭参考窗";
+        readonly en: "Close reference window";
+        readonly ja: "参考ウィンドウを閉じる";
+        readonly tok: "o pini e lupa lukin";
+    };
+    readonly "ref.prevRef": {
+        readonly zh: "上一张参考";
+        readonly en: "Previous reference";
+        readonly ja: "前の参考";
+        readonly tok: "sitelen pi tenpo pini";
+    };
+    readonly "ref.nextRef": {
+        readonly zh: "下一张参考";
+        readonly en: "Next reference";
+        readonly ja: "次の参考";
+        readonly tok: "sitelen kama";
+    };
+    readonly "ref.menu": {
+        readonly zh: "参考菜单（按住拖动窗口）";
+        readonly en: "Reference menu (hold to drag window)";
+        readonly ja: "参考メニュー（長押しでウィンドウ移動）";
+        readonly tok: "lipu wile (o awen la o tawa e lupa)";
     };
     readonly "cp.title": {
         readonly zh: "从图库选图";
@@ -2811,23 +2847,17 @@ export declare const S: {
         readonly ja: "参考用の画像を選択";
         readonly tok: "o wile e sitelen lukin";
     };
-    readonly "ref.hintFolder": {
-        readonly zh: "文件夹图标 = 加载图片";
-        readonly en: "Folder icon = load image";
-        readonly ja: "フォルダアイコン = 画像を読み込む";
-        readonly tok: "sitelen poki: o kama jo e sitelen";
-    };
-    readonly "ref.hintPip": {
-        readonly zh: "画中画图标 = 实时镜像主画布";
-        readonly en: "PiP icon = live mirror of canvas";
-        readonly ja: "PiPアイコン = キャンバスをライブミラー";
-        readonly tok: "sitelen lupa: sama supa sitelen lon tenpo ale";
+    readonly "ref.hintPlus": {
+        readonly zh: "＋ 导入 / 更多操作（按住拖动窗口）";
+        readonly en: "＋ import / more (hold to drag window)";
+        readonly ja: "＋ 読み込み / その他（長押しで移動）";
+        readonly tok: "＋: o kama jo (o awen la o tawa)";
     };
     readonly "ref.hintGesture": {
-        readonly zh: "单指拖移 / 双指 pinch + 旋转 / 双击适应";
-        readonly en: "One-finger drag / two-finger pinch + rotate / double-tap to fit";
-        readonly ja: "一本指ドラッグ / 二本指ピンチ+回転 / ダブルタップでフィット";
-        readonly tok: "luka wan: tawa · luka tu: suli / sike · luka pi tenpo tu: suli pona";
+        readonly zh: "单指拖移 / 双指 pinch + 旋转 / 双击适应 / 长按吸色";
+        readonly en: "Drag / pinch + rotate / double-tap to fit / long-press to pick color";
+        readonly ja: "ドラッグ / ピンチ+回転 / ダブルタップでフィット / 長押しでスポイト";
+        readonly tok: "luka wan: tawa · luka tu: suli / sike · luka pi tenpo tu: suli pona · o awen la kama jo e kule";
     };
     readonly "la.stack": {
         readonly zh: "套索 / 选区";
@@ -6590,6 +6620,12 @@ export declare const S: {
         readonly en: " (scaled to {w}×{h})";
         readonly ja: "（{w}×{h} に縮小）";
         readonly tok: " (lili tawa {w}×{h})";
+    };
+    readonly "mi.referenceCompressed": {
+        readonly zh: "（已压缩 {from} → {to}）";
+        readonly en: " (compressed {from} → {to})";
+        readonly ja: "（{from} → {to} に圧縮）";
+        readonly tok: " (lili tan {from} tawa {to})";
     };
     readonly "mi.referenceLoadFailed": {
         readonly zh: "参考图载入失败：{err}";

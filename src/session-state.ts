@@ -17,6 +17,7 @@ import { setBrushColor } from "./color-panel.ts";
 import { thumbBlobFromBytes, setCurrentSessionName, triggerDownload } from "./session.ts";
 import { renderNodesToBytes } from "./backend/doc-render.ts";
 import { encodeDocToOra, decodeOraToPainting, paintingDataToEncodeDoc, parseAppVersion, type DecodedPainting } from "./backend/ora.ts";
+import { applyLoadedReferences, collectReferenceBlobsForSave } from "./side-windows.ts";   // 多参考（format 2）：载入灌注/保存收集
 import { ORA_FORMAT_VERSION } from "./backend/ora-stack-xml.ts";
 import { flattenViewLeaves } from "./backend/workpiece/painting-view.ts";
 import { tLatin } from "./i18n/index.ts";
@@ -375,7 +376,7 @@ async function leaveLocalDoc(): Promise<boolean> {
 // 三组，存时 syncRuntimeForSave 捞进）；activeId 在 stack.xml weebpaint:active 原生携带。
 // 读兼容：restoreEditorStateFromOra 仍吃存量 .ora 的 _weebpaintState（desk 后手赢），拔除另议。
 function resetEditorState() {
-  referenceWindow.clearBitmap?.(); referenceWindow.close?.();   // ?.=元素可能未升级（无 CE 环境），见 ReferenceWindowHandle 注
+  referenceWindow.clearAll?.(); referenceWindow.close?.();   // ?.=元素可能未升级（无 CE 环境），见 ReferenceWindowHandle 注
   paletteWindow.clear?.(); paletteWindow.close?.();
   setBrushColor("#000000"); applyCheckerboard(false); state.filterBrush = null; applyBlenderSyncState();   // restore 路径绕 target（v0.9.11）
   desk.reset();   // desk per-doc：开新文件/换画/卸载 → 重置 desk struct（stage4）
@@ -387,12 +388,6 @@ function resetEditorState() {
 function applyEditorStateToUI(): void { window.dispatchEvent(new CustomEvent("wp:applyEditorState")); }
 function restoreEditorStateFromOra(loaded: LoadedDoc) {
   const ws = loaded?._weebpaintState as OraWeebpaintState | undefined;
-  if (loaded?._referenceBlob) {
-    // skipFit：ref 面板 open/位置/vp 由 desk.refPanel 经 wp:applyEditorState 恢复；bitmap 异步载入不覆盖已载入 vp。
-    createImageBitmap(loaded._referenceBlob).then((bitmap: ImageBitmap) => {
-      referenceWindow.setBitmap?.(bitmap, { persistBlob: loaded._referenceBlob, skipFit: true });
-    }).catch(() => {});
-  }
   if (ws?.color) setBrushColor(ws.color);   // 存档笔刷色写笔刷不写 target——fill 期载图曾被吞进 PendingFill 蒸发（v0.9.11）
   if (ws?.palette) { try { paletteWindow.applySerializedState(ws.palette); } catch (_) {} }
   // 旧轨（webpaint/state.json）：灌**全部**工具的 dial（eraser/filterBrush 只在这一轨；见 storeEditorStateToOra 的双轨注）。
@@ -412,6 +407,9 @@ function restoreEditorStateFromOra(loaded: LoadedDoc) {
   // 新轨（desk per-doc）：载入 .weebpaint/editor-state.json（缺失=老画作 → resetEditorState 已回默认）。
   //   **后手赢**：它会用 brushTool 覆盖 toolStates.brush + color。
   if (loaded._editorState != null) desk.Unserialize(loaded._editorState);
+  // 多参考（format 2）：必须排在 desk.Unserialize **之后**（vp/index 从 desk.refPanels 对位取）。
+  //   bitmap 异步 decode，fire-and-forget（窗 open/rect 由 wp:applyEditorState 同步恢复，不等图）。
+  if (loaded._references?.length) void applyLoadedReferences(loaded._references);
   // T5（v0.8.21）：旧轨停写后三样的新家（desk 后手赢——覆盖上面旧轨灌的值；存量老 .ora 无这三组 = null 跳过）。
   if (loaded._editorState != null) {
     const dials = desk.toolDials;
@@ -437,7 +435,9 @@ function _buildOraMeta() {
     state.checkerboard,
     { toolDials: state.toolStates, palette: paletteWindow.getSerializedState(), blender: getBlenderSyncState() },
   );
-  return { referenceImage: referenceWindow.getPersistBlob?.() ?? undefined, desk: desk.Serialize() };
+  // 多参考：collect 内部先 syncRefsToDesk（manifest src/index 落 desk）**再** Serialize——顺序即契约。
+  const references = collectReferenceBlobsForSave();
+  return { references, desk: desk.Serialize() };
 }
 // S8（spec:41 存档一致性）：encode 前**同步**冻结 {结构 + 每叶 tile 快照}（零拷贝），bytes 与 peek
 //   读同一冻结视图 → encode 的 await 间隙里任何编辑（描边 commit / 层结构操作）都不撕存档，

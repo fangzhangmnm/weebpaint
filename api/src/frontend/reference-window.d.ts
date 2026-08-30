@@ -9,32 +9,44 @@ export interface RefPanelRect {
 export type RefBitmapSource = (ImageBitmap | HTMLImageElement | HTMLCanvasElement | OffscreenCanvas) & {
     close?: () => void;
 };
-export interface SetBitmapOpts {
-    persistBlob?: Blob | null;
-    skipFit?: boolean;
-}
 export type RefLiveSource = HTMLCanvasElement | OffscreenCanvas | ImageBitmap;
 export interface RefLabels {
     load?: string;
+    paste?: string;
     cloud?: string;
     live?: string;
-    fit?: string;
-    close?: string;
+    del?: string;
+    delConfirm?: string;
+    closeWin?: string;
+    prev?: string;
+    next?: string;
+    menu?: string;
     resize?: string;
     resizeAria?: string;
 }
+export type RefItem = {
+    kind: "image";
+    bitmap: RefBitmapSource;
+    blob: Blob | null;
+    vp: RefViewport | null;
+} | {
+    kind: "live";
+    vp: RefViewport | null;
+};
 export declare class WpReferenceWindow extends HTMLElement {
     static get observedAttributes(): string[];
-    queryLongPressPick: () => boolean;
-    private _headEl;
-    private _bodyEl;
+    liveProvider: (() => RefLiveSource | null) | null;
     private _canvas;
     private _cctx;
     private _emptyEl;
-    private _liveBtn;
-    private _bitmap;
-    private _bitmapBlob;
-    private _liveProvider;
+    private _plusEl;
+    private _menuEl;
+    private _chipsEl;
+    private _chipCountEl;
+    private _delItemEl;
+    private _items;
+    private _index;
+    private _labels;
     private _liveSource;
     private _liveDirty;
     private _lastLiveComposeT;
@@ -48,6 +60,8 @@ export declare class WpReferenceWindow extends HTMLElement {
     private _picking;
     private _longPressTimer;
     private _lpStart;
+    private _lpEvent;
+    private _idleTimer;
     constructor();
     get open(): boolean;
     set open(v: boolean);
@@ -60,21 +74,48 @@ export declare class WpReferenceWindow extends HTMLElement {
     get rect(): RefPanelRect;
     set rect(o: Partial<RefPanelRect> | null | undefined);
     set labels(l: RefLabels);
-    setBitmap(bitmap: RefBitmapSource | null, opts?: SetBitmapOpts): void;
-    clearBitmap(): void;
-    getPersistBlob(): Blob | null;
-    setLiveProvider(provider: () => RefLiveSource | null): void;
-    stopLive(): void;
-    private _stopLiveInternal;
-    private _reflectLive;
-    markLiveDirty(): void;
+    /** 整表替换（load 恢复用）。旧 image bitmap 全部释放。 */
+    setItems(items: RefItem[], index?: number): void;
+    /** 追加一张图并翻到它（导入漏斗尾）。 */
+    addImage(bitmap: RefBitmapSource, blob: Blob | null): void;
+    /** 画布镜像页：已有 → 翻过去；没有 → 追加并翻到（liveProvider 缺席 = no-op）。 */
+    showLive(): void;
+    /** 清空（换画/重置）。 */
+    clearAll(): void;
+    /** 宿主读走全部状态（desk 同步 + 保存收集）。当前页 vp 先回写。 */
+    getRefState(): {
+        index: number;
+        items: Array<{
+            kind: "image";
+            blob: Blob | null;
+            vp: RefViewport | null;
+        } | {
+            kind: "live";
+            vp: RefViewport | null;
+        }>;
+    };
+    get itemCount(): number;
     fitToPanel(): void;
-    private _sourceSize;
+    markLiveDirty(): void;
     private _emit;
     private _emitViewport;
     private _emitRect;
+    private _emitItems;
+    private _saveCurrentVp;
+    private _loadCurrentVp;
+    /** fit 但不发事件（程序性初始适应；用户双击走 fitToPanel）。 */
+    fitToPanelSilent(): void;
+    private _page;
+    private _deleteCurrent;
+    private _afterItemsChanged;
+    private _updateChips;
+    private _sourceSize;
     private _afterShow;
     private _bind;
+    private _toggleMenu;
+    private _closeMenu;
+    private _resetDeleteArm;
+    private _pokeIdle;
     private _onDown;
     private _onMove;
     private _onUp;
@@ -85,6 +126,7 @@ export declare class WpReferenceWindow extends HTMLElement {
     private _pickAt;
     private _resizeCanvasToBody;
     private _invalidate;
+    private _stopLiveTimer;
     private _recomposeLive;
     private _render;
     private _updateEmptyHint;

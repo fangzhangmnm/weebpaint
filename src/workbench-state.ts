@@ -139,6 +139,10 @@ function freshGroups() {
     colorPanel:    { enabled: false, position: null as PanelPos | null },
     layersPanel:   { enabled: false, position: null as PanelPos | null },
     refPanel:      { enabled: false, position: null as PanelPos | null, viewport: { tx: 0, ty: 0, scale: 1, rot: 0 } as EditorViewport },
+    // 多参考 manifest（format 2，spec 20260830）：items 顺序 = ora `.weebpaint/references/` entry 顺序
+    //   （src 由 refEntryName 生成，encode 侧同函数）。⚠ 本键必须在此默认值表里（mergeInto 白名单），
+    //   否则 Unserialize 静默丢。数组走 mergeInto 的「整体替换」分支。
+    refPanels:     { index: 0, items: [] as Array<{ kind: "image" | "live"; src?: string; vp: EditorViewport }> },
     blenderPanel:  { show: false, position: null as PanelPos | null },
     brushTool:     { activeBrushId: null as string | null, size: 12, opacity: 1, color: "#1b1b1b" },
     // v0.5（user 拍板）：魔棒/主栅格配置**跟文件走**。expand 是 toggle（开了才用 expandPx，默认 1）。
@@ -249,6 +253,8 @@ function mergeInto<T extends object>(dst: T, src: unknown): void {
   for (const k of Object.keys(dst) as (keyof T & string)[]) {
     if (!(k in src) || src[k] === undefined) continue;
     const dv = dst[k], sv = src[k];
+    // 数组 = 值语义整体替换（refPanels.items）：默认 [] 没有键可递归，逐键 merge 会静默丢整个数组。
+    if (Array.isArray(dv)) { if (Array.isArray(sv)) (dst as Record<string, unknown>)[k] = JSON.parse(JSON.stringify(sv)); continue; }
     if (isObj(dv) && isObj(sv)) mergeInto(dv as object, sv);
     else (dst as Record<string, unknown>)[k] = sv;
   }
@@ -273,6 +279,13 @@ export const desk = {
   layersPanel: {
     get enabled(): boolean { return S.g.layersPanel.enabled; }, set enabled(v: boolean) { S.g.layersPanel.enabled = v; },
     get position(): PanelPos | null { return S.g.layersPanel.position; }, set position(v: PanelPos | null) { S.g.layersPanel.position = v; },
+  },
+  // 多参考 manifest（format 2）：整对象读写（适配层 syncRefsToDesk 一次成型；深拷隔离 live 引用）。
+  get refPanels(): { index: number; items: Array<{ kind: "image" | "live"; src?: string; vp: EditorViewport }> } {
+    return JSON.parse(JSON.stringify(S.g.refPanels));
+  },
+  set refPanels(v: { index: number; items: Array<{ kind: "image" | "live"; src?: string; vp: EditorViewport }> }) {
+    S.g.refPanels = JSON.parse(JSON.stringify(v));
   },
   refPanel: {
     get enabled(): boolean { return S.g.refPanel.enabled; }, set enabled(v: boolean) { S.g.refPanel.enabled = v; },

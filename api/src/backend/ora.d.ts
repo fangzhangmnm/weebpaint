@@ -36,6 +36,14 @@ type EncodeDoc = {
 /** exportData 冻结快照 → encode 消费面（保存路径的 freezeDocForEncode 后继；bytes 已当场拷出，
  *  getImageData = 纯切片，无 canvas、无追写风险）。 */
 export declare function paintingDataToEncodeDoc(data: PaintingData): EncodeDoc;
+export declare function refEntryName(i: number, mime: string): string;
+/** decode 产出的参考项（manifest 顺序）。live=零字节标记（宿主重绑合成 provider）。 */
+export type DecodedReference = {
+    kind: "image";
+    blob: Blob;
+} | {
+    kind: "live";
+};
 interface EncodeOpts {
     wroteWith: string;
     mergedBytes?: {
@@ -43,7 +51,7 @@ interface EncodeOpts {
         w: number;
         h: number;
     } | null;
-    referenceImage?: Blob;
+    references?: (Blob | null)[];
     desk?: object;
     timelapse?: {
         json: string;
@@ -52,7 +60,7 @@ interface EncodeOpts {
 }
 export interface DecodedPainting {
     data: PaintingData;
-    _referenceBlob?: Blob;
+    _references?: DecodedReference[];
     _weebpaintState?: unknown;
     _editorState?: unknown;
     _timelapseJson?: string;
@@ -62,12 +70,19 @@ export interface DecodedPainting {
 }
 /** doc → Blob (.ora)
  *
- * WeebPaint 私有扩展（都在 weebpaint/ 命名空间下，第三方 reader 会忽略或剥离）：
- *   weebpaint/reference.png     — ref 小窗当前显示的图（原 Blob bytes）
- *   .weebpaint/editor-state.json — desk struct（desk per-doc；含 toolDials/palette/blender 三组）
- *   （旧轨 webpaint/state.json **v0.8.21 起停写**——ADR-0008 §9；decode 读兼容保留存量，拔除另议）
- *
- * opts.referenceImage: optional Blob
+ * ══ zip 布局契约（format 2，2026-08-30 user 拍板；动布局必须上报+附目录表 = CLAUDE.md 纪律）══
+ * 终态目录表（写端唯一形状）：
+ *   mimetype                              ← ORA spec 强制第一
+ *   stack.xml                             ← 结构 + wrote-with / weebpaint:format
+ *   mergedimage.png                       ← spec
+ *   data/layer<id>.png × N                ← spec
+ *   .weebpaint/editor-state.json          ← desk（含 refPanels manifest）
+ *   .weebpaint/references/r<i>.<ext>      ← 多参考（refEntryName；manifest 驱动，扩展名说真话）
+ *   .weebpaint/timelapse.json / .mp4      ← 录像（format 2 起 mp4 与 json 团圆）
+ *   Thumbnails/thumbnail.png              ← spec 强制，恒最后（byte-range 尾窗契约）
+ * 心智模型：根目录 = ORA spec 领土；`.weebpaint/` = 全部 WP 私货（与云端 store `.weebpaint/` 同义）。
+ * **非点 `weebpaint/` 已停写**（format 2）；读端兜底链见 decode 尾部路由表——只读不写、保存即自愈。
+ * （旧轨 webpaint/state.json v0.8.21 停写——ADR-0008 §9；decode 读兼容保留存量。）
  */
 export declare function encodeDocToOra(doc: EncodeDoc, opts: EncodeOpts): Promise<any>;
 /** Blob (.ora 明文) → DecodedPainting（json 形 + 内联 tile 字节 + sidecar）。 */

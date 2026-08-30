@@ -24,7 +24,7 @@ import { unlockImportedContainer } from "./enc-thumbs.ts";
 import { onPasswordVerified } from "./crypto-state.ts";
 import { setTool, updateLassoToolbar } from "./toolbar.ts";
 import { openChoiceSheet } from "./sheets.ts";
-import { setReferenceFromFile } from "./side-windows.ts";
+import { addReferenceImage } from "./side-windows.ts";
 import { importGuardLimit, needsBigImportSheet } from "./clipboard-policy.ts";
 import { droppedOraHandle, consumeLaunchFiles, type LocalFileHandle } from "./local-file-session.ts";
 import { pickCloudImage } from "./cloud-picker-host.ts";
@@ -371,7 +371,7 @@ export function initImportImage(ctx: AppContext) {
     if (!choice) return;
     try {
       if (choice === "layer") await importImageAsLayer(img, { center });
-      else await setReferenceFromFile(img);
+      else await addReferenceImage(img);
     } catch (err) { setStatus(t("mi.dropFailed", { err: errMsg(err) }), true); }
   });
 

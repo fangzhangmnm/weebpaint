@@ -47,8 +47,12 @@ export interface WeebPaintBackendInterface {
     encodeOra(opts?: {
         /** 壳 sidecar（不透明携带，backend 不解释）：desk struct → .weebpaint/editor-state.json。 */
         editorSidecar?: object;
-        /** 参考窗图 bytes → weebpaint/reference.png。 */
-        referencePng?: Uint8Array;
+        /** 多参考（format 2）：与 manifest 位置对齐的 bytes 列表（live 占位 null）→
+         *  .weebpaint/references/r<i>.<ext>（mime 定扩展名；manifest 在 editorSidecar.refPanels 里）。 */
+        references?: ({
+            bytes: Uint8Array;
+            mime: string;
+        } | null)[];
     }): Promise<Uint8Array>;
     exportImage(fmt: "png" | "jpg"): Promise<Uint8Array>;
     docInfo(): BackendDocInfo;

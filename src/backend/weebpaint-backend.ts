@@ -72,7 +72,7 @@ export interface BackendInject {
 export interface BackendOpenResult {
   backend: WeebPaintBackend;
   /** open 解出的壳 sidecar（backend 不解释，原样交壳）。 */
-  sidecar: { editorState?: unknown; legacyState?: unknown; referencePng?: Uint8Array; wroteWith: string | null };
+  sidecar: { editorState?: unknown; legacyState?: unknown; references?: ({ bytes: Uint8Array; mime: string } | null)[]; wroteWith: string | null };
 }
 
 // ---- 魔数嗅探（open 路由归 backend）----
@@ -180,7 +180,10 @@ export class WeebPaintBackend implements WeebPaintBackendInterface {
         backend,
         sidecar: {
           editorState: dec._editorState, legacyState: dec._weebpaintState,
-          referencePng: dec._referenceBlob ? new Uint8Array(await dec._referenceBlob.arrayBuffer()) : undefined,
+          references: dec._references
+            ? await Promise.all(dec._references.map(async (r) =>
+                r.kind === "image" ? { bytes: new Uint8Array(await r.blob.arrayBuffer()), mime: r.blob.type } : null))
+            : undefined,
           wroteWith: dec._wroteWith,
         },
       };
@@ -223,7 +226,7 @@ export class WeebPaintBackend implements WeebPaintBackendInterface {
 
   // ── 字节面 ──
 
-  async encodeOra(opts: { editorSidecar?: object; referencePng?: Uint8Array;
+  async encodeOra(opts: { editorSidecar?: object; references?: ({ bytes: Uint8Array; mime: string } | null)[];
                           timelapse?: { json: string; mp4: Uint8Array } | null } = {}): Promise<Uint8Array> {
     this._guard();
     // merged 合成（mergedimage/缩略图）：合成面可用则渲（per-tenant 注入，缺省全局接缝），GL 缺席 →
@@ -234,7 +237,7 @@ export class WeebPaintBackend implements WeebPaintBackendInterface {
       wroteWith: this._inject.appVersion ?? "",
       mergedBytes: merged,
       desk: opts.editorSidecar,
-      referenceImage: opts.referencePng ? new Blob([opts.referencePng as unknown as BlobPart], { type: "image/png" }) : undefined,
+      references: opts.references?.map((r) => r ? new Blob([r.bytes as unknown as BlobPart], { type: r.mime }) : null),
       timelapse: opts.timelapse,
     }) as Blob;
     return new Uint8Array(await blob.arrayBuffer());

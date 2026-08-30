@@ -527,10 +527,16 @@ export const S = {
   "lp.foot.importClipboard":{ zh: "导入剪贴板", en: "Import from clipboard", ja: "クリップボードから読み込む", tok: "o kama jo tan poki kipisi" },
   "lp.foot.importCloud":{ zh: "从云盘导入…", en: "Import from cloud…", ja: "クラウドから読み込む…", tok: "o kama jo tan poki sewi…" },
   "lp.foot.stampAll":   { zh: "合并全部为新层", en: "Collapse all into new layer", ja: "すべてを結合して新規レイヤーへ", tok: "o wan e lipu ale tawa lipu sin" }, 
-  "ref.load":        { zh: "从文件载入", en: "Load from file", ja: "ファイルから読み込む", tok: "o kama jo e sitelen" }, 
-  "ref.live":        { zh: "实时镜像主画布", en: "Live mirror of canvas", ja: "キャンバスをライブミラー", tok: "sama supa sitelen lon tenpo ale" }, 
-  "ref.fit":         { zh: "适应窗口", en: "Fit to window", ja: "ウィンドウに合わせる", tok: "suli sama lupa" },
-  "ref.cloud":       { zh: "从图库选图", en: "Pick from gallery", ja: "ギャラリーから選ぶ", tok: "o kama jo tan poki sitelen" },
+  "ref.load":        { zh: "导入图片…", en: "Import image…", ja: "画像を読み込む…", tok: "o kama jo e sitelen" },
+  "ref.live":        { zh: "画布镜像", en: "Canvas mirror", ja: "キャンバスミラー", tok: "sama supa sitelen" },
+  "ref.cloud":       { zh: "从图库选图…", en: "Pick from gallery…", ja: "ギャラリーから選ぶ…", tok: "o kama jo tan poki sitelen" },
+  "ref.paste":       { zh: "粘贴剪贴板", en: "Paste clipboard", ja: "クリップボードを貼り付け", tok: "o pana e sitelen awen" },
+  "ref.delete":      { zh: "删除这张参考", en: "Delete this reference", ja: "この参考を削除", tok: "o weka e sitelen lukin ni" },
+  "ref.deleteConfirm": { zh: "再点一下确认删除", en: "Tap again to confirm", ja: "もう一度タップで確認", tok: "o luka sin la weka" },
+  "ref.closeWin":    { zh: "关闭参考窗", en: "Close reference window", ja: "参考ウィンドウを閉じる", tok: "o pini e lupa lukin" },
+  "ref.prevRef":     { zh: "上一张参考", en: "Previous reference", ja: "前の参考", tok: "sitelen pi tenpo pini" },
+  "ref.nextRef":     { zh: "下一张参考", en: "Next reference", ja: "次の参考", tok: "sitelen kama" },
+  "ref.menu":        { zh: "参考菜单（按住拖动窗口）", en: "Reference menu (hold to drag window)", ja: "参考メニュー（長押しでウィンドウ移動）", tok: "lipu wile (o awen la o tawa e lupa)" },
 
   // ── 云盘图片 picker（<wp-cloud-picker>，spec 20260820）─────────────────────
   "cp.title":        { zh: "从图库选图", en: "Pick an image from the gallery", ja: "ギャラリーから画像を選ぶ", tok: "o kama jo e sitelen tan poki sitelen" },
@@ -545,9 +551,8 @@ export const S = {
   "ref.resize":      { zh: "拖动调整大小", en: "Drag to resize", ja: "ドラッグでサイズ変更", tok: "luka la suli li ante" }, 
   "ref.picking":     { zh: "吸色（参考）", en: "Picking color (reference)", ja: "スポイト（参考）", tok: "kama jo e kule (sitelen lukin)" }, // C9：原 reference.ts 硬编码中文 → 组件事件化后补 key
   "ref.pick":        { zh: "选个图当参考", en: "Pick an image as reference", ja: "参考用の画像を選択", tok: "o wile e sitelen lukin" },
-  "ref.hintFolder":  { zh: "文件夹图标 = 加载图片", en: "Folder icon = load image", ja: "フォルダアイコン = 画像を読み込む", tok: "sitelen poki: o kama jo e sitelen" }, 
-  "ref.hintPip":     { zh: "画中画图标 = 实时镜像主画布", en: "PiP icon = live mirror of canvas", ja: "PiPアイコン = キャンバスをライブミラー", tok: "sitelen lupa: sama supa sitelen lon tenpo ale" }, 
-  "ref.hintGesture": { zh: "单指拖移 / 双指 pinch + 旋转 / 双击适应", en: "One-finger drag / two-finger pinch + rotate / double-tap to fit", ja: "一本指ドラッグ / 二本指ピンチ+回転 / ダブルタップでフィット", tok: "luka wan: tawa · luka tu: suli / sike · luka pi tenpo tu: suli pona" }, // ── index.html 静态 chrome（切片 5b-2：lasso icon tooltips + rack/settings 头 + 各对话框）──
+  "ref.hintPlus":    { zh: "＋ 导入 / 更多操作（按住拖动窗口）", en: "＋ import / more (hold to drag window)", ja: "＋ 読み込み / その他（長押しで移動）", tok: "＋: o kama jo (o awen la o tawa)" },
+  "ref.hintGesture": { zh: "单指拖移 / 双指 pinch + 旋转 / 双击适应 / 长按吸色", en: "Drag / pinch + rotate / double-tap to fit / long-press to pick color", ja: "ドラッグ / ピンチ+回転 / ダブルタップでフィット / 長押しでスポイト", tok: "luka wan: tawa · luka tu: suli / sike · luka pi tenpo tu: suli pona · o awen la kama jo e kule" }, // ── index.html 静态 chrome（切片 5b-2：lasso icon tooltips + rack/settings 头 + 各对话框）──
   // 套索工具栏（icon 按钮 tooltip；文字按钮=glyph 切片 4 不在此）
   "la.stack":        { zh: "套索 / 选区", en: "Lasso / selection", ja: "投げ縄 / 選択", tok: "ilo pi ma wile" }, 
   "la.freehand":     { zh: "自由套索", en: "Freehand lasso", ja: "フリーハンド投げ縄", tok: "nasin luka" }, 
@@ -1206,7 +1211,8 @@ export const S = {
   "mi.boundaryTooltip": { zh: "选区边界：位移源落到选区外怎么办", en: "Selection boundary: what to do when the displacement source falls outside the selection", ja: "選択範囲の境界：変位元が選択範囲外に出た場合の扱い", tok: "selo pi ma wile: ijo li tan selo la mi kepeken e nasin seme?" }, 
   "mi.boundary": { zh: "边界：{mode}", en: "Boundary: {mode}", ja: "境界：{mode}", tok: "selo: {mode}" }, 
   "mi.referenceLoaded": { zh: "参考：{name}{scaled}（会跟当前画一起保存）", en: "Reference: {name}{scaled} (saved together with the current artwork)", ja: "参考：{name}{scaled}（現在の作品と一緒に保存されます）", tok: "sitelen lukin: {name}{scaled} (mi awen e ona lon insa pi sitelen ni)" }, 
-  "mi.referenceScaled": { zh: "（已缩到 {w}×{h}）", en: " (scaled to {w}×{h})", ja: "（{w}×{h} に縮小）", tok: " (lili tawa {w}×{h})" }, 
+  "mi.referenceScaled": { zh: "（已缩到 {w}×{h}）", en: " (scaled to {w}×{h})", ja: "（{w}×{h} に縮小）", tok: " (lili tawa {w}×{h})" },
+  "mi.referenceCompressed": { zh: "（已压缩 {from} → {to}）", en: " (compressed {from} → {to})", ja: "（{from} → {to} に圧縮）", tok: " (lili tan {from} tawa {to})" }, 
   "mi.referenceLoadFailed": { zh: "参考图载入失败：{err}", en: "Failed to load reference image: {err}", ja: "参考画像の読み込みに失敗：{err}", tok: "sitelen lukin li ken ala kama: {err}" }, 
   "mi.referenceLive": { zh: "参考小窗：实时镜像主画布", en: "Reference window: live-mirroring the main canvas", ja: "参考ウィンドウ：メインキャンバスをリアルタイムミラー", tok: "lupa lukin: sama supa sitelen lon tenpo ale" }, 
   "mi.referenceLiveExit": { zh: "参考小窗：已退出实时模式", en: "Reference window: exited live mode", ja: "参考ウィンドウ：リアルタイムモードを終了", tok: "lupa lukin: nasin pi tenpo ale li pini" }, 

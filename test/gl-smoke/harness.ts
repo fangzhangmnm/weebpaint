@@ -1455,12 +1455,12 @@ async function referenceComponentCheck(add: Add): Promise<void> {
     let vpEvents = 0;
     el.addEventListener("viewportchange", () => vpEvents++);
 
-    // 静态位图：红 32² → fit（发一次 viewportchange：状态真变，非回灌）→ 中心读回红
+    // 静态位图（0830 多参考 API）：addImage 程序性追加（静默：不发 viewportchange）→ 中心读回红
     const src = document.createElement("canvas"); src.width = 32; src.height = 32;
     const sctx = src.getContext("2d")!; sctx.fillStyle = "#ff0000"; sctx.fillRect(0, 0, 32, 32);
-    el.setBitmap(src, {});
+    el.addImage(src, null);
     const evAfterFit = vpEvents;
-    await nextFrames(2);
+    await nextFrames(3);
     const cv = el.shadowRoot!.querySelector("canvas") as HTMLCanvasElement;
     const cctx = cv.getContext("2d")!;
     const mid = cctx.getImageData(cv.width >> 1, cv.height >> 1, 1, 1).data;
@@ -1488,16 +1488,24 @@ async function referenceComponentCheck(add: Add): Promise<void> {
     add("component:pick→colorpick=红", pickHex === "#ff0000", String(pickHex));
     el.removeAttribute("pick");
 
-    // live provider：宿主合成注入（绿 16²）→ 渲染=绿 + live 属性反射
+    // live 页（0830）：liveProvider 端口 + showLive 追加为第二页 → 渲染=绿；chip 翻页回图页=红
     const live = document.createElement("canvas"); live.width = 16; live.height = 16;
     const lctx = live.getContext("2d")!; lctx.fillStyle = "#00ff00"; lctx.fillRect(0, 0, 16, 16);
-    el.setLiveProvider(() => live);
-    await nextFrames(2);
+    el.liveProvider = () => live;
+    el.showLive();
+    await nextFrames(3);
     const mid2 = cctx.getImageData(cv.width >> 1, cv.height >> 1, 1, 1).data;
-    add("component:live provider 渲染=绿", mid2[1] > 200 && mid2[0] < 60, `[${mid2[0]},${mid2[1]},${mid2[2]}]`);
-    add("component:live 属性反射", el.hasAttribute("live") && el.live);
-    el.stopLive();
-    add("component:stopLive 摘反射", !el.hasAttribute("live") && !el.live);
+    add("component:live 页渲染=绿", mid2[1] > 200 && mid2[0] < 60, `[${mid2[0]},${mid2[1]},${mid2[2]}]`);
+    add("component:live 页语义+双页", el.live && el.itemCount === 2, `live=${el.live} n=${el.itemCount}`);
+    // chips 翻页（用户路径 → itemschange）：点 › 回到图页
+    let itemsEv = 0;
+    el.addEventListener("itemschange", () => itemsEv++);
+    const chipNext = el.shadowRoot!.querySelector('[data-page="1"]') as HTMLElement;
+    add("component:N>1 露出翻页 chips", !!chipNext && !el.shadowRoot!.querySelector(".chips")!.classList.contains("hidden"));
+    chipNext.click();
+    await nextFrames(3);
+    const mid3 = cctx.getImageData(cv.width >> 1, cv.height >> 1, 1, 1).data;
+    add("component:chip 翻页→回图页+发 itemschange", !el.live && itemsEv === 1 && mid3[0] > 200, `live=${el.live} ev=${itemsEv} [${mid3[0]},${mid3[1]},${mid3[2]}]`);
   } finally {
     el.remove();
   }

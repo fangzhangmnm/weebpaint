@@ -46,7 +46,8 @@ describe("timelapse · ora 集成", () => {
     const blob = await encodeDocToOra(mkDoc(), { wroteWith: "v-test", timelapse: saved });
     const bytes = await blobBytes(blob);
 
-    const offMp4 = nameOffset(bytes, "timelapse.mp4");
+    // format 2（0830 布局拍板）：mp4 与 json 团圆同住 .weebpaint/（根目录路径停写，读端兜底旧根）。
+    const offMp4 = nameOffset(bytes, ".weebpaint/timelapse.mp4");
     const offJson = nameOffset(bytes, ".weebpaint/timelapse.json");
     const offThumb = nameOffset(bytes, "Thumbnails/thumbnail.png");
     assert(offMp4 > 0 && offJson > 0 && offThumb > 0, "三个 entry 都得在");
