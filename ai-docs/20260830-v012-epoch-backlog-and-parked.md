@@ -14,18 +14,27 @@
 ## user 拍板 park（「可以先把之前一些不能随手修的需求parked」2026-08-29）
 
 1. **reference 窗口整改批**（建议一批做）：
-   - 背景不跟 color theme（很跳的黑色）；
+   - ~~背景不跟 color theme（很跳的黑色）~~ → **v0.12.5 已修**（user 0830「顺便修」：底=--void+点阵
+     对齐 editor 画布，canvas 自画暗棋盘退役；edited by Claude Fable 5）；
    - UI redesign + **multi reference** 支持；
    - image size warning（大图警告）；
    - 「perhaps auto convert to jpeg?」（user 疑问句，未拍板——做前要确认）；
-   - 入口直觉：「每次想开 reference 总是去按图层按钮想在那里找」→ 入口/分组重排候选。
+   - 入口直觉：「每次想开 reference 总是去按图层按钮想在那里找」→ 入口/分组重排候选
+     （0830 心理学讨论已呈：app 自己的「设为参考层」语义联想+对象vs设置分类+心流手位；
+     0830 第一遍已把入口从视图页挪到画布页，图层面板加 PiP 钮等候整改批 grill）。
 2. **上旧库也问笔刷播种问题**：根因 = `switchFlow` 的 `askSeed: minted.created`——`created` 是
    「registry 条目新造」不是「库是新的」；新设备/registry 清空后连**旧**云库也会被问「继承 or
    出厂」（答案其实无效：rack getInitData 契约=库里 json 已存在则忽略种子）。
-   正解候选：把问句推迟到 rack collection `getInitData` 被真正咨询（=库确实空）的时刻再弹 sheet，
-   永远静默捕种子。改的是 P3 verdicts §1.9 的用户流程 → **需 user 拍板后动**。
-3. **UI cleanup pass**（user：「perhaps we need to do the ui cleanup pass this turn」——本轮只按
-   标准件重做了离线横幅=.toast 底部 pill；全面 cleanup 另起一轮）。
+   **0830 拍板+机制勘误（edited by Claude Fable 5）**：user 批了语义 abc（a 取消=出厂兜底；b 无种子
+   场景静默 builtin；c 问句挪离「点连接」时刻）。但原候选「getInitData 被咨询=库空」**premise 已证伪**
+   ——collection.ts 的 getInitData 是 eager、按「本地 IDB 空」触发（新设备连旧库也会咨询，种子先落地
+   云端到了再覆盖），照原案做会把问句弹给新设备连旧库。正解改为**连接时探目标库**：需 store 只读口子
+   `collectionPeek`（collections 云面 fetchMeta 判 `.appId/brush-rack.json` 存在性，零记账），
+   "absent"+有种子才弹问句；"present"/"unknown"（离线）不问。**等 user 过 store 口子**（提案已呈 0830）。
+   边角：scaffold（开库即建空信封）意味着「存在但空信封」的残库判 present→静默出厂，方向安全。
+3. **UI cleanup pass**（user：「perhaps we need to do the ui cleanup pass this turn」——全面 cleanup
+   另起一轮慢慢 grill。**0830 第一遍已落 v0.12.5**：视图 tab 解散（工作台三件归画布页、显示开关并入
+   设置页三段分组、文件页纯行政、timelapse 判画布页），离线横幅 .toast 化在 v0.12.0）。
 
 ## 本轮已修（不在 park 内）
 
