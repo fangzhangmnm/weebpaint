@@ -2775,6 +2775,12 @@ export declare const S: {
         readonly ja: "参考メニュー（長押しでウィンドウ移動）";
         readonly tok: "lipu wile (o awen la o tawa e lupa)";
     };
+    readonly "ref.oneToOne": {
+        readonly zh: "1:1 像素";
+        readonly en: "1:1 pixels";
+        readonly ja: "1:1 ピクセル";
+        readonly tok: "suli lon: wan sama wan";
+    };
     readonly "cp.title": {
         readonly zh: "从图库选图";
         readonly en: "Pick an image from the gallery";

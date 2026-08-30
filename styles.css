@@ -1128,6 +1128,8 @@ input[type="range"].color-ramp::-moz-range-thumb {
   cursor: pointer;
   padding: 0 4px;
 }
+/* 图层面板头 PiP shortcut（0830）：head 是 space-between 布局，auto margin 把双钮一起推右侧 */
+#layersPanelRefBtn { margin-left: auto; }
 .layers-list {
   display: flex;
   flex-direction: column;

@@ -537,6 +537,7 @@ export const S = {
   "ref.prevRef":     { zh: "上一张参考", en: "Previous reference", ja: "前の参考", tok: "sitelen pi tenpo pini" },
   "ref.nextRef":     { zh: "下一张参考", en: "Next reference", ja: "次の参考", tok: "sitelen kama" },
   "ref.menu":        { zh: "参考菜单（按住拖动窗口）", en: "Reference menu (hold to drag window)", ja: "参考メニュー（長押しでウィンドウ移動）", tok: "lipu wile (o awen la o tawa e lupa)" },
+  "ref.oneToOne":    { zh: "1:1 像素", en: "1:1 pixels", ja: "1:1 ピクセル", tok: "suli lon: wan sama wan" },
 
   // ── 云盘图片 picker（<wp-cloud-picker>，spec 20260820）─────────────────────
   "cp.title":        { zh: "从图库选图", en: "Pick an image from the gallery", ja: "ギャラリーから画像を選ぶ", tok: "o kama jo e sitelen tan poki sitelen" },

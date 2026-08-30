@@ -1478,6 +1478,18 @@ async function referenceComponentCheck(add: Add): Promise<void> {
     el.viewport = { tx: cr.width / 2, ty: cr.height / 2, scale: 4, rot: 0 };
     add("component:程序性 viewport set 静默", vpEvents === evBefore && el.viewport.scale === 4);
 
+    // 平移护栏（0830）：程序性把图丢到画布外远处（不护，信任回灌）→ 一次 wheel 用户交互 → 钳回可见
+    el.viewport = { tx: 99999, ty: -99999, scale: 4, rot: 0 };
+    cv.dispatchEvent(new WheelEvent("wheel", { deltaY: 10, clientX: cr.left + 5, clientY: cr.top + 5, bubbles: true, cancelable: true }));
+    const vpc = el.viewport;
+    add("component:平移护栏→图钳回画布可见", vpc.tx < cr.width + 200 && vpc.ty > -200, `tx=${vpc.tx.toFixed(0)} ty=${vpc.ty.toFixed(0)}`);
+    // 1:1 像素：scale = 1/dpr、rot 归零、发事件
+    const ev11 = vpEvents;
+    el.oneToOne();
+    add("component:1:1 像素", Math.abs(el.viewport.scale - 1 / (window.devicePixelRatio || 1)) < 1e-9 && el.viewport.rot === 0 && vpEvents === ev11 + 1,
+      `scale=${el.viewport.scale} ev=${vpEvents}`);
+    el.viewport = { tx: cr.width / 2, ty: cr.height / 2, scale: 4, rot: 0 };   // 回到吸色用例的已知态
+
     // 吸色：pick 属性 + pointerdown → colorpick(hex=红)
     let pickHex: string | null | undefined;
     el.addEventListener("colorpick", (e) => { pickHex = (e as CustomEvent).detail.hex; });

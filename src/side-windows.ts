@@ -20,7 +20,7 @@ import { areaResampleBytes } from "./backend/algorithms/resample-bytes.ts";
 import { encodeJpegFromBytes } from "./backend/jpeg-codec.ts";
 import { refEntryName } from "./backend/ora.ts";
 import type { DecodedReference } from "./backend/ora.ts";
-import { planRefTranscode, flattenWhiteInPlace, REF_JPEG_QUALITY } from "./reference-transcode.ts";
+import { planRefImport, flattenWhiteInPlace, REF_JPEG_QUALITY } from "./reference-transcode.ts";
 import { readImageFromClipboard } from "./session.ts";
 import { humanSize } from "./gallery/gallery-view-model.ts";
 import { setColor } from "./color-panel.ts";
@@ -206,6 +206,7 @@ export function initSideWindows(ctx: AppContext) {
   // i18n：shadow 内菜单/chip 文案走 labels property（slot 够不到）。语言切换 = 整页 reload，boot 一次即可。
   ref.labels = {
     load: t("ref.load"), paste: t("ref.paste"), cloud: t("ref.cloud"), live: t("ref.live"),
+    oneToOne: t("ref.oneToOne"),
     del: t("ref.delete"), delConfirm: t("ref.deleteConfirm"), closeWin: t("ref.closeWin"),
     prev: t("ref.prevRef"), next: t("ref.nextRef"), menu: t("ref.menu"),
     resize: t("ref.resize"), resizeAria: t("ref.resizeAria"),
@@ -215,6 +216,8 @@ export function initSideWindows(ctx: AppContext) {
     setMenuOpen(false);
     refSetOpen(true);
   });
+  // 图层面板头 PiP shortcut（user 0830「同意图层加一个 pip」；心理学讨论落地：肌肉记忆落点接住）
+  document.getElementById("layersPanelRefBtn")?.addEventListener("click", () => refSetOpen(!ref.open));
   els.referenceFileInput.addEventListener("change", async (e: Event) => {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file) return;
@@ -237,17 +240,20 @@ export async function addReferenceImage(file: File | Blob): Promise<void> {
       const decoded = await decodeImageFile(file);          // C：鲁棒解码（修 Windows createImageBitmap 失效）
       const sw = decoded.width || (decoded as HTMLImageElement).naturalWidth;
       const sh = decoded.height || (decoded as HTMLImageElement).naturalHeight;
-      const plan = planRefTranscode(sw, sh);
-      if (!plan) return { bitmap: decoded, blob: file, note: "" };          // 政策 1：小图原样豁免
+      const plan = planRefImport(sw, sh, file.size, file.type || "");
+      if (!plan) return { bitmap: decoded, blob: file, note: "" };          // 政策 1：面积+字节双达标豁免（非 GIF）
       const px = imageSourceToBytes(decoded);
-      const small = areaResampleBytes(px.data, sw, sh, plan.fw, plan.fh);
+      const needResample = plan.fw !== sw || plan.fh !== sh;
+      const small = needResample ? areaResampleBytes(px.data, sw, sh, plan.fw, plan.fh) : px.data;
       flattenWhiteInPlace(small);                                           // 政策 2：拍平白底
       const jpeg = encodeJpegFromBytes(small, plan.fw, plan.fh, REF_JPEG_QUALITY);
-      if (jpeg.length >= file.size) return { bitmap: decoded, blob: file, note: "" };   // 政策 3：压大保原
+      if (plan.allowKeepIfBigger && jpeg.length >= file.size) return { bitmap: decoded, blob: file, note: "" };   // 政策 3：压大保原（GIF 无此路）
       const blob = new Blob([jpeg as unknown as BlobPart], { type: "image/jpeg" });
       const bitmap = await createImageBitmap(blob);         // 显示位图 = 存的字节（所见即所存）
       (decoded as ImageBitmap).close?.();
-      return { bitmap, blob, note: t("mi.referenceCompressed", { from: humanSize(file.size), to: humanSize(jpeg.length) }) };
+      // 变大（只可能是 GIF 强转）不写「已压缩」——不谎报
+      const note = jpeg.length < file.size ? t("mi.referenceCompressed", { from: humanSize(file.size), to: humanSize(jpeg.length) }) : "";
+      return { bitmap, blob, note };
     },
   );
   refSetOpen(true);

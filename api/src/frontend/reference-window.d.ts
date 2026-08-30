@@ -15,6 +15,7 @@ export interface RefLabels {
     paste?: string;
     cloud?: string;
     live?: string;
+    oneToOne?: string;
     del?: string;
     delConfirm?: string;
     closeWin?: string;
@@ -96,6 +97,11 @@ export declare class WpReferenceWindow extends HTMLElement {
     };
     get itemCount(): number;
     fitToPanel(): void;
+    /** 1:1 像素（user 0830）：1 图像素 = 1 **设备**像素（像素图标真面目；scale=1/dpr）、摆正（rot=0）、
+     *  当前画布中心的图点保持锚定。菜单项触发 = 用户交互 → 发事件。 */
+    oneToOne(): void;
+    private _scaleBounds;
+    private _containVp;
     markLiveDirty(): void;
     private _emit;
     private _emitViewport;
@@ -130,5 +136,8 @@ export declare class WpReferenceWindow extends HTMLElement {
     private _recomposeLive;
     private _render;
     private _updateEmptyHint;
+    /** 视口护栏：尺寸不超视口预算、位置不落屏外（拖已自钳；这里兜 restore/open/浏览器窗口 resize/
+     *  native CSS resize 四条路）。返回是否有修正。 */
+    private _clampIntoViewport;
 }
 export declare const WP_REFERENCE_WINDOW_TAG = "wp-reference-window";

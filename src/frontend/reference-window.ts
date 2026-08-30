@@ -28,7 +28,7 @@ export interface RefPanelRect { left: number; top: number; width: number; height
 export type RefBitmapSource = (ImageBitmap | HTMLImageElement | HTMLCanvasElement | OffscreenCanvas) & { close?: () => void };
 export type RefLiveSource = HTMLCanvasElement | OffscreenCanvas | ImageBitmap;
 export interface RefLabels {
-  load?: string; paste?: string; cloud?: string; live?: string;
+  load?: string; paste?: string; cloud?: string; live?: string; oneToOne?: string;
   del?: string; delConfirm?: string; closeWin?: string;
   prev?: string; next?: string; menu?: string; resize?: string; resizeAria?: string;
 }
@@ -43,6 +43,11 @@ const LIVE_THROTTLE_MS = 300;                 // S9：live 全量合成节流；
 const PLUS_DRAG_SLOP = 6;                     // ＋ 拖把：位移超此 = 拖窗，未超 = 点开菜单
 const IDLE_DIM_MS = 2500;                     // 闲置淡出（.35 透明度）
 const NEAREST_MIN_SCALE = 2;                  // 放大 nearest 阈值（像素画 friendly；与编辑器手感对齐可调）
+// 缩放护栏（user 0830）：放大顶 50×；缩小只护到「眼睛能看到」——长边显示 ≥16px 即可
+//   （user 会故意缩很小看像素图标效果，别护过头）。平移护栏 = 图的 bbox 与画布保 ≥24px 重叠（找得回来）。
+const MAX_SCALE = 50;
+const MIN_VISIBLE_PX = 16;
+const PAN_KEEP_PX = 24;
 // WeebPaint 布局事实（组件自有默认；宿主布局大改时同步这里）：
 const SPAWN_LEFT = 112, SPAWN_TOP = 104;      // v112/v267：默认避开 topbar(56)+左栏(80)+iPad 状态栏
 const CLAMP_MIN_LEFT = 96, CLAMP_MIN_TOP = 96;   // v268b：旧持久化位置钳进安全区
@@ -65,6 +70,7 @@ const ICON_CHEV_L = `<svg ${SVG_ATTRS}><path d="M14.5 5.5 L8 12 L14.5 18.5"/></s
 const ICON_CHEV_R = `<svg ${SVG_ATTRS}><path d="M9.5 5.5 L16 12 L9.5 18.5"/></svg>`;
 const ICON_PASTE = `<svg ${SVG_ATTRS}><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4a3 3 0 0 1 6 0"/></svg>`;   // 剪贴板
 const ICON_TRASH = `<svg ${SVG_ATTRS}><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6.5 7l1 13h9l1-13"/></svg>`;      // sprite#trash-can 对账
+const ICON_ONE_TO_ONE = `<svg ${SVG_ATTRS}><rect x="4" y="4" width="7" height="7"/><rect x="13" y="13" width="7" height="7" fill="currentColor" stroke="none"/></svg>`;   // 1:1 像素（两格错位=像素隐喻；库缺此图形，按纪律候选）
 
 // chrome 全 overlay（borderless）：窗体只有 1px 边框+阴影当边界 affordance（无边界在同款点阵底上
 // 根本看不见窗在哪），内容满铺。
@@ -183,6 +189,7 @@ canvas:active { cursor: grabbing; }
   <button class="mi" data-mi="paste" type="button" role="menuitem">${ICON_PASTE}<span></span></button>
   <button class="mi" data-mi="cloud" type="button" role="menuitem">${ICON_CLOUD}<span></span></button>
   <button class="mi" data-mi="live" type="button" role="menuitem">${ICON_PIP}<span></span></button>
+  <button class="mi" data-mi="onetoone" type="button" role="menuitem">${ICON_ONE_TO_ONE}<span></span></button>
   <hr>
   <button class="mi" data-mi="delete" type="button" role="menuitem">${ICON_TRASH}<span></span></button>
   <button class="mi" data-mi="close" type="button" role="menuitem">${ICON_X}<span></span></button>
@@ -298,7 +305,7 @@ export class WpReferenceWindow extends HTMLElement {
       if (b && text) b.textContent = text;
     };
     setText("load", l.load); setText("paste", l.paste); setText("cloud", l.cloud);
-    setText("live", l.live); setText("delete", l.del); setText("close", l.closeWin);
+    setText("live", l.live); setText("onetoone", l.oneToOne); setText("delete", l.del); setText("close", l.closeWin);
     const setTitle = (sel: string, title?: string, aria?: string) => {
       const b = this.shadowRoot!.querySelector(sel) as HTMLElement | null;
       if (!b) return;
@@ -370,6 +377,46 @@ export class WpReferenceWindow extends HTMLElement {
     this._saveCurrentVp();
     this._emitViewport();   // 状态真变（双击适应/载图自适应）→ 宿主该持久化；非属性回灌
     this._invalidate();
+  }
+
+  /** 1:1 像素（user 0830）：1 图像素 = 1 **设备**像素（像素图标真面目；scale=1/dpr）、摆正（rot=0）、
+   *  当前画布中心的图点保持锚定。菜单项触发 = 用户交互 → 发事件。 */
+  oneToOne() {
+    const src = this._sourceSize();
+    if (!src) return;
+    const dpr = window.devicePixelRatio || 1;
+    const bw = this._canvas.width / dpr, bh = this._canvas.height / dpr;
+    const ip = screenToImg(bw / 2, bh / 2, this._vp);   // 锚：当前在画布中心的图点
+    const scale = 1 / dpr;
+    const t = solveAnchorTranslation(ip, scale, 0, bw / 2, bh / 2);
+    this._vp = { tx: t.tx, ty: t.ty, scale, rot: 0 };
+    this._containVp();
+    this._saveCurrentVp();
+    this._emitViewport();
+    this._invalidate();
+  }
+
+  // 缩放界限：放大顶 MAX_SCALE；缩小到长边显示 ≥ MIN_VISIBLE_PX 即止（小图不设限到 1:1 之上）。
+  private _scaleBounds(): { lo: number; hi: number } {
+    const src = this._sourceSize();
+    const lo = src ? Math.min(1, MIN_VISIBLE_PX / Math.max(src.w, src.h)) : 0.02;
+    return { lo, hi: MAX_SCALE };
+  }
+  // 平移护栏：图的（旋转后）bbox 与画布保 ≥keep 重叠——图永远找得回来；keep 对小图/小窗自适应收缩。
+  private _containVp() {
+    const src = this._sourceSize();
+    if (!src) return;
+    const dpr = window.devicePixelRatio || 1;
+    const cw = this._canvas.width / dpr, ch = this._canvas.height / dpr;
+    if (!(cw > 0) || !(ch > 0)) return;
+    const v = this._vp;
+    const c = Math.abs(Math.cos(v.rot)), s = Math.abs(Math.sin(v.rot));
+    const halfW = ((src.w * c + src.h * s) / 2) * v.scale;
+    const halfH = ((src.w * s + src.h * c) / 2) * v.scale;
+    const keepX = Math.min(PAN_KEEP_PX, halfW, cw / 2);
+    const keepY = Math.min(PAN_KEEP_PX, halfH, ch / 2);
+    v.tx = clamp(v.tx, keepX - halfW, cw - keepX + halfW);
+    v.ty = clamp(v.ty, keepY - halfH, ch - keepY + halfH);
   }
 
   // 宿主在 doc 像素/结构变化时调（组件不监听宿主全局事件）。真合成在 _render 里按脏标+节流做。
@@ -525,6 +572,7 @@ export class WpReferenceWindow extends HTMLElement {
       else if (mi === "paste") this._emit("requestpaste");
       else if (mi === "cloud") this._emit("requestcloudload");
       else if (mi === "live") { this.showLive(); this._emitItems(); }
+      else if (mi === "onetoone") this.oneToOne();
       else if (mi === "close") { this.open = false; this._emit("openchange", { open: false }); }
     });
     // 点别处关菜单（shadow 内 canvas/chips pointerdown；菜单开着时吞第一击）
@@ -663,6 +711,7 @@ export class WpReferenceWindow extends HTMLElement {
     if (this._pointers.size === 1) {
       this._vp.tx += (e.clientX - px);
       this._vp.ty += (e.clientY - py);
+      this._containVp();
       this._saveCurrentVp();
       this._emitViewport();
       this._invalidate();
@@ -675,11 +724,13 @@ export class WpReferenceWindow extends HTMLElement {
       const angle = Math.atan2(dy, dx);
       const g = this._gestureStart;
       // 共享 scale/rot + anchor 解（image-origin 约定）：起手按住的 image 点保持在当前两指中点
-      const { scale, rot } = pinchScaleRot(g, dist, angle, 0.02, 50);
+      const b = this._scaleBounds();
+      const { scale, rot } = pinchScaleRot(g, dist, angle, b.lo, b.hi);
       const rect = this._canvas.getBoundingClientRect();
       const ip = screenToImg(g.midX - rect.left, g.midY - rect.top, g.vp);
       const t = solveAnchorTranslation(ip, scale, rot, midX - rect.left, midY - rect.top);
       this._vp = { tx: t.tx, ty: t.ty, scale, rot };
+      this._containVp();
       this._saveCurrentVp();
       this._emitViewport();
       this._invalidate();
@@ -700,9 +751,11 @@ export class WpReferenceWindow extends HTMLElement {
     const sy = e.clientY - rect.top;
     const ip = screenToImg(sx, sy, this._vp);
     const factor = e.ctrlKey || e.metaKey ? Math.exp(-e.deltaY * 0.01) : Math.exp(-e.deltaY * 0.005);
-    const newScale = clamp(this._vp.scale * factor, 0.02, 50);
+    const b = this._scaleBounds();
+    const newScale = clamp(this._vp.scale * factor, b.lo, b.hi);
     const t = solveAnchorTranslation(ip, newScale, this._vp.rot, sx, sy);
     this._vp.tx = t.tx; this._vp.ty = t.ty; this._vp.scale = newScale;
+    this._containVp();
     this._saveCurrentVp();
     this._emitViewport();
     this._invalidate();
