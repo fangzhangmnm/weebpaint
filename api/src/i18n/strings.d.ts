@@ -2631,18 +2631,6 @@ export declare const S: {
         readonly ja: "新規フォルダ…";
         readonly tok: "poki sin…";
     };
-    readonly "gal.menu.signIn": {
-        readonly zh: "登录 OneDrive";
-        readonly en: "Sign in to OneDrive";
-        readonly ja: "OneDrive にサインイン";
-        readonly tok: "poki sewi \"OneDrive\" o sona e mi";
-    };
-    readonly "gal.menu.signOut": {
-        readonly zh: "退出登录";
-        readonly en: "Sign out";
-        readonly ja: "サインアウト";
-        readonly tok: "poki sewi o weka e sona mi";
-    };
     readonly "nd.title": {
         readonly zh: "新建作品";
         readonly en: "New artwork";
@@ -5211,11 +5199,29 @@ export declare const S: {
         readonly ja: "ギャラリーを接続…";
         readonly tok: "o wan e poki sitelen…";
     };
-    readonly "gm.detachEntry": {
-        readonly zh: "卸下图库";
-        readonly en: "Detach gallery";
-        readonly ja: "ギャラリーを取り外す";
-        readonly tok: "o weka e poki sitelen";
+    readonly "gm.disconnectEntry": {
+        readonly zh: "断开连接";
+        readonly en: "Disconnect";
+        readonly ja: "接続を解除";
+        readonly tok: "o weka e wan";
+    };
+    readonly "gm.switchEntry": {
+        readonly zh: "切换图库…";
+        readonly en: "Switch gallery…";
+        readonly ja: "ギャラリーを切り替え…";
+        readonly tok: "o ante e poki sitelen…";
+    };
+    readonly "gm.connectOneDrive": {
+        readonly zh: "连接 OneDrive";
+        readonly en: "Connect OneDrive";
+        readonly ja: "OneDrive を接続";
+        readonly tok: "o wan e OneDrive";
+    };
+    readonly "gm.connectFolder": {
+        readonly zh: "连接本地文件夹";
+        readonly en: "Connect local folder";
+        readonly ja: "ローカルフォルダーを接続";
+        readonly tok: "o wan e poki lipu lon ilo ni";
     };
     readonly "gm.connectTitle": {
         readonly zh: "连接图库";
@@ -5337,17 +5343,11 @@ export declare const S: {
         readonly ja: "{label} に切り替えました";
         readonly tok: "mi ante tawa {label}";
     };
-    readonly "gm.detached": {
-        readonly zh: "已卸下图库（画布与图库文件不受影响）";
-        readonly en: "Gallery detached (canvas and gallery files untouched)";
-        readonly ja: "ギャラリーを取り外しました（キャンバスとファイルはそのまま）";
-        readonly tok: "poki sitelen li weka. sitelen li awen pona";
-    };
-    readonly "gm.forgetTitle": {
-        readonly zh: "忘记「{label}」？";
-        readonly en: "Forget \"{label}\"?";
-        readonly ja: "「{label}」を一覧から削除しますか？";
-        readonly tok: "o weka e \"{label}\" tan lipu?";
+    readonly "gm.disconnected": {
+        readonly zh: "已断开图库连接（画布与图库文件不受影响）";
+        readonly en: "Gallery disconnected (canvas and gallery files untouched)";
+        readonly ja: "ギャラリーの接続を解除しました（キャンバスとファイルはそのまま）";
+        readonly tok: "wan pi poki sitelen li weka. sitelen li awen pona";
     };
     readonly "fr.menuItem": {
         readonly zh: "还原出厂设置…";
@@ -5438,24 +5438,6 @@ export declare const S: {
         readonly en: "Gallery connected — this artwork was saved as \"{name}\"";
         readonly ja: "ギャラリーに接続しました。この作品は「{name}」として保存されました";
         readonly tok: "poki sitelen li wan. sitelen ni li awen kepeken nimi \"{name}\"";
-    };
-    readonly "gm.forgetMsg": {
-        readonly zh: "只从这台设备的名册移除，不动图库本身的文件。";
-        readonly en: "Removes it from this device's list only; gallery files are untouched.";
-        readonly ja: "この端末の一覧から削除するだけで、ギャラリーのファイルには触れません。";
-        readonly tok: "ni li weka e nimi taso. lipu li awen pona";
-    };
-    readonly "gm.forgotten": {
-        readonly zh: "已忘记 {label}";
-        readonly en: "Forgot {label}";
-        readonly ja: "{label} を一覧から削除しました";
-        readonly tok: "mi weka e {label} tan lipu";
-    };
-    readonly "gm.forgetHint": {
-        readonly zh: "忘记（不动文件）";
-        readonly en: "Forget (files untouched)";
-        readonly ja: "一覧から削除（ファイルはそのまま）";
-        readonly tok: "o weka e nimi taso";
     };
     readonly "gm.offlineBanner": {
         readonly zh: "图库「{label}」已离线——画照常，同步暂停";
@@ -5588,12 +5570,6 @@ export declare const S: {
         readonly en: "No gallery connected (use “Connect gallery…” in the file menu)";
         readonly ja: "ギャラリー未接続（ファイルメニューの「ギャラリーに接続…」から）";
         readonly tok: "poki sitelen ala. o kepeken nimi “o wan e poki sitelen” lon lipu nasin";
-    };
-    readonly "gm.forgetDirtyWarn": {
-        readonly zh: "⚠ 该图库还有 {n} 张画未上云（缓存留在本机，重新连接后可继续上传）。";
-        readonly en: "⚠ {n} paintings in that gallery are not yet uploaded (cache stays on this device; reconnect later to resume uploading).";
-        readonly ja: "⚠ そのギャラリーには未アップロードの絵が {n} 枚あります（キャッシュは端末に残り、再接続で再開できます）。";
-        readonly tok: "⚠ sitelen {n} li lon poki sewi ala. ona li awen lon ilo ni";
     };
     readonly "gs.cloudDisabledNoGallery": {
         readonly zh: "云端功能已停用，图库不可用（可在设置里重新开启）";

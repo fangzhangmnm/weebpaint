@@ -532,8 +532,12 @@ function adoptAsNew(loaded: LoadedDoc, name: string) {
 /** A1（user 2026-08-28 拍板 a）：挂库成功后，开着的 transient 画自动安家进新图库——
  *  「有库时新画自动创建身份」既有拍板的延伸：连接图库的手势就是安家意图，不再问。
  *  file 家不动（已有家）；无开画/gallery 家 = no-op。返回新身份名（null = 无事可做）。 */
-async function adoptTransientIntoGallery(): Promise<string | null> {
-  if (session.home?.kind !== "transient") return null;
+async function adoptTransientIntoGallery(): Promise<{ kind: "adopted"; name: string } | { kind: "none" } | { kind: "untouched-blank" }> {
+  if (session.home?.kind !== "transient") return { kind: "none" };
+  // user 0830：「一开始打开的空画布没被动过的话，不在库里新建」——连接手势=安家意图只对动过的
+  //   transient 成立；未动过的 boot 空白（lazyblank ∧ 全层 bbox 空）不塞进新库。调用方把它当 no-doc
+  //   办（落图库页，丢弃零损失）。_docIsBlankUnnamed 的 lazyblank 分支顺带做真伪复核（有内容即降旗）。
+  if (_isLazyBlankSession && _docIsBlankUnnamed()) return { kind: "untouched-blank" };
   let name = galleryDefaultName();
   for (let i = 0; i < 3 && (await sessionNameConflict(name)); i++) name = galleryDefaultName();   // hex4 撞名重铸（首存 mode:"new" 仍兜底）
   es.adopted(toFull(name), { create: true });   // es 接管：标脏 + 首存走 mode:"new"（撞名不静默覆盖）
@@ -545,7 +549,7 @@ async function adoptTransientIntoGallery(): Promise<string | null> {
   updateSaveStatus();
   await saveNow();                              // 首存落盘（tryPush best-effort）
   void _captureCheckpoint(name, "new-doc");
-  return name;
+  return { kind: "adopted", name };
 }
 
 /** revert 回滚：装入一个解好的 doc，身份**不变**（首存 mode:"existing"，就是要写回原文件）。

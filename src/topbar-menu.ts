@@ -38,7 +38,7 @@ import { isBusyActive } from "./fullscreen-busy.ts";
 import { reportError } from "./error-badge.ts";
 import { decodeOraToPainting } from "./backend/ora.ts";
 import { t } from "./i18n/index.ts";
-import { openGalleryConnectFlow } from "./gallery/gallery-manage-ui.ts";   // P3 无库单入口
+import { openConnectMenuFromEditor } from "./gallery/gallery-manage-ui.ts";   // P3 无库单入口（0830：同一个连接菜单）
 import { runFactoryReset } from "./factory-reset.ts";   // P7 还原出厂（0828 收货 store 0.7.0 深清口子）
 import type { ViewLeaf } from "./backend/workpiece/painting-view.ts";
 
@@ -237,7 +237,12 @@ export function initTopbarMenu(ctx: AppContext) {
   // v0.5.21：图库回三条杠菜单（独立 pill 一日游——user：visually distracting）
   els.menuGallery?.addEventListener("click", () => { if (!hasGallery()) return; setMenuOpen(false); void session.exit(); });
   // P3 无库模式单入口（VS Code Open Folder 姿态；显隐由 settings-menu gating 反相管）
-  document.getElementById("menuConnectGallery")?.addEventListener("click", () => { setMenuOpen(false); void openGalleryConnectFlow(); });
+  // 0830 user：「editor 里连接到库也用同一个菜单」——关文件菜单，云 popup（连接选项形态）锚到汉堡钮。
+  document.getElementById("menuConnectGallery")?.addEventListener("click", () => {
+    setMenuOpen(false);
+    const anchor = document.getElementById("menuButton");
+    if (anchor) openConnectMenuFromEditor(anchor);
+  });
   // v0.9.25 编辑器内新建（user 2026-08-20）：复用图库加号的三选 popup（新建/从图片/从剪切板），
   //   三个条目的 handler 全在 gallery-shell（init 时已接好，与图库开合无关）——这里只开 popup，
   //   零逻辑重复。「新建文件夹」是图库视图操作，编辑器语境隐藏（图库加号打开时恢复）。

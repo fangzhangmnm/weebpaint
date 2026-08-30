@@ -71,7 +71,7 @@
     <link rel="icon" href="./icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=0fcdfc982e9b" />
+    <link rel="stylesheet" href="./styles.css?v=ab8ed4a7ec12" />
     <!-- zip.js UMD bundle：自挂 window.zip。必须在 module bundle 之前。
          defer（v417）：原来是 parser-blocking 的，硬刷新时 SW 被绕过 → 直奔网络 → 网络一卡整个
          文档解析就停住（浏览器标签页转圈）。defer 后它与下面的 type=module bundle 同属延迟脚本、
@@ -587,23 +587,17 @@
       </button>
     </div>
 
-    <!-- 云图标 popup：P3 起 = 图库管理面（当前库 + 名册 + 连接/卸下）+ 账号（登录/退出） -->
+    <!-- 云图标 popup（2026-08-30 user 拍板重构）：有库 = 当前库行 + [离线时重新连接] + 切换图库…(弹连接选项)
+         + 断开连接（=卸库+退出登录；被动 offline 才是不卸库）；无库/编辑器入口 = 直接列连接选项
+         （OneDrive / 换账号 / 本地文件夹，平权菜单项，无模态）。名册切换行/忘记✕/独立登录退出按钮已退役。
+         动态项都长在 galleryConnectBox（gallery-manage-ui 渲染）。 -->
     <div class="menu-panel hidden" id="cloudAccountPopup" role="menu">
       <div class="menu-item-info hidden" id="galleryCurrentInfo"></div>
-      <div id="galleryListBox"></div>
-      <button class="menu-item hidden menu-item-with-icon" id="galleryConnectBtn" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#create-folder"/></svg>
-        <span class="menu-item-label" data-i18n="gm.connectEntry">连接图库…</span>
-      </button>
+      <div id="galleryConnectBox"></div>
       <button class="menu-item hidden menu-item-with-icon" id="galleryDetachBtn" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#sign-out"/></svg>
-        <span class="menu-item-label" data-i18n="gm.detachEntry">卸下图库</span>
+        <span class="menu-item-label" data-i18n="gm.disconnectEntry">断开连接</span>
       </button>
       <div class="menu-item-info" id="cloudAccountInfo" data-i18n="cf.cloudNotConfigured">云端：未配置</div>
-      <button class="menu-item hidden menu-item-with-icon" id="cloudSignInBtn" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#cloud"/></svg>
-        <span class="menu-item-label" data-i18n="gal.menu.signIn">登录 OneDrive</span>
-      </button>
-      <button class="menu-item hidden menu-item-with-icon" id="cloudSignOutBtn" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#sign-out"/></svg>
-        <span class="menu-item-label" data-i18n="gal.menu.signOut">退出登录</span>
-      </button>
     </div>
 
     <!-- 新建作品 sheet：名字 + 分辨率（预设 + 自定义） -->
@@ -1556,6 +1550,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-7fceef8ecdea.mjs"></script>
+    <script type="module" src="./dist/weebpaint-a43a92378fc3.mjs"></script>
   </body>
 </html>

@@ -23,7 +23,14 @@ declare function adoptAsNew(loaded: LoadedDoc, name: string): void;
 /** A1（user 2026-08-28 拍板 a）：挂库成功后，开着的 transient 画自动安家进新图库——
  *  「有库时新画自动创建身份」既有拍板的延伸：连接图库的手势就是安家意图，不再问。
  *  file 家不动（已有家）；无开画/gallery 家 = no-op。返回新身份名（null = 无事可做）。 */
-declare function adoptTransientIntoGallery(): Promise<string | null>;
+declare function adoptTransientIntoGallery(): Promise<{
+    kind: "adopted";
+    name: string;
+} | {
+    kind: "none";
+} | {
+    kind: "untouched-blank";
+}>;
 /** revert 回滚：装入一个解好的 doc，身份**不变**（首存 mode:"existing"，就是要写回原文件）。
  *  **不封存 checkpoint** —— 否则刚回滚掉的状态立刻把快照覆盖了，只能 revert 一次。 */
 declare function adoptAsExisting(loaded: LoadedDoc, name: string): void;

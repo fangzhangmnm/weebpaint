@@ -511,8 +511,6 @@ export const S = {
   "gal.otherFile": { zh: "文件（在 WeebPaint 外管理）", en: "File (managed outside WeebPaint)", ja: "ファイル（WeebPaint 外で管理）", tok: "lipu (lawa lon ilo ante)" },
   "gal.del.imageDetail": { zh: "移到回收站（可恢复）。这是图片素材，不是画作。", en: "Move to trash (recoverable). This is an image file, not an artwork.", ja: "ゴミ箱へ移動（復元可）。これは画像ファイルで、作品ではありません。", tok: "ni li tawa poki jaki (ken kama sin). ni li sitelen lipu taso." },
   "gal.menu.newFolder":   { zh: "新建文件夹…", en: "New folder…", ja: "新規フォルダ…", tok: "poki sin…" },
-  "gal.menu.signIn":      { zh: "登录 OneDrive", en: "Sign in to OneDrive", ja: "OneDrive にサインイン", tok: "poki sewi \"OneDrive\" o sona e mi" },
-  "gal.menu.signOut":     { zh: "退出登录", en: "Sign out", ja: "サインアウト", tok: "poki sewi o weka e sona mi" },
   // 新建作品 sheet
   "nd.title":        { zh: "新建作品", en: "New artwork", ja: "新規作品", tok: "sitelen sin" },
   "nd.untitled":     { zh: "未命名", en: "Untitled", ja: "無題", tok: "nimi ala" },
@@ -970,7 +968,10 @@ export const S = {
   // cloud-capability v1.1：setGalleryOpen(true) 中央兜底闸（理论不可达——入口都已显隐/短路；防漏 gate）
   // ---- P3 图库管理（gallery-manage-ui；gm.*）----
   "gm.connectEntry": { zh: "连接图库…", en: "Connect gallery…", ja: "ギャラリーを接続…", tok: "o wan e poki sitelen…" },
-  "gm.detachEntry": { zh: "卸下图库", en: "Detach gallery", ja: "ギャラリーを取り外す", tok: "o weka e poki sitelen" },
+  "gm.disconnectEntry": { zh: "断开连接", en: "Disconnect", ja: "接続を解除", tok: "o weka e wan" },
+  "gm.switchEntry": { zh: "切换图库…", en: "Switch gallery…", ja: "ギャラリーを切り替え…", tok: "o ante e poki sitelen…" },
+  "gm.connectOneDrive": { zh: "连接 OneDrive", en: "Connect OneDrive", ja: "OneDrive を接続", tok: "o wan e OneDrive" },
+  "gm.connectFolder": { zh: "连接本地文件夹", en: "Connect local folder", ja: "ローカルフォルダーを接続", tok: "o wan e poki lipu lon ilo ni" },
   "gm.connectTitle": { zh: "连接图库", en: "Connect a gallery", ja: "ギャラリーを接続", tok: "o wan e poki sitelen" },
   "gm.srcOneDrive": { zh: "OneDrive", en: "OneDrive", ja: "OneDrive", tok: "OneDrive" },
   "gm.srcOneDriveSwitch": { zh: "OneDrive · 换一个账号…", en: "OneDrive · use another account…", ja: "OneDrive · 別のアカウントで…", tok: "OneDrive · kepeken jan ante…" },
@@ -991,8 +992,7 @@ export const S = {
   "gm.seedFresh": { zh: "出厂全新", en: "Factory fresh", ja: "新規（デフォルト）", tok: "sin" },
   "gm.alreadyCurrent": { zh: "已经是当前图库", en: "Already the current gallery", ja: "すでに現在のギャラリーです", tok: "ni li poki sitelen lon tenpo ni" },
   "gm.switched": { zh: "已切换到 {label}", en: "Switched to {label}", ja: "{label} に切り替えました", tok: "mi ante tawa {label}" },
-  "gm.detached": { zh: "已卸下图库（画布与图库文件不受影响）", en: "Gallery detached (canvas and gallery files untouched)", ja: "ギャラリーを取り外しました（キャンバスとファイルはそのまま）", tok: "poki sitelen li weka. sitelen li awen pona" },
-  "gm.forgetTitle": { zh: "忘记「{label}」？", en: "Forget \"{label}\"?", ja: "「{label}」を一覧から削除しますか？", tok: "o weka e \"{label}\" tan lipu?" },
+  "gm.disconnected": { zh: "已断开图库连接（画布与图库文件不受影响）", en: "Gallery disconnected (canvas and gallery files untouched)", ja: "ギャラリーの接続を解除しました（キャンバスとファイルはそのまま）", tok: "wan pi poki sitelen li weka. sitelen li awen pona" },
   // ── P7 还原出厂设置（factory-reset.ts，2026-08-28）+ 打字 consent ──
   "fr.menuItem": { zh: "还原出厂设置…", en: "Factory reset…", ja: "出荷時設定にリセット…", tok: "o sin e ilo ni…" },
   "fr.introTitle": { zh: "还原出厂设置", en: "Factory reset", ja: "出荷時設定にリセット", tok: "o sin e ilo ni" },
@@ -1009,9 +1009,6 @@ export const S = {
   "br.resetConsentPrompt": { zh: "这会用内置笔刷覆盖同名笔刷。输入「{phrase}」以确认。", en: "This overwrites same-named brushes with the built-ins. Type \"{phrase}\" to confirm.", ja: "同名のブラシを内蔵ブラシで上書きします。「{phrase}」と入力して確認してください。", tok: "ni li ante e ilo sitelen sama. o sitelen e \"{phrase}\" tawa ken." },
   "gs.createdTransient": { zh: "已新建画布 {w}×{h}（未保存·无家——保存时选择去处）", en: "New canvas {w}×{h} (unsaved, no home — choose where to save it later)", ja: "新しいキャンバス {w}×{h}（未保存・保存時に保存先を選択）", tok: "sitelen sin {w}×{h} (awen ala — o awen e ona kepeken tomo la)" },
   "gm.transientAdopted": { zh: "已连接图库，这幅画已自动保存为「{name}」", en: "Gallery connected — this artwork was saved as \"{name}\"", ja: "ギャラリーに接続しました。この作品は「{name}」として保存されました", tok: "poki sitelen li wan. sitelen ni li awen kepeken nimi \"{name}\"" },
-  "gm.forgetMsg": { zh: "只从这台设备的名册移除，不动图库本身的文件。", en: "Removes it from this device's list only; gallery files are untouched.", ja: "この端末の一覧から削除するだけで、ギャラリーのファイルには触れません。", tok: "ni li weka e nimi taso. lipu li awen pona" },
-  "gm.forgotten": { zh: "已忘记 {label}", en: "Forgot {label}", ja: "{label} を一覧から削除しました", tok: "mi weka e {label} tan lipu" },
-  "gm.forgetHint": { zh: "忘记（不动文件）", en: "Forget (files untouched)", ja: "一覧から削除（ファイルはそのまま）", tok: "o weka e nimi taso" },
   "gm.offlineBanner": { zh: "图库「{label}」已离线——画照常，同步暂停", en: "Gallery \"{label}\" is offline — keep painting, sync paused", ja: "ギャラリー「{label}」はオフライン——描画は通常どおり、同期は一時停止", tok: "poki sitelen \"{label}\" li weka. o sitelen kin. awen sewi li lape" },
 
   // ── #18 全库备份（library-backup.ts；bk.*，2026-08-28）──
@@ -1036,7 +1033,6 @@ export const S = {
   "gm.dismiss": { zh: "关闭", en: "Dismiss", ja: "閉じる", tok: "o pini" },
   "gm.currentLegacy": { zh: "当前图库：OneDrive（本机既有）", en: "Current gallery: OneDrive (this device's existing library)", ja: "現在のギャラリー：OneDrive（この端末の既存ライブラリ）", tok: "poki sitelen lon tenpo ni: OneDrive" },
   "gm.noneConnected": { zh: "未连接图库（在文件菜单「连接图库…」接入）", en: "No gallery connected (use “Connect gallery…” in the file menu)", ja: "ギャラリー未接続（ファイルメニューの「ギャラリーに接続…」から）", tok: "poki sitelen ala. o kepeken nimi “o wan e poki sitelen” lon lipu nasin" },
-  "gm.forgetDirtyWarn": { zh: "⚠ 该图库还有 {n} 张画未上云（缓存留在本机，重新连接后可继续上传）。", en: "⚠ {n} paintings in that gallery are not yet uploaded (cache stays on this device; reconnect later to resume uploading).", ja: "⚠ そのギャラリーには未アップロードの絵が {n} 枚あります（キャッシュは端末に残り、再接続で再開できます）。", tok: "⚠ sitelen {n} li lon poki sewi ala. ona li awen lon ilo ni" },
   "gs.cloudDisabledNoGallery": { zh: "云端功能已停用，图库不可用（可在设置里重新开启）", en: "Cloud features are disabled; the gallery is unavailable (re-enable in settings)", ja: "クラウド機能が無効のため、ギャラリーは利用できません（設定で再度有効化できます）", tok: "ilo sewi li lape la, poki sitelen li ken ala. (o open e ona lon lawa)" },
   "gs.quotaCritical": { zh: "本地存储 {pct}% 已满 — 立即去图库卸载不常用的作品", en: "Local storage {pct}% full — go to the gallery now and offload works you rarely use", ja: "ローカルストレージが {pct}% 使用済み — 今すぐギャラリーで使わない作品を退避してください", tok: "poki pi ilo ni li kama ale ({pct}%)! o tawa tomo sitelen. o weka e sitelen pi kepeken ala tan ilo ni." }, 
   "gs.quotaWarn": { zh: "本地存储 {pct}% 已用 — 建议在图库整理", en: "Local storage {pct}% used — consider tidying up in the gallery", ja: "ローカルストレージが {pct}% 使用済み — ギャラリーで整理することをおすすめします", tok: "poki pi ilo ni li kama mute ({pct}%). o lukin e tomo sitelen." }, 

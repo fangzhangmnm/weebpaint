@@ -87,11 +87,8 @@ export const els = {
   cloudAccountPopup: byId("cloudAccountPopup"),
   cloudAccountInfo: byId("cloudAccountInfo"),
   galleryCurrentInfo: byId("galleryCurrentInfo"),   // P3 图库管理面（gallery-manage-ui）
-  galleryListBox: byId("galleryListBox"),
-  galleryConnectBtn: byId("galleryConnectBtn"),
-  galleryDetachBtn: byId("galleryDetachBtn"),
-  cloudSignInBtn: byId("cloudSignInBtn"),
-  cloudSignOutBtn: byId("cloudSignOutBtn"),
+  galleryConnectBox: byId("galleryConnectBox"),     // 2026-08-30 重构：动态项区（连接选项/切换/重新连接）
+  galleryDetachBtn: byId("galleryDetachBtn"),       // = 断开连接（卸库+退出登录）
   cloudRefreshBtn: byId("cloudRefreshBtn"),
   galleryFootUsage: byId("galleryFootUsage"),
   galleryFootVersion: byId("galleryFootVersion"),
