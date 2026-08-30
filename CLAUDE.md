@@ -14,6 +14,7 @@ Procreate 级绘画 PWA。UI 中文。iPad 是手感的最终裁判。
   gallery overlay/busy/gate/modal）、`info`→状态栏、`log`→仅 console（良性 offline/fallback）。
   **别再散落 `console.error/warn` 做错误处理**——funnel 到这里。store 侧走库内 error-handling 的
   `reportStoreError`（store 不 log），createStore 把它接到 app 传进去的 `ui.reportError`（= error-badge）。
+- **ora 布局变更纪律（2026-08-30 user 拍板；edited by Claude Fable 5）**：每次动 .ora 内部布局（entry 增删/改名/搬家）**必须严格上报 user，并附一张具体文件的完整目录表**（entry 清单，长什么样一眼可见）。背景：weebpaint//.weebpaint//根目录三套并存是历史有机生长的事故，读端兼容路由是代价——布局从此只准显式演化。
 - `journal/cached feedback.md` = 人类专属反馈日志，AI 只读，永不写。
 - **宣发（launch）已分仓（2026-08-21）**：素材源件 + 宣发工单 + 台账在兄弟目录 `../20260821 WeebPaint宣发/`（私有孵化仓）。B1-B4 前置工单、itch/og/截图交付槽位表、图片素材工单**都在那边**，本仓 ai-docs 已不再持有（`20260821-launch-prep-workorders.md` 已迁出）。起手读那仓的 `ai-docs/20260821-material-inventory-and-doc-index.md`。本仓仍持有的宣发相关件：`ai-docs/20260821-icon-tiers.md`（图标档位+两条别再踩回去的线）、图标输出档（`icon-*.png` / `icon.svg` 的 SSoT 在本仓根，美术 `.ora` 源在宣发仓）。
 - 人类钉死的区域：手感（streamline/taper/压感 gamma）、UI/UX 决策、store model。其余按 greenfield 标准大胆重构。
