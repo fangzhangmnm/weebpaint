@@ -53,14 +53,35 @@ export class SharpenBlurFilter {
     if (amt === 0) { dstData.set(srcData); return; }
     if (amt < 0) {
       const N = Math.max(1, Math.min(10, Math.round(-amt / 10)));
-      let src = srcData;
-      const tmp = new Uint8ClampedArray(srcData.length);
-      let dst = tmp;
+      // v0.12.3 黑边修（user 0823 报「模糊工具黑边」）：卷积必须在**预乘 alpha 空间**做——
+      // straight RGBA 逐通道平均会把透明像素的 RGB(0,0,0) 当颜色卷进来，alpha 羽化边被拖黑。
+      // 预乘一次 → N 轮 box blur（float，免逐轮量化漂移）→ 反预乘一次。
+      const n = srcData.length;
+      let src = new Float32Array(n);
+      for (let i = 0; i < n; i += 4) {
+        const a = srcData[i + 3] / 255;
+        src[i] = srcData[i] * a; src[i + 1] = srcData[i + 1] * a; src[i + 2] = srcData[i + 2] * a;
+        src[i + 3] = srcData[i + 3];
+      }
+      let dst = new Float32Array(n);
       for (let it = 0; it < N; it++) {
-        SharpenBlurFilter._boxBlur3(src, dst, w, h, mask);
+        SharpenBlurFilter._boxBlur3Premul(src, dst, w, h, mask);
         [src, dst] = [dst, src];
       }
-      if (src !== dstData) dstData.set(src);
+      for (let i = 0; i < n; i += 4) {
+        const a = src[i + 3];
+        if (a <= 0) {
+          // 全透明邻域：无颜色可言，保原字节（RGB 藏色不动，alpha 归 0）
+          dstData[i] = srcData[i]; dstData[i + 1] = srcData[i + 1]; dstData[i + 2] = srcData[i + 2];
+          dstData[i + 3] = 0;
+        } else {
+          const inv = 255 / a;
+          dstData[i]     = clamp8(src[i] * inv);
+          dstData[i + 1] = clamp8(src[i + 1] * inv);
+          dstData[i + 2] = clamp8(src[i + 2] * inv);
+          dstData[i + 3] = clamp8(a);
+        }
+      }
       return;
     }
     // 锐化：luma-only USM with Gaussian + threshold
@@ -113,7 +134,8 @@ export class SharpenBlurFilter {
       }
     }
   }
-  static _boxBlur3(src: Uint8ClampedArray, dst: Uint8ClampedArray, w: number, h: number, mask: Uint8Array | null): void {
+  // 预乘空间 3×3 box（blur path 用；见 bake 内黑边注）。src/dst = premul RGBA float，alpha 通道 0..255。
+  static _boxBlur3Premul(src: Float32Array, dst: Float32Array, w: number, h: number, mask: Uint8Array | null): void {
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const o = (y * w + x) * 4;
@@ -130,10 +152,10 @@ export class SharpenBlurFilter {
             r += src[so]; g += src[so+1]; b += src[so+2]; a += src[so+3];
           }
         }
-        dst[o]   = (r / 9) | 0;
-        dst[o+1] = (g / 9) | 0;
-        dst[o+2] = (b / 9) | 0;
-        dst[o+3] = (a / 9) | 0;
+        dst[o]   = r / 9;
+        dst[o+1] = g / 9;
+        dst[o+2] = b / 9;
+        dst[o+3] = a / 9;
       }
     }
   }
