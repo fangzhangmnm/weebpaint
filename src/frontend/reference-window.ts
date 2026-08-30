@@ -105,10 +105,11 @@ canvas:active { cursor: grabbing; }
   width: 30px; height: 30px; padding: 0; border: none; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: color-mix(in srgb, var(--bg, #202124) 72%, transparent);
-  color: var(--ink, #e8eaed); cursor: grab;
+  color: var(--ink, #e8eaed); cursor: pointer;   /* 主语义=点开菜单；真拖起来才换 grabbing（.dragging） */
   touch-action: none; user-select: none; -webkit-user-select: none;
   transition: opacity 0.35s;
 }
+.plus.dragging { cursor: grabbing; }
 .plus svg { width: 18px; height: 18px; pointer-events: none; }
 .plus:hover { background: color-mix(in srgb, var(--bg, #202124) 90%, transparent); }
 .grip {
@@ -129,6 +130,7 @@ canvas:active { cursor: grabbing; }
   background: color-mix(in srgb, var(--bg, #202124) 72%, transparent);
   border-radius: 12px; padding: 1px 4px;
   color: var(--ink, #e8eaed);
+  cursor: default;   /* 计数文本不出 I-beam；按钮各自 pointer */
   transition: opacity 0.35s;
 }
 .chips.hidden { display: none; }
@@ -225,6 +227,12 @@ export class WpReferenceWindow extends HTMLElement {
 
   constructor() {
     super();
+    // 视口护栏（user 0830 反馈）：浏览器窗口 resize 后小窗可能整个落屏外——钳回。这不是宿主 app
+    //   事件（组件约定禁的是 wp:*），是组件对自身定位环境的自理；修正后 emitRect 让宿主持久化真值。
+    window.addEventListener?.("resize", () => {
+      if (!this.open) return;
+      if (this._clampIntoViewport()) this._emitRect();
+    });
     const root = this.attachShadow({ mode: "open" });
     root.innerHTML = TEMPLATE;
     this._canvas = root.querySelector("canvas")!;
@@ -276,6 +284,7 @@ export class WpReferenceWindow extends HTMLElement {
       this.style.top = Math.max(CLAMP_MIN_TOP, o.top) + "px";
       if (o.width) this.style.width = o.width + "px";
       if (o.height) this.style.height = o.height + "px";
+      this._clampIntoViewport();   // 越界持久化（大屏存小屏开）：右/下边同样钳回（未 open 时 _afterShow 兜）
     } else if (!this.style.left || !this.style.top) {
       this.style.left = SPAWN_LEFT + "px";
       this.style.top = SPAWN_TOP + "px";
@@ -452,6 +461,7 @@ export class WpReferenceWindow extends HTMLElement {
       this.style.left = SPAWN_LEFT + "px";
       this.style.top = SPAWN_TOP + "px";
     }
+    this._clampIntoViewport();   // 开窗即钳（restore 的越界位置在 display:none 期钳不了）
     this._resizeCanvasToBody();
     this._updateEmptyHint();
     this._updateChips();
@@ -474,6 +484,7 @@ export class WpReferenceWindow extends HTMLElement {
       const d = this._panelDrag;
       if (!d || e.pointerId !== d.id) return;
       if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < PLUS_DRAG_SLOP) return;
+      if (!d.moved) this._plusEl.classList.add("dragging");
       d.moved = true;
       const w = this.offsetWidth, h = this.offsetHeight;
       const left = clamp(d.ol + (e.clientX - d.sx), 0, window.innerWidth - w);
@@ -487,9 +498,10 @@ export class WpReferenceWindow extends HTMLElement {
       if (!d || e.pointerId !== d.id) return;
       try { this._plusEl.releasePointerCapture(e.pointerId); } catch {}
       this._panelDrag = null;
+      this._plusEl.classList.remove("dragging");
       if (!d.moved) this._toggleMenu();
     });
-    this._plusEl.addEventListener("pointercancel", () => { this._panelDrag = null; });
+    this._plusEl.addEventListener("pointercancel", () => { this._panelDrag = null; this._plusEl.classList.remove("dragging"); });
 
     // 菜单项
     this._menuEl.addEventListener("click", (e) => {
@@ -569,6 +581,7 @@ export class WpReferenceWindow extends HTMLElement {
     // 避免 resize 时 1 帧空白闪屏。rectchange 在这里也发（桌面 CSS resize:both 没有拖 handle 事件，
     // RO 是唯一出口）；程序性 rect 下灌产生的回声由宿主值比较吸收。
     const ro = new ResizeObserver(() => {
+      this._clampIntoViewport();   // native CSS resize:both 没有 handle 事件可钳 → 这里兜（幂等收敛）
       this._resizeCanvasToBody();
       if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
       this._render();
@@ -803,6 +816,25 @@ export class WpReferenceWindow extends HTMLElement {
 
   private _updateEmptyHint() {
     this._emptyEl.classList.toggle("hidden", this._items.length > 0);
+  }
+
+  /** 视口护栏：尺寸不超视口预算、位置不落屏外（拖已自钳；这里兜 restore/open/浏览器窗口 resize/
+   *  native CSS resize 四条路）。返回是否有修正。 */
+  private _clampIntoViewport(): boolean {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    if (!(vw > 0) || !(vh > 0)) return false;
+    let w = this.offsetWidth, h = this.offsetHeight;
+    if (!(w > 0) || !(h > 0)) return false;   // display:none（未 open）：开窗时 _afterShow 再钳
+    let changed = false;
+    const maxW = Math.max(MIN_EDGE, vw - 8), maxH = Math.max(MIN_EDGE, vh - DRAG_TOP_FLOOR - 8);
+    if (w > maxW) { w = maxW; this.style.width = w + "px"; changed = true; }
+    if (h > maxH) { h = maxH; this.style.height = h + "px"; changed = true; }
+    const r = this.getBoundingClientRect();
+    const left = clamp(r.left, 0, vw - w);
+    const top = clamp(r.top, DRAG_TOP_FLOOR, vh - h);
+    if (Math.abs(left - r.left) > 0.5) { this.style.left = left + "px"; changed = true; }
+    if (Math.abs(top - r.top) > 0.5) { this.style.top = top + "px"; changed = true; }
+    return changed;
   }
 }
 

@@ -1506,6 +1506,14 @@ async function referenceComponentCheck(add: Add): Promise<void> {
     await nextFrames(3);
     const mid3 = cctx.getImageData(cv.width >> 1, cv.height >> 1, 1, 1).data;
     add("component:chip 翻页→回图页+发 itemschange", !el.live && itemsEv === 1 && mid3[0] > 200, `live=${el.live} ev=${itemsEv} [${mid3[0]},${mid3[1]},${mid3[2]}]`);
+
+    // 视口护栏（0830 反馈）：越界持久化位置回灌 → 钳回屏内（右/下边也兜）
+    el.rect = { left: 99999, top: 99999, width: 200, height: 200 };
+    await nextFrames(2);
+    const rc = el.getBoundingClientRect();
+    add("component:越界位置钳回屏内",
+      rc.left >= 0 && rc.top >= 0 && rc.left + rc.width <= window.innerWidth + 1 && rc.top + rc.height <= window.innerHeight + 1,
+      `${Math.round(rc.left)},${Math.round(rc.top)} ${Math.round(rc.width)}×${Math.round(rc.height)} vp=${window.innerWidth}×${window.innerHeight}`);
   } finally {
     el.remove();
   }
