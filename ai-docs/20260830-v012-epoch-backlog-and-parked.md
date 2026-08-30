@@ -13,10 +13,13 @@
 
 ## user 拍板 park（「可以先把之前一些不能随手修的需求parked」2026-08-29）
 
-1. **reference 窗口整改批** → **0830 出 park 开工**（user「记，然后开干」）：spec 定稿 =
-   **ai-docs/20260830-reference-window-rework-spec.md**（多轮 grill 逐条拍板：`.weebpaint/` 全家桶
-   零迁移契约 / 1024² 拍平 jpeg 静默压缩 / borderless+加号菜单拖把 UI / 放大 nearest+小点对齐 /
-   addReferenceImage 漏斗）。下列原始清单仅存档：
+1. **reference 窗口整改批** → **0830 全落地 v0.12.7 推 dev**（spec =
+   **ai-docs/20260830-reference-window-rework-spec.md**，user 多轮 grill 逐条拍板）：ora format 2
+   `.weebpaint/` 全家桶零迁移 + 1024² 拍平 jpeg 压缩 + borderless 多页 UI + nearest/点阵对齐 +
+   addReferenceImage 漏斗；1257 node 测 + GL smoke 组件用例全绿。**批内两个尾巴**（edited by
+   Claude Fable 5）：①「image size warning」被强制压缩政策实质 supersede（图进不了大，唯余
+   「压大保原」病理边角）——按 supersede 记，user 有异议再复活；②「图层面板加 PiP 入口」候选
+   （0830 心理学讨论产物）未裁未做，等 user 一句话。下列原始清单仅存档：
    - ~~背景不跟 color theme（很跳的黑色）~~ → **v0.12.5 已修**（user 0830「顺便修」：底=--void+点阵
      对齐 editor 画布，canvas 自画暗棋盘退役；edited by Claude Fable 5）；
    - UI redesign + **multi reference** 支持（user 0830：genai 稻草人之外正常画画也有用——手/腿/帽子参考图多开）。
