@@ -1519,6 +1519,32 @@ async function referenceComponentCheck(add: Add): Promise<void> {
     const mid3 = cctx.getImageData(cv.width >> 1, cv.height >> 1, 1, 1).data;
     add("component:chip 翻页→回图页+发 itemschange", !el.live && itemsEv === 1 && mid3[0] > 200, `live=${el.live} ev=${itemsEv} [${mid3[0]},${mid3[1]},${mid3[2]}]`);
 
+    // ＋ 拖把（0830 user「参考窗口怎么拖动」）：按住 ＋ 移动超 slop → 窗动、菜单不开；轻点 → 菜单开
+    {
+      const plus = el.shadowRoot!.querySelector(".plus") as HTMLElement;
+      const pr = plus.getBoundingClientRect();
+      const r0 = el.getBoundingClientRect();
+      const px0 = pr.left + pr.width / 2, py0 = pr.top + pr.height / 2;
+      const mk = (type: string, x: number, y: number) => new PointerEvent(type, { pointerId: 11, pointerType: "mouse", clientX: x, clientY: y, bubbles: true, cancelable: true, isPrimary: true });
+      plus.dispatchEvent(mk("pointerdown", px0, py0));
+      plus.dispatchEvent(mk("pointermove", px0 - 40, py0 + 30));
+      plus.dispatchEvent(mk("pointermove", px0 - 60, py0 + 50));
+      plus.dispatchEvent(mk("pointerup", px0 - 60, py0 + 50));
+      await nextFrames(2);
+      const r1 = el.getBoundingClientRect();
+      const menuHidden = el.shadowRoot!.querySelector(".menu")!.classList.contains("hidden");
+      add("component:＋按住拖=拖窗且不开菜单", Math.abs((r1.left - r0.left) + 60) < 2 && Math.abs((r1.top - r0.top) - 50) < 2 && menuHidden,
+        `Δ=${(r1.left - r0.left).toFixed(0)},${(r1.top - r0.top).toFixed(0)} menuHidden=${menuHidden}`);
+      const pr2 = plus.getBoundingClientRect();
+      const px2 = pr2.left + pr2.width / 2, py2 = pr2.top + pr2.height / 2;
+      plus.dispatchEvent(mk("pointerdown", px2, py2));
+      plus.dispatchEvent(mk("pointerup", px2, py2));
+      const menuOpen = !el.shadowRoot!.querySelector(".menu")!.classList.contains("hidden");
+      add("component:＋轻点=开菜单", menuOpen);
+      plus.dispatchEvent(mk("pointerdown", px2, py2));
+      plus.dispatchEvent(mk("pointerup", px2, py2));   // 再点收起，回到已知态
+    }
+
     // 视口护栏（0830 反馈）：越界持久化位置回灌 → 钳回屏内（右/下边也兜）
     el.rect = { left: 99999, top: 99999, width: 200, height: 200 };
     await nextFrames(2);

@@ -7,8 +7,8 @@
 //   - 主题 = CSS 变量穿透（--bg/--ink/--line/--radius/--shadow/--z-window/--void/--void-dot，
 //     全带 fallback，裸挂也能看）；文案 = slot（empty，宿主 light DOM 走自家 i18n）+ labels property。
 //   - 图标烤进 shadow（<use href="#id"> 不穿 shadow 边界），源=家族 sprite（20260708 SVG Icons），
-//     对账 id：folder / cloud / picture-in-picture / x / plus / chevron-left / chevron-right /
-//     clipboard-paste / trash-can（后五个如库里缺 → 已按纪律登记该仓 TODO.md）。
+//     对账 id：folder / cloud / picture-in-picture / x / new(＋) / paste / trash-can（库原几何烤入）；
+//     库缺的两件 = chips 裸 chevron 左右 + 1:1 像素，stopgap 自绘，2026-08-30 登记该仓 TODO.md 待画。
 //   - live 镜像的**合成知识在宿主**（backend/doc-render）：宿主 set 一次 liveProvider 端口。
 //
 // ══ 0830 整改批（spec=ai-docs/20260830-reference-window-rework-spec.md，user 逐条拍板）══
@@ -65,12 +65,17 @@ const ICON_FOLDER = `<svg ${SVG_ATTRS}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0
 const ICON_PIP = `<svg ${SVG_ATTRS}><rect x="3" y="4" width="18" height="14" rx="2"/><rect x="12" y="10" width="7" height="5" rx="1"/></svg>`;
 const ICON_X = `<svg ${SVG_ATTRS}><path d="M6.5 6.5 L17.5 17.5 M17.5 6.5 L6.5 17.5"/></svg>`;
 const ICON_CLOUD = `<svg ${SVG_ATTRS}><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>`;   // sprite#cloud
-const ICON_PLUS = `<svg ${SVG_ATTRS}><path d="M12 5v14M5 12h14"/></svg>`;                                  // sprite#plus 对账
+const ICON_PLUS = `<svg ${SVG_ATTRS}><path d="M12 5v14M5 12h14"/></svg>`;                                  // = sprite#new（纯加号，同几何；对账 id=new）
+// chips 翻页小箭头：库里裸 chevron-left 曾因小尺寸渲染差被 sunset（改 back=带杆整箭头），chips 14px 容不下
+//   带杆版 → 先烤裸 chevron 当 stopgap，已登记图标库 TODO.md（2026-08-30）等美工裁。
 const ICON_CHEV_L = `<svg ${SVG_ATTRS}><path d="M14.5 5.5 L8 12 L14.5 18.5"/></svg>`;
 const ICON_CHEV_R = `<svg ${SVG_ATTRS}><path d="M9.5 5.5 L16 12 L9.5 18.5"/></svg>`;
-const ICON_PASTE = `<svg ${SVG_ATTRS}><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4a3 3 0 0 1 6 0"/></svg>`;   // 剪贴板
-const ICON_TRASH = `<svg ${SVG_ATTRS}><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6.5 7l1 13h9l1-13"/></svg>`;      // sprite#trash-can 对账
-const ICON_ONE_TO_ONE = `<svg ${SVG_ATTRS}><rect x="4" y="4" width="7" height="7"/><rect x="13" y="13" width="7" height="7" fill="currentColor" stroke="none"/></svg>`;   // 1:1 像素（两格错位=像素隐喻；库缺此图形，按纪律候选）
+// = sprite#paste 原几何烤入（对账 id=paste；mask id 在 shadow 内自作用域）
+const ICON_PASTE = `<svg ${SVG_ATTRS}><mask id="icPaC"><rect width="24" height="24" fill="#fff" stroke="none"/><g transform="translate(6.76 3.85) scale(0.860)" fill="#000" stroke="#000" stroke-width="3.14" stroke-linejoin="round"><path d="M4 5.6a1.7 1.7 0 0 1 1.7-1.7h6.6l4 4v11.5a1.7 1.7 0 0 1-1.7 1.7H5.7A1.7 1.7 0 0 1 4 20.8z"/></g></mask><g mask="url(#icPaC)"><mask id="icPbTC"><rect width="24" height="24" fill="#fff"/><rect x="6" y="1" width="6" height="4.2" rx="1.2" fill="#000" stroke="#000" stroke-width="2.4"/></mask><g mask="url(#icPbTC)"><rect x="2" y="3.3" width="14" height="17" rx="2"/></g><rect x="6" y="1" width="6" height="4.2" rx="1.2"/></g><g transform="translate(6.76 3.85) scale(0.860)" stroke-width="1.98"><path d="M4 5.6a1.7 1.7 0 0 1 1.7-1.7h6.6l4 4v11.5a1.7 1.7 0 0 1-1.7 1.7H5.7A1.7 1.7 0 0 1 4 20.8z"/><path d="M12.3 3.9V8h4"/><path d="M6.6 12.4h7.2M6.6 15.4h5"/></g></svg>`;
+// = sprite#trash-can 原几何烤入（对账 id=trash-can）
+const ICON_TRASH = `<svg ${SVG_ATTRS}><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 9.5v9"/><path d="M14 9.5v9"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`;
+// 1:1 像素：库无此图形 → 两格错位（像素隐喻）stopgap，已登记图标库 TODO.md（2026-08-30）
+const ICON_ONE_TO_ONE = `<svg ${SVG_ATTRS}><rect x="4" y="4" width="7" height="7"/><rect x="13" y="13" width="7" height="7" fill="currentColor" stroke="none"/></svg>`;
 
 // chrome 全 overlay（borderless）：窗体只有 1px 边框+阴影当边界 affordance（无边界在同款点阵底上
 // 根本看不见窗在哪），内容满铺。
