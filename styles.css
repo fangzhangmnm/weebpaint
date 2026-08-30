@@ -2793,7 +2793,11 @@ body[data-mode="gallery"] .board { display: none !important; }
 .tl-menu-item.danger:hover { background: color-mix(in srgb, #c0392b 12%, transparent); }
 
 /* ---- P3 图库管理面（gallery-manage-ui） ---- */
-/* .gm-row/.gm-x（名册切换行+忘记✕）已随 2026-08-30 连接语义重构退役（gallery-manage-ui）。 */
+/* history 行（gallery-manage-ui 连接内容「最近连接过的」；0830 终形拍板回归）：行主体 + 忘记✕ */
+.gm-row { display: flex; align-items: stretch; gap: 2px; }
+.gm-row .menu-item { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gm-x { flex: 0 0 auto; background: none; border: none; color: inherit; opacity: .55; cursor: pointer; padding: 0 8px; border-radius: 6px; }
+.gm-x:hover { opacity: 1; background: color-mix(in srgb, currentColor 12%, transparent); }
 /* P6 无库轻折叠：gallery scope 徽章在无库语境藏起（行经 cascade 落 device 层，挂图库徽章=撒谎） */
 body[data-no-gallery] svg.menu-scope-badge[data-i18n-title="menu.scopeGalleryTip"] { display: none; }
 

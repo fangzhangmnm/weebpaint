@@ -5212,16 +5212,16 @@ export declare const S: {
         readonly tok: "o ante e poki sitelen…";
     };
     readonly "gm.connectOneDrive": {
-        readonly zh: "连接 OneDrive";
-        readonly en: "Connect OneDrive";
-        readonly ja: "OneDrive を接続";
-        readonly tok: "o wan e OneDrive";
+        readonly zh: "连接 OneDrive…";
+        readonly en: "Connect OneDrive…";
+        readonly ja: "OneDrive を接続…";
+        readonly tok: "o wan e OneDrive…";
     };
     readonly "gm.connectFolder": {
-        readonly zh: "连接本地文件夹";
-        readonly en: "Connect local folder";
-        readonly ja: "ローカルフォルダーを接続";
-        readonly tok: "o wan e poki lipu lon ilo ni";
+        readonly zh: "连接本地文件夹…";
+        readonly en: "Connect local folder…";
+        readonly ja: "ローカルフォルダーを接続…";
+        readonly tok: "o wan e poki lipu lon ilo ni…";
     };
     readonly "gm.connectTitle": {
         readonly zh: "连接图库";
@@ -5235,11 +5235,41 @@ export declare const S: {
         readonly ja: "OneDrive";
         readonly tok: "OneDrive";
     };
-    readonly "gm.srcOneDriveSwitch": {
-        readonly zh: "OneDrive · 换一个账号…";
-        readonly en: "OneDrive · use another account…";
-        readonly ja: "OneDrive · 別のアカウントで…";
-        readonly tok: "OneDrive · kepeken jan ante…";
+    readonly "gm.historyCaption": {
+        readonly zh: "最近连接过的：";
+        readonly en: "Recently connected:";
+        readonly ja: "最近接続したもの：";
+        readonly tok: "poki pi tenpo poka:";
+    };
+    readonly "gm.forgetTitle": {
+        readonly zh: "忘记「{label}」？";
+        readonly en: "Forget \"{label}\"?";
+        readonly ja: "「{label}」を一覧から削除しますか？";
+        readonly tok: "o weka e \"{label}\" tan lipu?";
+    };
+    readonly "gm.forgetMsg": {
+        readonly zh: "只从这台设备的名册移除，不动图库本身的文件。";
+        readonly en: "Removes it from this device's list only; gallery files are untouched.";
+        readonly ja: "この端末の一覧から削除するだけで、ギャラリーのファイルには触れません。";
+        readonly tok: "ni li weka e nimi taso. lipu li awen pona";
+    };
+    readonly "gm.forgotten": {
+        readonly zh: "已忘记 {label}";
+        readonly en: "Forgot {label}";
+        readonly ja: "{label} を一覧から削除しました";
+        readonly tok: "mi weka e {label} tan lipu";
+    };
+    readonly "gm.forgetHint": {
+        readonly zh: "忘记（不动文件）";
+        readonly en: "Forget (files untouched)";
+        readonly ja: "一覧から削除（ファイルはそのまま）";
+        readonly tok: "o weka e nimi taso";
+    };
+    readonly "gm.forgetDirtyWarn": {
+        readonly zh: "⚠ 该图库还有 {n} 张画未上云（缓存留在本机，重新连接后可继续上传）。";
+        readonly en: "⚠ {n} paintings in that gallery are not yet uploaded (cache stays on this device; reconnect later to resume uploading).";
+        readonly ja: "⚠ そのギャラリーには未アップロードの絵が {n} 枚あります（キャッシュは端末に残り、再接続で再開できます）。";
+        readonly tok: "⚠ sitelen {n} li lon poki sewi ala. ona li awen lon ilo ni";
     };
     readonly "gm.fileProtoCloudHelp": {
         readonly zh: "单文件直接双击打开（file://）时，微软登录用不了——需要一个本地 http 环境。逃生舱：在这个文件所在的文件夹打开命令行，运行\n\n    python -m http.server 8000\n\n然后用浏览器打开 http://localhost:8000/{file} 再连接 OneDrive。（本地文件夹图库不受影响，可以直接用。）";

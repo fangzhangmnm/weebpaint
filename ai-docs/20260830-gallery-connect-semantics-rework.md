@@ -1,7 +1,7 @@
 # 图库连接语义重构（user 2026-08-30 拍板；supersedes P3 verdicts §1 的管理面布局部分）
 
 > created 20260830 by Claude Fable 5
-> as-of v0.12.1 / 2026-08-30
+> as-of v0.12.2 / 2026-08-30
 
 ## user 拍板原话要点（对话，2026-08-30）
 
@@ -36,6 +36,24 @@
 
 ## 已知代价（记录在案）
 
-- 换库到**已知 folder 库**需重新走系统 picker（isSameEntry 去重复用户口）——名册 UI 退役的
-  直接代价，user 拍板「没有切换（名册）」时已含。
+- ~~换库到已知 folder 库需重新走系统 picker~~（轮二 history 回归后撤销，见下）。
 - boot restore 开着画时，redirect 回程的换库续办会被收口开画 gate 挡下（状态行提示）——预期。
+
+## 轮二终形（同日 grill，user 拍板「同意，做」；v0.12.2；edited by Claude Fable 5）
+
+- **history（名册 UI）回归**——VS Code「Open Recent」形制。v0.12.1 砍名册是对「没有切换」的
+  字面执行，不是技术必然；grill 后 user 定案要记忆连过的库。
+- 连接内容（切换点开 / editor 入口 / 无库 popup，同一份）：
+  1. `连接 OneDrive…`——**唯一** OneDrive 动词，**永远弹微软账号选择页**（user：「永远都是
+     connect to another account，防止误点」；label 不用「换一个账号」相对措辞）。旧的
+     「connect to OneDrive（SSO 快路）/ 换一个账号」二选一 sunset——已登录时前者恒冗余
+     （自己库在 history 或已是当前），SSO 静默还有连错账号风险；快速回常用库走 history。
+  2. `连接本地文件夹…`（网盘在前，user 拍板）。
+  3. 分隔线 + 「最近连接过的：」+ history 行（当前库不列；网盘组在前、组内 lastActive 新近
+     在前；folder 行=存的句柄直接复活不走 picker；行尾 ✕=忘记——user：「忘记肯定要，
+     用户对隐私有掌握」，忘记带孤儿 dirty 确认注）。
+- **离线时「重新连接」排最上**（user：「重新连接是必须要的，最上面最优先」）：掉线态 popup
+  顺序 = 重新连接 → 切换图库… → 断开连接。
+- 双份竞态防御换形：history 异步填充落在**本次渲染私有的 histBox**——重渲后旧节点已离树，
+  迟到 fill 天然无害（不再需要 epoch 计数）。
+- i18n：gm.forget×4 + forgetHint 复活、加 gm.historyCaption；gm.srcOneDriveSwitch sunset。

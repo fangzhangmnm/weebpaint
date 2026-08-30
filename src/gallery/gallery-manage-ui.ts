@@ -3,10 +3,11 @@
 //   2026-08-30 user 重构拍板（edited by Claude Fable 5）：
 //   · 语义只剩「连接 / 切换 / 断开」：**主动断开 = 卸库 + 退出登录**（signOut 的语义就是 disconnect）；
 //     被动 offline（token 过期/断网/权限掉）才是「不卸库」的离线态。
-//   · 有库：popup = 当前库行 + [离线时「重新连接」] + 「切换图库…」（弹连接选项）+ 「断开连接」。
-//   · 无库/编辑器入口：**同一份连接选项菜单**（OneDrive / 换账号 / 本地文件夹——平权菜单项，
-//     无模态、无高亮偏袒；旧 choice-sheet 形制废除）。编辑器里不提供断开（回图库才有）。
-//   · 名册切换行 / 忘记✕ 退役（registry 仍是身份/dbId/lastActive 的内部器官，只是不再有 UI）。
+//   · 有库：popup = 当前库行 + [离线时「重新连接」**排最上**] + 「切换图库…」（弹连接内容）+ 「断开连接」。
+//   · 无库/编辑器入口：**同一份连接内容**（平权菜单项，无模态、无高亮偏袒；旧 choice-sheet 形制废除）：
+//     连接 OneDrive…（唯一 OneDrive 动词，**永远弹账号选择页**防误点）/ 连接本地文件夹… /
+//     分隔线 + 「最近连接过的」history（VS Code Open Recent 形制；✕=忘记，隐私掌握；
+//     网盘组在前）。快速回常用库走 history，不走 SSO。编辑器里不提供断开（回图库才有）。
 // 流程红线：切库/断开前置 = 收口开画（docHome≠gallery）+ 绿灯门（dirty=0）；dirty 逃生 sheet 三口 =
 //   下载备份（pushAll 先推、推不上去的逐张 triggerDownload）/ 仍要切换（警告缓存可能被清）/ 取消。
 // 离线态主动引导（verdicts §1.7）：attached 且 !online → `.toast` 横幅「图库已离线—重新连接」
@@ -18,9 +19,10 @@ import { openChoiceSheet, openConfirmSheet } from "../sheets.ts";
 import { anchorPopupToBtn } from "../anchored-popup.ts";
 import { iconHtml } from "../ui/icon.ts";
 import { galleryAttachment } from "../gallery-attachment-host.ts";
+import { galleryRegistry } from "../gallery-registry.ts";
 import type { GalleryEntry } from "../gallery-registry.ts";
 import { mintFolderByPicker, mintOneDriveByAccount, mintOneDriveSwitchAccount, attachGallery, ensureFolderPermission, canPickFolderGallery, hasFreshPendingOneDriveConnect, clearPendingOneDriveConnect, galleryFlow, type MintResult } from "../gallery-connect.ts";
-import { requireStore, signIn, signOut, isSignedIn, isAuthConfigured, _seedNextRackInitData, brushRackCollection } from "../app-store.ts";
+import { requireStore, signIn, signOut, isSignedIn, isAuthConfigured, _seedNextRackInitData, _buildStoreForGalleryEntry, brushRackCollection } from "../app-store.ts";
 import { getAllBrushes, getMeta, RACK_META_ID } from "../brushes.ts";
 import { preferences, PREF_REGISTRY, type PrefKey } from "../app-prefs.ts";
 import { docHome } from "../doc-home.ts";
@@ -205,11 +207,53 @@ function _menuItem(label: string, icon: string, onClick: () => void): HTMLButton
   b.addEventListener("click", onClick);
   return b;
 }
-function renderConnectOptions(box: HTMLElement): void {
+function renderConnectContent(box: HTMLElement): void {
+  // 连接动词（网盘在前，user 0830）。OneDrive 只此一条、**永远弹微软账号选择页**（user 0830 终形拍板
+  //   「永远都是 connect to another account，防止误点」）：快速回常用库走下面的 history——同时规避
+  //   「SSO 静默连错账号」与 pinned 账号重连连错人两个坑；label 不用「换一个账号」相对措辞（唯一动词）。
   if (isAuthConfigured()) box.appendChild(_menuItem(t("gm.connectOneDrive"), "cloud", () => { void onOneDrivePick(); }));
-  // 已登录才给「换一个账号」（0.9.0 口子）：铸第二账号入口——redirect 走微软账号选择页，回程续办。
-  if (isAuthConfigured() && isSignedIn()) box.appendChild(_menuItem(t("gm.srcOneDriveSwitch"), "cloud", () => { onSwitchAccountPick(); }));
   if (canPickFolderGallery()) box.appendChild(_menuItem(t("gm.connectFolder"), "folder-open", () => { void onFolderPick(); }));
+  // history（VS Code「Open Recent」形制，user 0830 拍板回归）：分隔线 + 说明行 + 名册行（✕=忘记，
+  //   「用户对隐私有掌握」）。folder 行=存的句柄直接复活（最多补权限），不走 picker——名册买回来的东西。
+  //   异步填充进本次渲染私有的 histBox：重渲后旧 histBox 已离树，迟到的 fill 落在游离节点上 =
+  //   天然免疫 0830 案卷 §BUG C 的双份竞态，无需 epoch 计数。
+  const histBox = document.createElement("div");
+  box.appendChild(histBox);
+  const att = galleryAttachment.state();
+  void galleryRegistry.list().then((entries) => {
+    const others = entries
+      .filter((e) => !(att.kind === "attached" && e.id === att.entry.id))   // 当前库不列
+      .sort((a, b) => a.kind !== b.kind
+        ? (a.kind === "onedrive" ? -1 : 1)                                                    // 网盘组在前（user 0830）
+        : ((b.lastActive ?? 0) - (a.lastActive ?? 0) || b.createdAt - a.createdAt));          // 组内新近在前
+    if (!others.length) return;
+    const sep = document.createElement("div");
+    sep.className = "menu-sep";
+    const cap = document.createElement("div");
+    cap.className = "menu-section-label";
+    cap.textContent = t("gm.historyCaption");
+    histBox.append(sep, cap);
+    for (const e of others) {
+      const row = document.createElement("div");
+      row.className = "gm-row";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "menu-item";
+      btn.textContent = `${e.label} — ${sourceLabel(e)}`;   // 卡标来源（撞名不设机制，user 拍板）
+      btn.addEventListener("click", () => { _closePopup(); void switchFlow(e, { askSeed: false }); });
+      const x = document.createElement("button");
+      x.type = "button";
+      x.className = "gm-x";
+      x.title = t("gm.forgetHint");
+      x.textContent = "✕";
+      x.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        void forgetFlow(e).then(() => { box.textContent = ""; renderConnectContent(box); });   // 留在 history 层刷新
+      });
+      row.append(btn, x);
+      histBox.appendChild(row);
+    }
+  }).catch((e) => reportError(new Error("[gallery-manage] history list failed: " + String(e)), "log"));
 }
 async function onOneDrivePick(): Promise<void> {
   _closePopup();
@@ -220,12 +264,10 @@ async function onOneDrivePick(): Promise<void> {
     await openConfirmSheet(t("gm.connectTitle"), t("gm.fileProtoCloudHelp", { file: fn }));
     return;
   }
-  const mintP = mintOneDriveByAccount();               // 点击同步栈起跳（未登录 → loginRedirect 页面即离开）
-  try {
-    const minted = await mintP;
-    if (!minted) return;                               // 用户取消 / 登录失败无账号
-    await switchFlow(minted.entry, { askSeed: minted.created });
-  } catch (e) { reportError(new Error("[gallery-manage] connect failed: " + String(e)), "error"); }
+  // 永远弹账号选择页（select_account redirect：页面即离开；点击同步栈起跳保手势）。回程由
+  //   resumePendingOneDriveConnect 续办 mint+switchFlow——选了同账号由「已是当前图库」短路。
+  try { await mintOneDriveSwitchAccount(); }
+  catch (e) { reportError(new Error("[gallery-manage] connect failed: " + String(e)), "error"); }
 }
 async function onFolderPick(): Promise<void> {
   _closePopup();
@@ -236,9 +278,21 @@ async function onFolderPick(): Promise<void> {
     await switchFlow(minted.entry, { askSeed: minted.created });
   } catch (e) { reportError(new Error("[gallery-manage] connect failed: " + String(e)), "error"); }
 }
-function onSwitchAccountPick(): void {
-  _closePopup();
-  void mintOneDriveSwitchAccount().catch((e) => reportError(new Error("[gallery-manage] switch-account connect failed: " + String(e)), "error"));
+
+/** 忘记（history 行尾 ✕；user 0830「忘记肯定要，用户对隐私有掌握」）：只删本机名册条目，不动库文件。
+ *  孤儿 dirty surfaced（0825 案卷）：临时建店只读 dirty 标量再拆，有账写进确认文案；全量 GC 挂深清（P7）。 */
+async function forgetFlow(entry: GalleryEntry): Promise<void> {
+  let dirtyNote = "";
+  try {
+    const tmp = _buildStoreForGalleryEntry(entry) as unknown as { files: { dirty: { count(): Promise<number> } }; dispose(o?: { drain?: boolean }): Promise<void> };
+    const n = await tmp.files.dirty.count();
+    await tmp.dispose({ drain: false });
+    if (n > 0) dirtyNote = "\n" + t("gm.forgetDirtyWarn", { n: String(n) });
+  } catch { /* soft：建不出（无权限/absent）→ 不加注照常确认 */ }
+  const ok = await openConfirmSheet(t("gm.forgetTitle", { label: entry.label }), t("gm.forgetMsg") + dirtyNote);
+  if (!ok) return;
+  await galleryRegistry.forget(entry.id);
+  _status(t("gm.forgotten", { label: entry.label }));
 }
 
 /** 断开连接（user 0830 拍板：主动断开 = 卸库 + 退出登录；被动 offline 才是不卸库）。
@@ -271,11 +325,11 @@ export function renderGalleryManage(): void {
     // 离线态：菜单里也给「重新连接」（横幅可被关掉；folder 权限补授需要手势入口）。
     if (!att.online) box.appendChild(_menuItem(t("gm.reconnect"), "refresh", () => { _closePopup(); void reconnectFlow(); }));
     // 「切换图库…」：点开原地换成连接选项（同一份菜单；popup 重开/事件重渲自动回到顶层）。
-    box.appendChild(_menuItem(t("gm.switchEntry"), "gallery", () => { box.textContent = ""; renderConnectOptions(box); }));
+    box.appendChild(_menuItem(t("gm.switchEntry"), "gallery", () => { box.textContent = ""; renderConnectContent(box); }));
   } else {
     cur.classList.add("hidden");
     els.galleryDetachBtn.classList.add("hidden");
-    renderConnectOptions(box);   // 无库：连接选项直接就是菜单项（editor 入口同一份）
+    renderConnectContent(box);   // 无库：连接选项直接就是菜单项（editor 入口同一份）
   }
   renderOfflineBanner();
 }
