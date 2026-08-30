@@ -13,6 +13,11 @@ import { storeAbsent, _swapStoreForGallery, signIn, getActiveAccount, isSignedIn
 import { deviceKvGet, deviceKvSet } from "./device-kv.ts";
 import { pickerAllowedInFrame } from "./local-file-session.ts";
 import { reportError } from "./error-badge.ts";
+import { createFlowLock } from "./flow-lock.ts";
+
+/** attach/detach 流程单飞道（案卷 20260830 §BUG D）：boot 领养 / redirect 续办 / 切库 / 卸库全走这条，
+ *  流程间不再交错（gallery-manage-ui 的 switchFlow/detachFlow 同用）。⚠ 不可重入：锁内别 await 走锁的流程。 */
+export const galleryFlow = createFlowLock();
 
 // ---- FSA 权限（folder 库）----
 type _PermHandle = { queryPermission?: (o: { mode: string }) => Promise<string>; requestPermission?: (o: { mode: string }) => Promise<string> };
@@ -90,6 +95,9 @@ export function hasFreshPendingOneDriveConnect(): boolean {
 export async function attachGallery(entry: GalleryEntry): Promise<void> {
   const online = entry.kind === "folder" ? await ensureFolderPermission(entry, { request: true }) : isSignedIn();
   await galleryAttachment.attach(entry, { online });
+  // online 旗收口（案卷 20260830 §BUG A）：attach 期间 auth 可能翻转，翻在 detached 上的 setOnline 会被丢；
+  //   落地后按当下登录态重读一次 → 旗的最终值=最后完成的一方所见，lost-update 定义性关闭。folder=权限语义不动。
+  if (entry.kind === "onedrive") galleryAttachment.setOnline(isSignedIn());
 }
 
 /** boot 静默重挂（app.ts prefsReady 链头，fixup/restore 之前）。店懒出生（2026-08-27）后只剩一问：
@@ -99,16 +107,27 @@ export async function attachGallery(entry: GalleryEntry): Promise<void> {
  *  attach 失败 → 响亮上报 + 回落无库（绝不让 app 骑在半挂的店上）。 */
 export async function bootAttachFromRegistry(): Promise<void> {
   if (storeAbsent) return;
-  let e: GalleryEntry | null = null;
-  try { e = await galleryRegistry.lastActive(); } catch (err) {
-    reportError(new Error("[gallery-connect] registry read failed at boot — staying in no-gallery mode: " + String(err)), "error");
-  }
-  if (!e) return;
-  try {
-    const online = e.kind === "folder" ? await ensureFolderPermission(e, { request: false }) : isSignedIn();
-    await galleryAttachment.attach(e, { online, gesture: false });
-  } catch (err) {
-    reportError(new Error("[gallery-connect] boot attach failed — falling back to no-gallery mode: " + String(err)), "error");
-    try { await _swapStoreForGallery(null); } catch { /* 已在 null 态 */ }
-  }
+  await galleryFlow(async () => {
+    // 单飞道内再查一次：redirect 续办等别的流程已把库挂好 → boot 领养目的已达，直接退
+    //   （0.11.37 只考虑了「boot 赢」的半边；输家继续 attach 会 throw 进 catch、兜底误拆赢家的店——案卷 §BUG D）。
+    if (galleryAttachment.state().kind === "attached") return;
+    let e: GalleryEntry | null = null;
+    try { e = await galleryRegistry.lastActive(); } catch (err) {
+      reportError(new Error("[gallery-connect] registry read failed at boot — staying in no-gallery mode: " + String(err)), "error");
+    }
+    if (!e) return;
+    try {
+      const online = e.kind === "folder" ? await ensureFolderPermission(e, { request: false }) : isSignedIn();
+      await galleryAttachment.attach(e, { online, gesture: false });
+      // online 旗收口（案卷 §BUG A）：boot attach 与 initAuth 赛跑，attach 期间 auth-changed 的翻牌
+      //   打在 detached 上会被丢——落地后按当下登录态重读，旗死锁根除。
+      if (e.kind === "onedrive") galleryAttachment.setOnline(isSignedIn());
+    } catch (err) {
+      reportError(new Error("[gallery-connect] boot attach failed — falling back to no-gallery mode: " + String(err)), "error");
+      // 兜底只救「自己半挂」：别的流程已把店挂好（attached）时绝不 swap(null) 拔活店（案卷 §BUG D）。
+      if (galleryAttachment.state().kind !== "attached") {
+        try { await _swapStoreForGallery(null); } catch { /* 已在 null 态 */ }
+      }
+    }
+  });
 }

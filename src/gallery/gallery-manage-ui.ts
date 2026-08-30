@@ -14,7 +14,7 @@ import { openChoiceSheet, openConfirmSheet } from "../sheets.ts";
 import { galleryAttachment } from "../gallery-attachment-host.ts";
 import { galleryRegistry } from "../gallery-registry.ts";
 import type { GalleryEntry } from "../gallery-registry.ts";
-import { mintFolderByPicker, mintOneDriveByAccount, mintOneDriveSwitchAccount, attachGallery, ensureFolderPermission, canPickFolderGallery, hasFreshPendingOneDriveConnect, clearPendingOneDriveConnect, type MintResult } from "../gallery-connect.ts";
+import { mintFolderByPicker, mintOneDriveByAccount, mintOneDriveSwitchAccount, attachGallery, ensureFolderPermission, canPickFolderGallery, hasFreshPendingOneDriveConnect, clearPendingOneDriveConnect, galleryFlow, type MintResult } from "../gallery-connect.ts";
 import { requireStore, galleryBackend, signIn, isSignedIn, isAuthConfigured, _seedNextRackInitData, _buildStoreForGalleryEntry, brushRackCollection } from "../app-store.ts";
 import { getAllBrushes, getMeta, RACK_META_ID } from "../brushes.ts";
 import { preferences, PREF_REGISTRY, type PrefKey } from "../app-prefs.ts";
@@ -106,7 +106,12 @@ async function backupDirty(): Promise<void> {
 }
 
 // ---- 切库 / 连接 / 卸下 / 忘记 ----
+// 切库/卸库整体走 galleryFlow 单飞道（案卷 20260830 §BUG D）：与 boot 领养 / redirect 续办互斥，
+//   detach→attach 序列不再被别的流程交错。锁内含用户 sheet（种子问/逃生）——串行等待属预期语义。
 async function switchFlow(entry: GalleryEntry, opts: { askSeed: boolean }): Promise<void> {
+  return galleryFlow(() => switchFlowBody(entry, opts));
+}
+async function switchFlowBody(entry: GalleryEntry, opts: { askSeed: boolean }): Promise<void> {
   const att = galleryAttachment.state();
   if (att.kind === "attached" && att.entry.id === entry.id) { _status(t("gm.alreadyCurrent")); return; }
   let seed: SeedBundle | null = null;
@@ -196,11 +201,13 @@ async function connectFlow(): Promise<void> {
 }
 
 async function detachFlow(): Promise<void> {
-  if (galleryAttachment.state().kind !== "attached") return;
-  if (!(await closeCurrentStoreWithGates())) return;
-  _status(t("gm.detached"), true);
-  try { _ctx?.gallery.refresh(); } catch { /* noop */ }
-  renderGalleryManage();
+  return galleryFlow(async () => {
+    if (galleryAttachment.state().kind !== "attached") return;
+    if (!(await closeCurrentStoreWithGates())) return;
+    _status(t("gm.detached"), true);
+    try { _ctx?.gallery.refresh(); } catch { /* noop */ }
+    renderGalleryManage();
+  });
 }
 
 async function forgetFlow(entry: GalleryEntry): Promise<void> {
@@ -221,6 +228,7 @@ async function forgetFlow(entry: GalleryEntry): Promise<void> {
 }
 
 // ---- 渲染（popup 内容；updateCloudAuthUI 每次一并调）----
+let _rosterGen = 0;   // 名册异步填充的 epoch（§BUG C 竞态守卫）
 export function renderGalleryManage(): void {
   const box = els.galleryListBox; const cur = els.galleryCurrentInfo;
   if (!box || !cur) return;
@@ -234,9 +242,14 @@ export function renderGalleryManage(): void {
     els.galleryDetachBtn.classList.add("hidden");
   }
   els.galleryConnectBtn.classList.remove("hidden");
-  // 名册列表（当前库不列；卡标来源——撞名不设机制，user 拍板）
-  box.textContent = "";
+  // 名册列表（当前库不列；卡标来源——撞名不设机制，user 拍板）。
+  // epoch 守卫（案卷 20260830 §BUG C）：清空是同步的、填充是异步的——两次渲染落在同一个 IDB 往返窗口
+  //   （boot 期 auth/attachment 事件密集）时，两个 fill 都往清空后的 box append = 名册整份×2（user 实锤）。
+  //   旧 fill 过期即弃；填充时刻再清一次，杜绝跨窗残留。
+  const gen = ++_rosterGen;
   void galleryRegistry.list().then((entries) => {
+    if (gen !== _rosterGen) return;
+    box.textContent = "";
     const others = entries.filter((e) => !(att.kind === "attached" && e.id === att.entry.id));
     for (const e of others) {
       const row = document.createElement("div");
@@ -259,25 +272,27 @@ export function renderGalleryManage(): void {
   renderOfflineBanner();
 }
 
-// ---- 离线横幅（主动引导；动态 DOM，同 error-badge 手法）----
+// ---- 离线横幅（主动引导；动态 DOM）----
+// UI 标准件 = `.toast`（更新 toast 同款：底部居中 pill、主题 token 反色、--z-toast band）。
+//   旧版手搓 inline style 钉在 top:0——v0.9.4 早就拍过「顶部通栏压 iPad 无框顶栏」（error-badge 迁底部
+//   的同一课），这条横幅踩了回去 → 位置差到点不到（user 2026-08-29）。2026-08-30 迁 toast 形制。
 let _bar: HTMLDivElement | null = null;
 let _dismissed = false;
 function _ensureBar(): HTMLDivElement {
   if (_bar) return _bar;
   const bar = document.createElement("div");
   bar.id = "__galleryOfflineBar";
-  bar.style.cssText = "position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:9000;display:flex;gap:8px;align-items:center;" +
-    "padding:6px 12px;border-radius:0 0 8px 8px;background:var(--panel-bg,#333);color:var(--fg,#eee);box-shadow:0 2px 8px rgba(0,0,0,.35);font-size:13px;";
+  bar.className = "toast";
+  bar.setAttribute("role", "status");
   const txt = document.createElement("span");
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.style.cssText = "padding:2px 10px;border-radius:6px;cursor:pointer;";
   btn.addEventListener("click", () => { void reconnectFlow(); });
   const x = document.createElement("button");
   x.type = "button";
+  x.className = "dismiss";
   x.textContent = "✕";
   x.title = t("gm.dismiss");
-  x.style.cssText = "background:none;border:none;color:inherit;cursor:pointer;opacity:.7;";
   x.addEventListener("click", () => { _dismissed = true; renderOfflineBanner(); });
   bar.append(txt, btn, x);
   document.body.appendChild(bar);
@@ -292,13 +307,20 @@ function renderOfflineBanner(): void {
   (bar.children[0] as HTMLElement).textContent = t("gm.offlineBanner", { label: att.entry.label });
   (bar.children[1] as HTMLElement).textContent = t("gm.reconnect");
 }
-/** 重新连接（手势）：OneDrive=signIn popup；folder=requestPermission。接通即翻牌+补推。 */
+/** 重新连接（手势）：OneDrive=已登录原地翻牌 / 未登录才 signIn；folder=requestPermission。接通即翻牌+补推。 */
 async function reconnectFlow(): Promise<void> {
   const att = galleryAttachment.state();
   if (att.kind !== "attached") return;
   try {
-    if (att.entry.kind === "onedrive") { await signIn(); galleryAttachment.setOnline(isSignedIn()); }
-    else galleryAttachment.setOnline(await ensureFolderPermission(att.entry, { request: true }));
+    if (att.entry.kind === "onedrive") {
+      // signIn = loginRedirect **整页跳走**（0.11.37 实锤），不是 popup——旧版无条件 signIn 在
+      //   「已登录但旗死锁」（案卷 20260830 §BUG A）时=白跳微软一整圈、回程重掷竞态骰子的死循环（§BUG B）。
+      //   已登录 → 原地翻牌即可；未登录才真跳（回程由 boot attach 的 online 收口接住）。
+      if (!isSignedIn()) { await signIn(); return; }   // redirect：页面即离开，后续代码不跑
+      galleryAttachment.setOnline(true);
+    } else {
+      galleryAttachment.setOnline(await ensureFolderPermission(att.entry, { request: true }));
+    }
     if (galleryAttachment.state().kind === "attached" && (galleryAttachment.state() as { online?: boolean }).online) {
       requireStore().files.drainOfflineQueue().catch(() => { /* 良性 */ });
       try { _ctx?.gallery.refresh(); } catch { /* noop */ }
