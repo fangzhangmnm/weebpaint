@@ -229,3 +229,10 @@ park（依赖无头 multiplayer 未建）。悬余两问：boot 落地画布 204
 对话框默认一致）；②reading mode 尽力面=body role="application"（无标准 opt-out API，真机验）；
 ③**沙①勘误**：duplicate 图层组 v0.10.14 已做（duplicateNode 递归深拷+组行 UI 预算门），复扫 grep 词
 没对上误报「未做」。自动重放=user 确认「很以后的事」维持 park。两粒沙至此全闭。
+
+**0830 收尾戳（edited by Claude Fable 5 2026-08-30）**：①§7 复扫件 2「桌面 MSAL popup」user 重新表态
+= b) 做（0830「msal popup也可以直接做吧」）→ **已落地** store 0.10.0（signIn mode:"popup" 口子）+
+v0.12.4（app 分流：桌面 popup / iOS·Android redirect）；「桌面 popup 撤案」一句话就此销。②#14/A5
+主菜单精简的「等你真机一句话」到货：user 0830「主菜单我看了下其实已经很好了」——v0.12.1-2 连接菜单
+终形即答卷，**closed 无余量**。③§3 #1 后半「模糊工具黑边」user 0830 拍板从 park 单拆直做 = v0.12.3
+（预乘卷积）；前半手指/涂抹仍 park（v0.12 纪元 backlog，见 20260830-v012-epoch-backlog-and-parked.md）。

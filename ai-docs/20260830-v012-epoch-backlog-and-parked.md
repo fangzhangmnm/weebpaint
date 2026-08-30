@@ -32,3 +32,12 @@
 - itch ritual 跟 prod 不跟 main（push-itch HEAD==prod 守卫）。
 - reconnect 三连 bug + attach 单飞锁 + 横幅标准化 = v0.12.0，
   详 ai-docs/20260830-reconnect-gallery-online-flag-race.md。
+- 连接语义重构 + 连接菜单终形 = v0.12.1-0.12.2（user 同日拍板；判例=ai-docs/20260830-gallery-connect-semantics-rework.md）。
+  **user 0830 验收原话「主菜单我看了下其实已经很好了」**——gallery 主菜单件就此关单（含老账 ledger #14/A5 主菜单精简的「等真机一句话」）。edited by Claude Fable 5 2026-08-30。
+- **模糊工具黑边 = v0.12.3**（user 0830 拍板从 park #1 单拆直做；手指/涂抹大件仍在纪元 backlog）：
+  blur 卷积迁预乘 alpha 空间，透明像素不再把黑拖进羽化边；回归测锁死。锐化路径的参考模糊仍是
+  straight 空间（只影响 luma delta，未见用户报症状，未动）。
+- **桌面 MSAL popup = v0.12.4 + store 0.10.0**（user 0825 拍板、0830 确认直做）：signIn 加
+  mode:"popup" 口子（库缺省 redirect 零变）；app 侧 oneDriveInteractMode 分流——桌面连接/换账号/
+  重连全程不离页，iOS/Android 维持 redirect 舞步；user_cancelled 静默。popup 交互本身无法无头
+  验证（要真微软登录），user 下次自己连的时候顺手看一眼即可。
