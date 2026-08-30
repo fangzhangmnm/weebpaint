@@ -57,6 +57,19 @@ function captureSeed(): SeedBundle | null {
   }
 }
 
+/** 目标库 rack collection 云端探针（临时店纯读即拆，forgetFlow 同姿势；store 0.11.0 collectionPeek）。
+ *  任何失败 = "unknown"（按旧库办：宁不问，绝不把离线误判成新库）。 */
+async function _peekTargetRack(entry: GalleryEntry): Promise<"absent" | "present" | "unknown"> {
+  try {
+    const tmp = _buildStoreForGalleryEntry(entry);
+    try { return await tmp.collectionPeek("brush-rack"); }   // 名字对齐 app-store 的 rack collection
+    finally { await tmp.dispose({ drain: false }); }
+  } catch (e) {
+    reportError(new Error("[gallery-manage] rack peek failed (treat as unknown): " + String(e)), "log");
+    return "unknown";
+  }
+}
+
 // ---- 绿灯门 + 逃生（切库/卸库共用）----
 /** 关掉当前店（挂载态走器官绿灯门；legacy 未领养态直接对当前 store 走同口径）。false = 用户取消/被 gate。 */
 async function closeCurrentStoreWithGates(): Promise<boolean> {
@@ -115,23 +128,27 @@ async function backupDirty(): Promise<void> {
 // ---- 切库 / 连接 / 卸下 / 忘记 ----
 // 切库/卸库整体走 galleryFlow 单飞道（案卷 20260830 §BUG D）：与 boot 领养 / redirect 续办互斥，
 //   detach→attach 序列不再被别的流程交错。锁内含用户 sheet（种子问/逃生）——串行等待属预期语义。
-async function switchFlow(entry: GalleryEntry, opts: { askSeed: boolean }): Promise<void> {
-  return galleryFlow(() => switchFlowBody(entry, opts));
+async function switchFlow(entry: GalleryEntry): Promise<void> {
+  return galleryFlow(() => switchFlowBody(entry));
 }
-async function switchFlowBody(entry: GalleryEntry, opts: { askSeed: boolean }): Promise<void> {
+/** 播种（user 0830 拍板 abc + collectionPeek 机制，store 0.11.0；台账 park#2 结案）：
+ *  永远静默捕种子（旧库还活着的此刻）；连接前探目标库 rack json——"absent"=真新库才弹「继承/出厂」
+ *  （取消=出厂兜底，旧笔仍在旧库无损）；"present"/"unknown"（离线）不弹不播。
+ *  旧判据 `askSeed: minted.created`（registry 条目新≠库新）退役——新设备连旧库误问的根因。 */
+async function switchFlowBody(entry: GalleryEntry): Promise<void> {
   const att = galleryAttachment.state();
   if (att.kind === "attached" && att.entry.id === entry.id) { _status(t("gm.alreadyCurrent")); return; }
-  let seed: SeedBundle | null = null;
-  if (opts.askSeed) {
+  const seed = captureSeed();
+  let inherit = false;
+  if (seed?.rack.length && (await _peekTargetRack(entry)) === "absent") {
     const v = await openChoiceSheet<"inherit" | "fresh">(t("gm.seedTitle"), t("gm.seedMsg"), [
       { label: t("gm.seedInherit"), value: "inherit", primary: true },
       { label: t("gm.seedFresh"), value: "fresh" },
     ]);
-    if (v == null) return;                             // 取消整个连接流程（条目已铸无妨，名册可复用）
-    if (v === "inherit") seed = captureSeed();         // 旧库还活着的此刻捕快照
+    inherit = v === "inherit";                         // 取消(null) = 出厂兜底（拍板 a），连接照常继续
   }
   if (!(await closeCurrentStoreWithGates())) return;
-  if (seed?.rack.length) _seedNextRackInitData(seed.rack);
+  if (inherit && seed) _seedNextRackInitData(seed.rack);
   try {
     await attachGallery(entry);
   } catch (e) {
@@ -139,7 +156,7 @@ async function switchFlowBody(entry: GalleryEntry, opts: { askSeed: boolean }): 
     reportError(new Error("[gallery-manage] attach failed: " + String(e)), "error");
     return;
   }
-  if (seed) for (const [k, v] of Object.entries(seed.prefs)) preferences.set(k as PrefKey, v as never);
+  if (inherit && seed) for (const [k, v] of Object.entries(seed.prefs)) preferences.set(k as PrefKey, v as never);
   // A1（user 0828 拍板 a）：开着的 transient 画自动安家进刚连上的图库（连接手势=安家意图，不再问）。
   //   0830 补拍板：未动过的 boot 空白不安家（"untouched-blank"）——空白件别塞进库，当 no-doc 办落图库页。
   let adopt: Awaited<ReturnType<typeof session.adoptTransientIntoGallery>> = { kind: "none" };
@@ -184,7 +201,7 @@ export async function resumePendingOneDriveConnect(): Promise<void> {
   try {
     const minted = await mintOneDriveByAccount();     // 已登录：零跳转同步路径
     if (!minted) return;
-    await switchFlow(minted.entry, { askSeed: minted.created });
+    await switchFlow(minted.entry);
   } catch (e) {
     reportError(new Error("[gallery-manage] resume connect failed: " + String(e)), "error");
   }
@@ -240,7 +257,7 @@ function renderConnectContent(box: HTMLElement): void {
       btn.type = "button";
       btn.className = "menu-item";
       btn.textContent = `${e.label} — ${sourceLabel(e)}`;   // 卡标来源（撞名不设机制，user 拍板）
-      btn.addEventListener("click", () => { _closePopup(); void switchFlow(e, { askSeed: false }); });
+      btn.addEventListener("click", () => { _closePopup(); void switchFlow(e); });
       const x = document.createElement("button");
       x.type = "button";
       x.className = "gm-x";
@@ -269,7 +286,7 @@ async function onOneDrivePick(): Promise<void> {
   //   resumePendingOneDriveConnect 续办 mint+switchFlow——选了同账号由「已是当前图库」短路。
   try {
     const minted = await mintOneDriveSwitchAccount();
-    if (minted) await switchFlow(minted.entry, { askSeed: minted.created });
+    if (minted) await switchFlow(minted.entry);
   } catch (e) {
     if (String(e).includes("user_cancelled")) return;   // 用户自己关了登录弹窗：无事发生，静默即诚实
     reportError(new Error("[gallery-manage] connect failed: " + String(e)), "error");
@@ -281,7 +298,7 @@ async function onFolderPick(): Promise<void> {
   try {
     const minted: MintResult | null = await mintP;
     if (!minted) return;                               // 用户取消 picker
-    await switchFlow(minted.entry, { askSeed: minted.created });
+    await switchFlow(minted.entry);
   } catch (e) { reportError(new Error("[gallery-manage] connect failed: " + String(e)), "error"); }
 }
 

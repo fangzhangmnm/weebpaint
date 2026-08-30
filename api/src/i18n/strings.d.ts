@@ -723,12 +723,6 @@ export declare const S: {
         readonly ja: "キャンバス";
         readonly tok: "supa";
     };
-    readonly "menu.tab.view": {
-        readonly zh: "视图";
-        readonly en: "View";
-        readonly ja: "表示";
-        readonly tok: "lukin";
-    };
     readonly "menu.tab.settings": {
         readonly zh: "设置";
         readonly en: "Settings";
