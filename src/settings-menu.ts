@@ -227,7 +227,9 @@ export function initSettingsMenu(ctx: AppContext) {
   initInstallCapture();
   bindInstallButton(document.getElementById("menuInstallApp"), () => setMenuOpen(false));
 
-  // v0.6C（user 拍板）：☰ 六 tab 分页（文件/画布/视图/设置/插件/dev）。停留页 RAM 记忆（session 内）。
+  // v0.6C（user 拍板）：☰ tab 分页。0830 重组后五页（文件/画布/设置/插件/dev）——视图 tab 解散：
+  //   工作台件归画布页、显示开关并入设置页（旧 desk.menuTab="view" 由下方 some() 守卫自然落回 file）。
+  //   停留页 RAM 记忆（session 内）。
   {
     _menuTabs = [...document.querySelectorAll<HTMLElement>("#menuPanel .menu-tab")];
     _menuPages = [...document.querySelectorAll<HTMLElement>("#menuPanel .menu-page")];

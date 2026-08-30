@@ -1303,7 +1303,6 @@
       <div class="menu-tabs" role="tablist">
         <button class="menu-tab" data-menu-tab="file" type="button" role="tab"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#floppy-disk"/></svg><span data-i18n="menu.tab.file">文件</span></button>
         <button class="menu-tab" data-menu-tab="canvas" type="button" role="tab"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#image"/></svg><span data-i18n="menu.tab.canvas">画布</span></button>
-        <button class="menu-tab" data-menu-tab="view" type="button" role="tab"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#maximize-viewport"/></svg><span data-i18n="menu.tab.view">视图</span></button>
         <button class="menu-tab" data-menu-tab="plugins" type="button" role="tab"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#blender"/></svg><span data-i18n="menu.tab.plugins">插件</span></button>
         <button class="menu-tab" data-menu-tab="settings" type="button" role="tab"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#sliders"/></svg><span data-i18n="menu.tab.settings">设置</span></button>
         <button class="menu-tab" data-menu-tab="dev" type="button" role="tab"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#wrench"/></svg><span data-i18n="menu.tab.dev">dev</span></button>
@@ -1350,11 +1349,6 @@
         <button class="menu-item menu-item-with-icon" id="menuRevertToOpen" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow-undo"/></svg>
         <span class="menu-item-label" data-i18n="menu.revert">回到打开时的版本…</span>
       </button>
-        <!-- timelapse 过程录像（宣发轮 2026-08-19；opt-in per-doc，spec=ai-docs/20260819-timelapse-spec.md） -->
-        <button class="menu-item menu-item-with-icon" id="menuTimelapse" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#timelapse-record"/></svg>
-        <span class="menu-item-label" data-i18n="menu.timelapse">过程录像…</span>
-        <span class="menu-item-state" id="menuTimelapseState"></span>
-      </button>
       </div>
       <div class="menu-page hidden" data-menu-page="canvas">
         <button class="menu-item menu-item-with-icon" id="menuCrop" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#crop"/></svg>
@@ -1372,8 +1366,34 @@
         <button class="menu-item menu-item-with-icon" id="adjustResample" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#scale-uniform"/></svg>
         <span class="menu-item-label" data-i18n="menu.resample">调整尺寸</span>
       </button>
+        <!-- 0830 菜单重组（user 拍板第一遍，后续慢慢 grill）：视图 tab 解散——工作台三件（视口复位/
+             参考小窗/过程录像）归画布页，显示开关（棋盘/像素栅格/主栅格）并入设置页，文件页=纯行政。
+             timelapse 判画布页非插件页：per-doc 第一方过程记录（带录制态徽标），插件页语义=外接集成。 -->
+        <button class="menu-item menu-item-with-icon" id="menuFit" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#maximize-viewport"/></svg>
+        <span class="menu-item-label" data-i18n="menu.fit">视口复位</span>
+      </button>
+        <button class="menu-item menu-item-with-icon" id="menuReference" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#picture-in-picture"/></svg>
+        <span class="menu-item-label" data-i18n="menu.reference">参考小窗</span>
+      </button>
+        <!-- timelapse 过程录像（宣发轮 2026-08-19；opt-in per-doc，spec=ai-docs/20260819-timelapse-spec.md） -->
+        <button class="menu-item menu-item-with-icon" id="menuTimelapse" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#timelapse-record"/></svg>
+        <span class="menu-item-label" data-i18n="menu.timelapse">过程录像…</span>
+        <span class="menu-item-state" id="menuTimelapseState"></span>
+      </button>
       </div>
-      <div class="menu-page hidden" data-menu-page="view">
+      <div class="menu-page hidden" data-menu-page="settings">
+        <!-- P5 scope（2026-08-27 拍板；分区标题栏 2026-08-27 晚 user 撤：微章足够，UX 后议）：
+             行尾微章 hover 出一句解释。「这个图库」= 跟身份/库走（PPSSPP 终版模型，账号层已撤回）；
+             无库语境（P6 Editor Only）gallery 微章藏（data-no-gallery）。 -->
+        <!-- 0830 重组分组（user 拍板第一遍；顺序即分组，无标题栏遵 0827 撤案）：
+             显示（主题/透明背景/像素栅格/主栅格，后三件自视图 tab 并入）→ 输入（吸色/单指绘画）
+             → 系统（语言/生成式 AI/快捷键/安装）。 -->
+        <label class="menu-item menu-lang-row menu-item-with-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#theme"/></svg>
+          <span class="menu-item-label" data-i18n="menu.theme">主题</span>
+          <button class="menu-lang-select menu-inline-select" id="menuThemeBtn" type="button" aria-haspopup="true"><span id="menuThemeBtnLabel" data-i18n="theme.auto">跟随系统</span><svg class="menu-inline-caret" viewBox="0 0 8 8" aria-hidden="true"><path d="M1.4 2.8 L4 5.6 L6.6 2.8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <svg class="menu-scope-badge" viewBox="0 0 24 24" aria-hidden="true" data-i18n-title="menu.scopeDeviceTip"><use href="#device"/></svg>
+        </label>
+        <button id="menuTheme" type="button" hidden></button><!-- 旧 id stub：theme.ts renderTheme 查它，v0.6C 下拉化后留防崩 -->
         <button class="menu-item menu-item-with-icon" id="menuCheckerboard" type="button" role="menuitemcheckbox" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#checkerboard-background"/></svg>
         <span class="menu-item-label" data-i18n="menu.checkerboard">透明背景显示棋盘</span>
         <svg class="menu-scope-badge" viewBox="0 0 24 24" aria-hidden="true" data-i18n-title="menu.scopeDocTip"><use href="#image"/></svg>
@@ -1396,37 +1416,16 @@
         </button>
           <button class="menu-item-wrench" id="menuDocGridCell" type="button" data-i18n-title="menu.docGridCell" data-i18n-aria="menu.docGridCell"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#wrench"/></svg></button>
         </div>
-        <button class="menu-item menu-item-with-icon" id="menuFit" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#maximize-viewport"/></svg>
-        <span class="menu-item-label" data-i18n="menu.fit">视口复位</span>
-      </button>
-        <button class="menu-item menu-item-with-icon" id="menuReference" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#picture-in-picture"/></svg>
-        <span class="menu-item-label" data-i18n="menu.reference">参考小窗</span>
-      </button>
-      </div>
-      <div class="menu-page hidden" data-menu-page="settings">
-        <!-- P5 scope（2026-08-27 拍板；分区标题栏 2026-08-27 晚 user 撤：微章足够，UX 后议）：
-             行尾微章 hover 出一句解释。「这个图库」= 跟身份/库走（PPSSPP 终版模型，账号层已撤回）；
-             无库语境（P6 Editor Only）gallery 微章藏（data-no-gallery）。 -->
         <button class="menu-item menu-item-with-icon" id="menuLongPressPick" type="button" role="menuitemcheckbox" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#eyedropper"/></svg>
         <span class="menu-item-label" data-i18n="menu.longPressPick">单指长按吸色</span>
         <svg class="menu-scope-badge" viewBox="0 0 24 24" aria-hidden="true" data-i18n-title="menu.scopeDocTip"><use href="#image"/></svg>
         <span class="menu-item-state" data-state-for="longPressPick">关</span>
-      </button>
-        <!-- v0.9.26 PWA 安装入口（user 2026-08-20）：beforeinstallprompt 捕获后才显形（Chromium）；已安装/装态恒隐 -->
-        <button class="menu-item menu-item-with-icon" id="menuInstallApp" type="button" role="menuitem" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#download"/></svg>
-        <span class="menu-item-label" data-i18n="menu.installApp">安装 WeebPaint 到桌面</span>
       </button>
         <button class="menu-item menu-item-with-icon" id="menuSingleFingerDraw" type="button" role="menuitemcheckbox" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#finger"/></svg>
         <span class="menu-item-label" data-i18n="menu.singleFingerDraw">单指绘画</span>
         <svg class="menu-scope-badge" viewBox="0 0 24 24" aria-hidden="true" data-i18n-title="menu.scopeDeviceTip"><use href="#device"/></svg>
         <span class="menu-item-state" data-state-for="singleFingerDraw">关</span>
       </button>
-        <label class="menu-item menu-lang-row menu-item-with-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#theme"/></svg>
-          <span class="menu-item-label" data-i18n="menu.theme">主题</span>
-          <button class="menu-lang-select menu-inline-select" id="menuThemeBtn" type="button" aria-haspopup="true"><span id="menuThemeBtnLabel" data-i18n="theme.auto">跟随系统</span><svg class="menu-inline-caret" viewBox="0 0 8 8" aria-hidden="true"><path d="M1.4 2.8 L4 5.6 L6.6 2.8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-          <svg class="menu-scope-badge" viewBox="0 0 24 24" aria-hidden="true" data-i18n-title="menu.scopeDeviceTip"><use href="#device"/></svg>
-        </label>
-        <button id="menuTheme" type="button" hidden></button><!-- 旧 id stub：theme.ts renderTheme 查它，v0.6C 下拉化后留防崩 -->
         <!-- P3 sunset（§9.8）：cloud-enabled toggle 退役——「关云」的真身 = 没挂图库；动词（连接/卸下）
              住 gallery 页管理面。此处只留只读当前库行（Q1 拍板：设置页不管库的生死）。 -->
         <label class="menu-item menu-lang-row menu-item-with-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#globe-speech"/></svg>
@@ -1443,7 +1442,10 @@
         <button class="menu-item menu-item-with-icon" id="menuShortcuts" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#shortcut"/></svg>
         <span class="menu-item-label" data-i18n="menu.shortcuts">快捷键</span>
       </button>
-
+        <!-- v0.9.26 PWA 安装入口（user 2026-08-20）：beforeinstallprompt 捕获后才显形（Chromium）；已安装/装态恒隐 -->
+        <button class="menu-item menu-item-with-icon" id="menuInstallApp" type="button" role="menuitem" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#download"/></svg>
+        <span class="menu-item-label" data-i18n="menu.installApp">安装 WeebPaint 到桌面</span>
+      </button>
       </div>
       <div class="menu-page hidden" data-menu-page="plugins">
         <!-- 插件页：BTP 是插件（user）；将来 AI 模块等同住。tab 图标暂用 #blender（库出通用 plugin 图标后换） -->

@@ -105,7 +105,11 @@ const TEMPLATE = `<style>
 }
 .body {
   position: relative; flex: 1; min-height: 0;
-  background: #1a1a1a;
+  /* 底=editor 画布 void 同款（user 2026-08-30：跟 color theme + 对齐画布底含小点）：
+     --void/--void-dot 主题变量穿透 shadow；点阵参数对齐 board（24px 网格 / r1.25px 软边）。 */
+  background-color: var(--void, #e6e2d6);
+  background-image: radial-gradient(circle, var(--void-dot, #cec8b8) 1.25px, transparent 2px);
+  background-size: 24px 24px;
   border-radius: 0 0 var(--radius, 10px) var(--radius, 10px);
   overflow: hidden;
   touch-action: none;        /* 不让 iPad 系统抢双指手势 */
@@ -583,16 +587,8 @@ export class WpReferenceWindow extends HTMLElement {
     ctx.clearRect(0, 0, W, H);
     const source = this._liveProvider ? this._liveSource : this._bitmap;
     if (!source) return;
-    // 棋盘格底（暗示透明 / 浮在主画布上的感觉）
-    const cell = 8 * dpr;
-    ctx.fillStyle = "#2a2a2a";
-    ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = "#3a3a3a";
-    for (let y = 0; y < H; y += cell) {
-      for (let x = ((y / cell) | 0) % 2 ? 0 : cell; x < W; x += cell * 2) {
-        ctx.fillRect(x, y, cell, cell);
-      }
-    }
+    // 底不再 canvas 自画（旧版硬编码暗棋盘格不跟主题，user 2026-08-30 打回）：
+    //   clearRect 透底，.body 的 void+点阵 CSS 从图外与图的透明部分透出——语义对齐 editor。
     // viewport：tx/ty 是 CSS 像素，要 × dpr；scale/rot 不动
     const v = this._vp;
     const c = Math.cos(v.rot), s = Math.sin(v.rot);

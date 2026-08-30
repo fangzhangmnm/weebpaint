@@ -661,7 +661,9 @@ export class Board {
       W, H, this.viewport.scale, this._voidColor, docBg,
       this._glFloatInputs(), stampOverlay,
       liveSync as unknown as GLLeaf | null, this._glSurrogates(),
-      transparentBg ? { dotColor: this._voidDotColor, stepPx: 24 * this.dpr, radiusPx: 1.25 * this.dpr } : null,
+      // 点网格恒开（user 2026-08-30「没有transparency也应该有小点」）：白纸模式 doc 自身不透明，
+      //   点只露在画布外的 void 区；透明显示时照旧透进 doc 内。
+      { dotColor: this._voidDotColor, stepPx: 24 * this.dpr, radiusPx: 1.25 * this.dpr },
     );
     this._reportGlResidencyDrops();
     // 2D 叠层（透明底）：lasso 蚂蚁线/handles + doc 边框（透明显示=与点网格同色同软度；白纸=淡黑）

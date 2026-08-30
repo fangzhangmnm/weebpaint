@@ -169,7 +169,6 @@ export const S = {
   // ── ⋯ 菜单：文件段（切片 2）────────────────────────────────────
   "menu.tab.file":     { zh: "文件", en: "File", ja: "ファイル", tok: "sitelen" }, 
   "menu.tab.canvas":   { zh: "画布", en: "Canvas", ja: "キャンバス", tok: "supa" }, 
-  "menu.tab.view":     { zh: "视图", en: "View", ja: "表示", tok: "lukin" }, 
   "menu.tab.settings": { zh: "设置", en: "Settings", ja: "設定", tok: "nasin" }, 
   "menu.tab.plugins":  { zh: "插件", en: "Plugins", ja: "プラグイン", tok: "ilo namako" }, 
   "menu.tab.dev":      { zh: "dev", en: "dev", ja: "dev", tok: "\"dev\"" }, 
