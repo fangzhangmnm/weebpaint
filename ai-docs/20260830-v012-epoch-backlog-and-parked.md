@@ -16,7 +16,15 @@
 1. **reference 窗口整改批**（建议一批做）：
    - ~~背景不跟 color theme（很跳的黑色）~~ → **v0.12.5 已修**（user 0830「顺便修」：底=--void+点阵
      对齐 editor 画布，canvas 自画暗棋盘退役；edited by Claude Fable 5）；
-   - UI redesign + **multi reference** 支持；
+   - UI redesign + **multi reference** 支持（user 0830：genai 稻草人之外正常画画也有用——手/腿/帽子参考图多开）。
+     **0830 数据契约勘察（edited by Claude Fable 5）：可零 backward migration 实现**。现状=单张
+     `weebpaint/reference.png`（原样字节，运行时 persistBlob round-trip）+ desk.refPanel{enabled,position,
+     viewport}（.weebpaint/editor-state.json）。加法设计：reference.png 保槽位0 + `reference-2.png…` 新
+     entry；desk 加 `refPanels[]` 新键（⚠ mergeInto 白名单机制：新键必须进 freshGroups 默认值才收得进，
+     否则 Unserialize 静默丢）。新版读旧文件：refPanels 缺→落单张，天然零迁移。formatVersion 不必 bump
+     （additive 非 break；wrote-with 比较已覆盖「新写旧读」警告，user 0830：旧读新不担心）。
+     成本注意：每张参考原字节全进 ora（decode zipUnpack 全量进 RAM + 云同步体积）→ 与本批「大图警告 /
+     auto-jpeg?」绑一起做正合适；thumbnail 恒最后一 entry 的 byte-range 契约不受影响（v399 起按名取）。
    - image size warning（大图警告）；
    - 「perhaps auto convert to jpeg?」（user 疑问句，未拍板——做前要确认）；
    - 入口直觉：「每次想开 reference 总是去按图层按钮想在那里找」→ 入口/分组重排候选
@@ -30,8 +38,11 @@
    ——collection.ts 的 getInitData 是 eager、按「本地 IDB 空」触发（新设备连旧库也会咨询，种子先落地
    云端到了再覆盖），照原案做会把问句弹给新设备连旧库。正解改为**连接时探目标库**：需 store 只读口子
    `collectionPeek`（collections 云面 fetchMeta 判 `.appId/brush-rack.json` 存在性，零记账），
-   "absent"+有种子才弹问句；"present"/"unknown"（离线）不问。**等 user 过 store 口子**（提案已呈 0830）。
+   "absent"+有种子才弹问句；"present"/"unknown"（离线）不问。
    边角：scaffold（开库即建空信封）意味着「存在但空信封」的残库判 present→静默出厂，方向安全。
+   **→ 0830 结案（edited by Claude Fable 5）**：user「同意」→ store 0.11.0（collectionPeek 三态探针，
+   4 契约测）+ v0.12.6（switchFlow 永远静默捕种子 + _peekTargetRack 临时店探针 + askSeed 判据退役 +
+   prefs 只随继承应用）已推 dev。本条出 park。
 3. **UI cleanup pass**（user：「perhaps we need to do the ui cleanup pass this turn」——全面 cleanup
    另起一轮慢慢 grill。**0830 第一遍已落 v0.12.5**：视图 tab 解散（工作台三件归画布页、显示开关并入
    设置页三段分组、文件页纯行政、timelapse 判画布页），离线横幅 .toast 化在 v0.12.0）。
