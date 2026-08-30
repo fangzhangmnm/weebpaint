@@ -13,7 +13,10 @@
 
 ## user 拍板 park（「可以先把之前一些不能随手修的需求parked」2026-08-29）
 
-1. **reference 窗口整改批**（建议一批做）：
+1. **reference 窗口整改批** → **0830 出 park 开工**（user「记，然后开干」）：spec 定稿 =
+   **ai-docs/20260830-reference-window-rework-spec.md**（多轮 grill 逐条拍板：`.weebpaint/` 全家桶
+   零迁移契约 / 1024² 拍平 jpeg 静默压缩 / borderless+加号菜单拖把 UI / 放大 nearest+小点对齐 /
+   addReferenceImage 漏斗）。下列原始清单仅存档：
    - ~~背景不跟 color theme（很跳的黑色）~~ → **v0.12.5 已修**（user 0830「顺便修」：底=--void+点阵
      对齐 editor 画布，canvas 自画暗棋盘退役；edited by Claude Fable 5）；
    - UI redesign + **multi reference** 支持（user 0830：genai 稻草人之外正常画画也有用——手/腿/帽子参考图多开）。
