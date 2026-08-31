@@ -14,22 +14,22 @@
 #   KICK_SIGNATURE='Co-Authored-By: …' 环境变量：署进空 commit 正文（家规署名制；跑脚本的实体自己签）。
 #
 # 探法（07-27 教训）：探「只有新部署才有」的 content-hash bundle URL，**不探 index.html**（600s CDN 缓存）。
-#   weebpaint.com 与 fangzhangmnm.github.io 是两个缓存 key，轮着探；每次带新 query 串
-#   （07-27 记「query 不进 cache key」，08-31 实测 x-cache:MISS 说明会进——两说并存，轮 host 是保险）。
+#   每次带新 query 串（07-27 记「query 不进 cache key」，08-31 实测带新 query 的探测 x-cache:MISS——两说并存）。
+#   ⚠ 别拿 fangzhangmnm.github.io 当第二个缓存 key：配了自定义域名后它一律 301 跳 weebpaint.com（08-31 首跑实证），
+#     探它永远拿不到 200。
 set -euo pipefail
 cd "$(dirname "$0")/.."
 MODE=${1:-}
 HASH=$(grep -oE 'dist/weebpaint-[0-9a-f]+\.mjs' index.html | head -1)
 [ -n "$HASH" ] || { echo "[kick-pages] index.html 里找不到 bundle 引用"; exit 2; }
-HOSTS=("https://weebpaint.com" "https://fangzhangmnm.github.io/weebpaint")
+HOST="https://weebpaint.com"
 
 probe() {  # $1=轮数 $2=间隔秒；源站服新 bundle 即返回 0
-  local i code host
+  local i code
   for ((i = 1; i <= $1; i++)); do
-    host=${HOSTS[$((i % 2))]}
-    code=$(curl -s -o /dev/null -w '%{http_code}' "$host/$HASH?probe=$RANDOM$i" || echo 000)
-    if [ "$code" = "200" ]; then echo "[kick-pages] ✓ 源站已服新 bundle（$host/$HASH，第 $i 次探测）"; return 0; fi
-    echo "[kick-pages] … 第 $i 次：$host → HTTP $code（等 ${2}s）"; sleep "$2"
+    code=$(curl -s -o /dev/null -w '%{http_code}' "$HOST/$HASH?probe=$RANDOM$i" || echo 000)
+    if [ "$code" = "200" ]; then echo "[kick-pages] ✓ 源站已服新 bundle（$HOST/$HASH，第 $i 次探测）"; return 0; fi
+    echo "[kick-pages] … 第 $i 次：HTTP $code（等 ${2}s）"; sleep "$2"
   done
   return 1
 }

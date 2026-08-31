@@ -96,7 +96,8 @@ concurrency:
 ### 规程（2026-08-31 立，user「建立安全规程」）
 
 - **验证走 content-hash URL，不走 index.html**：探 `https://weebpaint.com/dist/weebpaint-<hash>.mjs`——只有新部署才有这个文件。
-  index.html 有 600s CDN 缓存，探它会被缓存骗。weebpaint.com 与 fangzhangmnm.github.io 是两个缓存 key，轮着探。
+  index.html 有 600s CDN 缓存，探它会被缓存骗。每次带新 query 串。（fangzhangmnm.github.io 不能当第二缓存 key：
+  配了自定义域名后它一律 301 跳 weebpaint.com，08-31 首跑实证。）
 - **必须跑，不是必须读**：`scripts/kick-pages.sh` = 验证 → 3 分钟未切换自动空 commit 原子重推 → 再验 → 仍不行非零退出
   「停下来找人」。`scripts/push-prod.sh` 推完 prod **自动调用**；手动排查也先跑它（`--check` 只探不动 git）。
 - **超出记录在案手段就停**：空 commit 后仍不切 = 新情况，找人，别再自创花招（08-31 教训：修法早在 memory 索引里，
