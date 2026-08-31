@@ -76,6 +76,8 @@ import "./app-state.test.mjs";            // 2026-07-14 app-state struct 门面�
 import "./editor-state.test.mjs";         // 2026-07-14 desk struct：默认/setDirtyFlag/Serialize 往返/Unserialize 容错/reset
 import "./gallery-view-model.test.mjs";
 import "./frame-gate.test.ts";        // 图库帧门（防误触）：按压期扣帧只留最新/尾巴/多指/maxHold 保险丝
+import "./first-frame-watchdog.test.ts";   // 2026-08-31 案：首帧看门狗（到点报 stall/来帧销账/别夹不算/cancel/重 arm）
+import "./diag-log.test.mjs";              // 2026-08-31：诊断日志环（容量/截断/顺序/文本头/清空）
 import "./color-model.test.mjs";
 import "./brush-size.test.mjs";
 import "./drag-value.test.mjs";   // 拖动核纯状态机（v0.7.8）：shift 细调相对累积/无缝切换/clamp

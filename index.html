@@ -107,7 +107,7 @@
     <link rel="icon" href="./icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=84404b7e124b" />
+    <link rel="stylesheet" href="./styles.css?v=b7ff729cfcdf" />
     <!-- zip.js UMD bundle：自挂 window.zip。必须在 module bundle 之前。
          defer（v417）：原来是 parser-blocking 的，硬刷新时 SW 被绕过 → 直奔网络 → 网络一卡整个
          文档解析就停住（浏览器标签页转圈）。defer 后它与下面的 type=module bundle 同属延迟脚本、
@@ -1074,6 +1074,17 @@
       <button class="sheet-action ghost" id="genericSheetCancel" type="button" data-i18n="common.cancel">取消</button>
     </div>
 
+    <!-- 诊断日志窗口（diag-log-sheet.ts）：环形黑匣子 + 复制 + 清空。created 2026-08-31 by Claude Fable 5 -->
+    <div class="backdrop hidden" id="diagLogBackdrop"></div>
+    <div class="sheet hidden diag-log-sheet" id="diagLogSheet" role="dialog" aria-modal="true">
+      <h3 data-i18n="diag.title">诊断日志</h3>
+      <p class="sheet-hint" id="diagLogHint"></p>
+      <pre class="diag-log-pre" id="diagLogText"></pre>
+      <button class="sheet-action" id="diagLogCopy" type="button" data-i18n="diag.copy">复制</button>
+      <button class="sheet-action ghost" id="diagLogClear" type="button" data-i18n="diag.clear">清空</button>
+      <button class="sheet-action ghost" id="diagLogClose" type="button" data-i18n="diag.close">关闭</button>
+    </div>
+
     <!-- 按颜色拆分图层 sheet（explode-layers.ts）：选 k → 预览中心色/占比 → 拆分/取消 -->
     <div class="backdrop hidden" id="explodeBackdrop"></div>
     <div class="sheet hidden" id="explodeSheet" role="dialog" aria-modal="true" data-i18n-aria="ex.title">
@@ -1504,6 +1515,10 @@
         <span class="menu-item-label" data-i18n="menu.fps">FPS 计</span>
         <span class="menu-item-state" data-state-for="fps">关</span>
       </button>
+        <!-- 诊断日志（2026-08-31 user「dev 里面加一个日志窗口和拷贝按钮」；diag-log-sheet.ts） -->
+        <button class="menu-item menu-item-with-icon" id="menuDiagLog" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#file"/></svg>
+        <span class="menu-item-label" data-i18n="menu.diagLog">诊断日志…</span>
+      </button>
         <!-- v0.5.32 user：版本+强制更新挤一行（版本号=行尾 state，els.versionLabel 引用不变）；还原笔刷 #refresh 垫底 -->
         <button class="menu-item menu-item-with-icon" id="menuForcePwaReset" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#refresh"/></svg>
           <span class="menu-item-label" data-i18n="menu.forceReset">强制更新</span>
@@ -1595,6 +1610,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-e4ac385b9456.mjs"></script>
+    <script type="module" src="./dist/weebpaint-56dbb9203a2f.mjs"></script>
   </body>
 </html>

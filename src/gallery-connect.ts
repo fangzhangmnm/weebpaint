@@ -13,6 +13,7 @@ import { storeAbsent, _swapStoreForGallery, signIn, getActiveAccount, isSignedIn
 import { deviceKvGet, deviceKvSet } from "./device-kv.ts";
 import { pickerAllowedInFrame } from "./local-file-session.ts";
 import { reportError } from "./error-badge.ts";
+import { note as diagNote } from "./diag-log.ts";   // 黑匣子面包屑：boot 挂库结果
 import { createFlowLock } from "./flow-lock.ts";
 
 /** attach/detach 流程单飞道（案卷 20260830 §BUG D）：boot 领养 / redirect 续办 / 切库 / 卸库全走这条，
@@ -139,13 +140,14 @@ export async function bootAttachFromRegistry(): Promise<void> {
     try { e = await galleryRegistry.lastActive(); } catch (err) {
       reportError(new Error("[gallery-connect] registry read failed at boot — staying in no-gallery mode: " + String(err)), "error");
     }
-    if (!e) return;
+    if (!e) { diagNote("boot", "registry has no lastActive entry → no-gallery mode"); return; }
     try {
       const online = e.kind === "folder" ? await ensureFolderPermission(e, { request: false }) : isSignedIn();
       await galleryAttachment.attach(e, { online, gesture: false });
       // online 旗收口（案卷 §BUG A）：boot attach 与 initAuth 赛跑，attach 期间 auth-changed 的翻牌
       //   打在 detached 上会被丢——落地后按当下登录态重读，旗死锁根除。
       if (e.kind === "onedrive") galleryAttachment.setOnline(isSignedIn());
+      diagNote("boot", `attached ${e.kind} "${e.label}" db=${e.dbId} online=${e.kind === "onedrive" ? isSignedIn() : online}`);
     } catch (err) {
       reportError(new Error("[gallery-connect] boot attach failed — falling back to no-gallery mode: " + String(err)), "error");
       // 兜底只救「自己半挂」：别的流程已把店挂好（attached）时绝不 swap(null) 拔活店（案卷 §BUG D）。

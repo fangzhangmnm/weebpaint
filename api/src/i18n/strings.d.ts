@@ -567,6 +567,56 @@ export declare const S: {
         readonly ja: "FPS 表示";
         readonly tok: "nanpa pi sitelen tawa";
     };
+    readonly "menu.diagLog": {
+        readonly zh: "诊断日志…";
+        readonly en: "Diagnostic log…";
+        readonly ja: "診断ログ…";
+    };
+    readonly "diag.title": {
+        readonly zh: "诊断日志";
+        readonly en: "Diagnostic log";
+        readonly ja: "診断ログ";
+    };
+    readonly "diag.hint": {
+        readonly zh: "最近 {n} 条，只存在这台设备上，不会上传。复制后可粘贴给开发者。";
+        readonly en: "{n} recent entries, kept on this device only (never uploaded). Copy to share with the developer.";
+        readonly ja: "最近の {n} 件。この端末にのみ保存され、送信されません。コピーして開発者に共有できます。";
+    };
+    readonly "diag.copy": {
+        readonly zh: "复制";
+        readonly en: "Copy";
+        readonly ja: "コピー";
+    };
+    readonly "diag.clear": {
+        readonly zh: "清空";
+        readonly en: "Clear";
+        readonly ja: "消去";
+    };
+    readonly "diag.close": {
+        readonly zh: "关闭";
+        readonly en: "Close";
+        readonly ja: "閉じる";
+    };
+    readonly "diag.copied": {
+        readonly zh: "已复制 {n} 条日志";
+        readonly en: "Copied {n} log entries";
+        readonly ja: "ログ {n} 件をコピーしました";
+    };
+    readonly "diag.copyFailed": {
+        readonly zh: "复制失败：文本已选中，请长按「拷贝」";
+        readonly en: "Copy failed: text is selected — long-press to copy";
+        readonly ja: "コピーに失敗：テキストを選択済み。長押しでコピーしてください";
+    };
+    readonly "diag.cleared": {
+        readonly zh: "日志已清空";
+        readonly en: "Log cleared";
+        readonly ja: "ログを消去しました";
+    };
+    readonly "diag.empty": {
+        readonly zh: "（暂无日志）";
+        readonly en: "(no entries yet)";
+        readonly ja: "（ログはまだありません）";
+    };
     readonly "menu.version": {
         readonly zh: "{v}";
         readonly en: "{v}";
@@ -1658,6 +1708,21 @@ export declare const S: {
         readonly en: "Loading…";
         readonly ja: "読み込み中…";
         readonly tok: "o awen lili…";
+    };
+    readonly "gal.retry": {
+        readonly zh: "重试";
+        readonly en: "Retry";
+        readonly ja: "再試行";
+    };
+    readonly "gal.firstFrameTimeout": {
+        readonly zh: "图库读取超时：本地存储没有响应";
+        readonly en: "Gallery listing timed out: local storage did not respond";
+        readonly ja: "ギャラリーの読み込みがタイムアウトしました：ローカルストレージが応答しません";
+    };
+    readonly "gal.firstFrameFailed": {
+        readonly zh: "图库读取失败（详见 dev 页诊断日志）";
+        readonly en: "Gallery listing failed (see the diagnostic log on the dev tab)";
+        readonly ja: "ギャラリーの読み込みに失敗しました（dev タブの診断ログ参照）";
     };
     readonly "gal.folder": {
         readonly zh: "文件夹";

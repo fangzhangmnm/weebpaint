@@ -1,6 +1,6 @@
 import { createOneDriveProvider } from "@internal/store";
 import type { RackPersistence } from "./brush-rack-controller.ts";
-import type { Store } from "@internal/store";
+import type { Store, WatchFolderErrorPhase } from "@internal/store";
 export declare const storeAbsent: boolean;
 type _Auth = ReturnType<typeof createOneDriveProvider>["auth"];
 export declare const provider: import("@internal/store").CloudProvider | null;
@@ -16,7 +16,7 @@ export declare function requireStore(): AppStorePort;
 /** 有活店？店懒出生后的不变量：_storeFull≠null ⇔ attachment attached（无预建店无 boot 窗口）。
  *  P3 sunset：hasGallery 的真相源。 */
 export declare function hasLiveStore(): boolean;
-export type { Collection, EncryptedBlob } from "@internal/store";
+export type { Collection, EncryptedBlob, WatchFolderErrorPhase } from "@internal/store";
 export { wipeAppNamespace, scanAppNamespace } from "@internal/store";
 export { isCached as isCachedSyncState } from "@internal/store";
 export declare let brushRackCollection: RackPersistence;
@@ -100,7 +100,9 @@ export declare function watchFolder(folder: string, cb: (snap: {
     images: CloudImageItem[];
     others: CloudOtherItem[];
     folderNames: string[];
-}) => void): () => void;
+}) => void, opts?: {
+    onError?: (err: unknown, phase: WatchFolderErrorPhase) => void;
+}): () => void;
 export declare function watchFolderImages(folder: string, cb: (snap: {
     path: string;
     images: CloudImageItem[];

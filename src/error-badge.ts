@@ -8,6 +8,7 @@
 //   本模块 init 后接管 window.__wp_showFatal，让内联的 error/unhandledrejection handler 也走 severity）。
 
 import { t } from "./i18n/index.ts";
+import { record as diagRecord } from "./diag-log.ts";   // 黑匣子（2026-08-31）：全部级别都记，dev 页可看/复制
 export type ErrorLevel = "error" | "warning" | "info" | "log";
 
 const BANNER_COLOR: Record<"error" | "warning", string> = {
@@ -29,6 +30,7 @@ export function initErrorBadge(deps: { status: (text: string, persist?: boolean)
   statusSink = deps.status;
   // 接管内联 bootstrap 的 fatal shower：往后 window.error / unhandledrejection 也过 severity（默认当 error）。
   (window as unknown as { __wp_showFatal?: (t: string) => void }).__wp_showFatal = (text: string) => {
+    diagRecord("error", "[window] " + text);
     showBanner(text, "error");
   };
 }
@@ -64,8 +66,17 @@ function showBanner(text: string, level: "error" | "warning"): void {
  * @param err   任意错误（Error / string / 对象）
  * @param level 默认 "error"。见文件头分流表。
  */
+// 黑匣子行：文案 + 第一帧调用栈（minified bundle 里 file:line:col 仍可对 sourcemap）。
+function stackHint(err: unknown): string {
+  const st = err instanceof Error ? err.stack : undefined;
+  if (!st) return "";
+  const frame = st.split("\n").map((l) => l.trim()).find((l) => /^at |@/.test(l) && !l.includes("reportError"));
+  return frame ? `  ‹${frame.slice(0, 160)}›` : "";
+}
+
 export function reportError(err: unknown, level: ErrorLevel = "error"): void {
   const msg = errToText(err);
+  diagRecord(level, msg + stackHint(err));
   // 最终消费者 log（层层上报只此一处 log）
   if (level === "error") console.error("[wp]", err);
   else if (level === "warning") console.warn("[wp]", err);

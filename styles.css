@@ -2807,3 +2807,16 @@ body[data-no-gallery] svg.menu-scope-badge[data-i18n-title="menu.scopeGalleryTip
 .gallery-tile.other-file { opacity: .55; cursor: default; }
 .gallery-tile.other-file .gallery-tile-thumb { display: flex; align-items: center; justify-content: center; }
 .gallery-tile.other-file .gallery-tile-thumb svg { width: 40%; height: 40%; color: var(--ink-soft); }
+
+/* A2 首帧看门狗（2026-08-31）：loading 卡住时网格内显原因 + 重试（.gallery-loading 已 grid-column 1/-1 居中） */
+.gallery-stalled { margin-bottom: 12px; color: var(--ink-soft); }
+.gallery-retry-btn { display: inline-block; width: auto; padding: 8px 20px; }
+/* dev 诊断日志窗口（diag-log-sheet.ts） */
+.diag-log-sheet { max-width: 720px; }
+.diag-log-pre {
+  max-height: 50vh; overflow: auto; margin: 8px 0; padding: 8px; border-radius: 8px;
+  font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap; word-break: break-word; text-align: left;
+  background: rgba(127, 127, 127, 0.12);
+  -webkit-user-select: text; user-select: text;
+}

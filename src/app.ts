@@ -55,6 +55,8 @@ import { initFillMode } from "./fill-mode.ts";
 import { initPerspEdit } from "./persp-edit.ts";
 import { updateSaveStatus, updateNewerBanner } from "./save-status.ts";
 import { initErrorBadge, reportError } from "./error-badge.ts";
+import { initDiagLog, note as diagNote } from "./diag-log.ts";   // 黑匣子（2026-08-31）
+import { initDiagLogSheet } from "./diag-log-sheet.ts";           // dev 页「诊断日志」窗口
 import { initTransientPanels, _suppressTransientPanels, _restoreTransientPanels, _bringPanelTop, _commitTransform, _cancelTransform } from "./transient-panels.ts";
 import { initImportImage, importImageAsLayer } from "./import-image.ts";   // importImageAsNewDoc/setAddImportAsNewDoc 仅 gallery-shell/export-menu 用
 import { initExportImportMenu, exportBaseName } from "./export-import-menu.ts";
@@ -341,6 +343,7 @@ initTheme(ctx);
 initLayersPanel(ctx);
 initDocOps(ctx);
 initSettingsMenu(ctx);
+initDiagLogSheet({ status: setStatus });   // dev 页「诊断日志」（看/复制/清空）
 initExportImportMenu(ctx);
 initFiltersAdjust(ctx);
 initToolbar(ctx);
@@ -381,6 +384,7 @@ function setStatus(text: string, persist = false) {
 }
 // 统一 error banner：注入状态栏 sink（info 级走这）+ 接管内联 __errBar 的 fatal handler（往后走 severity）。
 initErrorBadge({ status: setStatus });
+initDiagLog();   // 页面生命周期/在线态面包屑 + pagehide flush（record 不依赖它）
 // 文档版本 newer banner + save 按钮 4 态渲染 = save-status.ts。
 // hook board render 更新 HUD
 const origRender = board.render.bind(board);
@@ -500,6 +504,7 @@ function _seedGalleryRegistry(): void {
 // auth 可观察 seam（候选1）：接缝 app-store 在**每个** auth 转变（登录回来/后台silent/登出/过期F2）fire wp:auth-changed（库 0.1.0 起不碰 window 事件，接缝订阅 onAuthChanged 转发）。
 // UI 订阅一次 → 按钮蓝/灰、save 图标、云列表 全自动同步，永不漂移、不再靠散落手 poke。
 window.addEventListener("wp:auth-changed", () => {
+  diagNote("auth", `changed signedIn=${isSignedIn()}`);
   updateCloudAuthUI();
   updateSaveStatus();                                       // 候选2：auth 变化影响 save 图标
   _seedGalleryRegistry();                                   // P3 播种（幂等；登录回来/silent 恢复都会经这里）

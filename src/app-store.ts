@@ -7,7 +7,7 @@ import { detectStoreAbsent } from "./store-absent.ts";
 import { createDeviceRackSlot } from "./device-rack-slot.ts";   // A2 终案：无库笔架器官（reload 不丢）
 import type { RackPersistence } from "./brush-rack-controller.ts";   // 脑定义 port（type-only 无环）
 import { embeddedBlobUrl } from "./standalone-html.ts";   // P6 单文件内嵌读口（msal 逃生舱）
-import type { Store, Collection as _Coll } from "@internal/store";
+import type { Store, Collection as _Coll, WatchFolderErrorPhase } from "@internal/store";
 import { stripSessionExt, sessionFileName } from "./config.ts";
 import { storeUI } from "./store-ui.ts";
 import { CLIENT_ID, SCOPES, AUTHORITY } from "./config.ts";
@@ -116,7 +116,7 @@ export function requireStore(): AppStorePort {
 /** 有活店？店懒出生后的不变量：_storeFull≠null ⇔ attachment attached（无预建店无 boot 窗口）。
  *  P3 sunset：hasGallery 的真相源。 */
 export function hasLiveStore(): boolean { return _storeFull != null; }
-export type { Collection, EncryptedBlob } from "@internal/store";   // app 侧仅剩的两个库类型，经接缝转口
+export type { Collection, EncryptedBlob, WatchFolderErrorPhase } from "@internal/store";   // app 侧仅剩的两个库类型，经接缝转口
 export { wipeAppNamespace, scanAppNamespace } from "@internal/store";   // P7 深清口子（0.7.0）——maintenance 面经接缝转口（factory-reset.ts 消费）
 export { isCached as isCachedSyncState } from "@internal/store";   // 备份配额归还判据（library-backup：备份前是否已缓存）
 
@@ -278,6 +278,7 @@ const _toOtherItems = (items: { path: string; syncState: string; lastModified?: 
 export function watchFolder(
   folder: string,
   cb: (snap: { path: string; items: ReturnType<typeof itemToG>[]; images: CloudImageItem[]; others: CloudOtherItem[]; folderNames: string[] }) => void,
+  opts?: { onError?: (err: unknown, phase: WatchFolderErrorPhase) => void },   // store 0.11.1：帧产不出的订阅者信号（gallery 首帧看门狗消费）
 ): () => void {
   const prefix = folder ? `${folder}/` : "";
   return requireStore().files.watchFolder(folder, (snap) => {
@@ -294,7 +295,7 @@ export function watchFolder(
       // 文件夹 tile 自然序正排（store 列举顺序不保证；user 2026-08-21：10 要排在 2 后面）
       folderNames: snap.folders.map((f) => f.slice(prefix.length)).filter(Boolean).sort(naturalCompare),   // 全路径 → immediate 段
     });
-  });
+  }, opts);
 }
 
 // cloud-picker 数据面（图层/参考窗入口仍用；与 watchFolder 同一订阅面，只留图片）。

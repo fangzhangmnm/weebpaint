@@ -137,6 +137,17 @@ export const S = {
   "menu.forceReset":       { zh: "强制更新", en: "Force update", ja: "強制更新", tok: "o sin wawa e mi" },
   "menu.smoothDev":        { zh: "平滑调参（dev）", en: "Smoothing tuning (dev)", ja: "スムージング調整（dev）", tok: "nasin pi linja pona (\"dev\")" }, 
   "menu.fps":              { zh: "FPS 计",     en: "FPS meter",       ja: "FPS 表示", tok: "nanpa pi sitelen tawa" }, 
+  // 诊断日志窗口（2026-08-31 user「dev 里面加一个日志窗口和拷贝按钮」）
+  "menu.diagLog":    { zh: "诊断日志…", en: "Diagnostic log…", ja: "診断ログ…" },
+  "diag.title":      { zh: "诊断日志", en: "Diagnostic log", ja: "診断ログ" },
+  "diag.hint":       { zh: "最近 {n} 条，只存在这台设备上，不会上传。复制后可粘贴给开发者。", en: "{n} recent entries, kept on this device only (never uploaded). Copy to share with the developer.", ja: "最近の {n} 件。この端末にのみ保存され、送信されません。コピーして開発者に共有できます。" },
+  "diag.copy":       { zh: "复制", en: "Copy", ja: "コピー" },
+  "diag.clear":      { zh: "清空", en: "Clear", ja: "消去" },
+  "diag.close":      { zh: "关闭", en: "Close", ja: "閉じる" },
+  "diag.copied":     { zh: "已复制 {n} 条日志", en: "Copied {n} log entries", ja: "ログ {n} 件をコピーしました" },
+  "diag.copyFailed": { zh: "复制失败：文本已选中，请长按「拷贝」", en: "Copy failed: text is selected — long-press to copy", ja: "コピーに失敗：テキストを選択済み。長押しでコピーしてください" },
+  "diag.cleared":    { zh: "日志已清空", en: "Log cleared", ja: "ログを消去しました" },
+  "diag.empty":      { zh: "（暂无日志）", en: "(no entries yet)", ja: "（ログはまだありません）" },
   // v0.6.14 去「版本：」前缀（user：只显版本号本体；何物之版本由所在行自明）
   "menu.version":          { zh: "{v}",  en: "{v}",    ja: "{v}", tok: "{v}" }, // ── 主题状态标签 ──────────────────────────────────────────────
   "theme.auto":     { zh: "跟随系统",          en: "System",          ja: "システムに従う", tok: "sama tenpo" },
@@ -340,6 +351,10 @@ export const S = {
   "bs.deleteBrush":  { zh: "删除此笔", en: "Delete this brush", ja: "このブラシを削除", tok: "o moli e ilo ni" }, // ── 图库 / 文件管理（ui/gallery.ts）切片 3c ──
   // 模板按钮 / tile
   "gal.loading":     { zh: "加载中…", en: "Loading…", ja: "読み込み中…", tok: "o awen lili…" },
+  // A2 首帧看门狗（2026-08-31 案：首帧永不来 → loading 空白）
+  "gal.retry":             { zh: "重试", en: "Retry", ja: "再試行" },
+  "gal.firstFrameTimeout": { zh: "图库读取超时：本地存储没有响应", en: "Gallery listing timed out: local storage did not respond", ja: "ギャラリーの読み込みがタイムアウトしました：ローカルストレージが応答しません" },
+  "gal.firstFrameFailed":  { zh: "图库读取失败（详见 dev 页诊断日志）", en: "Gallery listing failed (see the diagnostic log on the dev tab)", ja: "ギャラリーの読み込みに失敗しました（dev タブの診断ログ参照）" },
   "gal.folder":      { zh: "文件夹", en: "Folder", ja: "フォルダ", tok: "poki" },
   "gal.emptyFolder": { zh: "空文件夹", en: "Empty folder", ja: "空のフォルダ", tok: "poki pi jo ala" },
   "gal.more":        { zh: "更多操作", en: "More actions", ja: "その他の操作", tok: "ijo ante" },

@@ -35,6 +35,8 @@ import { importImageAsNewDoc } from "../import-image.ts";
 import { createFrameGate } from "./frame-gate.ts";
 import { naturalCompare } from "./natural-order.ts";
 import { reportError } from "../error-badge.ts";
+import { createFirstFrameWatchdog } from "./first-frame-watchdog.ts";   // A2（2026-08-31 案）：首帧看门狗
+import { note as diagNote } from "../diag-log.ts";                        // 面包屑：订阅/首帧/超时进黑匣子
 // 加密（ADR-0012）：tile 锁样式 + 解锁浏览；transform/密码循环全在 store（flow.encrypt/decrypt +
 // crypt seam）。图库只做 per-app 的部分：首次设密码双输 UX、活动项预检、明文残留清理、
 // 以及把 peek 字节解释成缩略图（enc-thumbs）。
@@ -315,20 +317,51 @@ function makeGallery(host: GalleryHost) {
         data.folderNames = snap.folderNames;
         _framedFolder = snap.path;
         loading.value = false;
+        wd.frame(snap.path);                      // A2：首帧到 → 看门狗销账
+        if (stalled.value) stalled.value = null;
+        if (_awaitingFirst) {                     // 只记订阅后的第一帧（写后重画不刷屏）
+          _awaitingFirst = false;
+          diagNote("gallery", `first frame folder="${snap.path}" items=${snap.items.length} folders=${snap.folderNames.length} in ${Math.round(performance.now() - _subscribedAt)}ms`);
+        }
         void probeEncrypted();                    // 本夹本地项的加密态（锁图标/缩略图路径/加密菜单都靠它）
       }
       const gate = createFrameGate<Snap>(applyFrame);
+      // ── A2 首帧看门狗（2026-08-31 案：iPad 长画锁屏后回图库，首帧永远不来 → loading 空白，重启 PWA 也不愈）──
+      //   loading 期 8s 无帧 → stalled：网格内显「读取超时 + 重试」、warning 横幅、黑匣子记一笔。
+      //   store 0.11.1 的 onError（本地帧产不出）→ 立即 stalled，不必等 8s。远端帧失败但本地帧已到 → 网格有内容，不打扰（store 已横幅）。
+      const stalled = ref<string | null>(null);   // null = 正常；string = 卡住原因（网格内显示）
+      let _awaitingFirst = false;
+      let _subscribedAt = 0;
+      const wd = createFirstFrameWatchdog(({ folder: f, elapsedMs }) => {
+        if (!loading.value) return;               // 帧其实到了（竞态）→ 无事
+        stalled.value = t("gal.firstFrameTimeout");
+        reportError(new Error(`[gallery] first frame timeout: folder="${f}" after ${elapsedMs}ms (store listing did not respond — IDB wedged?)`), "warning");
+      }, { timeoutMs: 8000 });
+      function onFrameError(err: unknown, phase: "local" | "remote"): void {
+        diagNote("gallery", `frame error phase=${phase} folder="${folder.value}" loading=${loading.value}: ${String(err)}`);
+        if (phase === "local" && loading.value) { wd.cancel(); stalled.value = t("gal.firstFrameFailed"); }
+      }
+      function retry(): void {
+        diagNote("gallery", `retry folder="${folder.value}"`);
+        stalled.value = null;
+        _framedFolder = null;                     // 强制走 loading 首帧路（重新武装看门狗 + 显 loading）
+        subscribe();
+      }
       function subscribe() {
         _unsub?.(); _unsub = null;
         if (view.value !== "files") return;
         // kind:none：不订阅、空网格（图库页无库不可开——组件 boot 期在场但静默；挂库后 refresh 重订）。
         //   旧版靠 null-store 喂空帧装订阅，替身退役后这里显式表态（2026-08-27 single-html smoke 逮到）。
-        if (galleryBackend().kind === "none") { data.files = []; data.images = []; data.others = []; data.folderNames = []; loading.value = false; return; }
+        if (galleryBackend().kind === "none") { data.files = []; data.images = []; data.others = []; data.folderNames = []; loading.value = false; wd.cancel(); stalled.value = null; return; }
         loading.value = _framedFolder !== folder.value;
+        stalled.value = null;
+        _awaitingFirst = true; _subscribedAt = performance.now();
+        if (loading.value) wd.arm(folder.value); else wd.cancel();
+        diagNote("gallery", `subscribe folder="${folder.value}" loading=${loading.value}`);
         _unsub = watchFolder(folder.value, (snap) => {
           if (snap.path !== folder.value) return;   // 双保险：换夹途中的旧帧丢弃（库内已 sanity-check，此处再挡）
           if (loading.value) applyFrame(snap); else gate.push(snap);
-        });
+        }, { onError: onFrameError });
       }
       // pointer 门的事件源：document 级捕获。只有图库模式下的按压才持门（canvas 长笔画与图库无关）；
       // up/cancel 恒计数（按下时开着图库、抬手前关掉也不会漏减）。
@@ -384,6 +417,7 @@ function makeGallery(host: GalleryHost) {
       subscribe();                        // 初始订阅当前夹（v409：此刻 collection 未 hydrate → 恒为根；hydrateFolder 随后灌真值）
       onUnmounted(() => {
         _unsub?.(); _unsub = null;
+        wd.cancel();
         gate.reset();
         document.removeEventListener("pointerdown", _onGatePtrDown, true);
         document.removeEventListener("pointerup", _onGatePtrUp, true);
@@ -738,9 +772,10 @@ function makeGallery(host: GalleryHost) {
         pushCloud: t("gal.pushCloud"), unloadLocal: t("gal.unloadLocal"), encrypt: t("menu.encrypt"), decrypt: t("menu.decrypt"),
         toTrash: t("gal.toTrash"), deleted: t("gal.deleted"), restore: t("gal.restore"), purge: t("gal.purge"),
         reupload: t("gal.reupload"), imageFile: t("gal.imageFile"), otherFile: t("gal.otherFile"),
+        retry: t("gal.retry"),
       };
       return {
-        view, folder, loading, openMenu, isEmpty, emptyText, L,
+        view, folder, loading, stalled, retry, openMenu, isEmpty, emptyText, L,
         folderTiles, fileTiles, imageTiles, otherTiles, trashTiles, crumbs,
         badgeIcon, fmtMeta, ICON, toggleMenu, menuUp, invalidateEncrypted, setFolder, hydrateFolder, enterFolder,
         openTile, openImageTile, deleteImage, rename, move, copy, push, reupload, unload, del, folderDelete, trashRestore, trashPurge, emptyTrash,
@@ -756,8 +791,14 @@ function makeGallery(host: GalleryHost) {
         </template>
       </div>
 
-      <div class="gallery-grid" v-show="!isEmpty">
-        <div v-if="loading" class="gallery-loading">{{ L.loading }}</div>
+      <div class="gallery-grid" v-show="!isEmpty || loading">
+        <div v-if="loading" class="gallery-loading">
+          <template v-if="!stalled">{{ L.loading }}</template>
+          <template v-else>
+            <div class="gallery-stalled">{{ stalled }}</div>
+            <button type="button" class="sheet-action ghost gallery-retry-btn" @click="retry">{{ L.retry }}</button>
+          </template>
+        </div>
 
         <template v-if="view==='files' && !loading">
           <div v-for="ft in folderTiles" :key="'F:'+ft.path" class="gallery-tile folder" @click="enterFolder(ft.path)">

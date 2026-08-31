@@ -129,9 +129,20 @@ function _selectPreset(val: string) {
 // quota 来自 storage.estimate，是**浏览器愿意分配的上限**（iOS Safari 通常 ~ 60-80% 可用
 // 磁盘；动辄几十 GB），不是 "我们申请了多少"。所以放 title 里给好奇用户看，不主显。
 // ⚠ 只在图库打开/刷新时调：内部是一次全表 cursor（本地、无网络，但别挂每帧）。
+const USAGE_TIMEOUT_MS = 8000;   // A3（2026-08-31 案）：usage() 是一次 IDB 全表 cursor；IDB 挂死时它永不 settle，「计算中…」就永远挂着
 export async function updateIdbUsage() {
   try {
-    const { bytes, count } = await requireStore().files.usage();
+    const usageP = requireStore().files.usage();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const timeout = new Promise<never>((_, rej) => { timer = setTimeout(() => rej(new Error(`[gallery] files.usage() timed out after ${USAGE_TIMEOUT_MS}ms (IDB not responding?)`)), USAGE_TIMEOUT_MS); });
+    let res: { bytes: number; count: number };
+    try { res = await Promise.race([usageP, timeout]); }
+    catch (e) {
+      usageP.catch(() => { /* 超时后原 promise 的结局不再关心（reject 也别成 unhandled） */ });
+      if (String(e).includes("timed out")) reportError(e, "warning");   // 超时是本案症状，值得一条横幅 + 黑匣子
+      throw e;
+    } finally { if (timer != null) clearTimeout(timer); }
+    const { bytes, count } = res;
     let label = t("gs.footUsage", { size: humanSize(bytes), count });
     let level = "ok";   // ok | warn | critical
     if (navigator.storage && navigator.storage.estimate) {
