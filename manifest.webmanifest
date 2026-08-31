@@ -1,7 +1,7 @@
 {
   "name": "WeebPaint",
   "short_name": "WeebPaint",
-  "description": "A free, open-source drawing app for anime and illustration. Runs in your browser. No account, no install — and a cloud-synced gallery you control.",
+  "description": "Free, open-source drawing app for anime and illustration on iPad, PC, and phone. No account, no install, and a cloud-synced gallery you control.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

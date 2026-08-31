@@ -51,20 +51,56 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="WeebPaint" />
-    <title>WeebPaint</title>
-    <!-- SEO/分享卡片元数据（文案 SSoT=宣发拍板 2026-08-29，动文案须 user 过目）。
+    <title>WeebPaint — free drawing app for iPad, PC &amp; phone</title>
+    <!-- SEO/分享卡片元数据（文案 SSoT=「20260821 WeebPaint宣发」的
+         writings-human-edit-only/20260828 writings.md，user 2026-08-30 拍板；动文案须 user 过目。
+         edited by Claude Opus 5 (claude-opus-5[1m]) 2026-08-30）。
          · lang 静态值=en（宣发阶段英文 default；boot 后 i18n 会按用户语言改写 <html lang>，真用户不受影响）。
          · canonical 写死 prod 绝对地址：同一份 index.html 部署到 / 和 /dev/ 两处，
            /dev/ 上这行自动变成「正主在 /」的声明——dev 不隐瞒但不当 SSoT，不必 robots 屏蔽。
-         · og:image 指线上 icon-512（分享卡片小方图），爬虫按需取，不进包不进 SW precache。 -->
-    <meta name="description" content="WeebPaint — a free, open-source drawing app for anime and illustration. Runs in your browser. No account, no install — and a cloud-synced gallery you control." />
+         · <title> 与 og:title 同文。运行时 src/save-status.ts 会把 document.title 覆写成
+           「● 画名 — WeebPaint」，所以这里的静态值只对爬虫和启动前那一瞬生效——改它对 app 零影响。
+         · og:image = og-card-1200x630.jpg（满幅 UI 截图；**图上刻意不写字**——品名与域名由各平台的
+           卡片外壳自己渲，图里再写一遍是重复还白吃一条画面）。出图脚本 = 宣发仓 20260828-make-social-images.py
+           的 og_card()；主体一律居中，因为同一个 URL 要同时喂横幅裁法和正方裁法（见下）。
+           **零变胖**：它是 <meta content>，不是 <img> —— 浏览器加载页面时根本不请求，只有爬虫按 URL 取；
+           不进 SW STATIC_PRECACHE、不进 esbuild bundle、不进 standalone
+           （pack-standalone 的内联与自检都只认 src/href 的 ./ 相对路径，认不得 content= 的绝对 URL）。
+           ⚠ 代价是**必须同步加进 .github/workflows/deploy.yml 的 cp 白名单**，漏了线上 404 且静默。
+         · twitter:card=summary_large_image：X 与 Discord 读这个标签决定卡片形态（横幅 vs 右侧小方缩略）；
+           Reddit/Facebook/LinkedIn 不读它、只看 og:image 尺寸；微信/QQ 永远小方图**且无法单独指定**
+           （OG 规范没有「方形变体」这个概念），它们会把横幅居中裁方——所以才有上面的「主体居中」约束，
+           自检图 = 宣发仓 socialmedia/20260830-og-正方裁切自检-630x630.jpg。 -->
+    <meta name="description" content="Free, open-source drawing app for anime and illustration on iPad, PC, and phone. No account, no install, and a cloud-synced gallery you control." />
     <link rel="canonical" href="https://weebpaint.com/" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="WeebPaint" />
-    <meta property="og:description" content="A free, open-source drawing app for anime and illustration. Runs in your browser. No account, no install — and a cloud-synced gallery you control." />
+    <meta property="og:title" content="WeebPaint — free drawing app for iPad, PC &amp; phone" />
+    <meta property="og:description" content="Free, open-source drawing app for anime and illustration on iPad, PC, and phone. No account, no install, and a cloud-synced gallery you control." />
     <meta property="og:url" content="https://weebpaint.com/" />
-    <meta property="og:image" content="https://weebpaint.com/icon-512.png" />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content="https://weebpaint.com/og-card-1200x630.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <!-- 结构化数据：给搜索引擎一句机器可读的「这是个免费的 Web 应用 + 这是它的截图」。
+         纯文本约 0.5KB，零图片下载。⚠ 这是**尽力面不是保证**：screenshot 主要喂富结果，
+         能不能进 Google 图片搜索不保证——图片搜索的主力仍是 DOM 里的 <img>，而本站刻意一个都不放
+         （放了就要真下载 = 变胖，user 2026-08-30 定「零变胖」）。搜 weebpaint 的图片结果主力
+         本来就是 GitHub README 与 itch 页，那两处域名权重高且早已有截图。
+         不写 aggregateRating —— 没有真实评分，编一个既不诚实、Google 也会判罚。
+         added by Claude Opus 5 (claude-opus-5[1m]) 2026-08-30 -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "WeebPaint",
+        "url": "https://weebpaint.com/",
+        "applicationCategory": "DesignApplication",
+        "operatingSystem": "Any (web browser)",
+        "screenshot": "https://weebpaint.com/og-card-1200x630.jpg",
+        "license": "https://opensource.org/licenses/MIT",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
     <link rel="manifest" href="./manifest.webmanifest" />
     <!-- 标签页图标走手绘像素档（32×32 逐像素画的，详 ai-docs/20260821-icon-tiers.md）。icon.svg 内嵌的是 192 栅格，
          留给 manifest 的 sizes=any 用；若挂在这里浏览器会优先取它再缩到 16，糊成一团。 -->
@@ -87,7 +123,7 @@
          文案 SSoT=宣发拍板 2026-08-29，动文案须 user 过目。 -->
     <section style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap">
       <h1>WeebPaint</h1>
-      <p>WeebPaint — a free, open-source drawing app for anime and illustration. Runs in your browser. No account, no install — and a cloud-synced gallery you control.</p>
+      <p>WeebPaint — a free, open-source drawing app for anime and illustration — on iPad, PC, and phone. No account, no install — and a cloud-synced gallery you control.</p>
       <p><a href="https://github.com/fangzhangmnm/weebpaint">Source code on GitHub</a></p>
     </section>
     <!-- 图标 sprite：共享库子集 + WeebPaint 本地补丁，静态内联（1×1 + opacity:0 藏起来）。
@@ -1559,6 +1595,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-756a8136b796.mjs"></script>
+    <script type="module" src="./dist/weebpaint-e4ac385b9456.mjs"></script>
   </body>
 </html>

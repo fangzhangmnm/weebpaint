@@ -10,6 +10,12 @@
 
 - **手指**（smudge/涂抹）——long requested。
 - **曲线**（curve 工具）——long requested。
+- **构建期瘦身：编译 html 去注释 + mjs 优化**（user 2026-08-30 park，原话「以后 park 一下编译 html
+  的时候可以去注释以及 mjs 优化一下，你不用管，进 backnote 就行」）。缘起：本轮 og/SEO 批往
+  index.html 里加了约 2KB 中文注释（gzip +1.5KB / 占 index.html 2.7%），user 判定当下无所谓，
+  但指出正解是**构建期剥注释**而不是少写注释——源码该注释就注释，发布产物再瘦身。
+  范围：index.html 注释剥离（注意别碰 `ICON-SPRITE:BEGIN` 之类的生成器标记注释，它们是脚本锚点）、
+  mjs 产物的进一步优化。**未动码**。edited by Claude Opus 5 (claude-opus-5[1m]) 2026-08-30。
 
 ## user 拍板 park（「可以先把之前一些不能随手修的需求parked」2026-08-29）
 

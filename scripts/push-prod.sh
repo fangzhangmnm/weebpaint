@@ -8,8 +8,15 @@
 #   dist/weebpaint-itch-<vX.Y.Z>.zip（内含 index.html，itch「浏览器可玩」上传用）。
 #   itch 上传走 butler 进 ritual（user 2026-08-29 拍板；scripts/push-itch.sh，同 channel 原地更新
 #   保同一条记录；首次需 butler login + itch 后台一次性勾选，详该脚本头注释。edited by Claude Fable 5 2026-08-29）。
+# --site-only（user 2026-08-30 拍板「纯网站 concern 的可以不推 itch」）：只更新站点，跳过下游产物
+#   （GH release + itch 上传）。用在改动只影响线上站点、单文件版拿不到任何好处的场合——典型 =
+#   SEO / og 卡片元数据（og 标签在 file:// 打开的单文件版里是死的，永远不会被 unfurl）。
+#   代价可接受：itch 与 GH release 停在**旧版本号**上，只是「旧」，不会出现同号异物。
+#   edited by Claude Opus 5 (claude-opus-5[1m]) 2026-08-30。
 set -euo pipefail
 cd "$(dirname "$0")/.."
+SITE_ONLY=0
+[ "${1:-}" = "--site-only" ] && { SITE_ONLY=1; shift; }
 FULLVER=$(grep -o '"v[0-9][^"]*"' src/version.ts | head -1 | tr -d '"')
 VER=${FULLVER%%-*}   # v0.11.44-2026-08-28 → v0.11.44（文件名只带语义版本号）
 [ -n "$VER" ] || { echo "[push-prod] 解析不到版本号（src/version.ts）"; exit 1; }
@@ -25,6 +32,12 @@ git push origin main:prod
 echo "[push-prod] ✓ prod 已快进到 main（$FULLVER）"
 echo "[push-prod] ✓ dist/weebpaint-standalone-$VER.html"
 echo "[push-prod] ✓ dist/weebpaint-itch-$VER.zip（SharedArrayBuffer 保持关）"
+if [ "$SITE_ONLY" = "1" ]; then
+  echo "[push-prod] --site-only：跳过 GH release 与 itch 上传（下游产物停在旧版本号）"
+  echo "[push-prod] 要补 release：gh release create $VER --target prod \"dist/weebpaint-standalone-$VER.html\" --title $VER"
+  echo "[push-prod] 要补 itch：   bash scripts/push-itch.sh $VER"
+  exit 0
+fi
 # GH release：单文件版自动挂 release（与 itch zip 同一份构建，GH 放裸 html）。
 # release 失败只警告不炸 ritual——prod 此刻已经推完，别让收尾步骤谎报整场失败。
 if command -v gh >/dev/null 2>&1; then
