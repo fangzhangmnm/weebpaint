@@ -38,6 +38,10 @@ Procreate 级绘画 PWA。UI 中文。iPad 是手感的最终裁判。
 > 首次需 `tools/butler/butler login` 一次；SharedArrayBuffer 保持关。edited by Claude Fable 5 2026-08-29）。
 > **itch 跟 prod 不跟 main**（user 2026-08-30 拍板）：main=dev 渠道，itch 与 prod 同步——push-itch.sh
 > 有「HEAD 必须 == prod」守卫，从领先的 main 单独跑会被拒（push-prod ritual 里快进后天然通过）。
+> **`--site-only`**（user 2026-08-30「纯网站 concern 的可以不推 itch」）：只更新站点，跳过 GH release 与 itch。
+> **push prod 后源站不切换 = 已知坑，别从零排查**（07-27 v0.6.17、08-31 v0.12.16 两次同症）：ritual 推完
+> prod 自动跑 `scripts/kick-pages.sh` 验证「源站真服新 bundle」，未切换自动空 commit 重推；手动排查也先跑它。
+> 症状/证据/记录在案的修法 = `ai-docs/20260530-lessons-pages-deploy-race.md`「坑二」。edited by Claude Opus 5 2026-08-31。
 
 每次push dev 走这 4 步（**成对 commit**：先源、后 bundle）：
 1. **bump 版本**：`./bump.sh vN-YYYY-MM-DD`（N 单调+1，日期=发版日；唯一版本号在 `src/version.ts`，esbuild inline 进 bundle、SW/index.html 都读它）。

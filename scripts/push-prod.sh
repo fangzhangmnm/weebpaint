@@ -30,6 +30,10 @@ cp dist/weebpaint-standalone.html tmp/itch-pack/index.html
 (cd tmp/itch-pack && zip -q -X "../../dist/weebpaint-itch-$VER.zip" index.html)
 git push origin main:prod
 echo "[push-prod] ✓ prod 已快进到 main（$FULLVER）"
+# 源站真切换了吗（坑二：同 sha 二次部署源站不切，07-27/08-31 两次；详 scripts/kick-pages.sh 头注释）。
+# 未切换 → kick-pages 自动空 commit 重推再验；仍不行才非零退出——这时别发 release/itch，先找人。
+KICK_SIGNATURE="${KICK_SIGNATURE:-}" bash scripts/kick-pages.sh --after-push \
+  || { echo "[push-prod] ✗ 源站未切换且自动修法失败——停。release/itch 未发，修好后手动补（命令见下）"; exit 1; }
 echo "[push-prod] ✓ dist/weebpaint-standalone-$VER.html"
 echo "[push-prod] ✓ dist/weebpaint-itch-$VER.zip（SharedArrayBuffer 保持关）"
 if [ "$SITE_ONLY" = "1" ]; then

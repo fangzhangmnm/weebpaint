@@ -27,6 +27,9 @@ concurrency:
   #   改 true → 新 push 来时取消正在跑的旧 workflow，最后那次必赢。
   #   副作用：连续 push（调代码 1 分钟 3 次）只最后 deploy 生效，dev/ 这无所谓。
   cancel-in-progress: true
+  # ⚠ 坑二（与上面的 race 不同，cancel-in-progress 挡不住）：prod 快进到与 main 同一个 sha 后，
+  #   两个 run 都 success 但源站可能不切换（07-27、08-31 两次）。修法与验证已写进
+  #   scripts/kick-pages.sh（push-prod.sh 自动调用）；详 ai-docs/20260530-lessons-pages-deploy-race.md「坑二」。
 
 jobs:
   deploy:

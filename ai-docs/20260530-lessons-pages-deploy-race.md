@@ -63,16 +63,53 @@ concurrency:
 
 这种 race 不会再咬人。
 
+## 坑二：prod 快进到与 main 同 sha → 二次部署「success」但源站不切换
+
+> added 2026-08-31 by Claude Opus 5 (claude-opus-5[1m])；as-of v0.12.16。与上面的 race **不是一回事**，
+> `cancel-in-progress: true` 挡不住它。已踩两次：2026-07-27（v0.6.17，记在 memory
+> project_webpaint_v0614_smallfixes）、2026-08-31（v0.12.16，本节）。
+
+### 现象（两次完全一致）
+
+- push main（dev 上线）→ 之后 `git push origin main:prod`（prod 快进到**与 main 同一个 commit**）。
+- 两个 workflow run 都 success；**没有重叠**（08-31：main run 02:02:02–02:02:29，prod run 02:02:43–02:03:02）。
+- 部署产物下下来核过：`./index.html` 与 prod 分支字节一致（sha256 同）、新文件在根与 `/dev/` 都在。
+- Pages deployment API：第二个 deployment `success`，并把第一个标 `inactive`——账面上新版已生效。
+- 但源站服的是**第一个 run 的产物** = 旧 prod-tree + 新 main-tree：`/dev/` 是新的、`/` 是旧的。
+  不是 CDN：og 图 404 的响应头 `x-cache: MISS, age: 0`；根 HTML `last-modified` = 第一个 run 的时刻。
+- `workflow_dispatch` 重跑：**无效**（两次都试过）。10+ 分钟不自愈（07-27 记 >1h）。
+
+### 「sha 撞」是什么（假说，未证实——别当定论引用）
+
+`actions/deploy-pages` 的日志：`Created deployment for <sha>, ID: <sha>`——**Pages 侧的 deployment ID 就是 commit sha**
+（`pages_build_version`）。prod 快进到 main 的同一个 commit 后，main 触发的 run 与 prod 触发的 run 打的是**同一个 ID**：
+第一个 run（旧 prod-tree）先占了这个 ID；第二个 run 内容对，但同 ID → Pages 后端疑似当「已构建过」处理，
+状态记录更新了、内容层没换。反证：v0.12.15（同 sha、间隔 16 分钟）正常切换——所以可能还叠着时间窗
+（同 sha 的构建缓存有 TTL 之类）。**只有症状与修法是实证，机制是推测**。
+
+### 记录在案的修法（07-27 验证，30 秒切换）
+
+给 prod 一个**没部署过的新 sha**：`git commit --allow-empty` 后 **`git push origin main main:prod` 一次原子推**
+（两个 ref 同一次 push 更新——无论哪个 run 赢，checkout prod 拿到的都已是新 tip；main/prod 也不错位）。
+不是改历史、不动任何文件、prod 内容与之前完全一样。
+
+### 规程（2026-08-31 立，user「建立安全规程」）
+
+- **验证走 content-hash URL，不走 index.html**：探 `https://weebpaint.com/dist/weebpaint-<hash>.mjs`——只有新部署才有这个文件。
+  index.html 有 600s CDN 缓存，探它会被缓存骗。weebpaint.com 与 fangzhangmnm.github.io 是两个缓存 key，轮着探。
+- **必须跑，不是必须读**：`scripts/kick-pages.sh` = 验证 → 3 分钟未切换自动空 commit 原子重推 → 再验 → 仍不行非零退出
+  「停下来找人」。`scripts/push-prod.sh` 推完 prod **自动调用**；手动排查也先跑它（`--check` 只探不动 git）。
+- **超出记录在案手段就停**：空 commit 后仍不切 = 新情况，找人，别再自创花招（08-31 教训：修法早在 memory 索引里，
+  却从零排查了 20 分钟、还把已验证的空 commit 误判成「动历史的高危操作」）。
+
 ## 救活已经搞砸的 deploy
 
 如果已经踩进去（live 还显示旧内容）：
 
 ```bash
-# 切到出问题的分支，push 个 empty commit 强制重 deploy
-git checkout prod
+# 2026-08-31 起：直接跑 scripts/kick-pages.sh（验证 + 空 commit 原子重推，见「坑二」）。下面是它做的事：
 git commit --allow-empty -m "force redeploy"
-git push origin prod
-git checkout main
+git push origin main main:prod      # 原子推两个 ref；别只推 prod（会与 main 错位、下次快进被拒）
 ```
 
 新 workflow 跑一遍，prod tree 已稳定到正确状态，deploy 一次就好。
