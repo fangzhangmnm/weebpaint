@@ -15,17 +15,13 @@ export const RESAMPLE_MODES = [
   // 以后：{ id: "ai", labelKey: "rsm.ai", contexts: ["scale"] }
 ];
 
-// 用 RESAMPLE_MODES 填一个 <select>（按 context 过滤），选中 selected。
+// 按 context 过滤出下拉项（2026-09-02 C6：原生 <select> 投影 fillResampleSelect 退役——下拉一律 ui/select-field 标准件）。
 // label：C2 分层——frontend/ 不得引 i18n，文案由 app 层注入（key=labelKey，通常传 tLatin；不传则裸 key 兜底）。
-export function fillResampleSelect(sel: HTMLSelectElement | null, context: string | null, selected: string, label?: (key: string) => string) {
-  if (!sel) return;
-  sel.innerHTML = "";
+export function resampleItems(context: string | null, label?: (key: string) => string): { value: string; label: string }[] {
+  const out: { value: string; label: string }[] = [];
   for (const m of RESAMPLE_MODES) {
     if (context && m.contexts && !m.contexts.includes(context)) continue;
-    const opt = document.createElement("option");
-    opt.value = m.id;
-    opt.textContent = label ? label(m.labelKey) : m.labelKey;
-    if (m.id === selected) opt.selected = true;
-    sel.appendChild(opt);
+    out.push({ value: m.id, label: label ? label(m.labelKey) : m.labelKey });
   }
+  return out;
 }

@@ -15,7 +15,10 @@ import { els } from "./els.ts";
 import { bumpDoc } from "./signals.ts";
 import { t } from "./i18n/index.ts";
 import { resizeCropRect, resizeCropRectAspect, fitRectToBBox, cropRectToInts } from "./crop-geometry.ts";
-import { loadCanvasTemplates, fillTemplateSelect, templatePx, templateById } from "./canvas-templates.ts";
+import { loadCanvasTemplates, templateItems, templatePx, templateById } from "./canvas-templates.ts";
+import { mountSelectField, type SelectField } from "./ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
+import { resampleItems } from "./frontend/resample-modes.ts";
+import { tLatin } from "./i18n/index.ts";
 import { desk } from "./workbench-state.ts";
 import { LayerPixels } from "./backend/tiles/tile-layer.ts";
 import { resampleBytes } from "./backend/algorithms/resample-bytes.ts";
@@ -162,7 +165,7 @@ function _syncCropModeUI() {
   document.getElementById("cropModeTemplate")!.setAttribute("aria-pressed", String(isT));
   const show = (id: string, on: boolean) => document.getElementById(id)!.classList.toggle("hidden", !on);
   show("cropTemplateSel", isT);
-  const isCustom = isT && (document.getElementById("cropTemplateSel") as HTMLSelectElement).value === "custom";
+  const isCustom = isT && _cropTplVal === "custom";
   show("cropCustomW", isCustom); show("cropCustomH", isCustom); show("cropCustomX", isCustom);
   show("cropFitCover", isT); show("cropFitContain", isT);
   // v0.6.64 resample toggle（模板模式专属，默认关）
@@ -247,10 +250,17 @@ function _closeOffsetDialog() {
   closeSheet(els.offsetSheet);
 }
 
+let _cropTplVal = "custom";          // 裁切模板下拉的值（SSoT；select-field 受控）
+let _resampleModeVal = "bicubic";    // 调整尺寸插值下拉的值（v0.6.45 默认双三次）
 export function initDocOps(ctx: AppContext) {
   ({ editMode, doc, board, history, setStatus, wp2,
      _suppressTransientPanels, _restoreTransientPanels } = ctx);
   registerContextToolbar(document.getElementById("cropToolbar"));   // C4：裁切条登记（popup 让位高度）
+  // 调整尺寸插值下拉（sheet 内 → band modal）：项从 RESAMPLE_MODES SSoT 取（scale context）。2026-09-02 C6 标准件。
+  mountSelectField(els.resampleMode, {
+    items: () => resampleItems("scale", tLatin as (key: string) => string),
+    value: () => _resampleModeVal, onChange: (v) => { _resampleModeVal = v; }, band: "modal",
+  });
 
   // 裁到选区 ----
   document.getElementById("adjustCropToSelection")!.addEventListener("click", () => {
@@ -392,13 +402,14 @@ export function initDocOps(ctx: AppContext) {
 
   // ---- v0.6.49 模板模式控件（v0.6.48 首版的接线块因文本替换静默漏落——本次补上）----
   {
-    const tplSel = document.getElementById("cropTemplateSel") as HTMLSelectElement;
-    // 模板下拉：SSoT = canvas-templates.json（v0.7.32 起和新建作品共用同一份表 + 同一个投影函数；
-    // 此前两边各有一张表，往新建里加的尺寸这里永远看不到）。async fetch，回来了再填。
-    // 先同步投影一次：模板模式按钮会把 value 设成 "custom"，那条 option 必须先在（否则赋值落空、
-    // _syncCropModeUI 会误判成非自定义、把 W/H 输入框藏起来）。json 回来再投影一次补上模板。
-    fillTemplateSelect(tplSel, t("crop.customTpl"));
-    void loadCanvasTemplates().then(() => fillTemplateSelect(tplSel, t("crop.customTpl")));
+    // 模板下拉：SSoT = canvas-templates.json（v0.7.32 起和新建作品共用同一份表 + 同一个投影函数）。
+    //   2026-09-02 C6：标准件 select-field（原生 <select> 退役）；值 = _cropTplVal（默认 custom）；json 回来 refresh 补项。
+    const tplField: SelectField = mountSelectField(document.getElementById("cropTemplateSel")!, {
+      items: () => templateItems(t("crop.customTpl")),
+      value: () => _cropTplVal,
+      onChange: (v) => { _cropTplVal = v; _applyCropTemplate(v); },
+    });
+    void loadCanvasTemplates().then(() => tplField.refresh());
     // 分段按钮 自由|模板（两项下拉太笨——user 2026-07-29 UI 意见）
     document.getElementById("cropModeFree")!.addEventListener("click", () => {
       if (!_cropState || _cropState.mode === "free") return;
@@ -411,13 +422,12 @@ export function initDocOps(ctx: AppContext) {
       if (!_cropState || _cropState.mode === "template") return;
       _cropState.mode = "template";
       // 默认=自定义、预填当前画布尺寸（user 拍板）→ 初始比例=画布比例、框=整画布，零跳变。
-      tplSel.value = "custom";
+      _cropTplVal = "custom"; tplField.refresh();
       (document.getElementById("cropCustomW") as HTMLInputElement).value = String(doc.width);
       (document.getElementById("cropCustomH") as HTMLInputElement).value = String(doc.height);
       _applyCropTemplate("custom");
     });
-    tplSel.addEventListener("change", () => _applyCropTemplate(tplSel.value));
-    const onCustom = () => { if (tplSel.value === "custom") _applyCropTemplate("custom"); };
+    const onCustom = () => { if (_cropTplVal === "custom") _applyCropTemplate("custom"); };
     (document.getElementById("cropCustomW") as HTMLInputElement).addEventListener("input", onCustom);
     (document.getElementById("cropCustomH") as HTMLInputElement).addEventListener("input", onCustom);
     // fit 基准 = **原画布**（user 2026-07-29 纠正——不是内容 bbox）。命名对齐 Windows 壁纸模式：
@@ -500,7 +510,7 @@ export function initDocOps(ctx: AppContext) {
   els.resampleConfirm.addEventListener("click", () => {
     const nw = parseFloat(els.resampleW.value) | 0;
     const nh = parseFloat(els.resampleH.value) | 0;
-    const mode = els.resampleMode.value || "bicubic";
+    const mode = _resampleModeVal;
     if (nw < 1 || nh < 1 || nw > 8192 || nh > 8192) { setStatus(t("tm.sizeOutOfRange"), true); return; }
     if (nw === doc.width && nh === doc.height) { _closeResampleDialog(); return; }
     const sx = nw / doc.width, sy = nh / doc.height;

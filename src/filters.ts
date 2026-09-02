@@ -34,6 +34,7 @@
 // registry 原语共享自 registry.js（candidate 2：filter 与 exporter 同一道接缝）。
 import { makeRegistry } from "./registry.ts";
 import { makeRampSlider } from "./ui/ramp-slider.ts";
+import { createSelectField } from "./ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
 
 // ============= Filter 契约（TS 化）=============
 // 一个 Filter = 一个全 static 的 ES class。下面是其类型契约——消费侧
@@ -322,11 +323,17 @@ export function makeSelectRow(
 ): HTMLLabelElement {
   const wrap = document.createElement("label");
   wrap.className = "brush-slider-row";
-  wrap.innerHTML = `<span class="brush-slider-label">${label}</span>` +
-    `<select style="flex:1; font:inherit; padding:2px 4px;">` +
-    options.map((o) => `<option value="${o.value}"${o.value === init ? " selected" : ""}>${o.label}</option>`).join("") +
-    `</select><span class="brush-slider-value" style="min-width:0"></span>`;
-  const sel = wrap.querySelector("select")!;
-  sel.addEventListener("change", () => onChange(key, sel.value));
+  wrap.innerHTML = `<span class="brush-slider-label">${label}</span>`;
+  // 2026-09-02 C6：select-field 标准件（原生 <select> 退役）；值受控在闭包里
+  let cur = init;
+  const f = createSelectField({
+    className: "generic-sheet-input",
+    items: () => options.map((o) => ({ value: o.value, label: o.label })),
+    value: () => cur,
+    onChange: (v) => { cur = v; onChange(key, v); },
+  });
+  f.el.style.flex = "1";
+  wrap.appendChild(f.el);
+  wrap.insertAdjacentHTML("beforeend", `<span class="brush-slider-value" style="min-width:0"></span>`);
   return wrap;
 }

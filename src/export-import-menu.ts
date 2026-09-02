@@ -15,6 +15,7 @@ import { getExporter, listExportersByKind } from "./exporters.ts";
 import { parseColorInput, colorNameOf } from "./color-name.ts";
 import { parseExportBg } from "./backend/algorithms/flatten-bg.ts";
 import { els } from "./els.ts";
+import { mountSelectField, type SelectField } from "./ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
 import { t } from "./i18n/index.ts";
 import { setMenuOpen } from "./settings-menu.ts";
 import { session } from "./session-state.ts";
@@ -123,13 +124,13 @@ function _updateMenuSubLabels() {
 }
 
 // 🔧 配置 popup（点开 / 点别处关）。setMenuOpen 不变，popup 嵌在 menu-item-row 里
-function _openMenuConfigPopup(wrenchBtn: HTMLElement, html: string, onApply: (popup: HTMLElement) => void) {
+function _openMenuConfigPopup(wrenchBtn: HTMLElement, html: string, onApply: (popup: HTMLElement) => void): HTMLElement | null {
   // v124 toggle：再点同一个扳手就收回（user：「再按一下扳手应该收回」）
   const existing = wrenchBtn.closest(".menu-item-row")?.querySelector(".menu-config-popup");
-  if (existing) { existing.remove(); return; }
+  if (existing) { existing.remove(); return null; }
   document.querySelectorAll(".menu-config-popup").forEach((el) => el.remove());
   const row = wrenchBtn.closest(".menu-item-row");
-  if (!row) return;
+  if (!row) return null;
   const popup = document.createElement("div");
   popup.className = "menu-config-popup";
   popup.innerHTML = html;
@@ -141,11 +142,13 @@ function _openMenuConfigPopup(wrenchBtn: HTMLElement, html: string, onApply: (po
   setTimeout(() => {
     function onDocClick(ev: Event) {
       if (popup.contains(ev.target as Node) || wrenchBtn.contains(ev.target as Node)) return;
+      if ((ev.target as Element | null)?.closest?.(".popup-menu")) return;   // popup 里再弹的下拉（select-field）不算外面
       popup.remove();
       document.removeEventListener("pointerdown", onDocClick, true);
     }
     document.addEventListener("pointerdown", onDocClick, true);
   }, 0);
+  return popup;
 }
 
 export function initExportImportMenu(ctx: AppContext) {
@@ -303,27 +306,26 @@ export function initExportImportMenu(ctx: AppContext) {
     const tgt0 = proj0Ora ? "file" : (proj0 && (c.target === "clipboard" || c.target === "print")) ? "file" : (c.target || "file");
     const bg0 = desk.export.bg;
     const bgCustom0 = bg0 !== "transparent" && bg0 !== "#ffffff" && bg0 !== "#000000";
-    const fmtOptions = [...listExportersByKind("image"), ...listExportersByKind("project")].map((exp) =>
-      `<option value="${exp.id}" ${c.format === exp.id ? "selected" : ""}>${exp.label}</option>`).join("");
+    // 2026-09-02 C6：三个下拉 = select-field 标准件（原生 <select> 退役）；值受控在这三个变量，锁定逻辑改写值 + refresh
+    const fmtItems = [...listExportersByKind("image"), ...listExportersByKind("project")].map((exp) => ({ value: exp.id, label: exp.label }));
+    let fmtV = c.format, scopeV: string = proj0 ? "all" : (c.scope || "merged"), tgtV: string = tgt0;
+    const fields: { fmt?: SelectField; scope?: SelectField; tgt?: SelectField } = {};
     const applyLocks = (popup: HTMLElement) => {
-      const fmtSel = popup.querySelector('select[name="fmt"]') as HTMLSelectElement;
-      const scopeSel = popup.querySelector('select[name="scope"]') as HTMLSelectElement;
-      const tgtSel = popup.querySelector('select[name="tgt"]') as HTMLSelectElement;
       const clipEl = popup.querySelector('input[name="clipsel"]') as HTMLInputElement;
       const defrEl = popup.querySelector('input[name="defringe"]') as HTMLInputElement;
-      const proj = _isProjectFormat(fmtSel.value);
-      const projOra = proj && fmtSel.value !== "psd";   // v0.9.30：psd 开放 file/cloud 去向；ora（及其他 project 格式）仍锁 file
-      if (projOra) { scopeSel.value = "all"; tgtSel.value = "file"; }
-      else if (proj) { scopeSel.value = "all"; if (tgtSel.value === "clipboard" || tgtSel.value === "print") tgtSel.value = "file"; }   // psd 无剪贴板/打印语义
-      else if (scopeSel.value === "all") scopeSel.value = "merged";   // 「所有图层」仅项目格式可选
-      scopeSel.disabled = proj; tgtSel.disabled = projOra;
-      (tgtSel.querySelector('option[value="clipboard"]') as HTMLOptionElement).disabled = proj;
-      (tgtSel.querySelector('option[value="print"]') as HTMLOptionElement).disabled = proj;
+      const proj = _isProjectFormat(fmtV);
+      const projOra = proj && fmtV !== "psd";   // v0.9.30：psd 开放 file/cloud 去向；ora（及其他 project 格式）仍锁 file
+      if (projOra) { scopeV = "all"; tgtV = "file"; }
+      else if (proj) { scopeV = "all"; if (tgtV === "clipboard" || tgtV === "print") tgtV = "file"; }   // psd 无剪贴板/打印语义
+      else if (scopeV === "all") scopeV = "merged";   // 「所有图层」仅项目格式可选
+      if (fields.scope) (fields.scope.el as HTMLButtonElement).disabled = proj;
+      if (fields.tgt) (fields.tgt.el as HTMLButtonElement).disabled = projOra;
+      fields.fmt?.refresh(); fields.scope?.refresh(); fields.tgt?.refresh();
       clipEl.disabled = proj || !doc.selection;
-      desk.export.format = fmtSel.value;
+      desk.export.format = fmtV;
       // QA ⑥：ora 锁死去向时不把锁定值写回 desk——切回 png/jpg/psd 后用户的 cloud 偏好还在
-      if (!tgtSel.disabled) desk.export.target = tgtSel.value;
-      desk.export.layerMode = scopeSel.value;
+      if (!projOra) desk.export.target = tgtV;
+      desk.export.layerMode = scopeV;
       if (!clipEl.disabled) desk.export.clipSelection = clipEl.checked;
       // v0.9.14 导出底色：preset radio 直落；自定义走 hex/色名/色温 parse，非法=保留现值（半输入永不生效）。
       //   项目格式（ora/psd）不碰像素 → 整节灰掉。
@@ -342,31 +344,22 @@ export function initExportImportMenu(ctx: AppContext) {
       const bgEff = parseExportBg(desk.export.bg);
       bgChip.style.background = bgEff ? desk.export.bg : "transparent";
       // v0.9.13/14 联动：defringe 只对「PNG 且透明底」有意义（涂了底 α 全 255；JPG 无 alpha；项目格式不碰像素）
-      defrEl.disabled = fmtSel.value !== "png" || !!bgEff;
+      defrEl.disabled = fmtV !== "png" || !!bgEff;
       if (!defrEl.disabled) desk.export.defringePng = defrEl.checked;
       _updateMenuSubLabels();
     };
-    _openMenuConfigPopup(e.currentTarget as HTMLElement, `
+    const popup = _openMenuConfigPopup(e.currentTarget as HTMLElement, `
       <div class="menu-config-section">
         <div class="menu-config-title">${t("tm.configFormat")}</div>
-        <select name="fmt" class="menu-config-select">${fmtOptions}</select>
+        <button type="button" data-select="fmt" class="menu-config-select select-field"></button>
       </div>
       <div class="menu-config-section">
         <div class="menu-config-title">${t("tm.configScope")}</div>
-        <select name="scope" class="menu-config-select" ${proj0 ? "disabled" : ""}>
-          <option value="merged" ${!proj0 && c.scope === "merged" ? "selected" : ""}>${t("tm.mergeAllVisible")}</option>
-          <option value="active" ${!proj0 && c.scope === "active" ? "selected" : ""}>${t("tm.onlyActiveLayer")}</option>
-          <option value="all" ${proj0 ? "selected" : ""}>${t("tm.scopeAllLayers")}</option>
-        </select>
+        <button type="button" data-select="scope" class="menu-config-select select-field"></button>
       </div>
       <div class="menu-config-section">
         <div class="menu-config-title">${t("tm.configTarget")}</div>
-        <select name="tgt" class="menu-config-select" ${proj0Ora ? "disabled" : ""}>
-          <option value="file" ${tgt0 === "file" ? "selected" : ""}>${t("tm.targetFile")}</option>
-          <option value="clipboard" ${tgt0 === "clipboard" ? "selected" : ""} ${proj0 ? "disabled" : ""}>${t("tm.targetClipboard")}</option>
-          <option value="print" ${tgt0 === "print" ? "selected" : ""} ${proj0 ? "disabled" : ""}>${t("tm.targetPrint")}</option>
-          <option value="cloud" ${tgt0 === "cloud" ? "selected" : ""} ${hasGallery() ? "" : "disabled"}>${t("tm.targetCloud")}</option>
-        </select>
+        <button type="button" data-select="tgt" class="menu-config-select select-field"></button>
       </div>
       <div class="menu-config-section">
         <div class="menu-config-title">${t("tm.configBg")}</div>
@@ -384,5 +377,26 @@ export function initExportImportMenu(ctx: AppContext) {
         <label><input type="checkbox" name="defringe" ${desk.export.defringePng ? "checked" : ""} ${(c.format !== "png" || !!parseExportBg(bg0)) ? "disabled" : ""} /> ${t("tm.defringe")}</label>
       </div>
     `, applyLocks);
+    if (!popup) return;
+    const mount = (name: "fmt" | "scope" | "tgt", items: () => { value: string; label: string; disabled?: boolean }[], get: () => string, set: (v: string) => void) => {
+      const el = popup.querySelector<HTMLElement>(`[data-select="${name}"]`);
+      if (!el) return;
+      fields[name] = mountSelectField(el, { items, value: get, onChange: (v) => { set(v); applyLocks(popup); }, band: "popover" });
+    };
+    mount("fmt", () => fmtItems, () => fmtV, (v) => { fmtV = v; });
+    mount("scope", () => [
+      { value: "merged", label: t("tm.mergeAllVisible") }, { value: "active", label: t("tm.onlyActiveLayer") },
+      { value: "all", label: t("tm.scopeAllLayers"), disabled: !_isProjectFormat(fmtV) },
+    ], () => scopeV, (v) => { scopeV = v; });
+    mount("tgt", () => {
+      const proj = _isProjectFormat(fmtV);
+      return [
+        { value: "file", label: t("tm.targetFile") },
+        { value: "clipboard", label: t("tm.targetClipboard"), disabled: proj },
+        { value: "print", label: t("tm.targetPrint"), disabled: proj },
+        { value: "cloud", label: t("tm.targetCloud"), disabled: !hasGallery() },
+      ];
+    }, () => tgtV, (v) => { tgtV = v; });
+    applyLocks(popup);   // 初始锁定态（disabled 钮 / 值收敛）就位
   });
 }

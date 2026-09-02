@@ -37,6 +37,7 @@ export interface PopupMenuItem<Id extends string = string> {
   danger?: boolean;         // 红字（删除 / 二段确认 armed）
   checked?: boolean;        // 单选态（compact 用 aria-pressed；list 用 aria-checked）
   separatorBefore?: boolean;
+  header?: boolean;         // 分组标题行（不可点；select-field 的 optgroup）
 }
 
 /** 现建 / 收养共用的锚定与关闭选项。 */
@@ -117,6 +118,7 @@ export function openPopupMenu<Id extends string>(opts: PopupMenuOpts<Id>): Popup
     let html = "";
     for (const it of items) {
       if (it.separatorBefore) html += `<hr class="popup-menu-sep">`;
+      if (it.header) { html += `<div class="popup-menu-group">${escapeHtml(it.label)}</div>`; continue; }
       const cls = variant === "compact"
         ? "lasso-tool-btn popup-menu-item"
         : "menu-item popup-menu-item" + (anyIcon ? " menu-item-with-icon" : "") + (it.danger ? " danger" : "");

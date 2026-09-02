@@ -107,7 +107,7 @@
     <link rel="icon" href="./icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=f5172eb56f72" />
+    <link rel="stylesheet" href="./styles.css?v=4617c512feee" />
     <!-- zip.js UMD bundle：自挂 window.zip。必须在 module bundle 之前。
          defer（v417）：原来是 parser-blocking 的，硬刷新时 SW 被绕过 → 直奔网络 → 网络一卡整个
          文档解析就停住（浏览器标签页转圈）。defer 后它与下面的 type=module bundle 同属延迟脚本、
@@ -660,7 +660,7 @@
       <div class="new-doc-preset-section">
         <label class="brush-slider-row" style="grid-template-columns: 80px 1fr;">
           <span class="brush-slider-label" data-i18n="nd.size">尺寸</span>
-          <select id="newDocPreset" class="generic-sheet-input new-doc-pixel-select"></select>
+          <button type="button" id="newDocPreset" class="generic-sheet-input new-doc-pixel-select select-field"></button>
         </label>
       </div>
       <label class="brush-slider-row" id="newDocCustomRow" style="grid-template-columns: 80px 1fr 1fr; display:none;">
@@ -796,7 +796,7 @@
           <span class="lasso-tool-sep" aria-hidden="true">|</span>
           <!-- v120: 3 个按钮意义不明，改 dropdown；nearest 改成「像素画」直说语义 -->
           <!-- 选项由 JS 从 resample.js RESAMPLE_MODES (SSoT) 填，见 fillResampleSelect -->
-          <select class="lasso-tool-select" id="lassoSampleSel" data-i18n-title="la.sampleMode"></select>
+          <button type="button" class="lasso-tool-select select-field" id="lassoSampleSel" data-i18n-title="la.sampleMode"></button>
           <span class="lasso-tool-sep" aria-hidden="true">|</span>
           <button class="lasso-tool-btn lasso-tool-confirm lasso-tool-icon" id="lassoStampBtn" type="button" title="盖印（写入但保留浮层，可连击多次叠加）" data-i18n-title="la.stampTip"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#stamp"/></svg></button>
           <button class="lasso-tool-btn lasso-tool-confirm lasso-tool-icon" id="lassoCommitBtn" type="button" title="应用变换" data-i18n-title="la.applyTf"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#check"/></svg></button>
@@ -811,10 +811,7 @@
       <div class="lasso-toolbar">
         <div class="lasso-section">
           <span class="lasso-tool-text" aria-hidden="true" data-i18n="pick.sampleLabel">取样</span>
-          <select class="lasso-tool-select" id="pickModeSel" data-i18n-title="pick.sampleTip">
-            <option value="composite" data-i18n="pick.composite">合并颜色</option>
-            <option value="layer" data-i18n="pick.active">当前图层</option>
-          </select>
+          <button type="button" class="lasso-tool-select select-field" id="pickModeSel" data-i18n-title="pick.sampleTip"></button>
         </div>
       </div>
     </div>
@@ -1197,11 +1194,7 @@
         </div>
         <div class="resample-row">
           <label for="bigImportMode" data-i18n="dim.interp">插值</label>
-          <select id="bigImportMode">
-            <option value="bicubic" data-i18n="interp.bicubic">双三次（默认 / 高质量）</option>
-            <option value="bilinear" data-i18n="interp.bilinear">双线性（软）</option>
-            <option value="nearest" data-i18n="interp.nearest">最近邻（像素艺术 / 硬边）</option>
-          </select>
+          <button type="button" id="bigImportMode" class="generic-sheet-input select-field"></button>
         </div>
       </div>
       <div class="resample-foot">
@@ -1228,7 +1221,7 @@
         <div class="resample-row">
           <label for="resampleMode" data-i18n="dim.interp">插值</label>
           <!-- 选项由 JS 从 resample.js RESAMPLE_MODES (SSoT) 填，见 fillResampleSelect -->
-          <select id="resampleMode"></select>
+          <button type="button" id="resampleMode" class="generic-sheet-input select-field"></button>
         </div>
       </div>
       <div class="resample-foot">
@@ -1282,7 +1275,7 @@
       <button class="crop-toolbar-btn crop-toolbar-icon" id="cropModeFree" type="button" aria-pressed="true" data-i18n-title="crop.modeFree"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#crop"/></svg></button>
       <button class="crop-toolbar-btn crop-toolbar-icon" id="cropModeTemplate" type="button" aria-pressed="false" data-i18n-title="crop.modeTemplate"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#crop-fixed-size"/></svg></button>
       <span class="crop-toolbar-sep" aria-hidden="true">|</span>
-      <select class="crop-toolbar-btn hidden" id="cropTemplateSel"></select>
+      <button type="button" class="crop-toolbar-btn hidden select-field" id="cropTemplateSel"></button>
       <input class="crop-toolbar-btn crop-wh-input hidden" id="cropCustomW" type="number" min="1" max="8192" placeholder="宽px" data-i18n-ph="crop.widthPh" />
       <span class="hidden" id="cropCustomX" aria-hidden="true">×</span>
       <input class="crop-toolbar-btn crop-wh-input hidden" id="cropCustomH" type="number" min="1" max="8192" placeholder="高px" data-i18n-ph="crop.heightPh" />
@@ -1604,6 +1597,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-21967f05e544.mjs"></script>
+    <script type="module" src="./dist/weebpaint-09c5d394161d.mjs"></script>
   </body>
 </html>

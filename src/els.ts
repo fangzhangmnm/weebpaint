@@ -47,7 +47,7 @@ export const els = {
   resampleW: byId<HTMLInputElement>("resampleW"),
   resampleH: byId<HTMLInputElement>("resampleH"),
   resampleLock: byId<HTMLInputElement>("resampleLock"),
-  resampleMode: byId<HTMLSelectElement>("resampleMode"),
+  resampleMode: byId("resampleMode"),   // 2026-09-02 C6：select-field 按钮（原生 select 退役）
   resampleCancel: byId("resampleCancel"),
   resampleConfirm: byId("resampleConfirm"),
   // 偏移接缝（环绕）对话框

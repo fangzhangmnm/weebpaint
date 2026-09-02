@@ -919,6 +919,12 @@ input[type=range] {
   background: transparent; color: var(--ink); cursor: pointer;
 }
 .menu-inline-caret { width: 8px; height: 8px; opacity: .6; flex: 0 0 auto; }
+/* 2026-09-02 C6 下拉标准件（src/ui/select-field.ts）：原生 <select> 退役。按钮沿用各处既有 class 的皮（.lasso-tool-select /
+   .generic-sheet-input / .crop-toolbar-btn），这里只补 label+caret 排版与分组标题。 */
+.select-field { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; text-align: left; }
+.select-field .select-field-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.select-field .menu-inline-caret { width: 12px; height: 12px; }
+.popup-menu-group { font-size: 10px; color: var(--ink-soft); padding: 6px 8px 2px; text-transform: uppercase; letter-spacing: .06em; user-select: none; }
 .menu-item-state { color: var(--ink-soft); font-size: 12px; }
 /* P5 scope 分区（2026-08-27 拍板「人话标题+行尾微章」）：设置项按归属分组，微章答「这设置跟谁走」 */
 .menu-section-label { font-size: 11px; color: var(--ink-soft); padding: 10px 14px 2px; user-select: none; letter-spacing: .06em; opacity: .85; }

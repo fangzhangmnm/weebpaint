@@ -96,32 +96,15 @@ export function templateLabel(tp: CanvasTemplate): string {
 }
 
 /**
- * 把模板表投影进一个 <select>：按 kind 分 optgroup，末尾追加「自定义…」。
+ * 把模板表投影成下拉项（ui/select-field 标准件；2026-09-02 C6 前是原生下拉+optgroup）：按 kind 分组，末尾追加「自定义…」。
  * 两个消费面（新建作品 / 裁剪模板模式）共用这一份渲染，**显示完全一样的列表**
  * （v0.7.34 user 定；此前有个 surfaces 分面白名单，已连同机制一起删掉）。
  * json 是 async fetch 的 → 调用方在 loadCanvasTemplates() resolve 后调；重复调用幂等（先清空再填）。
  */
-export function fillTemplateSelect(sel: HTMLSelectElement, customLabel: string): void {
-  const keep = sel.value;
-  sel.textContent = "";
-  let group: HTMLOptGroupElement | null = null;
-  let groupKind: CanvasTemplate["kind"] | null = null;
-  for (const tp of _templates) {
-    if (tp.kind !== groupKind) {
-      group = document.createElement("optgroup");
-      group.label = t(GROUP_I18N[tp.kind]);
-      sel.appendChild(group);
-      groupKind = tp.kind;
-    }
-    const o = document.createElement("option");
-    o.value = tp.id;
-    o.textContent = templateLabel(tp);
-    group!.appendChild(o);
-  }
-  const custom = document.createElement("option");
-  custom.value = "custom";
-  custom.textContent = customLabel;
-  sel.appendChild(custom);
-  // 填表可能发生在用户已选好之后（异步 fetch 回来才渲染）——尽量把选择还原回去。
-  if (keep && Array.from(sel.options).some((o) => o.value === keep)) sel.value = keep;
+export function templateItems(customLabel: string): { value: string; label: string; group?: string }[] {
+  // 2026-09-02 C6：原生 <select>+optgroup 投影 fillTemplateSelect 退役——下拉一律 ui/select-field（分组 = optgroup 等价）。
+  const out: { value: string; label: string; group?: string }[] = [];
+  for (const tp of _templates) out.push({ value: tp.id, label: templateLabel(tp), group: t(GROUP_I18N[tp.kind]) });
+  out.push({ value: "custom", label: customLabel });
+  return out;
 }

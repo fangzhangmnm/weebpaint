@@ -9,6 +9,7 @@ export interface PopupMenuItem<Id extends string = string> {
     danger?: boolean;
     checked?: boolean;
     separatorBefore?: boolean;
+    header?: boolean;
 }
 /** 现建 / 收养共用的锚定与关闭选项。 */
 export interface PopupAnchorOpts {

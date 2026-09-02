@@ -60,6 +60,16 @@ if [ -n "$VIS_HITS" ]; then
 fi
 echo "[build] ✓ 可见性规则单一"
 
+# 0.45 标准件 lint（2026-09-02 C6）：原生 <select>/<option> 退役——下拉一律 ui/select-field（T6「原生控件在 PWA 里不受控」×4 的结构解）。
+echo "[build] 标准件 lint（禁原生 <select>/<option>）…"
+SEL_HITS=$( (grep -nE '^\s*<(select|option)\b' index.html; grep -rnE 'createElement\("select"\)|<select\b' src --include='*.ts' | grep -vE ':\s*(//|\*|/\*)') || true)   # datalist 的 <option> 豁免；注释行豁免（那是文本框补全，不是弹层）
+if [ -n "$SEL_HITS" ]; then
+  echo "[build] ✗ 出现原生 <select>/<option>（下拉走 src/ui/select-field.ts 标准件；UA 弹层 = chrome 域，iPad/夜间必翻车）：" >&2
+  echo "$SEL_HITS" >&2
+  exit 1
+fi
+echo "[build] ✓ 无原生 select"
+
 # 0.5 deep-import lint（红线封口的**真**守卫）。
 #     store 引擎 = @internal/store 包（cutover 2026-08-14：src/store/ 已删，tgz 走 vendor-pkgs/）。
 #     合法入口只有两个：`@internal/store`（主门牌）和 `@internal/store/testing`（测试替身）。

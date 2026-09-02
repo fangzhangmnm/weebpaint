@@ -13,6 +13,7 @@
 import { els } from "./els.ts";
 import { withBusy } from "./fullscreen-busy.ts";
 import { openSheet, closeSheet } from "./ui/sheet.ts";   // 2026-09-02 C3
+import { mountSelectField, type SelectField } from "./ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
 import { reportError } from "./error-badge.ts";
 import { t } from "./i18n/index.ts";
 import { session } from "./session-state.ts";
@@ -96,11 +97,19 @@ export async function importImageAsNewDoc(file: File, opts?: { nameOverride?: st
 //   只在图片超**护栏**（max(2048, 画布长边)，undo 内存护栏——重采样在 lift 前才真省内存）时弹；
 //   不超护栏静默原尺寸进。fit 选项 = 适配护栏（fit-to-canvas 作废：photobash 常态是素材比画布大、
 //   摆位后裁溢出，进门先缩到画布 = 后续放大 = 糊）。resolve { w, h, mode } 或 null（取消）。
+let _bigImportModeField: SelectField | null = null;
+let _bigImportModeVal = "bicubic";
 function _openBigImportSheet(ow: number, oh: number, docW: number, docH: number, limit: number): Promise<BigImportChoice | null> {
   const sheet = document.getElementById("bigImportSheet") as HTMLElement;
   const wIn = document.getElementById("bigImportW") as HTMLInputElement;
   const hIn = document.getElementById("bigImportH") as HTMLInputElement;
-  const modeSel = document.getElementById("bigImportMode") as HTMLSelectElement;
+  // 插值下拉（2026-09-02 C6 标准件；挂一次，值受控）
+  if (!_bigImportModeField) _bigImportModeField = mountSelectField(document.getElementById("bigImportMode")!, {
+    items: () => [
+      { value: "bicubic", label: t("interp.bicubic") }, { value: "bilinear", label: t("interp.bilinear") }, { value: "nearest", label: t("interp.nearest") },
+    ],
+    value: () => _bigImportModeVal, onChange: (v) => { _bigImportModeVal = v; }, band: "modal",
+  });
   const info = document.getElementById("bigImportInfo") as HTMLElement;
   const okBtn = document.getElementById("bigImportConfirm") as HTMLElement;
   const cancelBtn = document.getElementById("bigImportCancel") as HTMLElement;
@@ -148,7 +157,7 @@ function _openBigImportSheet(ow: number, oh: number, docW: number, docH: number,
     okBtn.onclick = () => {
       const w = Math.max(1, Math.min(8192, parseFloat(wIn.value) | 0));
       const h = Math.max(1, Math.min(8192, parseFloat(hIn.value) | 0));
-      const mode = modeSel.value || "bicubic";
+      const mode = _bigImportModeVal;
       cleanup();
       resolve({ w, h, mode });
     };

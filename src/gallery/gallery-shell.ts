@@ -43,7 +43,8 @@ import { setAddImportAsNewDoc, importImageAsNewDoc } from "../import-image.ts";
 import { isUnlocked, lock, setPassword, promptPassword } from "../crypto-state.ts";
 import { hasVerifier, checkVerifier, clearVerifier } from "../password-verifier.ts";
 import { t } from "../i18n/index.ts";
-import { loadCanvasTemplates, fillTemplateSelect, templateById, templatePx } from "../canvas-templates.ts";
+import { loadCanvasTemplates, templateItems, templateById, templatePx } from "../canvas-templates.ts";
+import { mountSelectField, type SelectField } from "../ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
 import { bindInstallButton } from "../install-prompt.ts";
 
 import type { AppContext } from "../app-context.ts";
@@ -110,10 +111,10 @@ const DEFAULT_PRESET = "screen-1024sq";   // user 2026-08-19：2048 默认护栏
 let _presetVal = DEFAULT_PRESET;   // #21：preset 单一真相（confirm 读它）。值 = 模板 id 或 "custom"。
 // #21 终版（v0.5.10）：全部预设进一个下拉框（#newDocPreset，三 optgroup + 自定义）——chips 已删。
 // v0.7.32：option 由 canvas-templates.json 投影（不再手写在 index.html——那是和裁切分叉的第二份表）。
+let _presetField: SelectField | null = null;
 function _selectPreset(val: string) {
   _presetVal = val;
-  const sel = document.getElementById("newDocPreset") as HTMLSelectElement | null;
-  if (sel && sel.value !== val) sel.value = val;
+  _presetField?.refresh();
   els.newDocCustomRow.style.display = val === "custom" ? "" : "none";
 }
 
@@ -398,17 +399,15 @@ export function initGalleryShell(ctx: AppContext) {
 
   // 新建作品 sheet 接线
   // #21 终版（v0.5.10）：唯一的尺寸下拉框（v217 的 chips 按钮组已删）
-  const presetSel = document.getElementById("newDocPreset") as HTMLSelectElement | null;
-  // v0.7.32：option 来自 canvas-templates.json（async fetch）。先同步投影一次——此刻表可能还空着，
-  // 但「自定义…」这条立刻就在，下拉框不会有一段完全空白的窗口；json 回来再投影一次并选回默认。
-  if (presetSel) {
-    fillTemplateSelect(presetSel, t("nd.custom"));
-    void loadCanvasTemplates().then(() => {
-      fillTemplateSelect(presetSel, t("nd.custom"));
-      _selectPreset(_presetVal);
+  // 2026-09-02 C6：标准件 select-field（原生 <select>+optgroup 退役；分组 = templateItems 的 group）。
+  //   项来自 canvas-templates.json（async fetch）：先同步挂——「自定义…」立刻就在；json 回来 refresh 并选回默认。
+  const presetEl = document.getElementById("newDocPreset");
+  if (presetEl) {
+    _presetField = mountSelectField(presetEl, {
+      items: () => templateItems(t("nd.custom")), value: () => _presetVal, onChange: (v) => _selectPreset(v), band: "modal",
     });
+    void loadCanvasTemplates().then(() => { _presetField?.refresh(); _selectPreset(_presetVal); });
   }
-  presetSel?.addEventListener("change", () => { if (presetSel.value) _selectPreset(presetSel.value); });
   els.newDocCancel.addEventListener("click", closeNewDocSheet);
   // v0.5.40（user：「确认总是要点好几下」）：名字输入框聚焦时点按钮，pointerdown 默认行为先 blur →
   //   键盘收起 → 底部 sheet 位移 → click 落空。preventDefault 挡掉焦点转移，按钮原位吃到 click。

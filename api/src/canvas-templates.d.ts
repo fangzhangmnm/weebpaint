@@ -22,9 +22,13 @@ export declare function templatePx(tp: CanvasTemplate): {
 /** 显示文本：i18n（有则用）+ 物理单位模板自动追加换算出的像素数（label 里手写会漂移）。 */
 export declare function templateLabel(tp: CanvasTemplate): string;
 /**
- * 把模板表投影进一个 <select>：按 kind 分 optgroup，末尾追加「自定义…」。
+ * 把模板表投影成下拉项（ui/select-field 标准件；2026-09-02 C6 前是原生下拉+optgroup）：按 kind 分组，末尾追加「自定义…」。
  * 两个消费面（新建作品 / 裁剪模板模式）共用这一份渲染，**显示完全一样的列表**
  * （v0.7.34 user 定；此前有个 surfaces 分面白名单，已连同机制一起删掉）。
  * json 是 async fetch 的 → 调用方在 loadCanvasTemplates() resolve 后调；重复调用幂等（先清空再填）。
  */
-export declare function fillTemplateSelect(sel: HTMLSelectElement, customLabel: string): void;
+export declare function templateItems(customLabel: string): {
+    value: string;
+    label: string;
+    group?: string;
+}[];

@@ -31,7 +31,7 @@ export declare const els: {
     resampleW: HTMLInputElement;
     resampleH: HTMLInputElement;
     resampleLock: HTMLInputElement;
-    resampleMode: HTMLSelectElement;
+    resampleMode: HTMLElement;
     resampleCancel: HTMLElement;
     resampleConfirm: HTMLElement;
     offsetSheet: HTMLElement;

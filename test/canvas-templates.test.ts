@@ -63,11 +63,12 @@ test("templatePx：物理单位按 DPI 换算成整像素", () => {
 
 test("一份表喂两个面：两边显示完全一样的列表（user 2026-07-31 定）", () => {
   // 机制上已经没有 per-surface 过滤了（surfaces 字段连同 templatesFor() 一起删掉）——
-  // 这条守的是「别再把它加回来」：投影函数只吃 (select, 自定义文案)，没有第三个分面参数。
+  // 这条守的是「别再把它加回来」：投影函数只吃 (自定义文案)，没有分面参数。
+  //   2026-09-02 C6：fillTemplateSelect(select, customLabel) → templateItems(customLabel)（原生 select 退役，下拉走 ui/select-field）。
   const src = readFileSync(new URL("../src/canvas-templates.ts", import.meta.url), "utf-8");
   assert(!/templatesFor/.test(src), "templatesFor() 复活了 = 分面差异回来了");
-  assert(/export function fillTemplateSelect\(sel: HTMLSelectElement, customLabel: string\)/.test(src),
-    "fillTemplateSelect 签名变了——多出的参数是不是又在分面？");
+  assert(/export function templateItems\(customLabel: string\)/.test(src),
+    "templateItems 签名变了——多出的参数是不是又在分面？");
   // 这次的直接起因：3:4 / 4:3 得在表里（当初只加进了新建那半边的手写 option）。
   for (const id of ["screen-1200x900", "screen-900x1200"]) assert(templateById(id), `${id} 不在表里`);
 });

@@ -15,6 +15,7 @@
 // 不碰 store 红线：只调 session.markEdited() 公共 API（同 import-image.ts），其余持久化全走库。
 
 import { registerFloatingWindow, type FloatingWindowHandle } from "./ui/floating-window.ts";   // 2026-09-02 C2 浮窗深模块
+import { mountSelectField } from "./ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
 import type { AppContext } from "./app-context.ts";
 import { preferences } from "./app-prefs.ts";   // blender-panel-url（gallery scope+无库 cascade，残留审计 F）
 import { reportError } from "./error-badge.ts";
@@ -464,17 +465,7 @@ function buildPanel() {
           <input id="btpSizeW" class="btp-input" placeholder="${t("bl.widthPlaceholder")}" inputmode="numeric" />
           <span class="btp-x"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#x"/></svg></span>
           <input id="btpSizeH" class="btp-input" placeholder="${t("bl.heightPlaceholder")}" inputmode="numeric" />
-          <select id="btpSizePreset" class="btp-sizepreset" aria-label="${t("bl.sizePresetAria")}">
-            <option value="">${t("bl.presetPlaceholder")}</option>
-            <option value="doc">${t("bl.presetDocSize")}</option>
-            <option value="fit512">${t("bl.presetFit512")}</option>
-            <option value="fit1024">${t("bl.presetFit1024")}</option>
-            <option value="fit2048">${t("bl.presetFit2048")}</option>
-            <option value="256">${t("bl.presetSquare256")}</option>
-            <option value="512">${t("bl.presetSquare512")}</option>
-            <option value="1024">${t("bl.presetSquare1024")}</option>
-            <option value="2048">${t("bl.presetSquare2048")}</option>
-          </select>
+          <button type="button" id="btpSizePreset" class="btp-sizepreset select-field" aria-label="${t("bl.sizePresetAria")}"></button>
         </div>
       </div>
     </div>
@@ -519,18 +510,23 @@ function buildPanel() {
 
   // 分辨率预设下拉 → 把算好的实数填进两个文本框（文本框始终是真源），随即复位下拉。
   //   原尺寸 = doc W/H；比例 ≤N = 保持比例缩进 N 见方（不放大）；方 N² = N×N。
-  const sizePreset = q<HTMLSelectElement>("#btpSizePreset");
-  sizePreset.addEventListener("change", () => {
-    const v = sizePreset.value;
-    if (v) {
+  //   2026-09-02 C6：select-field 标准件（原生 <select> 退役）；值恒为 ""（占位），选中即执行、不留选态。
+  const PRESETS: [string, string][] = [
+    ["doc", "bl.presetDocSize"], ["fit512", "bl.presetFit512"], ["fit1024", "bl.presetFit1024"], ["fit2048", "bl.presetFit2048"],
+    ["256", "bl.presetSquare256"], ["512", "bl.presetSquare512"], ["1024", "bl.presetSquare1024"], ["2048", "bl.presetSquare2048"],
+  ];
+  mountSelectField(q<HTMLElement>("#btpSizePreset"), {
+    items: () => [{ value: "", label: t("bl.presetPlaceholder") }, ...PRESETS.map(([v, k]) => ({ value: v, label: t(k as Parameters<typeof t>[0]) }))],
+    value: () => "",
+    onChange: (v) => {
+      if (!v) return;
       const wh =
         v === "doc" ? { w: ctx.doc.width, h: ctx.doc.height }
         : v.startsWith("fit") ? fitAspect(Number(v.slice(3)))
         : { w: Number(v), h: Number(v) };
       sizeW.value = String(wh.w);
       sizeH.value = String(wh.h);
-    }
-    sizePreset.selectedIndex = 0;
+    },
   });
 
   // 浮窗生命周期归 ui/floating-window（2026-09-02 C2；以前自带一份拖动且没注册进 window band → 会被别的浮窗压住）

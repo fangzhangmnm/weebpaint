@@ -11,6 +11,7 @@
 // 工具链同色轮：vendor vue.esm-browser.prod + template 字符串 + esbuild bundle。
 
 import { createApp, defineComponent, ref } from "../../vendor/vue/vue.esm-browser.prod.js";
+import { SelectFieldVue } from "./select-field.ts";   // 2026-09-02 C6 下拉标准件（Vue v-model 包装）
 import { quantizeSize } from "./brush-size.ts";
 import { t } from "../i18n/index.ts";
 import { ensureBrushConfigDefaults } from "../common/current-brush-config.ts";
@@ -29,6 +30,7 @@ export const BrushSettings = defineComponent({
     blendModes: { type: Object, default: () => ({}) },   // { mode: 中文label }
   },
   emits: ["delete", "export"],
+  components: { SelectField: SelectFieldVue },
   setup() {
     // i18n：t() 在 setup 建 L manifest（§5a，key 受 tsc 检查），模板引 L.*。
     // 纯 latin 参数名(size/opacity/flow/streamline/stabilization/pressure LPF/pressureGamma/
@@ -53,14 +55,10 @@ export const BrushSettings = defineComponent({
       <div class="${TITLE}">{{ L.basic }}</div>
       <div class="${ROW_FULL}"><label>{{ L.name }}</label><input type="text" v-model="draft.name"></div>
       <div class="${ROW_FULL}"><label>{{ L.tool }}</label>
-        <select v-model="draft.tool">
-          <option value="brush">{{ L.toolBrush }}</option><option value="eraser">{{ L.toolEraser }}</option>
-        </select>
+        <SelectField v-model="draft.tool" :options="{ brush: L.toolBrush, eraser: L.toolEraser }" band="modal" />
       </div>
       <div class="${ROW_FULL}"><label>{{ L.blendMode }}</label>
-        <select v-model="draft.blendMode">
-          <option v-for="(label,val) in blendModes" :key="val" :value="val">{{ label }}</option>
-        </select>
+        <SelectField v-model="draft.blendMode" :options="blendModes" band="modal" />
       </div>
       <div class="${ROW_FULL}"><label>{{ L.folder }}</label><input type="text" v-model="draft.folder"></div>
     </div>
@@ -69,9 +67,7 @@ export const BrushSettings = defineComponent({
     <div class="${SECTION}">
       <div class="${TITLE}">{{ L.shape }}</div>
       <div class="${ROW_FULL}"><label>{{ L.shapeKind }}</label>
-        <select v-model="draft.shape.kind">
-          <option value="round">{{ L.round }}</option><option value="ellipse">{{ L.ellipse }}</option>
-        </select>
+        <SelectField v-model="draft.shape.kind" :options="{ round: L.round, ellipse: L.ellipse }" band="modal" />
       </div>
       <template v-if="draft.shape.kind === 'ellipse'">
         <div class="${ROW}"><label>{{ L.aspect }}</label><input type="range" min="0.1" max="1" step="0.05" v-model.number="draft.shape.aspect"><span class="${VAL}">{{ draft.shape.aspect.toFixed(2) }}</span></div>
@@ -113,10 +109,7 @@ export const BrushSettings = defineComponent({
     <div class="${SECTION}">
       <div class="${TITLE}">{{ L.advanced }}</div>
       <div class="${ROW_FULL}"><label>{{ L.composite }}</label>
-        <select v-model="draft.compositeMode">
-          <option value="wash">{{ L.wash }}</option>
-          <option value="buildup">{{ L.buildup }}</option>
-        </select>
+        <SelectField v-model="draft.compositeMode" :options="{ wash: L.wash, buildup: L.buildup }" band="modal" />
       </div>
       <div class="${ROW}"><label>pressureGamma</label><input type="range" min="0.2" max="3" step="0.05" v-model.number="draft.pressureGamma"><span class="${VAL}">{{ draft.pressureGamma.toFixed(2) }}</span></div>
       <div class="${ROW_FULL}">

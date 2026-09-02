@@ -18,7 +18,8 @@ import { registerContextToolbar } from "./ui/context-toolbar.ts";   // 2026-09-0
 
 import { setTool } from "./toolbar.ts";   // 命令 = toolbar 的接口（显式 import）
 import { requireEditableLeaf } from "./editable-leaf.ts";
-import { fillResampleSelect } from "./frontend/resample-modes.ts";
+import { resampleItems } from "./frontend/resample-modes.ts";
+import { createSelectField, type SelectFieldOpts } from "./ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
 import type { ViewLeafSnap as LayerSnap } from "./backend/workpiece/painting-view.ts";
 import type { WriteToken } from "./backend/workpiece/workpiece.ts";
 import type { AppContext } from "./app-context.ts";
@@ -119,24 +120,20 @@ function _openFilterPanel(filterId: string, opts: { picker?: FilterLike[] } = {}
     const wrap = document.createElement("label");
     wrap.className = "brush-slider-row";
     wrap.innerHTML = `<span class="brush-slider-label">${t("mi.chooseFilter")}</span>`;
-    const sel = document.createElement("select");
-    sel.style.flex = "1";
-    sel.style.font = "inherit";
-    sel.style.padding = "2px 4px";
-    for (const F of opts.picker) {
-      const opt = document.createElement("option");
-      opt.value = F.id;
-      opt.textContent = F.title;
-      if (F.id === filterId) opt.selected = true;
-      sel.appendChild(opt);
-    }
-    sel.addEventListener("change", () => {
-      const newId = sel.value;
-      if (newId === filterId) return;
-      _closeFilterPanel(false);
-      _openFilterPanel(newId, { picker: opts.picker });
+    // 2026-09-02 C6：滤镜挑选下拉走 select-field 标准件（原生 <select> 退役）
+    const picker = opts.picker;
+    const field = createSelectField({
+      className: "generic-sheet-input",
+      items: () => picker.map((F) => ({ value: F.id, label: F.title })),
+      value: () => filterId,
+      onChange: (newId) => {
+        if (newId === filterId) return;
+        _closeFilterPanel(false);
+        _openFilterPanel(newId, { picker });
+      },
     });
-    wrap.appendChild(sel);
+    field.el.style.flex = "1";
+    wrap.appendChild(field.el);
     wrap.appendChild(document.createElement("span"));
     els.adjustParamsBody.appendChild(wrap);
   }
@@ -315,27 +312,17 @@ function _renderFilterBrushToolbar() {
   tb.classList.remove("hidden");
   title.textContent = Filter.title;
   slot.innerHTML = "";
-  const mkSel = (id: string) => {
-    const sel = document.createElement("select");
-    sel.id = id;
-    sel.className = "crop-toolbar-btn";
-    sel.style.padding = "2px 6px";
-    slot.appendChild(sel);
-    return sel;
+  // 2026-09-02 C6：滤镜笔条里的三个下拉全走 select-field 标准件（原 mkSel 造原生 <select> 退役）
+  const mkField = (id: string, opts: SelectFieldOpts) => {
+    const f = createSelectField({ id, className: "crop-toolbar-btn", ...opts });
+    slot.appendChild(f.el);
+    return f;
   };
   // ① 子算法 dropdown（多 variant 才显）
   const variants = Filter.brushVariants || [];
   if (variants.length > 1) {
-    const sel = mkSel("filterBrushVariantSel");
-    for (const v of variants) {
-      const opt = document.createElement("option");
-      opt.value = v.id;
-      opt.textContent = v.title;
-      if (v.id === variantId) opt.selected = true;
-      sel.appendChild(opt);
-    }
-    sel.addEventListener("change", () => {
-      const v = variants.find((x) => x.id === sel.value);
+    mkField("filterBrushVariantSel", { items: () => variants.map((v) => ({ value: v.id, label: v.title })), value: () => fb.variantId || variantId || "", onChange: (id) => {
+      const v = variants.find((x) => x.id === id);
       if (!v) return;
       // 切 variant 别丢 bleed/sample（声明了对应能力的 filter 才有这些 key）
       let np = Filter.boundaryModes
@@ -348,37 +335,31 @@ function _renderFilterBrushToolbar() {
       if (state.toolStates.filterBrush) state.toolStates.filterBrush.variantId = v.id;
       // UI 态不 mark dirty（user 2026-06-10）：variant 选择是工具态，保存时顺手捞；真应用滤镜走 histchange 门。
       setStatus(t("mi.switchedTo", { title: v.title }));
-    });
+    } });
   }
   // ② v0.6.36 采样核下拉：声明了 sampleModes 的 filter（液化）常驻渲染。选项 = RESAMPLE_MODES
   //   的 liquify context（SSoT 复用，与 transform 下拉同源）；持久化 desk.liquify.sample。
   if (Filter.sampleModes) {
-    const ssel = mkSel("filterBrushSampleSel");
-    fillResampleSelect(ssel, "liquify", (fb.params.sample as string) || "bicubic", tLatin as (key: string) => string);
-    ssel.addEventListener("change", () => {
-      fb.params = { ...fb.params, sample: ssel.value };
-      desk.liquify.sample = ssel.value;
+    mkField("filterBrushSampleSel", {
+      items: () => resampleItems("liquify", tLatin as (key: string) => string),
+      value: () => (fb.params.sample as string) || "bicubic",
+      onChange: (v) => { fb.params = { ...fb.params, sample: v }; desk.liquify.sample = v; },
     });
   }
   // ③ v147 边界取样下拉：仅当 filter 声明 boundaryModes（液化）且有选区时渲染。
   //   feature 声明数据 + 通用渲染 → 删 filter 即删 UI，不再像旧 #liquifyPanel 那样静态腐烂。
   if (Filter.boundaryModes && doc.selection) {
-    const bsel = mkSel("filterBrushBleedSel");
-    bsel.title = tLatin("mi.boundaryTooltip");
-    const curBleed = fb.params.bleed || "edge";
-    for (const b of Filter.boundaryModes) {
-      const opt = document.createElement("option");
-      opt.value = b.id;
-      opt.textContent = b.title;
-      if (b.id === curBleed) opt.selected = true;
-      bsel.appendChild(opt);
-    }
-    bsel.addEventListener("change", () => {
-      fb.params = { ...fb.params, bleed: bsel.value };
-      desk.liquify.bleed = bsel.value;
-      const m = Filter.boundaryModes!.find((b) => b.id === bsel.value);
-      setStatus(t("mi.boundary", { mode: m ? m.title : bsel.value }));
+    const bf = mkField("filterBrushBleedSel", {
+      items: () => Filter.boundaryModes!.map((b) => ({ value: b.id, label: b.title })),
+      value: () => (fb.params.bleed as string) || "edge",
+      onChange: (v) => {
+        fb.params = { ...fb.params, bleed: v };
+        desk.liquify.bleed = v;
+        const m = Filter.boundaryModes!.find((b) => b.id === v);
+        setStatus(t("mi.boundary", { mode: m ? m.title : v }));
+      },
     });
+    bf.el.title = tLatin("mi.boundaryTooltip");
   }
 }
 

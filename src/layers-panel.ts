@@ -21,10 +21,11 @@
 // 仍留 app.js 的协作件经 ctx 绑入：doc / board / history / layers / setStatus（核心单例）
 // + _afterDocChange（lasso / history handler 也调）。
 
-import { createApp, defineComponent, reactive, computed, watch, nextTick, ref } from "../vendor/vue/vue.esm-browser.prod.js";
+import { createApp, defineComponent, reactive, computed, watch, nextTick, ref, onMounted, onUnmounted } from "../vendor/vue/vue.esm-browser.prod.js";
 import { positionPopup } from "./anchored-popup.ts";
 import { registerFloatingWindow, type FloatingWindowHandle } from "./ui/floating-window.ts";
-import { toggleAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";   // 2026-09-02 C1：＋ 菜单收养（搬 body，锚到 ＋ 钮）   // 2026-09-02 C2 浮窗深模块（z/拖缩/钳制/出血区/transient 一处）
+import { toggleAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";   // 2026-09-02 C1：＋ 菜单收养（搬 body，锚到 ＋ 钮）
+import { mountSelectField, type SelectField } from "./ui/select-field.ts";   // 2026-09-02 C6：混合模式下拉标准件（Vue 行内原生 select 退役）   // 2026-09-02 C2 浮窗深模块（z/拖缩/钳制/出血区/transient 一处）
 
 // （出血区地板常数 PANEL_MIN_TOP=60 退役 2026-09-02：iPadOS 顶部死区没有 API 可查，地板由 ui/floating-window 运行时量顶栏下缘）
 import { countViewLeaves, findViewNodeById, flattenViewLeaves, type ViewNode, type ViewLeaf, type ViewGroup } from "./backend/workpiece/painting-view.ts";
@@ -61,7 +62,7 @@ interface LayerRowData {
   hasPx: boolean; childLeafCount?: number;
 }
 // <LayerRow> setup 里读到的 props（其余 props 只在 template 用）。
-interface LayerRowProps { layer: LayerLeafSnap; depth: number; isGroup: boolean; menuOpen: boolean; }
+interface LayerRowProps { layer: LayerLeafSnap; depth: number; isGroup: boolean; menuOpen: boolean; moveTargets: MoveTarget[]; }
 
 let doc: AppContext["doc"], board: AppContext["board"], history: AppContext["history"], setStatus: AppContext["setStatus"];
 let layers: AppContext["layers"];
@@ -462,7 +463,19 @@ const LayerRow = defineComponent({
       }
       opaOld = null;
     }
-    function modeChange(e: Event) { _setMode(live(), (e.target as HTMLSelectElement).value); }
+    // 混合模式下拉（2026-09-02 C6）：select-field 标准件挂在行内按钮上——items/value 从 Vue 态派生，改了 refresh。
+    const modeBtn = ref<HTMLElement | null>(null);
+    let _modeField: SelectField | null = null;
+    onMounted(() => {
+      if (!modeBtn.value) return;
+      _modeField = mountSelectField(modeBtn.value, {
+        items: () => Object.entries(modeOptions.value as Record<string, string>).map(([value, label]) => ({ value, label })),
+        value: () => props.layer.mode,
+        onChange: (v) => _setMode(live(), v),
+      });
+    });
+    onUnmounted(() => { _modeField?.dispose(); _modeField = null; });
+    watch(() => [props.layer.mode, props.isGroup], () => _modeField?.refresh());
 
     // 组折叠三角（仅组行）。折叠态在 layersUi.collapsedIds（不影响合成，纯 UI）。
     function toggleCollapse(e: Event) {
@@ -498,12 +511,22 @@ const LayerRow = defineComponent({
       else if (a === "moveOut")   _moveOutOfGroup(live());
     }
     // 移入选中的已有组（high：把外面的层加入已知组，不限上方相邻；dropdown 不挤占菜单）
-    function onMoveSelect(e: Event) {
-      const v = (e.target as HTMLSelectElement).value;
-      if (!v) return;
-      layersUi.menuId = null;
-      _moveIntoGroup(live(), parseInt(v, 10));
-    }
+    // 移入某组下拉（2026-09-02 C6）：⋯ 菜单是 Teleport，开合时现挂/拆 select-field；菜单里再弹 → band popover。
+    const moveBtn = ref<HTMLElement | null>(null);
+    let _moveField: SelectField | null = null;
+    watch(() => props.menuOpen, async (open: boolean) => {
+      _moveField?.dispose(); _moveField = null;
+      if (!open) return;
+      await nextTick();
+      if (!moveBtn.value) return;
+      _moveField = mountSelectField(moveBtn.value, {
+        items: () => [{ value: "", label: String((L as unknown as { value?: Record<string, string> }).value?.choose ?? (L as unknown as Record<string, string>).choose ?? "…") },
+          ...props.moveTargets.map((g: MoveTarget) => ({ value: String(g.id), label: g.name }))],
+        value: () => "",
+        onChange: (v) => { if (!v) return; layersUi.menuId = null; _moveIntoGroup(live(), parseInt(v, 10)); },
+        band: "popover",
+      });
+    });
 
     // 层重排 = ⋯ 菜单的「上移/下移」（_moveLayerDelta）。早先定：不做行拖拽（iPad 触屏 drag-drop 不可靠）。
     function toggleClip(e: Event) { e.stopPropagation(); _toggleClipping(live()); }
@@ -539,7 +562,7 @@ const LayerRow = defineComponent({
       EYE_OPEN, EYE_OFF, FOLDER_OPEN, FOLDER_CLOSED, LAYER_MODE_LABEL,
       onRowClick, onNameClick, onRenameCommit, onRenameKey,
       toggleBadge, toggleMenu, vis, toggleCollapse, menuBtn, menuEl,
-      opaInput, opaCommit, modeChange, act, onMoveSelect,
+      opaInput, opaCommit, modeBtn, act, moveBtn,
       toggleClip, toggleRef, toggleLock,
     };
   },
@@ -589,10 +612,7 @@ const LayerRow = defineComponent({
         <button v-if="isGroup" class="menu-item menu-item-with-icon" type="button" @click="act('ungroup')"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#explode-folder"/></svg><span class="menu-item-label">{{ L.ungroup }}</span></button>
         <button v-if="isGroup" class="menu-item menu-item-with-icon" type="button" @click="act('collapseToLayer')"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#merge-layers"/></svg><span class="menu-item-label">{{ L.collapseToLayer }}</span></button>
         <label v-if="moveTargets.length" class="menu-item layer-move-into menu-item-with-icon" @click.stop><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#move-to-folder"/></svg><span class="menu-item-label">{{ L.moveIntoGroup }}</span>
-          <select class="layer-move-select" @change="onMoveSelect" @click.stop>
-            <option value="" selected>{{ L.choose }}</option>
-            <option v-for="g in moveTargets" :key="'mi'+g.id" :value="String(g.id)">{{ g.name }}</option>
-          </select>
+          <button ref="moveBtn" type="button" class="layer-move-select select-field" @click.stop></button>
         </label>
         <button v-if="canMoveOut" class="menu-item menu-item-with-icon" type="button" @click="act('moveOut')"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#move-out-folder"/></svg><span class="menu-item-label">{{ L.moveOut }}</span></button>
 
@@ -619,9 +639,7 @@ const LayerRow = defineComponent({
       </label>
       <label class="layer-slider-row">
         <span>{{ L.mode }}</span>
-        <select style="grid-column: span 2;" :value="layer.mode" @change="modeChange" @click.stop>
-          <option v-for="(lbl, val) in modeOptions" :key="val" :value="val">{{ lbl }}</option>
-        </select>
+        <button ref="modeBtn" type="button" class="select-field layer-mode-select" style="grid-column: span 2;" @click.stop></button>
       </label>
       <!-- v267 (user)：剪裁 / 锁α / 参考 toggle 已收进 ⋯ 菜单，折叠区只留 透明度 + 模式 -->
     </div>
@@ -826,7 +844,7 @@ export function initLayersPanel(ctx: AppContext) {
   document.addEventListener("pointerdown", (e: Event) => {
     if (layersUi.menuId == null) return;
     const tgt = e.target as HTMLElement | null;
-    if (!tgt?.closest(".layer-tools-popup") && !tgt?.closest(".layer-tools-btn")) {
+    if (!tgt?.closest(".layer-tools-popup") && !tgt?.closest(".layer-tools-btn") && !tgt?.closest(".popup-menu")) {   // .popup-menu = 菜单里再弹的下拉（C6）
       layersUi.menuId = null;
     }
   }, true);

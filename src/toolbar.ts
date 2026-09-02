@@ -16,7 +16,8 @@ import { makeRampSlider } from "./ui/ramp-slider.ts";
 import type { RampSliderHandle } from "./ui/ramp-slider.ts";
 import { requireEditableLeaf } from "./editable-leaf.ts";
 import { desk } from "./workbench-state.ts";   // pickMode → desk.colorPicker.layerMode SSoT（binding 写反应式）
-import { fillResampleSelect } from "./frontend/resample-modes.ts";
+import { resampleItems } from "./frontend/resample-modes.ts";
+import { mountSelectField, type SelectField } from "./ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
 import { t, tLatin } from "./i18n/index.ts";
 import { fillPreviewActive, commitFillNow, sendSelectionToFill } from "./fill-mode.ts";
 import { openAdoptedPopup, toggleAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";
@@ -62,7 +63,7 @@ let lassoSetOpSlot: HTMLElement, lassoSetOpSlotUse: SVGUseElement, lassoSetOpMen
 let lassoSubSlot: HTMLElement, lassoSubSlotUse: SVGUseElement, lassoSubMenu: HTMLElement, lassoSubMenuBtns: HTMLElement[];   // 子工具组槽（v0.5.14）
 let lassoExpandToggle: HTMLElement, lassoMagicExpandVal: HTMLElement, lassoMagicExpandMenu: HTMLElement;   // 扩张钮（v0.6.26 图标+小三角，stepper 收弹出）
 let lassoTransformBtn: HTMLElement, lassoFillCommitBtn: HTMLElement, lassoDeselectBtn: HTMLElement;
-let pickerToolbar: HTMLElement | null, pickModeSel: HTMLSelectElement | null;   // 吸色 context toolbar（取样模式：合并 / 当前图层）
+let pickerToolbar: HTMLElement | null, pickModeField: SelectField | null = null;   // 吸色 context toolbar（取样模式：合并 / 当前图层）
 
 // v0.6.24 fill/lasso 分家（v0.5.16 的共享 RAM 记忆 _selMem 作废）：子工具/布尔/1:1 per-tool
 //   持久化在 desk.lassoTool / fillTool（跟 ora 走）。当前选区工具的记录：
@@ -167,7 +168,7 @@ export function updateLassoToolbar() {
   const pickerActive = editMode.current() === "picker";
   if (pickerToolbar) {
     pickerToolbar.classList.toggle("hidden", !pickerActive);
-    if (pickerActive && pickModeSel && pickModeSel.value !== state.pickMode) pickModeSel.value = state.pickMode;
+    if (pickerActive) pickModeField?.refresh();   // desk.colorPicker.layerMode 是值的 SSoT，label 从它派生
   }
   const floating = input.lasso.hasFloating();
   const hasSelection = !!doc.selection;
@@ -1144,29 +1145,28 @@ export function initToolbar(ctx: AppContext) {
     }
   });
   // v120: 插值模式 dropdown（旧 3 个按钮 → 1 个 select）
-  const lassoSampleSel = document.getElementById("lassoSampleSel") as HTMLSelectElement | null;
-  // 变换采样 + 调整尺寸 两个 dropdown 都从 resample.js 的 RESAMPLE_MODES SSoT 填（以后加方法/AI 一处生效）
-  fillResampleSelect(lassoSampleSel, "transform", "bicubic", tLatin as (key: string) => string);   // v0.6.45 默认双三次（真机裁决，spline 降自选）
-  fillResampleSelect(els.resampleMode, "scale", "bicubic", tLatin as (key: string) => string);
-  if (lassoSampleSel) {
-    lassoSampleSel.addEventListener("change", () => {
-      input.lasso.setSampleMode(lassoSampleSel.value);
-      board.invalidateAll();
-      updateLassoToolbar();
-    });
-  }
+  // 变换采样下拉：项从 resample-modes 的 RESAMPLE_MODES SSoT 取（以后加方法/AI 一处生效）。
+  //   2026-09-02 C6：标准件 select-field（原生 <select> 退役）；值的 SSoT = 引擎 getSampleMode。
+  const lassoSampleEl = document.getElementById("lassoSampleSel");
+  if (lassoSampleEl) mountSelectField(lassoSampleEl, {
+    items: () => resampleItems("transform", tLatin as (key: string) => string),
+    value: () => input.lasso.getSampleMode(),
+    onChange: (v) => { input.lasso.setSampleMode(v); board.invalidateAll(); updateLassoToolbar(); },
+  });
   // 吸色取样模式 dropdown（composite 合并 / layer 当前图层 raw）。
   //   持久化 = desk.colorPicker.layerMode（per-doc desk，进 .weebpaint/editor-state.json）——**不是 LS**，
   //   v406 起设备级 webpaint.pickMode 已删。input._doPick 经 getPickMode 读（走 bindEditorReactive 的桥）。
   pickerToolbar = document.getElementById("pickerToolbar");
   registerContextToolbar(pickerToolbar);
-  pickModeSel = document.getElementById("pickModeSel") as HTMLSelectElement | null;
-  if (pickModeSel) {
-    const psel = pickModeSel;
-    psel.value = desk.colorPicker.layerMode;   // binding → state.pickMode（引擎 input._doPick 经 getPickMode 读）
-    psel.addEventListener("change", () => { desk.colorPicker.layerMode = psel.value; });
+  const pickModeEl = document.getElementById("pickModeSel");
+  if (pickModeEl) {
+    pickModeField = mountSelectField(pickModeEl, {
+      items: () => [{ value: "composite", label: tLatin("pick.composite") }, { value: "layer", label: tLatin("pick.active") }],
+      value: () => desk.colorPicker.layerMode,
+      onChange: (v) => { desk.colorPicker.layerMode = v; },   // binding → state.pickMode（引擎 input._doPick 经 getPickMode 读）
+    });
     // desk 载入：文档的 pickMode 回灌 → 刷新下拉显示（desk 已由 Unserialize 更新，只同步 UI，不回写）
-    window.addEventListener("wp:applyEditorState", () => { psel.value = desk.colorPicker.layerMode; });
+    window.addEventListener("wp:applyEditorState", () => pickModeField?.refresh());
   }
   // 选区 → 新层 / 复制层
 
