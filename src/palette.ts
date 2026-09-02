@@ -11,6 +11,7 @@
 //   .clear()
 //   .getSerializedState() / .applySerializedState(s)  ← 持久化 to weebpaint/state.json
 
+import { attachPanelDrag } from "./ui/panel-gizmo.ts";   // 2026-09-02 拖动把手深模块
 import { raiseWindow } from "./surfaces.ts";
 
 const CANVAS_SIZE = 256;
@@ -175,22 +176,16 @@ export class PaletteWindow {
   _wireDrag() {
     const head = this.root.querySelector<HTMLElement>(".palette-head");
     if (!head) return;
-    let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
-    head.addEventListener("pointerdown", (e: PointerEvent) => {
-      if ((e.target as HTMLElement).tagName === "BUTTON") return;
-      dragging = true; sx = e.clientX; sy = e.clientY;
-      const r = this.root.getBoundingClientRect();
-      ox = r.left; oy = r.top;
-      head.setPointerCapture(e.pointerId);
+    // 2026-09-02：走 ui/panel-gizmo（三窗同一份把手舞蹈；以前这份没钳视口，调色板能被拖出屏找不回来）
+    attachPanelDrag(this.root, head, {
+      ignore: (t) => t.tagName === "BUTTON",
+      onMove: ({ left, top }) => {
+        this.root.style.left = left + "px";
+        this.root.style.top = top + "px";
+        this.root.style.right = "auto";
+        this.root.style.bottom = "auto";
+      },
     });
-    head.addEventListener("pointermove", (e: PointerEvent) => {
-      if (!dragging) return;
-      this.root.style.left = (ox + (e.clientX - sx)) + "px";
-      this.root.style.top  = (oy + (e.clientY - sy)) + "px";
-      this.root.style.right = "auto";
-      this.root.style.bottom = "auto";
-    });
-    head.addEventListener("pointerup", () => { dragging = false; });
   }
 
   // serialize：保存 canvas 内容（toDataURL b64）+ 窗口位置

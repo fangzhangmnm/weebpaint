@@ -88,6 +88,7 @@ import "./builtin-brushes.test.ts";        // 出厂笔数据契约 + 「固定�
 import "./pointer-route.test.mjs";
 import "./pressure-probe.test.mjs";     // 2026-09-02 压感自诊探针：pen-flat / absolute-mouse 判定边界 + 鼠绘零误报钉子
 import "./md-lite.test.mjs";            // 2026-09-02 in-app 说明书极简 md 渲染：转义先行/块/行内
+import "./panel-gizmo.test.mjs";        // 2026-09-02 浮窗把手深模块：视口钳制纯函数 + 拖动/缩放把手接线
 import "./stroke-input-smooth.test.mjs";
 import "./stroke-smoother.test.mjs";
 import "./stroke-session.test.mjs";

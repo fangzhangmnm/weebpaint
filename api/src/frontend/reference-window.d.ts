@@ -35,6 +35,31 @@ export type RefItem = {
     kind: "live";
     vp: RefViewport | null;
 };
+export interface RefMenuItem {
+    id: string;
+    label: string;
+    icon?: string;
+    hidden?: boolean;
+    danger?: boolean;
+    separatorBefore?: boolean;
+}
+export interface RefMenuOpts {
+    anchor: HTMLElement;
+    items: () => RefMenuItem[];
+    onPick: (id: string) => void | "keep";
+    onClose?: () => void;
+    align?: "left" | "right";
+    band?: "menu";
+    swallowOutsideTap?: boolean;
+    ariaLabel?: string;
+}
+export interface RefMenuHandle {
+    close(): void;
+    refresh(): void;
+    readonly isOpen: boolean;
+}
+/** toggle 语义：同锚已开 → 关并返回 null；否则开并返回句柄。 */
+export type RefMenuPort = (opts: RefMenuOpts) => RefMenuHandle | null;
 export declare const REF_ICON_IDS: {
     readonly folder: "folder";
     readonly paste: "paste";
@@ -50,6 +75,7 @@ export declare const REF_ICON_IDS: {
 export declare class WpReferenceWindow extends HTMLElement {
     static get observedAttributes(): string[];
     liveProvider: (() => RefLiveSource | null) | null;
+    menuPort: RefMenuPort | null;
     private _canvas;
     private _cctx;
     private _emptyEl;

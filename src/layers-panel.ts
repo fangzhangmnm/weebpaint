@@ -23,6 +23,7 @@
 
 import { createApp, defineComponent, reactive, computed, watch, nextTick, ref } from "../vendor/vue/vue.esm-browser.prod.js";
 import { positionPopup } from "./anchored-popup.ts";
+import { attachPanelDrag, attachPanelResize } from "./ui/panel-gizmo.ts";   // 2026-09-02 拖动/缩放把手深模块
 
 // 浮窗 top 出血区（v0.4.11，真机 1.1 softlock）：iPad 顶部 hidden title bar / 系统手势区会拦截
 //   贴顶元素的拖动——面板头一旦钻进去就拉不回来。地板 ≈ safe-area + 顶栏（同 reference MIN_TOP 先例）。
@@ -825,8 +826,6 @@ function _canMergeDownActive(): boolean {
   return !under.isGroup && !(under.clippingMask && !L.clippingMask);
 }
 
-let _layersDrag: { id: number; sx: number; sy: number; ol: number; ot: number } | null = null;
-
 export function initLayersPanel(ctx: AppContext) {
   ({ doc, board, history, setStatus, layers, editMode, afterDocChange: _afterDocChange } = ctx);
 
@@ -860,59 +859,32 @@ export function initLayersPanel(ctx: AppContext) {
   els.layersBtn.addEventListener("click", () => toggleLayersPanel());
   els.layersPanelClose.addEventListener("click", () => toggleLayersPanel(false));
 
-  // 拖动 layers 面板（沿用 color panel 模式）
-  els.layersPanelHead.addEventListener("pointerdown", (e: PointerEvent) => {
-    if ((e.target as HTMLElement | null)?.closest(".float-panel-close")) return;
-    const r = els.layersPanel.getBoundingClientRect();
-    _layersDrag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, ol: r.left, ot: r.top };
-    els.layersPanelHead.setPointerCapture(e.pointerId);
-    e.preventDefault();
-  });
-  els.layersPanelHead.addEventListener("pointermove", (e: PointerEvent) => {
-    if (!_layersDrag || e.pointerId !== _layersDrag.id) return;
-    const w = els.layersPanel.offsetWidth;
-    const h = els.layersPanel.offsetHeight;
-    // v0.4.11（真机 1.1 softlock）：top 地板 = 顶部出血区——面板头钻进 iPad hidden title bar
-    //   后拖不回来（系统手势拦截），文档被软锁。仿 reference._loadPos 的 MIN_TOP 先例。
-    const left = Math.max(0, Math.min(window.innerWidth - w, _layersDrag.ol + (e.clientX - _layersDrag.sx)));
-    const top  = Math.max(PANEL_MIN_TOP, Math.min(window.innerHeight - h, _layersDrag.ot + (e.clientY - _layersDrag.sy)));
-    els.layersPanel.style.left = left + "px";
-    els.layersPanel.style.right = "auto";
-    els.layersPanel.style.top = top + "px";
-    _clampListHeightSoon();   // 拖动改了面板顶 → 重钉列表高度，底部 item 始终够得着（合帧，120Hz 笔不逐事件重排）
-    // 位置随文档走；保留已持久化的 width/height（#13），别整枝盖掉
-    desk.layersPanel.position = { ...(desk.layersPanel.position ?? {}), left, top };
+  // 拖动 / 缩放 = ui/panel-gizmo 深模块（2026-09-02：图层/颜色/调色板三窗共用一份把手舞蹈 + 视口钳制口径；
+  //   top 地板 = PANEL_MIN_TOP 出血区，v0.4.11 真机 1.1 softlock 先例）。落地（写 style / 持久化 desk）留在这里。
+  attachPanelDrag(els.layersPanel, els.layersPanelHead, {
+    ignore: (t) => !!t.closest(".float-panel-close"),
+    topFloor: PANEL_MIN_TOP,
+    onMove: ({ left, top }) => {
+      els.layersPanel.style.left = left + "px";
+      els.layersPanel.style.right = "auto";
+      els.layersPanel.style.top = top + "px";
+      _clampListHeightSoon();   // 拖动改了面板顶 → 重钉列表高度，底部 item 始终够得着（合帧，120Hz 笔不逐事件重排）
+      // 位置随文档走；保留已持久化的 width/height（#13），别整枝盖掉
+      desk.layersPanel.position = { ...(desk.layersPanel.position ?? {}), left, top };
+    },
   });
   // #13 右下角拖拽调大小：宽 = 面板宽，高 = 列表高（_userListH）。尺寸随 position 一起持久化（PanelPos.width/height）。
   const resizeEl = document.getElementById("layersPanelResize");
-  let _layersResize: { id: number; sx: number; sy: number; ow: number; oh: number } | null = null;
-  resizeEl?.addEventListener("pointerdown", (e: PointerEvent) => {
-    const listH = els.layersList.getBoundingClientRect().height;
-    _layersResize = { id: e.pointerId, sx: e.clientX, sy: e.clientY, ow: els.layersPanel.offsetWidth, oh: listH };
-    resizeEl.setPointerCapture(e.pointerId);
-    e.preventDefault();
-  });
-  resizeEl?.addEventListener("pointermove", (e: PointerEvent) => {
-    if (!_layersResize || e.pointerId !== _layersResize.id) return;
-    const r = els.layersPanel.getBoundingClientRect();
-    const w = Math.max(200, Math.min(window.innerWidth - r.left - 8, _layersResize.ow + (e.clientX - _layersResize.sx)));
-    _userListH = Math.max(0, _layersResize.oh + (e.clientY - _layersResize.sy));
-    els.layersPanel.style.width = w + "px";
-    _clampListHeightSoon();   // 高走 maxHeight 夹取：往下拖也永远够不出视口底（含 foot）
-    desk.layersPanel.position = { left: r.left, top: r.top, width: w, height: _userListH };   // 整枝赋值
-  });
-  resizeEl?.addEventListener("pointerup", (e: PointerEvent) => {
-    if (_layersResize && e.pointerId === _layersResize.id) {
-      try { resizeEl.releasePointerCapture(e.pointerId); } catch {}
-      _layersResize = null;
-    }
-  });
-
-  els.layersPanelHead.addEventListener("pointerup", (e: PointerEvent) => {
-    if (_layersDrag && e.pointerId === _layersDrag.id) {
-      try { els.layersPanelHead.releasePointerCapture(e.pointerId); } catch {}
-      _layersDrag = null;
-    }
+  if (resizeEl) attachPanelResize(els.layersPanel, resizeEl, {
+    getSize: () => ({ w: els.layersPanel.offsetWidth, h: els.layersList.getBoundingClientRect().height }),
+    min: { w: 200, h: 0 },
+    onResize: ({ w, h }) => {
+      const r = els.layersPanel.getBoundingClientRect();
+      _userListH = h;
+      els.layersPanel.style.width = w + "px";
+      _clampListHeightSoon();   // 高走 maxHeight 夹取：往下拖也永远够不出视口底（含 foot）
+      desk.layersPanel.position = { left: r.left, top: r.top, width: w, height: _userListH };   // 整枝赋值
+    },
   });
   // 面板开关 + 位置随文档走：doc 的 desk 加载/重置后由 session-state 派发 wp:applyEditorState，据此应用到 DOM。
   window.addEventListener("wp:applyEditorState", () => applyLayersPanelFromEditorState());

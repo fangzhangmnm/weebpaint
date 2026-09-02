@@ -2,6 +2,7 @@
 // 色轮渲染/HSV 在 ui/color-wheel.ts；本模块只管「当前色 + 面板 chrome + 吸色提示」。
 // drawing app 与色彩只经一个 color 值耦合（setColor 写 state.color → 反应式 → currentBrush 重派生）。
 
+import { attachPanelDrag, attachPanelResize } from "./ui/panel-gizmo.ts";   // 2026-09-02 拖动/缩放把手深模块
 import type { AppContext } from "./app-context.ts";
 import { els } from "./els.ts";
 import { mountColorWheel } from "./ui/color-wheel.ts";
@@ -65,7 +66,6 @@ export function toggleColorPanel(force?: boolean) {
   }
 }
 
-let _panelDrag: { id: number; sx: number; sy: number; ol: number; ot: number } | null = null;
 let _pickerPinTimer: ReturnType<typeof setTimeout> | undefined;
 
 // 文档加载/新建后应用该 doc 保存的面板状态：只写 DOM，绝不回写 desk（否则会误标脏）。
@@ -98,50 +98,25 @@ export function initColorPanel(ctx: AppContext) {
   setColor(state.color);
   els.colorPanelClose.addEventListener("click", () => toggleColorPanel(false));
 
-  // 拖标题栏移动面板
-  els.colorPanelHead.addEventListener("pointerdown", (e: PointerEvent) => {
-    if ((e.target as HTMLElement | null)?.closest(".close-x")) return;
-    const r = els.colorPanel.getBoundingClientRect();
-    _panelDrag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, ol: r.left, ot: r.top };
-    els.colorPanelHead.setPointerCapture(e.pointerId);
-    e.preventDefault();
-  });
-  els.colorPanelHead.addEventListener("pointermove", (e: PointerEvent) => {
-    if (!_panelDrag || e.pointerId !== _panelDrag.id) return;
-    const w = els.colorPanel.offsetWidth;
-    const h = els.colorPanel.offsetHeight;
-    const left = Math.max(0, Math.min(window.innerWidth - w, _panelDrag.ol + (e.clientX - _panelDrag.sx)));
-    const top = Math.max(60, Math.min(window.innerHeight - h, _panelDrag.ot + (e.clientY - _panelDrag.sy)));   // top 地板=出血区（v0.4.11，同 layers-panel）
-    els.colorPanel.style.left = left + "px";
-    els.colorPanel.style.top = top + "px";
-    desk.colorPanel.position = { ...(desk.colorPanel.position ?? {}), left, top };
-  });
-  els.colorPanelHead.addEventListener("pointerup", (e: PointerEvent) => {
-    if (_panelDrag && e.pointerId === _panelDrag.id) {
-      try { els.colorPanelHead.releasePointerCapture(e.pointerId); } catch {}
-      _panelDrag = null;
-    }
+  // 拖动 / 缩放 = ui/panel-gizmo 深模块（2026-09-02，同 layers-panel；top 地板 60 = 出血区 v0.4.11）
+  attachPanelDrag(els.colorPanel, els.colorPanelHead, {
+    ignore: (t) => !!t.closest(".close-x"),
+    onMove: ({ left, top }) => {
+      els.colorPanel.style.left = left + "px";
+      els.colorPanel.style.top = top + "px";
+      desk.colorPanel.position = { ...(desk.colorPanel.position ?? {}), left, top };
+    },
   });
   // v0.5.21 user：颜色窗口调大小（宽；sv-pad 已流体化，高随内容）。同 layers #13 手柄纪律。
   const resizeEl = document.getElementById("colorPanelResize");
-  let _resize: { id: number; sx: number; ow: number } | null = null;
-  resizeEl?.addEventListener("pointerdown", (e: PointerEvent) => {
-    _resize = { id: e.pointerId, sx: e.clientX, ow: els.colorPanel.offsetWidth };
-    resizeEl.setPointerCapture(e.pointerId);
-    e.preventDefault();
-  });
-  resizeEl?.addEventListener("pointermove", (e: PointerEvent) => {
-    if (!_resize || e.pointerId !== _resize.id) return;
-    const r = els.colorPanel.getBoundingClientRect();
-    const w = Math.max(180, Math.min(window.innerWidth - r.left - 8, _resize.ow + (e.clientX - _resize.sx)));
-    els.colorPanel.style.width = w + "px";
-    desk.colorPanel.position = { ...(desk.colorPanel.position ?? {}), left: r.left, top: r.top, width: w };
-  });
-  resizeEl?.addEventListener("pointerup", (e: PointerEvent) => {
-    if (_resize && e.pointerId === _resize.id) {
-      try { resizeEl.releasePointerCapture(e.pointerId); } catch {}
-      _resize = null;
-    }
+  if (resizeEl) attachPanelResize(els.colorPanel, resizeEl, {
+    getSize: () => ({ w: els.colorPanel.offsetWidth, h: 0 }),
+    min: { w: 180, h: 0 },
+    onResize: ({ w }) => {
+      const r = els.colorPanel.getBoundingClientRect();
+      els.colorPanel.style.width = w + "px";
+      desk.colorPanel.position = { ...(desk.colorPanel.position ?? {}), left: r.left, top: r.top, width: w };
+    },
   });
   window.addEventListener("wp:toggleColor", () => toggleColorPanel());
   window.addEventListener("wp:applyEditorState", () => applyColorPanelFromEditorState());
