@@ -35,7 +35,6 @@ import { supportsFileSystemAccess, pickLocalOraFile } from "./local-file-session
 import { intakeOraDoc } from "./import-image.ts";
 import { openAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";   // 2026-09-02 C1
 import { allows } from "./ui/interaction-lock.ts";   // 2026-09-02 C8
-import { openSheet as openModalSheet, closeSheet as closeModalSheet } from "./ui/sheet.ts";   // 2026-09-02 C3
 import { reportError } from "./error-badge.ts";
 import { decodeOraToPainting } from "./backend/ora.ts";
 import { t } from "./i18n/index.ts";
@@ -135,18 +134,7 @@ export function initTopbarMenu(ctx: AppContext) {
   els.undoBtn.disabled = true;
   els.redoBtn.disabled = true;
 
-  els.clearSheet.addEventListener("click", (e: Event) => {
-    const a = (e.target as HTMLElement | null)?.closest("[data-clear]") ? ((e.target as HTMLElement).closest("[data-clear]") as HTMLElement).dataset.clear : undefined;
-    if (!a) return;
-    closeModalSheet(els.clearSheet);
-    if (a !== "confirm") return;
-    const layer = doc.activeLayer as ViewLeaf | null;
-    if (!layer || layer.isGroup) return;
-    // v0.8.3（S3）：走 ctx.layers.clearLayer（快照/清空/入栈收进组件），Ctrl+Z 能复活。
-    layers.clearLayer(layer.id);
-    board.invalidateAll();
-    setStatus(t("tm.clearedActiveLayer"));
-  });
+  // （clearSheet 确认对话 2026-09-02 删：v124b 撤 menuClear 后再无打开者；清空当前层走图层面板底栏「清空内容」）
 
   // ---- 保存触发：wp:histchange + wp:sidecarchange dirty 门 / Ctrl+S / beforeunload / topSaveBtn ----
   // 笔触结束 / undo / redo / 图层操作（wp:histchange）与 sidecar 变更（参考图等，wp:sidecarchange，

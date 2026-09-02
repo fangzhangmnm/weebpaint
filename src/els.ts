@@ -135,6 +135,5 @@ export const els = {
   colorPanelClose: byId("colorPanelClose"),
   colorPanelBody: document.querySelector("#colorPanel .float-panel-body"),  // 色轮 Vue 组件挂载点
   // clear sheet
-  clearSheet: byId("clearSheet"),
   // （update toast 2026-09-02 C7 退役：通知走 ui/notice.ts）
 };

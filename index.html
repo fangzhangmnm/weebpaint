@@ -107,7 +107,7 @@
     <link rel="icon" href="./icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=4617c512feee" />
+    <link rel="stylesheet" href="./styles.css?v=01cb9e4fd051" />
     <!-- zip.js UMD bundle：自挂 window.zip。必须在 module bundle 之前。
          defer（v417）：原来是 parser-blocking 的，硬刷新时 SW 被绕过 → 直奔网络 → 网络一卡整个
          文档解析就停住（浏览器标签页转圈）。defer 后它与下面的 type=module bundle 同属延迟脚本、
@@ -1585,18 +1585,13 @@
     </div>
 
     <!-- 清空确认（只清当前图层；可撤销） -->
-    <div id="clearSheet" class="sheet" role="dialog" data-i18n-aria="clr.aria">
-      <h3 data-i18n="clr.title">清空当前图层？</h3>
-      <p class="sheet-hint" id="clearSheetMessage" data-i18n="clr.msg">把当前图层的像素全部抹掉。可以 Ctrl+Z 撤销。</p>
-      <button class="sheet-action danger" data-clear="confirm" data-i18n="clr.confirm">清空</button>
-      <button class="sheet-action ghost" data-clear="cancel" data-i18n="common.cancel">取消</button>
-    </div>
+    <!-- clearSheet（清空当前图层确认）2026-09-02 删：v124b 撤 menuClear 后再无打开者，死 UI -->
 
     <!-- 更新 toast / 压感 toast：2026-09-02 C7 起由 src/ui/notice.ts 运行时建（同一条通知栈），静态节点退役 -->
 
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-09c5d394161d.mjs"></script>
+    <script type="module" src="./dist/weebpaint-c0586a1d28ed.mjs"></script>
   </body>
 </html>

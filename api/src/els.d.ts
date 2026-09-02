@@ -112,5 +112,4 @@ export declare const els: {
     colorPanelHead: HTMLElement;
     colorPanelClose: HTMLElement;
     colorPanelBody: Element | null;
-    clearSheet: HTMLElement;
 };

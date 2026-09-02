@@ -3788,30 +3788,6 @@ export declare const S: {
         readonly ja: "カラー";
         readonly tok: "kule";
     };
-    readonly "clr.aria": {
-        readonly zh: "清空确认";
-        readonly en: "Clear confirmation";
-        readonly ja: "消去の確認";
-        readonly tok: "toki pi weka ale";
-    };
-    readonly "clr.title": {
-        readonly zh: "清空当前图层？";
-        readonly en: "Clear current layer?";
-        readonly ja: "現在のレイヤーを消去？";
-        readonly tok: "sina wile ala wile weka e ale pi lipu ni?";
-    };
-    readonly "clr.msg": {
-        readonly zh: "把当前图层的像素全部抹掉。可以 Ctrl+Z 撤销。";
-        readonly en: "Erase all pixels on the current layer. Undo with Ctrl+Z.";
-        readonly ja: "現在のレイヤーのピクセルをすべて消去します。Ctrl+Z で元に戻せます。";
-        readonly tok: "ni li weka e kule ale pi lipu ni. sina ken weka e pali ni (Ctrl+Z).";
-    };
-    readonly "clr.confirm": {
-        readonly zh: "清空";
-        readonly en: "Clear";
-        readonly ja: "消去";
-        readonly tok: "o weka e ale";
-    };
     readonly "upd.available": {
         readonly zh: "有新版本";
         readonly en: "New version available";
@@ -4421,12 +4397,6 @@ export declare const S: {
         readonly en: "Unload failed: {error}";
         readonly ja: "アンロードに失敗しました：{error}";
         readonly tok: "weka li pakala: {error}";
-    };
-    readonly "tm.clearedActiveLayer": {
-        readonly zh: "已清空当前图层（Ctrl+Z 撤销）";
-        readonly en: "Active layer cleared (Ctrl+Z to undo)";
-        readonly ja: "現在のレイヤーを消去しました（Ctrl+Z で取り消し）";
-        readonly tok: "mi weka e ale pi lipu ni (Ctrl+Z)";
     };
     readonly "tm.hubTitle": {
         readonly zh: "导出与另存";

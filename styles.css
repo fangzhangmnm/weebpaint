@@ -964,8 +964,8 @@ div.version-slim { transform-origin: left center; }   /* 图库菜单的 info �
 }
 .menu-item-wrench:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
 .menu-config-popup {
-  position: absolute; right: 0; top: 100%; z-index: 50;
-  margin-top: 4px; padding: 10px 12px;
+  /* 2026-09-02：位置/z 归 popup-menu（收养挂 body、锚到扳手、band popover）；原 absolute+裸 z 50 会被主菜单 overflow 裁 */
+  padding: 10px 12px;
   /* 外观（实底）走共享规则 */
   min-width: 180px;
   display: flex; flex-direction: column; gap: 8px;

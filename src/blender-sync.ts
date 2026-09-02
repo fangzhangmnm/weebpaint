@@ -16,6 +16,7 @@
 
 import { registerFloatingWindow, type FloatingWindowHandle } from "./ui/floating-window.ts";   // 2026-09-02 C2 浮窗深模块
 import { mountSelectField } from "./ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
+import { toggleAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";   // 2026-09-02：⋯ 弹层收养（挂 body、锚到扳手）
 import type { AppContext } from "./app-context.ts";
 import { preferences } from "./app-prefs.ts";   // blender-panel-url（gallery scope+无库 cascade，残留审计 F）
 import { reportError } from "./error-badge.ts";
@@ -89,10 +90,7 @@ export function initBlenderSync(c: AppContext) {
     setMenuOpen(false);
     togglePanel(true);
   });
-  // 点面板外 → 收起所有 ⋯ 弹层
-  document.addEventListener("pointerdown", (e) => {
-    if (!panel.contains(e.target as Node)) closeAllPopups();
-  });
+  // （点面板外收 ⋯ 弹层：2026-09-02 归 popup-menu 外点关）
   // 文档 desk 加载/重置后 → 回灌面板 show/position（+ 账号级 URL）
   window.addEventListener("wp:applyEditorState", () => applyBlenderPanelFromEditorState());
 }
@@ -380,16 +378,18 @@ function syncConfigUI() {
 
 // ───────────────────────── 面板 DOM ─────────────────────────
 
+const _btpPopups: HTMLElement[] = [];   // 收养后节点搬到 body，不再能从 panel 里 query → 自己记着
 function closeAllPopups() {
-  for (const p of panel.querySelectorAll<HTMLElement>(".btp-popup")) p.classList.add("hidden");
+  for (const p of _btpPopups) closePopupMenuOf(p);
 }
 
+// 2026-09-02：⋯ 配置弹层收养进 popup-menu（原 absolute 嵌在面板行里，面板靠底时伸出屏外）：搬 body、锚到扳手、
+//   band popover（压过 window band）、外点关/Escape/单例归 module。
 function wirePopup(wrench: HTMLElement, popup: HTMLElement) {
+  _btpPopups.push(popup);
   wrench.addEventListener("click", (e) => {
     e.stopPropagation();
-    const show = popup.classList.contains("hidden");
-    closeAllPopups();
-    popup.classList.toggle("hidden", !show);
+    toggleAdoptedPopup(popup, { anchor: wrench, align: "right", offsetY: 4, band: "popover", mountToBody: true });
   });
   popup.addEventListener("pointerdown", (e) => e.stopPropagation());
 }

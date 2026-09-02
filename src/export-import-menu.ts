@@ -16,6 +16,7 @@ import { parseColorInput, colorNameOf } from "./color-name.ts";
 import { parseExportBg } from "./backend/algorithms/flatten-bg.ts";
 import { els } from "./els.ts";
 import { mountSelectField, type SelectField } from "./ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
+import { openAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";   // 2026-09-02：扳手弹层收养（挂 body，不再困在菜单 overflow 里）
 import { t } from "./i18n/index.ts";
 import { setMenuOpen } from "./settings-menu.ts";
 import { session } from "./session-state.ts";
@@ -123,33 +124,31 @@ function _updateMenuSubLabels() {
   }
 }
 
-// 🔧 配置 popup（点开 / 点别处关）。setMenuOpen 不变，popup 嵌在 menu-item-row 里
+// 🔧 配置 popup（点开 / 点别处关）。setMenuOpen 不变。
+//   2026-09-02：原先嵌在 menu-item-row 里 position:absolute + 裸 z 50——主菜单 .menu-panel 有 overflow-y:auto，行靠底时弹层被
+//   裁（T1 同族，考古报告 C1 未迁清单）。现改 popup-menu 收养：节点现建后 mountToBody、锚到扳手、band popover（压过主菜单）、
+//   外点关/Escape/与主菜单的父子栈全归 module；里面的 select-field 下拉再弹一层也在栈里。
 function _openMenuConfigPopup(wrenchBtn: HTMLElement, html: string, onApply: (popup: HTMLElement) => void): HTMLElement | null {
   // v124 toggle：再点同一个扳手就收回（user：「再按一下扳手应该收回」）
-  const existing = wrenchBtn.closest(".menu-item-row")?.querySelector(".menu-config-popup");
-  if (existing) { existing.remove(); return null; }
-  document.querySelectorAll(".menu-config-popup").forEach((el) => el.remove());
-  const row = wrenchBtn.closest(".menu-item-row");
-  if (!row) return null;
+  const existing = _configPopup;
+  if (existing) {
+    const same = existing.wrench === wrenchBtn;
+    closePopupMenuOf(existing.el);   // onClose → remove + _configPopup=null
+    if (same) return null;
+  }
   const popup = document.createElement("div");
   popup.className = "menu-config-popup";
   popup.innerHTML = html;
-  row.appendChild(popup);
   const onPopupChange = () => onApply(popup);
   popup.addEventListener("change", onPopupChange);
   // popup 内点击不冒泡（让 menu 自身的「点外面关」别误把 popup 当外面）
   popup.addEventListener("click", (e) => e.stopPropagation());
-  setTimeout(() => {
-    function onDocClick(ev: Event) {
-      if (popup.contains(ev.target as Node) || wrenchBtn.contains(ev.target as Node)) return;
-      if ((ev.target as Element | null)?.closest?.(".popup-menu")) return;   // popup 里再弹的下拉（select-field）不算外面
-      popup.remove();
-      document.removeEventListener("pointerdown", onDocClick, true);
-    }
-    document.addEventListener("pointerdown", onDocClick, true);
-  }, 0);
+  _configPopup = { el: popup, wrench: wrenchBtn };
+  openAdoptedPopup(popup, { anchor: wrenchBtn, align: "right", offsetY: 4, band: "popover", mountToBody: true,
+    onClose: () => { popup.remove(); if (_configPopup?.el === popup) _configPopup = null; } });
   return popup;
 }
+let _configPopup: { el: HTMLElement; wrench: HTMLElement } | null = null;
 
 export function initExportImportMenu(ctx: AppContext) {
   ({ doc, setStatus, board } = ctx);

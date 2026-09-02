@@ -725,10 +725,6 @@ export const S = {
   // 颜色浮窗
   "color.title":     { zh: "颜色", en: "Color", ja: "カラー", tok: "kule" },
   // 清空确认 sheet
-  "clr.aria":        { zh: "清空确认", en: "Clear confirmation", ja: "消去の確認", tok: "toki pi weka ale" },
-  "clr.title":       { zh: "清空当前图层？", en: "Clear current layer?", ja: "現在のレイヤーを消去？", tok: "sina wile ala wile weka e ale pi lipu ni?" },
-  "clr.msg":         { zh: "把当前图层的像素全部抹掉。可以 Ctrl+Z 撤销。", en: "Erase all pixels on the current layer. Undo with Ctrl+Z.", ja: "現在のレイヤーのピクセルをすべて消去します。Ctrl+Z で元に戻せます。", tok: "ni li weka e kule ale pi lipu ni. sina ken weka e pali ni (Ctrl+Z)." },
-  "clr.confirm":     { zh: "清空", en: "Clear", ja: "消去", tok: "o weka e ale" },
   // 更新 toast
   "upd.available":   { zh: "有新版本", en: "New version available", ja: "新しいバージョンあり", tok: "mi ken kama sin" },
   "upd.reload":      { zh: "刷新", en: "Reload", ja: "再読み込み", tok: "o open sin" },
@@ -841,7 +837,6 @@ export const S = {
   "ss.unloadingBusy": { zh: "正在卸载本地 {name}…", en: "Unloading local {name}…", ja: "ローカルの {name} をアンロードしています…", tok: "mi weka e {name} tan ilo ni…" }, 
   "ss.unloaded": { zh: "已卸载本地：{name}（修改在本地回收站，云端保留）", en: "Unloaded local: {name} (changes are in the local trash; the cloud is kept)", ja: "ローカルをアンロードしました：{name}（変更はローカルのゴミ箱にあり、クラウドは保持されます）", tok: "weka tan ilo ni li pini: {name}. ante li lon poki jaki pi ilo ni. poki sewi li awen jo." }, 
   "ss.unloadFailed": { zh: "卸载失败：{error}", en: "Unload failed: {error}", ja: "アンロードに失敗しました：{error}", tok: "weka li pakala: {error}" }, 
-  "tm.clearedActiveLayer": { zh: "已清空当前图层（Ctrl+Z 撤销）", en: "Active layer cleared (Ctrl+Z to undo)", ja: "現在のレイヤーを消去しました（Ctrl+Z で取り消し）", tok: "mi weka e ale pi lipu ni (Ctrl+Z)" },
   // ── 导出与另存 hub（2026-08-21）────────────────────────────────
   "tm.hubTitle": { zh: "导出与另存", en: "Export & save a copy", ja: "書き出しと別名保存", tok: "pana en awen" },
   "tm.hubExportImage": { zh: "导出图片（{cfg}）", en: "Export image ({cfg})", ja: "画像を書き出す（{cfg}）", tok: "o pana e sitelen ({cfg})" },
