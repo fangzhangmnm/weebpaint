@@ -1,4 +1,4 @@
-import { S, type Lang } from "./strings.ts";
+import { S, type Lang, type Entry } from "./strings.ts";
 export type { Lang } from "./strings.ts";
 export type Key = keyof typeof S;
 export declare const LANGS: Lang[];
@@ -7,6 +7,7 @@ export declare function langDisplayName(l: Lang): string;
 export declare function lang(): Lang;
 export declare function t(key: Key, params?: Record<string, string | number>): string;
 export declare function tLatin(key: Key, params?: Record<string, string | number>): string;
+export declare function tEntry(e: Entry): string;
 export declare function applyHtmlLang(): void;
 export declare function setLang(l: Lang): Promise<void>;
 export declare function reconcileLangFromPrefs(): void;

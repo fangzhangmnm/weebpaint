@@ -86,6 +86,8 @@ import "./brush-rack-view.test.mjs";
 import "./brush-rack-reactive.test.mjs";   // ★笔架↔collection 绑定回归（v415 漏接过）
 import "./builtin-brushes.test.ts";        // 出厂笔数据契约 + 「固定」变体 = 原笔逐字拷贝仅三 coeff 归零（2026-08-28 笔压 toggle sunset）
 import "./pointer-route.test.mjs";
+import "./pressure-probe.test.mjs";     // 2026-09-02 压感自诊探针：pen-flat / absolute-mouse 判定边界 + 鼠绘零误报钉子
+import "./md-lite.test.mjs";            // 2026-09-02 in-app 说明书极简 md 渲染：转义先行/块/行内
 import "./stroke-input-smooth.test.mjs";
 import "./stroke-smoother.test.mjs";
 import "./stroke-session.test.mjs";

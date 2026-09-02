@@ -4,7 +4,7 @@
 //   · <html lang> 随语言动态 → 浏览器选对 CJK 字形（日文汉字 ≠ 中文汉字）。
 //   · data-i18n 是过渡桥（非终点）：静态 index.html 一次性填充；新内容/需动的段走 Vue + t()。
 
-import { S, type Lang } from "./strings.ts";
+import { S, type Lang, type Entry } from "./strings.ts";
 import { tokGlyphsCached, tokGlyphs, stripTokMarkup, ucsurActive, initTokFontGate } from "./ucsur.ts";
 import { preferences, preferencesReady, flushPreferences } from "../app-prefs.ts";   // 语言 = gallery 层偏好（跟身份走；P5 唯一门面）
 import { readBootSnapshot, writeBootSnapshot } from "../boot-snapshot.ts";   // eval 期读得到的 lang 快照（IDB 异步，见该文件）
@@ -58,6 +58,13 @@ export function t(key: Key, params?: Record<string, string | number>): string {
 }
 export function tLatin(key: Key, params?: Record<string, string | number>): string {
   return _interp(_resolve(key, /*latin*/ true), params);
+}
+// 直接解析一条 Entry（不经 S 表的文案：说明书 readme-docs.ts 等按主题分文件的长文）。
+//   tok 只在该条真有 tok 时走 UCSUR 转写；没有则 fallback en（绝不对英文跑 tokGlyphs）。edited by Claude Fable 5.1 2026-09-02
+export function tEntry(e: Entry): string {
+  const l = lang();
+  if (l === "tok" && e.tok) return ucsurActive() ? tokGlyphs(e.tok) : stripTokMarkup(e.tok);
+  return (e as Record<string, string | undefined>)[l] ?? e.en ?? e.zh;
 }
 function _resolve(key: Key, latin: boolean): string {
   const e = S[key] as Record<string, string> | undefined;

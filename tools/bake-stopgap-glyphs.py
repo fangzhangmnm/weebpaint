@@ -53,6 +53,8 @@ SPECS = [
     ("chevron-left",  "‹",   (3, 3, 18, 18, 'sans'), "参考窗翻页 chip ‹（stopgap 字形；库裸 chevron 曾 sunset，待美工裁小尺寸版）"),
     ("chevron-right", "›",   (3, 3, 18, 18, 'sans'), "参考窗翻页 chip ›（stopgap 字形）"),
     ("one-to-one",    "1:1", (2, 5, 20, 14, 'sans'), "参考窗菜单「1:1 像素」（stopgap 字形；待像素隐喻真图）"),
+    # 2026-09-02 内置说明书入口（设置菜单「帮助」；登记见 ../20260708 SVG Icons/TODO.md 待画）
+    ("help",          "?",   (5, 3, 14, 18, 'sans'), "设置菜单「帮助」= in-app 说明书入口（stopgap 字形；待 help/question 真图）"),
 ]
 syms = []
 for sid, text, box, note in SPECS:

@@ -42,6 +42,8 @@ import { initDocOps } from "./doc-ops.ts";
 import { initCloudAuthUI, updateCloudAuthUI } from "./gallery/cloud-auth-ui.ts";
 import { initGalleryManageUI, resumePendingOneDriveConnect } from "./gallery/gallery-manage-ui.ts";
 import { initSettingsMenu, applyCheckerboard, renderSettingsFromPrefs } from "./settings-menu.ts";   // setMenuOpen→各菜单模块
+import { initReadmePanel } from "./readme-panel.ts";       // 2026-09-02 内置说明书（菜单「帮助」+ #help/<id> 深链）
+import { initPressureToast } from "./pressure-toast.ts";   // 2026-09-02 压感自诊 toast（input.ts 探针 → wp:pressure-doubt）
 import { initFiltersAdjust } from "./filters-adjust.ts";
 import { initToolbar, RACK_PANEL_BY_TOOL, closeTransientMenus } from "./toolbar.ts";
 import { setColor, initColorPanel } from "./color-panel.ts";
@@ -343,6 +345,8 @@ initTheme(ctx);
 initLayersPanel(ctx);
 initDocOps(ctx);
 initSettingsMenu(ctx);
+initReadmePanel();     // 说明书 sheet + 菜单入口 + 深链（需 settings-menu 已 init：setMenuOpen）
+initPressureToast();   // 一 session 一次的「没压感？」toast
 initDiagLogSheet({ status: setStatus });   // dev 页「诊断日志」（看/复制/清空）
 initExportImportMenu(ctx);
 initFiltersAdjust(ctx);

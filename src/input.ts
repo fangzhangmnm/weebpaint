@@ -29,6 +29,7 @@ import { ShapeBrushEngine } from "./shape-brush.ts";
 import { isPixelStroke, pixelStrokeSpec } from "./engine-registry.ts";
 import { computePinchViewport, snapRotation, isTap, isDoubleTap, gestureTapAction } from "./common/pointer-gesture.ts";
 import { assignRole, effectiveTool, toolToRole, strokeMode, eraserTapOnRelease } from "./pointer-route.ts";
+import { PressureProbe, sampleFromPointerEvent, isWindowsPlatform } from "./pressure-probe.ts";   // 2026-09-02 压感自诊（pen-flat / absolute-mouse）
 import { isBusyActive } from "./fullscreen-busy.ts";
 import { inputSmooth } from "./stroke-input-smooth.ts";
 import { t } from "./i18n/index.ts";
@@ -389,6 +390,7 @@ export class InputController {
   status: (msg: string) => void;
   pointers: Map<number, PointerRec>;
   penEverSeen: boolean;
+  pressureProbe: PressureProbe;   // 2026-09-02 压感自诊探针（判定 → window wp:pressure-doubt → pressure-toast）
   spaceDown: boolean;
   altDown: boolean;
   // 按住 E = 临时橡皮（spring-loaded；判定纯函数在 pointer-route.ts）。_keydown 置位 / _keyup 清位 /
@@ -445,6 +447,7 @@ export class InputController {
 
     this.pointers = new Map();
     this.penEverSeen = false;
+    this.pressureProbe = new PressureProbe({ windows: isWindowsPlatform() });
     this.spaceDown = false;
     this.altDown = false;
     this.eraserHold = false;
@@ -485,6 +488,10 @@ export class InputController {
     c.addEventListener("pointerup", (e) => this._up(e));
     c.addEventListener("pointercancel", (e) => this._up(e, true));
     c.addEventListener("pointerleave", (e) => this._up(e, true));
+    // 压感探针：光标离开画布 / 窗口失焦 / 页面隐藏 → 瞬移基线作废（OS 搬光标不算「数位板走鼠标模式」的证据）
+    c.addEventListener("pointerleave", () => this.pressureProbe.resetBaseline());
+    window.addEventListener("blur", () => this.pressureProbe.resetBaseline());
+    document.addEventListener("visibilitychange", () => this.pressureProbe.resetBaseline());
     c.addEventListener("contextmenu", (e) => e.preventDefault());
     // iOS：长按 callout / 放大镜 / "存储图像" 在 touchstart 长按计时器上 arm，contextmenu(iOS 基本不发)
     //   + pointerdown.preventDefault(错事件类型) 都拦不住。唯一可靠拦法 = 非 passive touchstart
@@ -700,7 +707,18 @@ export class InputController {
     e.preventDefault();
   }
 
+  // 压感自诊（pressure-probe.ts）：每个 move/up 喂一口；出判定 → 广播给 pressure-toast。判定后探针停摆，
+  //   之后每事件只剩一次 verdict 读——热路径零成本。
+  _probePressure(e: PointerEvent, up: boolean) {
+    const pr = this.pressureProbe;
+    if (pr.verdict) return;
+    const s = sampleFromPointerEvent(e);
+    const d = up ? pr.observeUp(e.pointerId, s) : pr.observeMove(e.pointerId, s);
+    if (d) window.dispatchEvent(new CustomEvent("wp:pressure-doubt", { detail: { reason: d } }));
+  }
+
   _move(e: PointerEvent) {
+    this._probePressure(e, false);
     const rec = this.pointers.get(e.pointerId);
     if (!rec) {
       // 没按下时也更新 cursor preview（pen hover / mouse hover）
@@ -874,6 +892,7 @@ export class InputController {
   }
 
   _up(e: PointerEvent, cancelled = false) {
+    this._probePressure(e, true);
     const rec = this.pointers.get(e.pointerId);
     if (!rec) return;
     this.pointers.delete(e.pointerId);

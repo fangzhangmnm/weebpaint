@@ -2,6 +2,7 @@ import { BrushEngine } from "./backend/brush.ts";
 import { LassoEngine } from "./lasso.ts";
 import { FilterBrushEngine } from "./filter-brush.ts";
 import { ShapeBrushEngine } from "./shape-brush.ts";
+import { PressureProbe } from "./pressure-probe.ts";
 import type { GestureViewport, TapRef } from "./common/pointer-gesture.ts";
 import type { PaintingView, ViewLeaf } from "./backend/workpiece/painting-view.ts";
 import type { Board } from "./board.ts";
@@ -105,6 +106,7 @@ export declare class InputController {
     status: (msg: string) => void;
     pointers: Map<number, PointerRec>;
     penEverSeen: boolean;
+    pressureProbe: PressureProbe;
     spaceDown: boolean;
     altDown: boolean;
     eraserHold: boolean;
@@ -133,6 +135,7 @@ export declare class InputController {
     _bind(): void;
     _updateCursorPreview(e: PointerEvent): void;
     _down(e: PointerEvent): void;
+    _probePressure(e: PointerEvent, up: boolean): void;
     _move(e: PointerEvent): void;
     _up(e: PointerEvent, cancelled?: boolean): void;
     _beginStroke(e: PointerEvent, rec: PointerRec, mode: string): void;

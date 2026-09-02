@@ -147,10 +147,11 @@ function _commit() {
 export function initExplodeSheet(c: AppContext) {
   ctx = c;
   // 词库下拉：家规 in-app 控件（不用系统 <select>）；条目开时现建 → 数据晚到也能拿到全清单。
-  wireInlineSelect("explodeCultureBtn", "explodeCultureMenu",
+  wireInlineSelect("explodeCultureBtn",
     () => namingCategories().map((c) => ({ value: c.id, label: c.label })),
     () => culture(),
-    (v) => { _culture = v; el.cultureLabel().textContent = categoryLabel(v); if (_state) _recompute(); });
+    (v) => { _culture = v; el.cultureLabel().textContent = categoryLabel(v); if (_state) _recompute(); },
+    { band: "modal" });   // sheet(--z-modal) 内的下拉：popover band 会被 sheet+backdrop 盖住（真机「点不开」）
   el.confirm().addEventListener("click", _commit);
   el.cancel().addEventListener("click", _close);
   el.backdrop().addEventListener("click", _close);

@@ -309,7 +309,7 @@ export function initSettingsMenu(ctx: AppContext) {
   // v0.5.37（user）：主题/语言换 in-app 下拉——原生 select 打开态是 chrome 域（iPad 弹层系统字体，
   //   UCSUR 必豆腐；夜间白底、装不了 SVG 同根性坑）。弹层复用紧凑菜单 list 形态 + 锚定。
   //   条目开时现建 → 标签永远新鲜（字体门迟到翻转后 endonym/主题名自动带字形）。
-  wireInlineSelect("menuThemeBtn", "menuThemeMenu",
+  wireInlineSelect("menuThemeBtn",
     () => THEMES.map((th) => ({ value: th, label: themeLabel(th) })),
     () => currentTheme(),
     (th) => { applyTheme(th); setStatus(t("status.theme", { s: themeLabel(th) })); });
@@ -317,7 +317,7 @@ export function initSettingsMenu(ctx: AppContext) {
   // 语言：endonym 各语自称；tok 在字形可用时=sitelen pona（langDisplayName）。setLang async 失败必 surface。
   const langBtnLabel = document.getElementById("menuLanguageBtnLabel");
   if (langBtnLabel) langBtnLabel.textContent = langDisplayName(lang());
-  wireInlineSelect("menuLanguageBtn", "menuLanguageMenu",
+  wireInlineSelect("menuLanguageBtn",
     () => LANGS.map((l) => ({ value: l, label: langDisplayName(l) })),
     () => lang(),
     (l) => {

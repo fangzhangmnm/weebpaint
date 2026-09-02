@@ -91,6 +91,7 @@ export const S = {
   "menu.theme":            { zh: "主题",       en: "Theme",           ja: "テーマ", tok: "nasin kule" }, 
   "menu.language":         { zh: "语言",       en: "Language",        ja: "言語", tok: "toki" }, 
   "menu.shortcuts":        { zh: "快捷键",     en: "Shortcuts",       ja: "ショートカット", tok: "nena pi tenpo lili" },
+  "menu.readme":           { zh: "帮助",       en: "Help",            ja: "ヘルプ", tok: "sona" },   // 2026-09-02 内置说明书入口（readme-panel.ts）
 
   // ── timelapse 过程录像（宣发轮 2026-08-19，spec=ai-docs/20260819-timelapse-spec.md）──────────
   "menu.timelapse":     { zh: "过程录像…",      en: "Timelapse…",        ja: "タイムラプス…", tok: "sitelen tawa…" },
@@ -732,6 +733,12 @@ export const S = {
   "upd.available":   { zh: "有新版本", en: "New version available", ja: "新しいバージョンあり", tok: "mi ken kama sin" },
   "upd.reload":      { zh: "刷新", en: "Reload", ja: "再読み込み", tok: "o open sin" },
   "upd.dismiss":     { zh: "忽略", en: "Dismiss", ja: "閉じる", tok: "weka" },
+  // ── 压感自诊 toast（2026-09-02 user：no pressure? please enable windows ink [link] tap to dismiss）──
+  "pressure.toast.win":     { zh: "没有压感？请在数位板驱动里开启 Windows Ink", en: "No pressure? Please enable Windows Ink in your tablet driver", ja: "筆圧が効かない？タブレットドライバーで Windows Ink を有効にしてください" },
+  "pressure.toast.generic": { zh: "没检测到笔压", en: "No pen pressure detected", ja: "筆圧が検出されません" },
+  "pressure.toast.more":    { zh: "详情", en: "Details", ja: "詳細", tok: "sona" },
+  // ── in-app 说明书（readme-panel.ts；内容 SSoT = readme-docs.ts）──
+  "readme.title":           { zh: "帮助", en: "Help", ja: "ヘルプ", tok: "sona" },
 
   // ── 切片 5c：命令式散点 fan-out（session/topbar/blender/gallery-shell/cloud/rack/selection/import 等 8 簇）──
   "ss.saveCancelled": { zh: "已取消保存", en: "Save cancelled", ja: "保存をキャンセルしました", tok: "awen li weka" },

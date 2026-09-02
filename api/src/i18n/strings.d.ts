@@ -414,6 +414,12 @@ export declare const S: {
         readonly ja: "ショートカット";
         readonly tok: "nena pi tenpo lili";
     };
+    readonly "menu.readme": {
+        readonly zh: "帮助";
+        readonly en: "Help";
+        readonly ja: "ヘルプ";
+        readonly tok: "sona";
+    };
     readonly "menu.timelapse": {
         readonly zh: "过程录像…";
         readonly en: "Timelapse…";
@@ -3823,6 +3829,28 @@ export declare const S: {
         readonly en: "Dismiss";
         readonly ja: "閉じる";
         readonly tok: "weka";
+    };
+    readonly "pressure.toast.win": {
+        readonly zh: "没有压感？请在数位板驱动里开启 Windows Ink";
+        readonly en: "No pressure? Please enable Windows Ink in your tablet driver";
+        readonly ja: "筆圧が効かない？タブレットドライバーで Windows Ink を有効にしてください";
+    };
+    readonly "pressure.toast.generic": {
+        readonly zh: "没检测到笔压";
+        readonly en: "No pen pressure detected";
+        readonly ja: "筆圧が検出されません";
+    };
+    readonly "pressure.toast.more": {
+        readonly zh: "详情";
+        readonly en: "Details";
+        readonly ja: "詳細";
+        readonly tok: "sona";
+    };
+    readonly "readme.title": {
+        readonly zh: "帮助";
+        readonly en: "Help";
+        readonly ja: "ヘルプ";
+        readonly tok: "sona";
     };
     readonly "ss.saveCancelled": {
         readonly zh: "已取消保存";

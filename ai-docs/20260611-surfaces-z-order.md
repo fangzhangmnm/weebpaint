@@ -41,6 +41,13 @@ chrome(10) < toolbar(25) < window(100..) < sheet(220) < overlay(300)
 - **popout**：anchored-popup、picker-pin——按设计「永远最高」（比 modal 还高，色轮等要浮在确认上）。
 
 新 UI 接入 = 选 band 写 `z-index: var(--z-menu)`，**不发明数字**。
+
+> **2026-09-02 补（edited by Claude Fable 5.1）**：band 表只保证「菜单 band 高于窗口」，**前提是菜单节点不在窗口里**。
+> 菜单一旦是某容器的子节点就会撞上两条结构性坑——容器 `overflow:hidden` 裁掉它（参考窗 shadow 内 `.menu` 2026-09-02
+> 复发的正是这个）、容器自成 stacking context 把它困在窗口 z 里。根治 = 运行时挂 `document.body` 的
+> **`src/ui/popup-menu.ts` 深模块**（锚定走 anchored-popup、z 走 band 选项 `menu | popover | modal`、外点关/Escape/单例内建）。
+> 新菜单一律走它；已迁：参考窗 ＋ 菜单、主题/语言/词库下拉（inline-select）。未迁（仍是静态节点 + 各自 hidden 切换）：
+> 汉堡主菜单、组槽 `.lasso-icon-menu`、图库 tile ⋯ 菜单、图层 ⋯（Vue Teleport）。
 局部 stacking context 内的相对值（gallery tile 内 ⋯popup、menu-config-popup、board-grid/cursor）
 不在表内，保持小整数。
 

@@ -54,10 +54,10 @@ export declare class WpReferenceWindow extends HTMLElement {
     private _cctx;
     private _emptyEl;
     private _plusEl;
-    private _menuEl;
+    private _menu;
+    private _delArmed;
     private _chipsEl;
     private _chipCountEl;
-    private _delItemEl;
     private _items;
     private _index;
     private _labels;
@@ -131,9 +131,8 @@ export declare class WpReferenceWindow extends HTMLElement {
     private _sourceSize;
     private _afterShow;
     private _bind;
+    private _menuItems;
     private _toggleMenu;
-    private _closeMenu;
-    private _resetDeleteArm;
     private _pokeIdle;
     private _onDown;
     private _onMove;

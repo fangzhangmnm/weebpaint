@@ -657,6 +657,20 @@ input[type=range] {
   display: flex; justify-content: space-between; align-items: center;
   padding: 4px 0; font-size: 13px;
 }
+/* 2026-09-02 内置说明书（readme-panel.ts）：宽一点、md-lite 排版；深链进来的节闪一下底色 */
+.readme-sheet { width: min(520px, calc(100% - 24px)); }
+.readme-body { font-size: 13px; line-height: 1.5; }
+.readme-section { padding: 6px 2px 10px; border-radius: 6px; }
+.readme-section + .readme-section { border-top: 1px solid var(--line); margin-top: 6px; }
+.readme-section h3 { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+.readme-section h4 { margin: 8px 0 4px; font-size: 13px; font-weight: 600; }
+.readme-section p { margin: 0 0 8px; }
+.readme-section ul { margin: 0 0 8px; padding-left: 18px; }
+.readme-section li { margin: 2px 0; }
+.readme-section a { color: var(--accent); }
+.readme-section code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; padding: 1px 4px; border-radius: 4px; background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.readme-section.flash { animation: readme-flash 1.6s ease-out; }
+@keyframes readme-flash { 0% { background: color-mix(in srgb, var(--accent) 22%, transparent); } 100% { background: transparent; } }
 .shortcuts-combo {
   font-family: ui-monospace, Menlo, Consolas, monospace;
   font-size: 12px;
@@ -700,11 +714,7 @@ input[type=range] {
 /* v0.7.9 按颜色拆分 sheet：带图标的动作按钮 + 中心色 swatch 行（chip 底色 = 簇心，em = 采样占比） */
 .sheet-action-with-icon { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .sheet-action-with-icon svg { width: 18px; height: 18px; flex: none; }
-#explodeCultureMenu {
-  /* sheet（--z-modal）内弹出的下拉：popover band(420) 在 modal(500) 之下会被 sheet+backdrop
-     整个盖住（真机现象「点不开」——其实开了，在底下）。提到 modal 之上、busy(520) 之下。 */
-  z-index: calc(var(--z-modal) + 5);
-}
+/* （explodeCultureMenu 静态节点已退役 2026-09-02：sheet 内下拉走 popup-menu band:"modal"，见下 .popup-menu.band-modal） */
 .explode-swatches {
   display: flex;
   flex-wrap: wrap;
@@ -840,6 +850,14 @@ input[type=range] {
   overscroll-behavior: contain;
 }
 .menu-panel.hidden { display: none; }
+/* 2026-09-02 popup-menu 深模块（src/ui/popup-menu.ts）：运行时挂 body 的菜单。外观复用 .menu-panel（list）/
+   .lasso-icon-menu.lasso-icon-list（compact）；这里只定 z band 与几个附件。双类 specificity 压过基类的 z。 */
+.popup-menu.band-menu    { z-index: var(--z-menu); }
+.popup-menu.band-popover { z-index: var(--z-popover); }
+.popup-menu.band-modal   { z-index: calc(var(--z-modal) + 5); }   /* sheet(--z-modal) 内的下拉：modal 之上、busy 之下 */
+.popup-menu--list { top: auto; left: auto; }                       /* 坐标全由 positionPopup 写 inline */
+.popup-menu-sep { border: none; border-top: 1px solid var(--line); margin: 4px 2px; }
+.popup-menu-item.danger, .popup-menu-item.danger svg { color: var(--danger); }
 .menu-section-label {
   font-size: 10px;
   color: var(--ink-soft);
@@ -2650,6 +2668,9 @@ body[data-mode="gallery"] .board { display: none !important; }
   font-size: 16px;
   padding: 2px 6px;
 }
+/* 2026-09-02 压感 toast：与更新 toast 同位同款；两条同时在时压感条让到上一层（叠放不遮） */
+#pressureToast { max-width: min(520px, calc(100vw - 24px)); }
+body:has(#updateToast:not(.hidden)) #pressureToast { bottom: calc(max(env(safe-area-inset-bottom, 0px), 20px) + 48px); }
 
 /* 移动端紧凑 */
 @media (max-width: 540px) {

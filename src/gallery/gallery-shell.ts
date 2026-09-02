@@ -477,13 +477,13 @@ export function initGalleryShell(ctx: AppContext) {
     els.menuForcePwaReset?.click();
   });
   // v0.5.40：主题/语言 in-app 下拉（同设置页机制）；gen-AI 代理主菜单同一 handler。
-  wireInlineSelect("galleryThemeBtn", "galleryThemeMenu",
+  wireInlineSelect("galleryThemeBtn",
     () => THEMES.map((th) => ({ value: th, label: themeLabel(th) })),
     () => currentTheme(),
     (th) => { applyTheme(th); });
   const galLangLabel = document.getElementById("galleryLanguageBtnLabel");
   if (galLangLabel) galLangLabel.textContent = langDisplayName(lang());
-  wireInlineSelect("galleryLanguageBtn", "galleryLanguageMenu",
+  wireInlineSelect("galleryLanguageBtn",
     () => LANGS.map((l) => ({ value: l, label: langDisplayName(l) })),
     () => lang(),
     (l) => { void setLang(l).catch((e) => reportError(e)); });

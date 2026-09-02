@@ -26,6 +26,7 @@ import { humanSize } from "./gallery/gallery-view-model.ts";
 import { setColor } from "./color-panel.ts";
 import { setMenuOpen } from "./settings-menu.ts";
 import { raiseWindow } from "./surfaces.ts";
+import { togglePopupMenu } from "./ui/popup-menu.ts";   // 参考窗 ＋ 菜单端口（挂 body；组件 frontend/ 不得 import ui/）
 import { desk } from "./workbench-state.ts";
 import { renderNodesToCanvas } from "./backend/doc-render.ts";
 import { pickCloudImage } from "./cloud-picker-host.ts";
@@ -132,6 +133,8 @@ export function initSideWindows(ctx: AppContext) {
 
   // live 合成端口：一次性 set（组件在当前页 kind=live 时消费；合成知识在宿主）。
   ref.liveProvider = composeLiveFrame;
+  // ＋ 菜单端口（2026-09-02）：菜单挂 body 走 popup-menu 深模块（overflow:hidden 裁不到、z 在 menu band）；组件只描述项。
+  ref.menuPort = (o) => togglePopupMenu(o);
 
   // ---- 组件事件 → desk 持久化（宿主 store 解耦：组件不认识 desk）----
   ref.addEventListener("viewportchange", () => syncRefsToDesk());

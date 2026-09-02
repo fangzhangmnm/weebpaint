@@ -36,6 +36,18 @@ export interface RefLabels {
 export type RefItem =
   | { kind: "image"; bitmap: RefBitmapSource; blob: Blob | null; vp: RefViewport | null }
   | { kind: "live"; vp: RefViewport | null };
+// 菜单端口（2026-09-02）：菜单**不在 shadow 里**——absolute 子节点被 :host overflow:hidden 裁、又困在 :host 的
+//   stacking context 被别的浮窗盖（老错误复发根因）。根治 = 挂 body 的 popup-menu 深模块（src/ui/popup-menu.ts），
+//   但 frontend/ 不得 import src/ui（C2 目录格律）→ 同 liveProvider 一样由宿主 set 一次端口（形状 = togglePopupMenu 子集）。
+export interface RefMenuItem { id: string; label: string; icon?: string; hidden?: boolean; danger?: boolean; separatorBefore?: boolean; }
+export interface RefMenuOpts {
+  anchor: HTMLElement; items: () => RefMenuItem[];
+  onPick: (id: string) => void | "keep"; onClose?: () => void;
+  align?: "left" | "right"; band?: "menu"; swallowOutsideTap?: boolean; ariaLabel?: string;
+}
+export interface RefMenuHandle { close(): void; refresh(): void; readonly isOpen: boolean; }
+/** toggle 语义：同锚已开 → 关并返回 null；否则开并返回句柄。 */
+export type RefMenuPort = (opts: RefMenuOpts) => RefMenuHandle | null;
 
 const REF_LONG_PRESS_MS = 450;                // 长按吸色延迟（对齐 input.ts）
 const REF_LONG_PRESS_CANCEL_SQ = 64;          // 8px²：长按期间移动超此 → 取消，回 pan
@@ -188,28 +200,8 @@ canvas:active { cursor: grabbing; }
    全隐会让 chips 变盲操作）。菜单弹层不在其列。 */
 :host(.idle) .plus, :host(.idle) .grip, :host(.idle) .chips, :host(.idle) .move { opacity: 0.35; }
 :host(.away) .plus, :host(.away) .grip, :host(.away) .chips, :host(.away) .move { opacity: 0; }
-.menu {
-  position: absolute; top: 38px; right: 4px; z-index: 4;
-  min-width: 170px; padding: 4px;
-  background: var(--bg, #202124);
-  border: 1px solid var(--line, #3c4043);
-  border-radius: 8px;
-  box-shadow: var(--shadow, 0 8px 24px rgba(0, 0, 0, 0.4));
-  display: flex; flex-direction: column;
-}
-.menu.hidden { display: none; }
-.menu hr { border: none; border-top: 1px solid var(--line, #3c4043); margin: 4px 2px; }
-.mi {
-  display: flex; align-items: center; gap: 8px;
-  background: transparent; border: none; color: var(--ink, #e8eaed);
-  padding: 7px 8px; border-radius: 6px; cursor: pointer;
-  font: inherit; text-align: left;
-}
-.mi svg { width: 16px; height: 16px; flex: none; color: var(--ink-soft, #9aa0a6); }
-.mi:hover { background: color-mix(in srgb, var(--ink, #e8eaed) 8%, transparent); }
-.mi.hidden { display: none; }
-.mi[data-arm="1"] { color: #e2574c; }
-.mi[data-arm="1"] svg { color: #e2574c; }
+/* 菜单不在 shadow 里（2026-09-02）：挂 body 走 ui/popup-menu——absolute 子节点会被 :host overflow:hidden 裁、
+   也困在 :host 的 stacking context 里被别的浮窗盖（老错误复发根因）。 */
 .empty {
   position: absolute; inset: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -229,31 +221,24 @@ canvas:active { cursor: grabbing; }
   <span class="chip-count">1/1</span>
   <button class="chip" data-page="1" type="button">${iconMarkup(REF_ICON_IDS.next)}</button>
 </div>
-<div class="menu hidden" role="menu">
-  <button class="mi" data-mi="load" type="button" role="menuitem">${iconMarkup(REF_ICON_IDS.folder)}<span></span></button>
-  <button class="mi" data-mi="paste" type="button" role="menuitem">${iconMarkup(REF_ICON_IDS.paste)}<span></span></button>
-  <button class="mi" data-mi="cloud" type="button" role="menuitem">${iconMarkup(REF_ICON_IDS.cloud)}<span></span></button>
-  <button class="mi" data-mi="live" type="button" role="menuitem">${iconMarkup(REF_ICON_IDS.pip)}<span></span></button>
-  <button class="mi" data-mi="onetoone" type="button" role="menuitem">${iconMarkup(REF_ICON_IDS.oneToOne)}<span></span></button>
-  <hr>
-  <button class="mi" data-mi="delete" type="button" role="menuitem">${iconMarkup(REF_ICON_IDS.trash)}<span></span></button>
-  <button class="mi" data-mi="close" type="button" role="menuitem">${iconMarkup(REF_ICON_IDS.x)}<span></span></button>
-</div>`; }
+`; }
 
 export class WpReferenceWindow extends HTMLElement {
   static get observedAttributes() { return ["open", "no-cloud"]; }   // no-cloud：宿主云功能关 → 藏云盘选图项
 
   // 宿主端口：live 合成 provider（一次性 set；组件在当前页 kind=live 时消费）。null = 合成不可用保上帧。
   liveProvider: (() => RefLiveSource | null) | null = null;
+  // 宿主端口：＋ 菜单（一次性 set = ui/popup-menu 的 togglePopupMenu）。null = 没菜单（裸挂时 ＋ 无反应）。
+  menuPort: RefMenuPort | null = null;
 
   private _canvas: HTMLCanvasElement;
   private _cctx: CanvasRenderingContext2D;
   private _emptyEl: HTMLElement;
   private _plusEl: HTMLButtonElement;
-  private _menuEl: HTMLElement;
+  private _menu: RefMenuHandle | null = null;     // 菜单句柄（开着才非 null）
+  private _delArmed = false;                       // 删除二段确认 armed（菜单关即复位）
   private _chipsEl: HTMLElement;
   private _chipCountEl: HTMLElement;
-  private _delItemEl: HTMLButtonElement;
 
   // ---- 多参考模型 ----
   private _items: RefItem[] = [];
@@ -290,20 +275,18 @@ export class WpReferenceWindow extends HTMLElement {
     this._canvas = root.querySelector("canvas")!;
     this._emptyEl = root.querySelector(".empty")!;
     this._plusEl = root.querySelector(".plus")!;
-    this._menuEl = root.querySelector(".menu")!;
     this._chipsEl = root.querySelector(".chips")!;
     this._chipCountEl = root.querySelector(".chip-count")!;
-    this._delItemEl = root.querySelector('[data-mi="delete"]')!;
     this._cctx = this._canvas.getContext("2d")!;
     this._bind(root);
   }
 
   // ---- 属性面（入向；程序性 set 不发事件）----
   get open(): boolean { return this.hasAttribute("open"); }
-  set open(v: boolean) { this.toggleAttribute("open", !!v); }
+  set open(v: boolean) { this.toggleAttribute("open", !!v); if (!v) this._menu?.close(); }   // 关窗 = 菜单一并收（菜单挂 body，不随窗隐）
   attributeChangedCallback(name: string, oldV: string | null, newV: string | null) {
     if (name === "no-cloud") {
-      this._menuEl.querySelector('[data-mi="cloud"]')!.classList.toggle("hidden", newV != null);
+      this._menu?.refresh();   // 云盘项显隐由 items() 现算
       return;
     }
     if (name === "open" && oldV !== newV && newV != null) this._afterShow();
@@ -345,12 +328,7 @@ export class WpReferenceWindow extends HTMLElement {
 
   set labels(l: RefLabels) {
     this._labels = { ...this._labels, ...l };
-    const setText = (mi: string, text?: string) => {
-      const b = this._menuEl.querySelector(`[data-mi="${mi}"] span`) as HTMLElement | null;
-      if (b && text) b.textContent = text;
-    };
-    setText("load", l.load); setText("paste", l.paste); setText("cloud", l.cloud);
-    setText("live", l.live); setText("onetoone", l.oneToOne); setText("delete", l.del); setText("close", l.closeWin);
+    this._menu?.refresh();   // 菜单文案由 items() 现算（开着就重绘）
     const setTitle = (sel: string, title?: string, aria?: string) => {
       const b = this.shadowRoot!.querySelector(sel) as HTMLElement | null;
       if (!b) return;
@@ -596,39 +574,8 @@ export class WpReferenceWindow extends HTMLElement {
     move.addEventListener("pointerup", endMove);
     move.addEventListener("pointercancel", endMove);
 
-    // 菜单项
-    this._menuEl.addEventListener("click", (e) => {
-      const b = (e.target as Element).closest("[data-mi]") as HTMLElement | null;
-      if (!b) return;
-      const mi = b.dataset.mi!;
-      if (mi === "delete") {
-        // 二段确认（防误碰，user 0830）：第一下 arm（文案换 delConfirm 变红），第二下才删。
-        if (this._delItemEl.dataset.arm !== "1") {
-          this._delItemEl.dataset.arm = "1";
-          const span = this._delItemEl.querySelector("span")!;
-          span.textContent = this._labels.delConfirm || span.textContent;
-          return;
-        }
-        this._closeMenu();
-        this._deleteCurrent();
-        return;
-      }
-      this._closeMenu();
-      if (mi === "load") this._emit("requestload");
-      else if (mi === "paste") this._emit("requestpaste");
-      else if (mi === "cloud") this._emit("requestcloudload");
-      else if (mi === "live") { this.showLive(); this._emitItems(); }
-      else if (mi === "onetoone") this.oneToOne();
-      else if (mi === "close") { this.open = false; this._emit("openchange", { open: false }); }
-    });
-    // 点别处关菜单（shadow 内 canvas/chips pointerdown；菜单开着时吞第一击）
-    root.addEventListener("pointerdown", (e) => {
-      this._pokeIdle();
-      if (this._menuEl.classList.contains("hidden")) return;
-      if ((e.target as Element).closest?.(".menu, .plus")) return;
-      this._closeMenu();
-      e.stopPropagation(); e.preventDefault();
-    }, { capture: true });
+    // 菜单 = ui/popup-menu 深模块（挂 body；外点关 + 吞掉那一击 + Escape 都在模块里）。这里只剩闲置计时。
+    root.addEventListener("pointerdown", () => this._pokeIdle(), { capture: true });
     root.addEventListener("pointermove", () => this._pokeIdle(), { capture: true, passive: true });
     // 能悬停的设备（鼠标 / 带悬停的笔；iPad 触屏主指针 = hover:none 走 idle 档）：指针离窗全隐、进窗即现。
     //   拖窗/resize/手势进行中不隐（capture 期指针可能在窗外）。
@@ -694,23 +641,44 @@ export class WpReferenceWindow extends HTMLElement {
     ro.observe(this);
   }
 
+  private _menuItems(): RefMenuItem[] {
+    const l = this._labels;
+    return [
+      { id: "load",     label: l.load ?? "Load image",   icon: REF_ICON_IDS.folder },
+      { id: "paste",    label: l.paste ?? "Paste",       icon: REF_ICON_IDS.paste },
+      { id: "cloud",    label: l.cloud ?? "From cloud",  icon: REF_ICON_IDS.cloud, hidden: this.hasAttribute("no-cloud") },
+      { id: "live",     label: l.live ?? "Live mirror",  icon: REF_ICON_IDS.pip },
+      { id: "onetoone", label: l.oneToOne ?? "1:1",      icon: REF_ICON_IDS.oneToOne },
+      // 删除 = 二段确认（防误碰，user 0830）：第一下 arm（文案换 delConfirm 变红），第二下才删；没有可删的页时藏。
+      { id: "delete",   label: this._delArmed ? (l.delConfirm ?? l.del ?? "Delete") : (l.del ?? "Delete"),
+        icon: REF_ICON_IDS.trash, danger: this._delArmed, hidden: this._items.length === 0, separatorBefore: true },
+      { id: "close",    label: l.closeWin ?? "Close",    icon: REF_ICON_IDS.x },
+    ];
+  }
   private _toggleMenu() {
-    const opening = this._menuEl.classList.contains("hidden");
-    this._menuEl.classList.toggle("hidden", !opening);
-    this._resetDeleteArm();
-    // 删除项：没有可删的页时藏
-    this._delItemEl.classList.toggle("hidden", this._items.length === 0);
-  }
-  private _closeMenu() {
-    this._menuEl.classList.add("hidden");
-    this._resetDeleteArm();
-  }
-  private _resetDeleteArm() {
-    if (this._delItemEl.dataset.arm === "1") {
-      delete this._delItemEl.dataset.arm;
-      const span = this._delItemEl.querySelector("span")!;
-      if (this._labels.del) span.textContent = this._labels.del;
-    }
+    if (!this.menuPort) return;
+    this._delArmed = false;
+    this._menu = this.menuPort({
+      anchor: this._plusEl,
+      items: () => this._menuItems(),
+      align: "right", band: "menu",
+      swallowOutsideTap: true,   // 菜单开着时点别处 = 只关菜单，那一击不落到画布/主画布（原 shadow 内行为保留并推广）
+      ariaLabel: this._labels.menu,
+      onClose: () => { this._menu = null; this._delArmed = false; },
+      onPick: (id) => {
+        if (id === "delete") {
+          if (!this._delArmed) { this._delArmed = true; return "keep"; }
+          this._deleteCurrent();
+          return;
+        }
+        if (id === "load") this._emit("requestload");
+        else if (id === "paste") this._emit("requestpaste");
+        else if (id === "cloud") this._emit("requestcloudload");
+        else if (id === "live") { this.showLive(); this._emitItems(); }
+        else if (id === "onetoone") this.oneToOne();
+        else if (id === "close") { this.open = false; this._emit("openchange", { open: false }); }
+      },
+    });
   }
   private _pokeIdle() {
     this.classList.remove("idle");
