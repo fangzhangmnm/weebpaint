@@ -1,0 +1,166 @@
+<!doctype html>
+<!--
+  WeebPaint 压感探针（独立诊断页，零依赖，不进 prod，只发 /dev/pen-probe.html）。
+  created 2026-09-02 by Claude Fable 5.1
+
+  用途：真机上一笔画完，屏幕直接显示浏览器交给 app 的压感数据——主 PointerEvent 的 pressure、
+  getCoalescedEvents() 里每个样本的 pressure、Touch 事件的 force，以及按 WeebPaint input.ts
+  effectivePressureFor 同款语义（mouse 恒 0.5；pen 的 0 → 沿用上一有效值，起手 0.2）算出的
+  「WeebPaint 等效压感」极差。案由：2026-09-02 iPad 测试者 Procreate 有压感、WeebPaint 勾线笔没有，
+  作者本机（更旧的 iPad）无痕模式有压感——只剩「她那台 Safari 给的事件数据」这一个变量，不猜，实测。
+  WeebPaint 笔画只吃 coalesced 列表里的 pressure（详 input.ts _move），主事件 pressure 正常不代表笔画有压感。
+-->
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="robots" content="noindex">
+<title>WeebPaint 压感探针</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #111; color: #eee;
+    font: 14px/1.45 -apple-system, system-ui, "PingFang SC", sans-serif; overflow: hidden;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  #pad { position: fixed; inset: 0; touch-action: none; background: #1b1b1b; }
+  #panel { position: fixed; left: 8px; top: 8px; right: 8px; max-height: 48vh; overflow: auto;
+    background: rgba(0,0,0,.8); padding: 10px 12px; border-radius: 10px; pointer-events: none;
+    white-space: pre-wrap; font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+  .ok { color: #8f8; } .bad { color: #f77; } .dim { color: #999; }
+  #bar { position: fixed; bottom: max(10px, env(safe-area-inset-bottom)); left: 0; right: 0;
+    display: flex; gap: 10px; justify-content: center; }
+  #bar button { font: inherit; padding: 10px 18px; border-radius: 8px; border: 1px solid #555;
+    background: #2a2a2a; color: #eee; }
+</style>
+</head>
+<body>
+<canvas id="pad"></canvas>
+<div id="panel">用笔在空白处画一笔（长一点、轻重变化明显），松笔后这里出结果。画完截图发给作者。</div>
+<div id="bar"><button id="clear">清屏</button><button id="copy">复制报告</button></div>
+<script>
+(function () {
+  "use strict";
+  var panel = document.getElementById("panel");
+  var pad = document.getElementById("pad");
+  var ctx = pad.getContext("2d");
+  var dpr = Math.max(1, window.devicePixelRatio || 1);
+  function resize() {
+    pad.width = Math.round(innerWidth * dpr); pad.height = Math.round(innerHeight * dpr);
+    pad.style.width = innerWidth + "px"; pad.style.height = innerHeight + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  resize(); addEventListener("resize", resize);
+
+  var ua = navigator.userAgent || "";
+  var m = /Version\/([\d.]+)/.exec(ua);
+  var env = [
+    "浏览器: " + (m ? "Safari " + m[1] : ua.slice(0, 60)),
+    "触点数 " + navigator.maxTouchPoints + " · dpr " + dpr + " · 独立窗口 " + (matchMedia("(display-mode: standalone)").matches ? "是" : "否"),
+    "PointerEvent.pressure " + ("pressure" in PointerEvent.prototype ? "有" : "无") +
+      " · getCoalescedEvents " + ("getCoalescedEvents" in PointerEvent.prototype ? "有" : "无") +
+      " · Touch.force " + (typeof Touch !== "undefined" && "force" in Touch.prototype ? "有" : "无"),
+  ].join("\n");
+
+  var strokes = 0, lastReport = "", touchStat = null;
+  var active = null;   // 当前笔画累计
+
+  function stat() { return { n: 0, min: Infinity, max: -Infinity, sum: 0, zeros: 0 }; }
+  function feed(s, p) { if (typeof p !== "number" || isNaN(p)) return; s.n++; s.sum += p; if (p === 0) s.zeros++; if (p < s.min) s.min = p; if (p > s.max) s.max = p; }
+  function fmt(s) { return s.n ? ("min " + s.min.toFixed(3) + " / max " + s.max.toFixed(3) + " / 极差 " + (s.max - s.min).toFixed(3) + " · " + s.n + " 样本" + (s.zeros ? " · 为0的 " + s.zeros : "")) : "无样本"; }
+  function range(s) { return s.n ? s.max - s.min : 0; }
+
+  // WeebPaint input.ts effectivePressureFor 同款：mouse 恒 0.5；pen/touch 的 0 或缺失 → 上一有效值，起手 0.2。
+  function eff(st, type, p) {
+    var raw;
+    if (type === "mouse") raw = 0.5;
+    else if (typeof p !== "number" || p === 0) raw = st.lastP != null ? st.lastP : 0.2;
+    else { raw = Math.max(0.05, Math.min(1, p)); st.lastP = raw; }
+    return raw;
+  }
+
+  function dot(x, y, p) {
+    var r = 1.5 + 16 * p;
+    ctx.fillStyle = "hsla(" + Math.round(120 * p) + ",90%,60%,.55)";
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+
+  pad.addEventListener("pointerdown", function (e) {
+    if (e.button !== 0 && e.pointerType !== "touch") return;
+    active = { id: e.pointerId, type: e.pointerType, main: stat(), co: stat(), effS: stat(), tilt: stat(),
+      lastTs: e.timeStamp, replayed: 0, coBatches: 0, downP: e.pressure, lastP: null, x: e.clientX, y: e.clientY };
+    feed(active.main, e.pressure);
+    var pe = eff(active, e.pointerType, e.pressure); feed(active.effS, pe);
+    dot(e.clientX, e.clientY, pe);
+    try { pad.setPointerCapture(e.pointerId); } catch (_) {}
+    e.preventDefault();
+  });
+
+  pad.addEventListener("pointermove", function (e) {
+    var st = active; if (!st || e.pointerId !== st.id) return;
+    feed(st.main, e.pressure);
+    if (typeof e.tiltX === "number") feed(st.tilt, e.tiltX);
+    var list = (typeof e.getCoalescedEvents === "function") ? e.getCoalescedEvents() : null;
+    if (list && list.length) st.coBatches++; else list = [e];
+    for (var i = 0; i < list.length; i++) {
+      var ev = list[i];
+      feed(st.co, ev.pressure);
+      if (ev.timeStamp <= st.lastTs) { st.replayed++; continue; }   // WeebPaint 同款：只收 timeStamp 严格递增
+      st.lastTs = ev.timeStamp;
+      var pe = eff(st, ev.pointerType, ev.pressure); feed(st.effS, pe);
+      dot(ev.clientX, ev.clientY, pe);
+    }
+    e.preventDefault();
+  });
+
+  function finish(e) {
+    var st = active; if (!st || e.pointerId !== st.id) return;
+    active = null; strokes++;
+    var effR = range(st.effS), coR = range(st.co), mainR = range(st.main);
+    var verdict, cls;
+    if (st.type === "mouse") { verdict = "这是 mouse 事件——浏览器把笔当鼠标（Windows 需开 Windows Ink）"; cls = "bad"; }
+    else if (effR >= 0.1) { verdict = "压感正常到达 WeebPaint 管线（等效极差 " + effR.toFixed(2) + "）"; cls = "ok"; }
+    else if (mainR >= 0.1 && coR < 0.02) { verdict = "主事件有压感、coalesced 样本没有 → 浏览器 coalesced 事件不带 pressure"; cls = "bad"; }
+    else if (mainR < 0.02 && coR < 0.02) { verdict = "浏览器整笔没给压感（主事件与 coalesced 都恒定）"; cls = "bad"; }
+    else { verdict = "压感很弱（等效极差 " + effR.toFixed(2) + "），请再画一笔轻重对比更大的"; cls = "bad"; }
+    var lines = [
+      "【环境】\n" + env,
+      "【第 " + strokes + " 笔】pointerType=" + st.type + " · 落笔 pressure " + (typeof st.downP === "number" ? st.downP.toFixed(3) : "?") + " · 抬笔 " + (typeof e.pressure === "number" ? e.pressure.toFixed(3) : "?"),
+      "主事件 pressure: " + fmt(st.main),
+      "coalesced pressure: " + fmt(st.co) + " · 批次 " + st.coBatches + " · 回放剔除 " + st.replayed,
+      "WeebPaint 等效压感: " + fmt(st.effS),
+      "tiltX: " + fmt(st.tilt),
+      "Touch.force: " + (touchStat ? (touchStat.kind + " · " + fmt(touchStat.s)) : "无 touch 事件"),
+    ];
+    lastReport = lines.join("\n") + "\n判定: " + verdict;
+    panel.innerHTML = lines.map(function (l) { return escapeHtml(l); }).join("\n") +
+      "\n<span class=\"" + cls + "\">判定: " + escapeHtml(verdict) + "</span>\n<span class=\"dim\">再画几笔看是否稳定；截图发作者。</span>";
+    touchStat = null;
+  }
+  pad.addEventListener("pointerup", finish);
+  pad.addEventListener("pointercancel", finish);
+
+  // Touch 通道（iOS 同时发 touch 事件；Procreate 走的 native force 对应这里的 Touch.force）
+  pad.addEventListener("touchstart", function (e) {
+    if (e.touches.length === 1) e.preventDefault();   // iOS 长按 callout / 放大镜只能在这里拦
+    touchStat = { kind: e.touches[0].touchType || "?", s: stat() };
+    for (var i = 0; i < e.touches.length; i++) feed(touchStat.s, e.touches[i].force);
+  }, { passive: false });
+  pad.addEventListener("touchmove", function (e) {
+    if (!touchStat) return;
+    for (var i = 0; i < e.touches.length; i++) feed(touchStat.s, e.touches[i].force);
+  }, { passive: true });
+
+  function escapeHtml(s) { return s.replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
+
+  document.getElementById("clear").addEventListener("click", function () { ctx.clearRect(0, 0, innerWidth, innerHeight); });
+  var copyBtn = document.getElementById("copy");
+  copyBtn.addEventListener("click", function () {
+    var text = lastReport || env;
+    var done = function (ok) { copyBtn.textContent = ok ? "已复制" : "复制失败（截图即可）"; setTimeout(function () { copyBtn.textContent = "复制报告"; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+    else done(false);
+  });
+
+  panel.innerHTML = escapeHtml("【环境】\n" + env) + "\n\n用笔在空白处画一笔（长一点、轻重变化明显），松笔后这里出结果。画完截图发给作者。";
+})();
+</script>
+</body>
+</html>

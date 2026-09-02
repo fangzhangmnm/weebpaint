@@ -73,6 +73,8 @@ jobs:
             cp -p prod-tree/$f site/     2>/dev/null || echo "::warning::prod 缺 $f —— / 上会 404"
             cp -p main-tree/$f site/dev/ 2>/dev/null || echo "::warning::main 缺 $f —— /dev/ 上会 404"
           done
+          # 压感探针页（独立诊断页，只发 /dev/，不进 prod；2026-09-02 iPad 测试者无压感案，Claude Fable 5.1）
+          cp -p main-tree/pen-probe.html site/dev/ 2>/dev/null || echo "::warning::main 缺 pen-probe.html"
           # 运行时 UMD libs + bundle 产物。src/ 是构建输入不进 deploy（bundle 后里头啥都不需要）
           cp -r prod-tree/vendor site/
           cp -r prod-tree/dist   site/
