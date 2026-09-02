@@ -117,7 +117,4 @@ export declare const els: {
     colorPanelBody: Element | null;
     clearSheet: HTMLElement;
     clearBackdrop: HTMLElement;
-    updateToast: HTMLElement;
-    updateReload: HTMLElement;
-    updateDismiss: HTMLElement;
 };

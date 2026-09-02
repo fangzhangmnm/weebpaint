@@ -46,7 +46,8 @@ import { initReadmePanel } from "./readme-panel.ts";       // 2026-09-02 内置�
 import { initPressureToast } from "./pressure-toast.ts";   // 2026-09-02 压感自诊 toast（input.ts 探针 → wp:pressure-doubt）
 import { initFiltersAdjust } from "./filters-adjust.ts";
 import { initToolbar, RACK_PANEL_BY_TOOL } from "./toolbar.ts";
-import { closePopupMenu } from "./ui/popup-menu.ts";   // 2026-09-02 C1：下笔一把关所有 popup（组槽/变体/stepper/主菜单/⋯）
+import { closePopupMenu } from "./ui/popup-menu.ts";
+import { showNotice } from "./ui/notice.ts";   // 2026-09-02 C7 通知栈   // 2026-09-02 C1：下笔一把关所有 popup（组槽/变体/stepper/主菜单/⋯）
 import { setColor, initColorPanel } from "./color-panel.ts";
 import { session, initSession, setSessionGallery } from "./session-state.ts";   // candidate 3 · 活动文档生命周期 SSoT
 import { setDocCompositor, setDocCompositorBytes } from "./backend/doc-render.ts";
@@ -612,9 +613,12 @@ els.board.addEventListener("pointerdown", () => {
 
 // ---- PWA 外壳：service-worker 注册 + 更新 toast + dev chip（src/pwa-shell.ts）----
 new PwaShell({
-  toast: els.updateToast,
-  reloadBtn: els.updateReload,
-  dismissBtn: els.updateDismiss,
+  // 2026-09-02 C7：更新提示走通知栈（ui/notice）——与压感 toast / 错误横幅 / 离线横幅同一条栈、同一样式
+  showUpdateNotice: ({ onReload, onDismiss }) => showNotice({
+    id: "sw-update", text: t("upd.available"),
+    actions: [{ label: t("upd.reload"), primary: true, onClick: onReload }],
+    dismissLabel: t("upd.dismiss"), tapToDismiss: false, onDismiss,
+  }),
   envChip: document.getElementById("envChip"),
   onBeforeReload: async () => {
     editMode.applyPendingTransient();

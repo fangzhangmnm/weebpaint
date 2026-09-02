@@ -140,8 +140,5 @@ export const els = {
   // clear sheet
   clearSheet: byId("clearSheet"),
   clearBackdrop: byId("clearBackdrop"),
-  // update toast
-  updateToast: byId("updateToast"),
-  updateReload: byId("updateToastReload"),
-  updateDismiss: byId("updateToastDismiss"),
+  // （update toast 2026-09-02 C7 退役：通知走 ui/notice.ts）
 };

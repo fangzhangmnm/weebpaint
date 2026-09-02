@@ -17,6 +17,7 @@ import { t } from "../i18n/index.ts";
 import { els } from "../els.ts";
 import { openChoiceSheet, openConfirmSheet } from "../sheets.ts";
 import { openAdoptedPopup, closePopupMenuOf } from "../ui/popup-menu.ts";   // 2026-09-02 C1
+import { showNotice, closeNotice } from "../ui/notice.ts";   // 2026-09-02 C7 通知栈
 import { iconHtml } from "../ui/icon.ts";
 import { galleryAttachment } from "../gallery-attachment-host.ts";
 import { galleryRegistry } from "../gallery-registry.ts";
@@ -360,36 +361,19 @@ export function renderGalleryManage(): void {
 // UI 标准件 = `.toast`（更新 toast 同款：底部居中 pill、主题 token 反色、--z-toast band）。
 //   旧版手搓 inline style 钉在 top:0——v0.9.4 早就拍过「顶部通栏压 iPad 无框顶栏」（error-badge 迁底部
 //   的同一课），这条横幅踩了回去 → 位置差到点不到（user 2026-08-29）。2026-08-30 迁 toast 形制。
-let _bar: HTMLDivElement | null = null;
 let _dismissed = false;
-function _ensureBar(): HTMLDivElement {
-  if (_bar) return _bar;
-  const bar = document.createElement("div");
-  bar.id = "__galleryOfflineBar";
-  bar.className = "toast";
-  bar.setAttribute("role", "status");
-  const txt = document.createElement("span");
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.addEventListener("click", () => { void reconnectFlow(); });
-  const x = document.createElement("button");
-  x.type = "button";
-  x.className = "dismiss";
-  x.textContent = "✕";
-  x.title = t("gm.dismiss");
-  x.addEventListener("click", () => { _dismissed = true; renderOfflineBanner(); });
-  bar.append(txt, btn, x);
-  document.body.appendChild(bar);
-  _bar = bar;
-  return bar;
-}
 function renderOfflineBanner(): void {
   const att = galleryAttachment.state();
   const show = att.kind === "attached" && !att.online && !_dismissed;
-  if (!show) { _bar?.remove(); _bar = null; return; }
-  const bar = _ensureBar();
-  (bar.children[0] as HTMLElement).textContent = t("gm.offlineBanner", { label: att.entry.label });
-  (bar.children[1] as HTMLElement).textContent = t("gm.reconnect");
+  if (!show) { closeNotice("gallery-offline"); return; }
+  // 2026-09-02 C7：进通知栈（同 id 原地更新；与更新/压感/错误横幅同一条栈同一样式，位置/z 不再各写各）
+  showNotice({
+    id: "gallery-offline", tapToDismiss: false,
+    text: t("gm.offlineBanner", { label: att.entry.label }),
+    actions: [{ label: t("gm.reconnect"), primary: true, onClick: () => { void reconnectFlow(); } }],
+    dismissLabel: t("gm.dismiss"),
+    onDismiss: () => { _dismissed = true; renderOfflineBanner(); },
+  });
 }
 /** 重新连接（手势）：OneDrive=已登录原地翻牌 / 未登录才 signIn；folder=requestPermission。接通即翻牌+补推。 */
 async function reconnectFlow(): Promise<void> {

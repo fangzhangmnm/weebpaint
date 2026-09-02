@@ -18,6 +18,7 @@ import { uniqueNameFor, setGalleryOpen } from "./gallery/gallery-shell.ts";
 import { withBusy } from "./fullscreen-busy.ts";
 import { stripSessionExt } from "./config.ts";
 import { reportError } from "./error-badge.ts";
+import { showNotice, closeNotice } from "./ui/notice.ts";   // 2026-09-02 C7 通知栈
 import { t } from "./i18n/index.ts";
 import { hasGallery } from "./gallery-capability.ts";
 import type { AppContext } from "./app-context.ts";
@@ -25,35 +26,21 @@ import type { AppContext } from "./app-context.ts";
 const errMsg = (e: unknown): string => String((e as { message?: unknown })?.message || e);
 let setStatus: AppContext["setStatus"];
 
-const BAR_CSS =
-  "position:fixed;left:50%;transform:translateX(-50%);top:max(env(safe-area-inset-top,0px), 52px);" +
-  "z-index:9000;max-width:min(640px,calc(100% - 24px));box-sizing:border-box;padding:10px 14px;" +
-  "border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.35);background:#34495e;color:#fff;" +
-  "font:13px/1.5 system-ui;display:flex;gap:10px;align-items:center;flex-wrap:wrap";
-const BTN_CSS = "font:inherit;border:1px solid rgba(255,255,255,.4);background:transparent;color:#fff;border-radius:7px;padding:4px 12px;cursor:pointer";
+// （inline BAR_CSS/BTN_CSS 2026-09-02 C7 退役：呈现归 ui/notice 通知栈）
 
-let _bar: HTMLElement | null = null;
-function _dismiss() { _bar?.remove(); _bar = null; }
+function _dismiss() { closeNotice("crash-recover"); }
 
 function _show(m: CrashRecordMeta, onDone: () => void) {
-  _dismiss();
-  const bar = document.createElement("div");
-  bar.style.cssText = BAR_CSS;
-  const txt = document.createElement("span");
-  txt.textContent = t("cb.crashFound", { name: m.name });
-  const mk = (label: string, primary: boolean, fn: () => void) => {
-    const b = document.createElement("button");
-    b.style.cssText = BTN_CSS + (primary ? ";background:rgba(255,255,255,.18);font-weight:600" : "");
-    b.textContent = label;
-    b.addEventListener("click", () => { _dismiss(); fn(); });
-    return b;
-  };
-  bar.append(txt,
-    mk(t("cb.recover"), true, () => { void _recover(m).finally(onDone); }),
-    mk(t("cb.discard"), false, () => { void crashStore.discard(m.tag).catch(() => {}).then(() => { setStatus(t("cb.discarded")); onDone(); }); }),
-    mk("✕", false, () => { /* 本次不管：记录留着，下次 boot 再问 */ }));
-  document.body.appendChild(bar);
-  _bar = bar;
+  // 非模态浮卡（P2 2026-08-26 拍板）：通知栈 warning 档，带两个动作；✕ = 本次不管（记录留着，下次 boot 再问）
+  showNotice({
+    id: "crash-recover", level: "warning", tapToDismiss: false,
+    text: t("cb.crashFound", { name: m.name }),
+    actions: [
+      { label: t("cb.recover"), primary: true, onClick: () => { void _recover(m).finally(onDone); } },
+      { label: t("cb.discard"), onClick: () => { void crashStore.discard(m.tag).catch(() => {}).then(() => { setStatus(t("cb.discarded")); onDone(); }); } },
+    ],
+    dismissLabel: t("common.close.aria"),
+  });
 }
 
 async function _recover(m: CrashRecordMeta): Promise<void> {

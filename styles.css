@@ -21,6 +21,7 @@
   --z-modal: 500;    /* .backdrop / .sheet 确认对话（resample = -2/-1，确认能盖住它） */
   --z-busy: 520;     /* fullscreen-busy 防误点锁 */
   --z-gate: 540;     /* sync gate 锁屏 / 冲突选择——必须盖过 busy（冲突必 surface，ADR-0009） */
+  --z-notice: 560;   /* 通知栈（toast/横幅，ui/notice.ts）：忙时错误也要看得见 → 在 busy 之上；模态开着时整条栈停靠顶部不盖按钮行 */
   --z-popout: 600;   /* anchored-popup / picker-pin：永远在 modal 之上 */
   --z-dev: 700;
   --z-error: 9999;   /* index.html __errBar 的 inline 值与此对齐 */
@@ -2669,8 +2670,23 @@ body[data-mode="gallery"] .board { display: none !important; }
   padding: 2px 6px;
 }
 /* 2026-09-02 压感 toast：与更新 toast 同位同款；两条同时在时压感条让到上一层（叠放不遮） */
-#pressureToast { max-width: min(520px, calc(100vw - 24px)); }
-body:has(#updateToast:not(.hidden)) #pressureToast { bottom: calc(max(env(safe-area-inset-bottom, 0px), 20px) + 48px); }
+/* 2026-09-02 C7 通知栈（src/ui/notice.ts）：所有 toast/横幅进同一条栈；.toast 只管外观，位置/z 归栈。
+   模态/gate 开着 → .docked-top（top 由 JS 按顶栏下缘写），底部让给 sheet 的按钮行。 */
+.notice-stack {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: max(env(safe-area-inset-bottom, 0px), 20px);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  max-width: calc(100vw - 24px);
+  z-index: var(--z-notice);
+  pointer-events: none;
+}
+.notice-stack.docked-top { bottom: auto; }
+.notice-stack > .toast { position: static; transform: none; pointer-events: auto; max-width: min(640px, calc(100vw - 24px)); flex-wrap: wrap; justify-content: center; }
+.notice-stack > .toast .notice-text { white-space: pre-wrap; word-break: break-word; max-height: 40vh; overflow: auto; }
+.toast.notice-error   { background: #c0392b; color: #fff; }
+.toast.notice-warning { background: #b7791f; color: #fff; }
+.toast.notice-error button, .toast.notice-warning button { color: #fff; border-color: rgba(255, 255, 255, 0.4); }
+.toast button.primary { background: rgba(255, 255, 255, 0.18); font-weight: 600; }
 
 /* 移动端紧凑 */
 @media (max-width: 540px) {

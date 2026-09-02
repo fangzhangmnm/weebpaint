@@ -12,9 +12,8 @@ import { isStandaloneHtml } from "./standalone-html.ts";   // P6：单文件 = S
 import { reportError } from "./error-badge.ts";
 
 export interface PwaShellDeps {
-  toast: HTMLElement;
-  reloadBtn: HTMLElement;
-  dismissBtn: HTMLElement;
+  /** 有新版本 → 请消费者弹通知（2026-09-02 C7：壳不碰 toast DOM；app 接 ui/notice）。 */
+  showUpdateNotice: (h: { onReload: () => void; onDismiss: () => void }) => void;
   envChip: HTMLElement | null;
   onBeforeReload: () => Promise<void>;
   onForeground: () => void;
@@ -26,7 +25,21 @@ export class PwaShell {
   dismissed = false;
   constructor(d: PwaShellDeps) { this.d = d; }
 
-  show() { if (!this.dismissed) this.d.toast.classList.remove("hidden"); }
+  show() {
+    if (this.dismissed) return;
+    this.d.showUpdateNotice({ onReload: () => { void this._reload(); }, onDismiss: () => { this.dismissed = true; } });
+  }
+  async _reload() {
+    await this.d.onBeforeReload();
+    // skip-waiting 推给 WAITING SW（不是 controller），听 controllerchange 再 reload。
+    const reg = this.reg || await navigator.serviceWorker?.getRegistration();
+    if (!reg || !reg.waiting) { location.reload(); return; }
+    let reloaded = false;
+    const doReload = () => { if (reloaded) return; reloaded = true; location.reload(); };
+    navigator.serviceWorker.addEventListener("controllerchange", doReload, { once: true });
+    reg.waiting.postMessage({ type: "skip-waiting" });
+    setTimeout(doReload, 5000);   // 兜底
+  }
 
   init() {
     const LOCAL_DEV_HOSTS = new Set(["localhost", "127.0.0.1", "::1", ""]);
@@ -34,18 +47,7 @@ export class PwaShell {
       || location.hostname === "localhost" || location.hostname === "127.0.0.1";
     if (this.d.envChip && IS_DEV_ROUTE) this.d.envChip.classList.remove("hidden");
 
-    this.d.reloadBtn.addEventListener("click", async () => {
-      await this.d.onBeforeReload();
-      // skip-waiting 推给 WAITING SW（不是 controller），听 controllerchange 再 reload。
-      const reg = this.reg || await navigator.serviceWorker?.getRegistration();
-      if (!reg || !reg.waiting) { location.reload(); return; }
-      let reloaded = false;
-      const doReload = () => { if (reloaded) return; reloaded = true; location.reload(); };
-      navigator.serviceWorker.addEventListener("controllerchange", doReload, { once: true });
-      reg.waiting.postMessage({ type: "skip-waiting" });
-      setTimeout(doReload, 5000);   // 兜底
-    });
-    this.d.dismissBtn.addEventListener("click", () => { this.dismissed = true; this.d.toast.classList.add("hidden"); });
+    // （刷新/忽略钮 2026-09-02 C7：进通知的 actions/onDismiss，见 show()）
 
     // ---- 前台钩子：**无条件挂**（v409 修）----
     // onForeground 是**业务**（app 拿它拉 4 个 settings/state collection + 查文件新鲜度）；SW 的 update poke

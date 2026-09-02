@@ -107,7 +107,7 @@
     <link rel="icon" href="./icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=2fd983d2a0f2" />
+    <link rel="stylesheet" href="./styles.css?v=fd5a40f4f8ad" />
     <!-- zip.js UMD bundle：自挂 window.zip。必须在 module bundle 之前。
          defer（v417）：原来是 parser-blocking 的，硬刷新时 SW 被绕过 → 直奔网络 → 网络一卡整个
          文档解析就停住（浏览器标签页转圈）。defer 后它与下面的 type=module bundle 同属延迟脚本、
@@ -1609,22 +1609,11 @@
       <button class="sheet-action ghost" data-clear="cancel" data-i18n="common.cancel">取消</button>
     </div>
 
-    <!-- 更新 toast -->
-    <div id="updateToast" class="toast hidden" role="status" aria-live="polite">
-      <span data-i18n="upd.available">有新版本</span>
-      <button id="updateToastReload" type="button" data-i18n="upd.reload">刷新</button>
-      <button id="updateToastDismiss" type="button" class="dismiss" data-i18n-aria="upd.dismiss"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#x"/></svg></button>
-    </div>
-    <!-- 2026-09-02 压感自诊 toast（pressure-toast.ts；证据 = input.ts PressureProbe）：整条点哪都关，「详情」跳说明书 windows-ink 节 -->
-    <div id="pressureToast" class="toast hidden" role="status" aria-live="polite">
-      <span id="pressureToastText"></span>
-      <button id="pressureToastMore" type="button" data-i18n="pressure.toast.more">详情</button>
-      <button id="pressureToastDismiss" type="button" class="dismiss" data-i18n-aria="upd.dismiss"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#x"/></svg></button>
-    </div>
+    <!-- 更新 toast / 压感 toast：2026-09-02 C7 起由 src/ui/notice.ts 运行时建（同一条通知栈），静态节点退役 -->
 
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-40e5e68acfad.mjs"></script>
+    <script type="module" src="./dist/weebpaint-7276249f336a.mjs"></script>
   </body>
 </html>

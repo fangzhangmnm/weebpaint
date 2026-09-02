@@ -1,27 +1,17 @@
 // 统一 error report（universal error banner）——全 app + store 的错误唯一汇拢点。
 //   职责：把一条错误按 severity 分流到正确的 UI 面，并作为**最终消费者** console.log（层层上报只有这里 log）。
-//   - "error"   → 底部红色浮卡 banner（#__errBar，z-9999，盖过 gallery overlay/busy/gate/modal）+ console.error
-//   - "warning" → 底部琥珀浮卡 banner + console.warn
+//   - "error"   → 红色通知（ui/notice 通知栈，--z-notice：在 busy 之上、模态开着时停靠顶部不盖按钮行）+ console.error
+//   - "warning" → 琥珀通知（同栈）+ console.warn
 //   - "info"    → 状态栏（setStatus，瞬态）
 //   - "log"     → 只 console.log（良性 offline/fallback：funnel 但不打扰用户）
-//   banner 复用 index.html 内联 bootstrap 落下的 #__errBar 那一档（那份内联 = bundle 加载前的早期兜底；
-//   本模块 init 后接管 window.__wp_showFatal，让内联的 error/unhandledrejection handler 也走 severity）。
+//   index.html 内联 bootstrap 的 #__errBar 只管 bundle 加载前的早期兜底；本模块 init 后接管 window.__wp_showFatal，
+//   让内联的 error/unhandledrejection handler 也走 severity（2026-09-02 C7 起呈现归 ui/notice，本文件零 inline 样式）。
 
 import { t } from "./i18n/index.ts";
-import { record as diagRecord } from "./diag-log.ts";   // 黑匣子（2026-08-31）：全部级别都记，dev 页可看/复制
+import { record as diagRecord } from "./diag-log.ts";
+import { showNotice } from "./ui/notice.ts";   // 2026-09-02 C7 通知栈   // 黑匣子（2026-08-31）：全部级别都记，dev 页可看/复制
 export type ErrorLevel = "error" | "warning" | "info" | "log";
 
-const BANNER_COLOR: Record<"error" | "warning", string> = {
-  error: "#c0392b",
-  warning: "#b7791f",
-};
-// v0.9.4 底部浮卡（原顶部通栏会压 iPad 无框顶栏）：居中限宽、让开 home indicator、不贴边所以右下 HUD
-//   （版本水印/状态——排错时要看的）仍可见。改这里要同步 index.html 内联 bootstrap 那份早期兜底。
-const BANNER_CSS =
-  "position:fixed;left:50%;transform:translateX(-50%);bottom:max(env(safe-area-inset-bottom,0px), 12px);" +
-  "z-index:9999;width:calc(100% - 24px);max-width:640px;box-sizing:border-box;padding:10px 14px;" +
-  "border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.35);color:#fff;" +
-  "font:13px/1.4 system-ui;white-space:pre-wrap;word-break:break-word;max-height:50vh;overflow:auto;cursor:pointer";
 
 let statusSink: ((text: string, persist?: boolean) => void) | null = null;
 
@@ -50,15 +40,8 @@ function errToText(err: unknown): string {
 }
 
 function showBanner(text: string, level: "error" | "warning"): void {
-  let bar = document.getElementById("__errBar");
-  if (!bar) {
-    bar = document.createElement("div");
-    bar.id = "__errBar";
-    bar.addEventListener("click", () => bar!.remove());
-    (document.body || document.documentElement).appendChild(bar);
-  }
-  bar.style.cssText = BANNER_CSS + ";background:" + BANNER_COLOR[level];
-  bar.textContent = text + "  (" + t("err.dismissHint") + ")";
+  // 同 id 原地更新（连报不堆一摞）；点空白即关（err.dismissHint 文案照旧）
+  showNotice({ id: "error-banner", level, text: text + "  (" + t("err.dismissHint") + ")", dismissLabel: t("err.dismissHint") });
 }
 
 /**

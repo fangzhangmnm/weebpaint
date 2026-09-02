@@ -27,8 +27,9 @@ user 的原话（2026-06-11）：「有什么深模块能一劳永逸的解决 z
 
 ```
 chrome(10) < toolbar(25) < window(100..) < sheet(220) < overlay(300)
-  < menu(400) < toast(450) < modal(500) < gate(520) < busy(540)
+  < menu(400) < toast(450) < modal(500) < busy(520) < gate(540) < notice(560)
   < popout(600) < dev(700) < error(9999)
+（v0.4.11 翻 gate>busy：冲突面被 busy 盖死=红线；2026-09-02 C7 加 notice band：通知栈在 busy 之上、模态开着时停靠顶部，见 src/ui/notice.ts 头注释）
 ```
 
 - **chrome**：顶栏 / 左栏 / HUD。
