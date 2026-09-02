@@ -2,18 +2,19 @@
 // created 2026-09-02 by Claude Fable 5.1.
 import { describe, it, eq, assert } from "./runner.mjs";
 const deq = (a, b, m) => eq(JSON.stringify(a), JSON.stringify(b), m);   // runner 的 eq 是 ===；结构比较走 JSON
-import { clampPanelPos, clampSize, attachPanelDrag, attachPanelResize, PANEL_TOP_FLOOR } from "../src/ui/panel-gizmo.ts";
+import { clampPanelPos, clampSize, attachPanelDrag, attachPanelResize } from "../src/ui/panel-gizmo.ts";
+const FLOOR = 60;   // 测试用地板（常数已退役：真地板由 floating-window 运行时量，见 floating-window.test）
 
 describe("panel-gizmo · clampPanelPos", () => {
   const vp = { w: 1000, h: 800 }, size = { w: 200, h: 300 };
   it("视口内原样", () => deq(clampPanelPos({ left: 100, top: 120 }, size, vp), { left: 100, top: 120 }));
-  it("左/上越界 → 0 / 顶地板 60（iPad 出血区）", () => {
-    deq(clampPanelPos({ left: -50, top: 10 }, size, vp), { left: 0, top: PANEL_TOP_FLOOR });
+  it("左/上越界 → 0 / 顶地板（传入值）", () => {
+    deq(clampPanelPos({ left: -50, top: 10 }, size, vp, FLOOR), { left: 0, top: FLOOR });
   });
   it("右/下越界 → vw-w / vh-h", () => deq(clampPanelPos({ left: 950, top: 700 }, size, vp), { left: 800, top: 500 }));
   it("自定义 topFloor", () => deq(clampPanelPos({ left: 0, top: 0 }, size, vp, 96).top, 96));
   it("窗比视口大：取靠左/靠上那端（不产生负 max 的反转）", () => {
-    deq(clampPanelPos({ left: 500, top: 500 }, { w: 1200, h: 900 }, vp), { left: 0, top: PANEL_TOP_FLOOR });
+    deq(clampPanelPos({ left: 500, top: 500 }, { w: 1200, h: 900 }, vp, FLOOR), { left: 0, top: FLOOR });
   });
   it("clampSize", () => { eq(clampSize(50, 100, 300), 100); eq(clampSize(500, 100, 300), 300); eq(clampSize(200, 100, Infinity), 200); });
 });
@@ -39,7 +40,7 @@ describe("panel-gizmo · attachPanelDrag", () => {
     const panel = fakeEl({ left: 100, top: 100, width: 200, height: 300 });
     const head = fakeEl({ left: 100, top: 100, width: 200, height: 30 });
     const moves = []; let ended = 0;
-    attachPanelDrag(panel, head, { onMove: (p) => moves.push(p), onEnd: () => ended++ });
+    attachPanelDrag(panel, head, { topFloor: () => FLOOR, onMove: (p) => moves.push(p), onEnd: () => ended++ });
     head.dispatch("pointerdown", pe(1, 150, 110));
     assert(head.captured);
     head.dispatch("pointermove", pe(2, 999, 999));          // 别的指针

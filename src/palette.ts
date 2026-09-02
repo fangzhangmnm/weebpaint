@@ -11,8 +11,7 @@
 //   .clear()
 //   .getSerializedState() / .applySerializedState(s)  ← 持久化 to weebpaint/state.json
 
-import { attachPanelDrag } from "./ui/panel-gizmo.ts";   // 2026-09-02 拖动把手深模块
-import { raiseWindow } from "./surfaces.ts";
+import { registerFloatingWindow, type FloatingWindowHandle } from "./ui/floating-window.ts";   // 2026-09-02 C2 浮窗深模块
 
 const CANVAS_SIZE = 256;
 
@@ -41,6 +40,7 @@ export class PaletteWindow {
   ctx: CanvasRenderingContext2D;
   mode: PaletteMode;
   _open: boolean;
+  _win: FloatingWindowHandle | null = null;   // 浮窗句柄（z/拖/钳制/transient 归 module）
 
   constructor({ root, onColorSampled, getCurrentColor }: PaletteWindowOptions) {
     this.root = root;
@@ -64,8 +64,8 @@ export class PaletteWindow {
   }
   clear() { this._fillBackground(); }
 
-  open() { this.root.classList.remove("hidden"); this._open = true; raiseWindow(this.root); }
-  close() { this.root.classList.add("hidden"); this._open = false; }
+  open() { this._open = true; if (this._win) this._win.open(); else this.root.classList.remove("hidden"); }
+  close() { this._open = false; if (this._win) this._win.close(); else this.root.classList.add("hidden"); }
   toggle() { this._open ? this.close() : this.open(); }
   isOpen() { return this._open; }
 
@@ -176,15 +176,15 @@ export class PaletteWindow {
   _wireDrag() {
     const head = this.root.querySelector<HTMLElement>(".palette-head");
     if (!head) return;
-    // 2026-09-02：走 ui/panel-gizmo（三窗同一份把手舞蹈；以前这份没钳视口，调色板能被拖出屏找不回来）
-    attachPanelDrag(this.root, head, {
-      ignore: (t) => t.tagName === "BUTTON",
-      onMove: ({ left, top }) => {
-        this.root.style.left = left + "px";
-        this.root.style.top = top + "px";
-        this.root.style.right = "auto";
-        this.root.style.bottom = "auto";
-      },
+    // 2026-09-02 C2：浮窗生命周期归 ui/floating-window（以前这份拖动没钳视口，调色板能被拖出屏找不回来）。
+    //   位置持久化仍由 getSerializedState 读 style（opaque 序列化不变）。
+    this._win = registerFloatingWindow(this.root, {
+      id: "palette",
+      head,
+      ignoreDragOn: (t) => t.tagName === "BUTTON",
+      onMove: () => { this.root.style.bottom = "auto"; },
+      transient: { keepDuring: [] },   // v116 白名单同款：transient 期间藏
+      fallbackSize: { w: 280, h: 355 },
     });
   }
 
@@ -203,9 +203,9 @@ export class PaletteWindow {
     if (!s) return;
     if (s.mode) this.setMode(s.mode);
     if (s.position) {
-      this.root.style.left = s.position.left;
-      this.root.style.top = s.position.top;
-      this.root.style.right = "auto";
+      const left = parseFloat(s.position.left), top = parseFloat(s.position.top);
+      if (this._win && Number.isFinite(left) && Number.isFinite(top)) this._win.restore({ left, top });   // 钳视口 + 出血区地板
+      else { this.root.style.left = s.position.left; this.root.style.top = s.position.top; this.root.style.right = "auto"; }
       this.root.style.bottom = "auto";
     }
     if (s.imageB64) {

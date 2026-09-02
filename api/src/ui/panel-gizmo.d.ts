@@ -1,4 +1,3 @@
-export declare const PANEL_TOP_FLOOR = 60;
 export interface PanelPos {
     left: number;
     top: number;
@@ -14,7 +13,7 @@ export declare function clampSize(v: number, min: number, max: number): number;
 export interface DragOpts {
     /** 把手上哪些目标不起拖（关闭钮等）。 */
     ignore?: (target: Element) => boolean;
-    topFloor?: number;
+    topFloor?: number | (() => number);
     /** 每次移动：已钳制的 left/top（消费者写 style + 持久化）。 */
     onMove: (pos: PanelPos) => void;
     onEnd?: () => void;

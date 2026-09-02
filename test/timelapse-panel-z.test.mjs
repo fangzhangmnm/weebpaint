@@ -16,11 +16,10 @@ const fire = (el, type) => { for (const fn of el._listeners.get(type) ?? []) fn(
 // 现场：图层面板已开着压在录制窗上面。**只摆图层面板**——录制窗自己进不进栈、挂不挂
 // pointerdown，全靠 app 侧接线（transient-panels 注册 + _openPanel 的 raise），测试不代劳。
 async function stage() {
-  const { raiseWindow, registerWindow } = await import("../src/surfaces.ts");
+  const { registerFloatingWindow } = await import("../src/ui/floating-window.ts");   // 2026-09-02 surfaces 并入 floating-window
   const { els } = await import("../src/els.ts");
   const layers = document.getElementById("layersPanel");
-  registerWindow(layers);
-  raiseWindow(layers);
+  registerFloatingWindow(layers, { id: "layers-test" }).raise();
   return { els, layers };
 }
 

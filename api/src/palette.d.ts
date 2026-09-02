@@ -1,3 +1,4 @@
+import { type FloatingWindowHandle } from "./ui/floating-window.ts";
 interface RGB {
     r: number;
     g: number;
@@ -26,6 +27,7 @@ export declare class PaletteWindow {
     ctx: CanvasRenderingContext2D;
     mode: PaletteMode;
     _open: boolean;
+    _win: FloatingWindowHandle | null;
     constructor({ root, onColorSampled, getCurrentColor }: PaletteWindowOptions);
     _fillBackground(): void;
     clear(): void;

@@ -76,6 +76,9 @@ export declare class WpReferenceWindow extends HTMLElement {
     static get observedAttributes(): string[];
     liveProvider: (() => RefLiveSource | null) | null;
     menuPort: RefMenuPort | null;
+    /** 拖把地板（宿主注入 = ui/floating-window 运行时量的「顶栏下缘」；缺省 60 = 旧常数，裸挂可用）。
+     *  拖 / 恢复 / 视口钳制三条路都吃它——出血区规则只准一个出处（2026-09-02 C2）。 */
+    topFloor: number;
     private _canvas;
     private _cctx;
     private _emptyEl;

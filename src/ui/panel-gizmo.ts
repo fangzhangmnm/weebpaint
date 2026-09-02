@@ -7,13 +7,13 @@
 //   由消费者的回调决定**——模块不认识 desk、不认识列表高之类的语义（图层窗的「高」= 列表高不是面板高）。
 // 参考窗（src/frontend/，C2 格律不得 import ui/）保留自家实现；口径以本模块为准。
 
-export const PANEL_TOP_FLOOR = 60;   // 顶部出血区：面板头钻进 iPad hidden title bar 后拖不回来（v0.4.11 真机软锁）
+// （2026-09-02 C2：出血区地板常数 60 退役——iPadOS 顶部死区没有 API 可查，改由 ui/floating-window 运行时量顶栏下缘；本模块只吃传入值）
 
 export interface PanelPos { left: number; top: number }
 export interface Viewport { w: number; h: number }
 
 /** 视口钳制（纯函数）：左右 0..vw-w；上下 topFloor..vh-h（窗比视口还大时取靠上/靠左那端）。 */
-export function clampPanelPos(pos: PanelPos, size: Viewport, vp: Viewport, topFloor = PANEL_TOP_FLOOR): PanelPos {
+export function clampPanelPos(pos: PanelPos, size: Viewport, vp: Viewport, topFloor = 0): PanelPos {
   return {
     left: Math.max(0, Math.min(vp.w - size.w, pos.left)),
     top: Math.max(topFloor, Math.min(vp.h - size.h, pos.top)),
@@ -28,7 +28,7 @@ export function clampSize(v: number, min: number, max: number): number {
 export interface DragOpts {
   /** 把手上哪些目标不起拖（关闭钮等）。 */
   ignore?: (target: Element) => boolean;
-  topFloor?: number;
+  topFloor?: number | (() => number);   // 常数或现算（floating-window 传函数：顶栏下缘每次现量）
   /** 每次移动：已钳制的 left/top（消费者写 style + 持久化）。 */
   onMove: (pos: PanelPos) => void;
   onEnd?: () => void;
@@ -51,7 +51,7 @@ export function attachPanelDrag(panel: HTMLElement, handle: HTMLElement, opts: D
       { left: d.ol + (e.clientX - d.sx), top: d.ot + (e.clientY - d.sy) },
       { w: panel.offsetWidth, h: panel.offsetHeight },
       { w: window.innerWidth, h: window.innerHeight },
-      opts.topFloor,
+      typeof opts.topFloor === "function" ? opts.topFloor() : opts.topFloor,
     );
     opts.onMove(pos);
   };

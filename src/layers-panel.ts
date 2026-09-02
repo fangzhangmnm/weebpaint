@@ -23,18 +23,15 @@
 
 import { createApp, defineComponent, reactive, computed, watch, nextTick, ref } from "../vendor/vue/vue.esm-browser.prod.js";
 import { positionPopup } from "./anchored-popup.ts";
-import { attachPanelDrag, attachPanelResize } from "./ui/panel-gizmo.ts";   // 2026-09-02 拖动/缩放把手深模块
+import { registerFloatingWindow, type FloatingWindowHandle } from "./ui/floating-window.ts";   // 2026-09-02 C2 浮窗深模块（z/拖缩/钳制/出血区/transient 一处）
 
-// 浮窗 top 出血区（v0.4.11，真机 1.1 softlock）：iPad 顶部 hidden title bar / 系统手势区会拦截
-//   贴顶元素的拖动——面板头一旦钻进去就拉不回来。地板 ≈ safe-area + 顶栏（同 reference MIN_TOP 先例）。
-export const PANEL_MIN_TOP = 60;
+// （出血区地板常数 PANEL_MIN_TOP=60 退役 2026-09-02：iPadOS 顶部死区没有 API 可查，地板由 ui/floating-window 运行时量顶栏下缘）
 import { countViewLeaves, findViewNodeById, flattenViewLeaves, type ViewNode, type ViewLeaf, type ViewGroup } from "./backend/workpiece/painting-view.ts";
 import { renderNodesToCanvas, renderNodesToBytes } from "./backend/doc-render.ts";
 import { t, tLatin } from "./i18n/index.ts";
 import { docVersion, bumpDoc } from "./signals.ts";
 import { els } from "./els.ts";
 import { desk } from "./workbench-state.ts";
-import { raiseWindow } from "./surfaces.ts";
 import type { AppContext } from "./app-context.ts";
 import { iconHtml } from "./ui/icon.ts";
 import { initExplodeSheet, openExplodeSheet } from "./explode-layers.ts";
@@ -106,55 +103,37 @@ const layersUi = reactive<{
 }>({ expandedId: null, menuId: null, renameId: null, collapsedIds: new Set() });
 
 // ---- 图层面板开关 ----
+let _win: FloatingWindowHandle | null = null;   // 浮窗句柄（initLayersPanel 注册）
 export function toggleLayersPanel(force?: boolean) {
-  const hidden = els.layersPanel.classList.contains("hidden");
-  const show = force === true ? true : force === false ? false : hidden;
+  if (!_win) return;
+  const show = force === true ? true : force === false ? false : !_win.isOpen();
   if (!show) layersUi.renameId = null;   // 收面板 = 放弃悬着的内联改名（家规「强退=cancel」；也免得重开时高度不重钉）
-  els.layersPanel.classList.toggle("hidden", !show);
-  els.layersBtn.setAttribute("aria-pressed", show ? "true" : "false");
   // 开关状态随文档走：写进 desk（setter 自动标记 workspace dirty）。
   desk.layersPanel.enabled = show;
-  if (show) {
-    // 兜底回屏（0828）：无论坐标从哪条路粘上来，用户点开面板的瞬间它必须在视口内。
-    const r = els.layersPanel.getBoundingClientRect();
-    if (r.width > 0 && (r.right < 48 || r.left > window.innerWidth - 48 || r.bottom < PANEL_MIN_TOP || r.top > window.innerHeight - 48)) {
-      els.layersPanel.style.left = Math.max(0, Math.min(window.innerWidth - r.width, r.left)) + "px";
-      els.layersPanel.style.right = "auto";
-      els.layersPanel.style.top = Math.max(PANEL_MIN_TOP, Math.min(window.innerHeight - r.height, r.top)) + "px";
-    }
-    raiseWindow(els.layersPanel); renderLayersPanel();
-  }
+  // open = 显示 + 置顶 + 兜底回屏（0828：无论坐标从哪条路粘上来，用户点开面板的瞬间它必须在视口内——现在在 module 里）
+  if (show) { _win.open(); renderLayersPanel(); }
+  else _win.close();
 }
 
 // doc 的 desk 加载/重置后，把面板开关 + 位置**只读地**应用到 DOM（绝不回写 desk → 不误标 dirty）。
 // 直接走裸 DOM 开关，不经 toggleLayersPanel（那条路径会写 desk）。session-state 在 desk 就绪后派发 wp:applyEditorState。
 function applyLayersPanelFromEditorState() {
+  if (!_win) return;
   // 换文档/重置 desk：悬着的 renameId 是**上一个 doc** 的层 id，必须清（否则新 doc 的同号层被当成正在改名）。
   layersUi.renameId = null;
   const pos = desk.layersPanel.position;   // {left,top,width?,height?} | null（null = 自动摆放，回 CSS 默认位）
   if (pos) {
-    // 0828 iPad 实锤「图层窗离奇失踪」：desk 坐标是**别的窗口几何**存的（回收站恢复的旧画/跨设备
-    //   同步件），此处原来 left 裸应用、top 只夹顶不夹底 → 面板整个出屏。与 color-panel 同款全夹取。
-    els.layersPanel.style.width = pos.width ? Math.max(200, Math.min(window.innerWidth - 24, pos.width)) + "px" : "";
+    // 0828 iPad 实锤「图层窗离奇失踪」：desk 坐标可能是**别的窗口几何**存的（回收站恢复的旧画/跨设备同步件）
+    //   → 全夹取（含出血区地板），现在在 module 的 restore 里一处做。
     _userListH = typeof pos.height === "number" ? pos.height : null;
-    const w = els.layersPanel.offsetWidth || pos.width || 264;    // 面板可能还 hidden（offsetWidth=0）→ 存值/默认兜底
-    const h = els.layersPanel.offsetHeight || 240;
-    els.layersPanel.style.left = Math.max(0, Math.min(window.innerWidth - w, pos.left)) + "px";
-    els.layersPanel.style.right = "auto";
-    els.layersPanel.style.top = Math.max(PANEL_MIN_TOP, Math.min(window.innerHeight - h, pos.top)) + "px";
+    _win.restore({ left: pos.left, top: pos.top, width: pos.width });
   } else {
-    // 同实锤第二刀（「新画也看不到」）：原来 null 分支不清 left/top —— 上一张画的出屏坐标粘在
-    //   单例 DOM 内联样式上，污染此后每张画（含新画）直到刷新。null = 回 CSS 默认位，必须清干净。
-    els.layersPanel.style.left = "";
-    els.layersPanel.style.right = "";
-    els.layersPanel.style.top = "";
-    els.layersPanel.style.width = "";
+    // 同实锤第二刀（「新画也看不到」）：null = 回 CSS 默认位，上一张画粘在单例 DOM 上的内联坐标必须清干净。
+    _win.restore(null);
     _userListH = null;
   }
   const enabled = desk.layersPanel.enabled;
-  els.layersPanel.classList.toggle("hidden", !enabled);
-  els.layersBtn.setAttribute("aria-pressed", enabled ? "true" : "false");
-  if (enabled) { raiseWindow(els.layersPanel); renderLayersPanel(); }
+  if (enabled) { _win.open(); renderLayersPanel(); } else _win.close();
 }
 
 // 兼容垫片：app.js 仍调它（导出名保留）—— 现在只 bumpDoc() → docVersion 信号驱动 Vue 重算。
@@ -859,32 +838,33 @@ export function initLayersPanel(ctx: AppContext) {
   els.layersBtn.addEventListener("click", () => toggleLayersPanel());
   els.layersPanelClose.addEventListener("click", () => toggleLayersPanel(false));
 
-  // 拖动 / 缩放 = ui/panel-gizmo 深模块（2026-09-02：图层/颜色/调色板三窗共用一份把手舞蹈 + 视口钳制口径；
-  //   top 地板 = PANEL_MIN_TOP 出血区，v0.4.11 真机 1.1 softlock 先例）。落地（写 style / 持久化 desk）留在这里。
-  attachPanelDrag(els.layersPanel, els.layersPanelHead, {
-    ignore: (t) => !!t.closest(".float-panel-close"),
-    topFloor: PANEL_MIN_TOP,
+  // 浮窗生命周期 = ui/floating-window 深模块（2026-09-02 C2）：z 栈 / 拖 / 缩 / 视口钳制 / 出血区地板 / transient 去留
+  //   全在 module；这里只描述本窗：把手、持久化落点、「高 = 列表高」的语义、transform/adjust 期间留下。
+  _win = registerFloatingWindow(els.layersPanel, {
+    id: "layers",
+    head: els.layersPanelHead,
+    ignoreDragOn: (t) => !!t.closest(".float-panel-close"),
     onMove: ({ left, top }) => {
-      els.layersPanel.style.left = left + "px";
-      els.layersPanel.style.right = "auto";
-      els.layersPanel.style.top = top + "px";
       _clampListHeightSoon();   // 拖动改了面板顶 → 重钉列表高度，底部 item 始终够得着（合帧，120Hz 笔不逐事件重排）
       // 位置随文档走；保留已持久化的 width/height（#13），别整枝盖掉
       desk.layersPanel.position = { ...(desk.layersPanel.position ?? {}), left, top };
     },
-  });
-  // #13 右下角拖拽调大小：宽 = 面板宽，高 = 列表高（_userListH）。尺寸随 position 一起持久化（PanelPos.width/height）。
-  const resizeEl = document.getElementById("layersPanelResize");
-  if (resizeEl) attachPanelResize(els.layersPanel, resizeEl, {
-    getSize: () => ({ w: els.layersPanel.offsetWidth, h: els.layersList.getBoundingClientRect().height }),
-    min: { w: 200, h: 0 },
-    onResize: ({ w, h }) => {
-      const r = els.layersPanel.getBoundingClientRect();
-      _userListH = h;
-      els.layersPanel.style.width = w + "px";
-      _clampListHeightSoon();   // 高走 maxHeight 夹取：往下拖也永远够不出视口底（含 foot）
-      desk.layersPanel.position = { left: r.left, top: r.top, width: w, height: _userListH };   // 整枝赋值
+    // #13 右下角拖拽调大小：宽 = 面板宽，高 = 列表高（_userListH）。尺寸随 position 一起持久化（PanelPos.width/height）。
+    resize: {
+      grip: document.getElementById("layersPanelResize"),
+      min: { w: 200, h: 0 },
+      getSize: () => ({ w: els.layersPanel.offsetWidth, h: els.layersList.getBoundingClientRect().height }),
+      apply: ({ w, h }) => {
+        const r = els.layersPanel.getBoundingClientRect();
+        _userListH = h;
+        els.layersPanel.style.width = w + "px";
+        _clampListHeightSoon();   // 高走 maxHeight 夹取：往下拖也永远够不出视口底（含 foot）
+        desk.layersPanel.position = { left: r.left, top: r.top, width: w, height: _userListH };   // 整枝赋值
+      },
     },
+    transient: { keepDuring: ["transform", "adjust-color"] },   // v116 白名单同款：transform 要切活动层、调色要看图层；crop 藏
+    onOpenChange: (open) => els.layersBtn.setAttribute("aria-pressed", open ? "true" : "false"),
+    fallbackSize: { w: 264, h: 240 },
   });
   // 面板开关 + 位置随文档走：doc 的 desk 加载/重置后由 session-state 派发 wp:applyEditorState，据此应用到 DOM。
   window.addEventListener("wp:applyEditorState", () => applyLayersPanelFromEditorState());

@@ -1,3 +1,4 @@
+export declare function safeAreaTop(): number;
 export declare function topToolbarBottom(): number;
 interface PositionOpts {
     anchor?: HTMLElement | null;

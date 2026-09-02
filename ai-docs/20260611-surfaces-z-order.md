@@ -15,6 +15,8 @@ v231 以前 z-index 是 30+ 个散落在 CSS/JS 里的手填数字，两类反�
 user 的原话（2026-06-11）：「有什么深模块能一劳永逸的解决 zorder 的问题吗，还有一个就是
 保证菜单在窗口上面，不用程序员手动填」。
 
+> **2026-09-02 C2（edited by Claude Fable 5.1）**：`src/surfaces.ts` 已**并入 `src/ui/floating-window.ts`**（浮窗深模块：z 栈 + 拖/缩 + 视口钳制 + 出血区地板 + transient 去留一处）。band 表（styles.css `--z-*`）不变仍是 SSoT；下文 §2 的 registerWindow/raiseWindow 读作 `registerFloatingWindow(el, spec)` / `handle.raise()`。
+
 ## 设计
 
 两半：**静态 band 表（CSS SSoT）** + **窗口 band 内的动态栈（surfaces.ts）**。

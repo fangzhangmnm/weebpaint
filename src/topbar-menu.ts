@@ -202,31 +202,7 @@ export function initTopbarMenu(ctx: AppContext) {
   //   且 forceSaveAndPush 内部的 save 本就走 store 的 freshness/冲突 surface，查云的效果被它包含。
   els.topSaveBtn.addEventListener("click", () => { smartSaveAndPush(); });
 
-  // adjust panel head 拖动
-  (function bindAdjustPanelDrag() {
-    let drag: { id: number; sx: number; sy: number; ol: number; ot: number } | null = null;
-    els.adjustPanelHead.addEventListener("pointerdown", (e: PointerEvent) => {
-      if ((e.target as HTMLElement | null)?.closest(".float-panel-close")) return;
-      const r = els.adjustPanel.getBoundingClientRect();
-      drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, ol: r.left, ot: r.top };
-      els.adjustPanelHead.setPointerCapture(e.pointerId);
-      e.preventDefault();
-    });
-    els.adjustPanelHead.addEventListener("pointermove", (e: PointerEvent) => {
-      if (!drag || e.pointerId !== drag.id) return;
-      const w = els.adjustPanel.offsetWidth, h = els.adjustPanel.offsetHeight;
-      const left = Math.max(0, Math.min(window.innerWidth - w, drag.ol + (e.clientX - drag.sx)));
-      const top  = Math.max(0, Math.min(window.innerHeight - h, drag.ot + (e.clientY - drag.sy)));
-      els.adjustPanel.style.left = left + "px";
-      els.adjustPanel.style.top = top + "px";
-    });
-    els.adjustPanelHead.addEventListener("pointerup", (e: PointerEvent) => {
-      if (drag && e.pointerId === drag.id) {
-        try { els.adjustPanelHead.releasePointerCapture(e.pointerId); } catch {}
-        drag = null;
-      }
-    });
-  })();
+  // （adjust panel 拖动 2026-09-02 C2 归 ui/floating-window，filters-adjust 注册；这里那份删）
 
   // v267 (user) 图库挪回三条杠菜单（menuGallery）。topGalleryBtn 已从顶栏删除，
   //   留 getElementById?. 兜底防旧缓存 DOM（有就接上，无则 no-op）。

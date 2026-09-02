@@ -230,6 +230,9 @@ export class WpReferenceWindow extends HTMLElement {
   liveProvider: (() => RefLiveSource | null) | null = null;
   // 宿主端口：＋ 菜单（一次性 set = ui/popup-menu 的 togglePopupMenu）。null = 没菜单（裸挂时 ＋ 无反应）。
   menuPort: RefMenuPort | null = null;
+  /** 拖把地板（宿主注入 = ui/floating-window 运行时量的「顶栏下缘」；缺省 60 = 旧常数，裸挂可用）。
+   *  拖 / 恢复 / 视口钳制三条路都吃它——出血区规则只准一个出处（2026-09-02 C2）。 */
+  topFloor = DRAG_TOP_FLOOR;
 
   private _canvas: HTMLCanvasElement;
   private _cctx: CanvasRenderingContext2D;
@@ -316,7 +319,7 @@ export class WpReferenceWindow extends HTMLElement {
     if (o && o.left != null && o.top != null) {
       // v268b：旧的(或越界的)持久化位置钳进安全区（iPad 顶部日期栏 + 左侧工具栏）
       this.style.left = Math.max(CLAMP_MIN_LEFT, o.left) + "px";
-      this.style.top = Math.max(CLAMP_MIN_TOP, o.top) + "px";
+      this.style.top = Math.max(CLAMP_MIN_TOP, this.topFloor, o.top) + "px";
       if (o.width) this.style.width = o.width + "px";
       if (o.height) this.style.height = o.height + "px";
       this._clampIntoViewport();   // 越界持久化（大屏存小屏开）：右/下边同样钳回（未 open 时 _afterShow 兜）
@@ -560,7 +563,7 @@ export class WpReferenceWindow extends HTMLElement {
       d.moved = true;
       const w = this.offsetWidth, h = this.offsetHeight;
       const left = clamp(d.ol + (e.clientX - d.sx), 0, window.innerWidth - w);
-      const top = clamp(d.ot + (e.clientY - d.sy), DRAG_TOP_FLOOR, window.innerHeight - h);
+      const top = clamp(d.ot + (e.clientY - d.sy), this.topFloor, window.innerHeight - h);
       this.style.left = left + "px";
       this.style.top = top + "px";
       this._emitRect();
@@ -903,12 +906,12 @@ export class WpReferenceWindow extends HTMLElement {
     let w = this.offsetWidth, h = this.offsetHeight;
     if (!(w > 0) || !(h > 0)) return false;   // display:none（未 open）：开窗时 _afterShow 再钳
     let changed = false;
-    const maxW = Math.max(MIN_EDGE, vw - 8), maxH = Math.max(MIN_EDGE, vh - DRAG_TOP_FLOOR - 8);
+    const maxW = Math.max(MIN_EDGE, vw - 8), maxH = Math.max(MIN_EDGE, vh - this.topFloor - 8);
     if (w > maxW) { w = maxW; this.style.width = w + "px"; changed = true; }
     if (h > maxH) { h = maxH; this.style.height = h + "px"; changed = true; }
     const r = this.getBoundingClientRect();
     const left = clamp(r.left, 0, vw - w);
-    const top = clamp(r.top, DRAG_TOP_FLOOR, vh - h);
+    const top = clamp(r.top, this.topFloor, vh - h);
     if (Math.abs(left - r.left) > 0.5) { this.style.left = left + "px"; changed = true; }
     if (Math.abs(top - r.top) > 0.5) { this.style.top = top + "px"; changed = true; }
     return changed;

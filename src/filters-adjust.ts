@@ -7,6 +7,7 @@
 // 拆分期约定：import { ctx }，在 initFiltersAdjust() 把用到的 core 单例绑进私有 let，函数体逐字搬迁。
 // state.filterBrush 是 active filter-brush 的 SSoT（在 state 上，经绑定的 state 读写）。
 import { els } from "./els.ts";
+import { registerFloatingWindow, type FloatingWindowHandle } from "./ui/floating-window.ts";   // 2026-09-02 C2 浮窗深模块
 import { t, tLatin } from "./i18n/index.ts";
 import { desk } from "./workbench-state.ts";
 import { PANELS, openExclusive, closeExclusive } from "./panel-state.ts";
@@ -50,7 +51,7 @@ interface AdjustState {
 let state: AppContext["state"], editMode: AppContext["editMode"], doc: AppContext["doc"], board: AppContext["board"], history: AppContext["history"];
 let wp2: AppContext["wp2"];
 let setStatus: AppContext["setStatus"], updateSaveStatus: AppContext["updateSaveStatus"];
-let _bringPanelTop: AppContext["_bringPanelTop"];
+let _adjustWin: FloatingWindowHandle | null = null;   // 调整面板浮窗句柄（initFiltersAdjust 注册）
 let _suppressTransientPanels: AppContext["_suppressTransientPanels"], _restoreTransientPanels: AppContext["_restoreTransientPanels"];
 
 // ---- topbar：adjustments popup（液化 / 后续调色 etc）----
@@ -139,13 +140,13 @@ function _openFilterPanel(filterId: string, opts: { picker?: FilterLike[] } = {}
     els.adjustParamsBody.appendChild(wrap);
   }
   Filter.buildBody(els.adjustParamsBody, _adjustState, _onFilterChange);
-  els.adjustPanel.classList.remove("hidden");
+  _adjustWin?.open();   // 显示 + 置顶（z 归 floating-window）
   const w = els.adjustPanel.offsetWidth || 320;
   // v270：滤镜面板（液化等）走统一 positionPopup——钉视口右边 16px、让到顶栏条以下、读 safe-area、
   //   夹视口。取代原来手搓的 left=innerWidth-w-16 / top=max(104,…)（漏 safe-area、和 toolbar 挤）。
   void w;   // 宽度由 CSS 定，右钉不再需要算 left
   positionPopup(els.adjustPanel, { align: "right", edgeMargin: 16, belowToolbars: true, offsetY: 8 });
-  _bringPanelTop(els.adjustPanel);
+  _adjustWin?.clamp();   // positionPopup 之后再钳一次（出血区地板/视口）
   board.setActiveLayerSurrogate?.(L.id, { data: out, w: L.bboxW, h: L.bboxH }, L.bboxX, L.bboxY);   // bbox 给 GL 上传替身 tiles 用（字节直传，就地更新）
   _runFilterPreview();      // 初次渲染（identity）
   _suppressTransientPanels("adjust-color");
@@ -191,7 +192,7 @@ function _closeFilterPanel(applied: boolean) {
     _adjustState.token.cancel();
   }
   _adjustState = null;
-  els.adjustPanel.classList.add("hidden");
+  _adjustWin?.close();
   els.adjustParamsBody.innerHTML = "";
   _restoreTransientPanels();
   board.invalidateAll();
@@ -382,7 +383,12 @@ function _renderFilterBrushToolbar() {
 
 export function initFiltersAdjust(ctx: AppContext) {
   ({ state, editMode, doc, board, history, setStatus, updateSaveStatus, wp2,
-     _bringPanelTop, _suppressTransientPanels, _restoreTransientPanels } = ctx);
+     _suppressTransientPanels, _restoreTransientPanels } = ctx);
+  // 调整面板 = 浮窗（2026-09-02 C2）：z/拖/钳制归 ui/floating-window；初始摆位仍走 positionPopup（钉右、让顶栏）。
+  //   不进 transient 抑制（它本身就是 adjust-color transient 的 UI）。拖动那份原在 topbar-menu.ts，已删。
+  _adjustWin = registerFloatingWindow(els.adjustPanel, {
+    id: "adjust", head: els.adjustPanelHead, ignoreDragOn: (t) => !!t.closest(".float-panel-close"), fallbackSize: { w: 320, h: 300 },
+  });
 
   els.topAdjustBtn.addEventListener("click", (e: Event) => {
     e.stopPropagation();

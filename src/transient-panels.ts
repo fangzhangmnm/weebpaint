@@ -6,7 +6,7 @@
 // 经 ctx 被 toolbar / selection-ops / doc-ops / filters-adjust 消费，故全部 export。
 import { closeExclusive } from "./panel-state.ts";
 import { updateLassoToolbar } from "./toolbar.ts";
-import { raiseWindow, registerWindow } from "./surfaces.ts";
+import { raiseFloatingWindow, suppressFloatingForTransient, restoreFloatingAfterTransient } from "./ui/floating-window.ts";   // 2026-09-02 C2
 import type { AppContext } from "./app-context.ts";
 
 let input: AppContext["input"], board: AppContext["board"], editMode: AppContext["editMode"];
@@ -15,37 +15,17 @@ let input: AppContext["input"], board: AppContext["board"], editMode: AppContext
 // user：「transient 的时候有些窗口应该暂时 hide... 大部分窗口都是准模态的，而不是一直留在画布上」
 // 进 transient (lasso transform / crop / color adjust)：把不相关 float 暂时藏起；
 // 退出时复原。brush rack 走 closeExclusive 顺便关；brush settings 全屏 view 不动 (用户主动开的)
-let _suppressedDuringTransient: { el: HTMLElement; id: string }[] = [];
+// 2026-09-02 C2：「藏谁 / 白名单 / 复原」进了 ui/floating-window（每窗自述 transient.keepDuring）。这里只剩编排：
+//   进 transient = 抑制浮窗 + 笔架 closeExclusive 一把关。
 export function _suppressTransientPanels(mode: string) {
-  const allow: Record<string, string[]> = {
-    transform:      ["referencePanel", "layersPanel"],     // transform 时还要看引用图 / 切活动层
-    crop:           ["referencePanel"],
-    "adjust-color": ["referencePanel", "layersPanel"],
-  };
-  const allowList = allow[mode] || [];
-  const candidates = ["colorPanel", "paletteWindow", "referencePanel", "layersPanel"];
-  // 防递归 (transition 间套用)：先复原再藏
-  _restoreTransientPanels();
-  for (const id of candidates) {
-    if (allowList.includes(id)) continue;
-    const el = document.getElementById(id);
-    if (!el || el.classList.contains("hidden")) continue;
-    _suppressedDuringTransient.push({ el, id });
-    el.classList.add("hidden");
-  }
-  // brush rack: closeExclusive 一把关
-  try { closeExclusive(); } catch {}
+  suppressFloatingForTransient(mode);
+  try { closeExclusive(); } catch { /* 无 exclusive */ }
 }
-export function _restoreTransientPanels() {
-  for (const { el } of _suppressedDuringTransient) {
-    el.classList.remove("hidden");
-  }
-  _suppressedDuringTransient = [];
-}
+export function _restoreTransientPanels() { restoreFloatingAfterTransient(); }
 
 // v113 起源 user：「adjust panel 点出来之后在 color panel 下面，导致我以为坏了，能不能点开谁谁到这一层的 top」
-// v232：实现移进 surfaces.ts（band 内归一化，取代无上限递增计数器）。导出名保留给老调用方。
-export const _bringPanelTop = raiseWindow;
+// v232：实现移进 surfaces.ts（band 内归一化，取代无上限递增计数器）；2026-09-02 surfaces 并入 ui/floating-window。导出名保留给老调用方。
+export const _bringPanelTop = raiseFloatingWindow;
 
 // transform 浮层的 commit / cancel（lasso commit/cancel 按钮 + 决定性动作都走这两个）
 export function _commitTransform() {
@@ -99,14 +79,5 @@ export function initTransientPanels(ctx: AppContext) {
   editMode = ctx.editMode;
   window.addEventListener("wp:histchange", scheduleFloatTransientSync);
 
-  // 所有浮窗注册进 surfaces 的 window band（pointerdown 置顶；open 路径各自调 raiseWindow）
-  // v232：补上 layersPanel（user：「toggle layers 之后 layers 应该 pop up 到 reference 上面」）
-  // 2026-08-28（Claude Opus 5）：补上 tlPanel（录制窗以前不在 window band 栈里，被图层面板等压住）
-  const panels = [
-    "colorPanel", "paletteWindow", "referencePanel",
-    "adjustPanel", "layersPanel", "tlPanel",
-  ];
-  for (const id of panels) {
-    registerWindow(document.getElementById(id));
-  }
+  // （浮窗注册 2026-09-02 C2 起各窗自己 registerFloatingWindow；这里不再持 id 清单——「没登记被压」结构上不可能）
 }

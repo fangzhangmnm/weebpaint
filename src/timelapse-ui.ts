@@ -10,7 +10,7 @@ import { setMenuOpen } from "./settings-menu.ts";
 import { openConfirmSheet } from "./sheets.ts";
 import { triggerDownload } from "./session.ts";
 import { reportError } from "./error-badge.ts";
-import { raiseWindow } from "./surfaces.ts";
+import { registerFloatingWindow, type FloatingWindowHandle } from "./ui/floating-window.ts";   // 2026-09-02 C2 浮窗深模块
 import {
   timelapseStatus, timelapseStart, timelapsePause, timelapseResume, timelapseClear, timelapseSnapshotMp4,
 } from "./timelapse-session.ts";
@@ -34,8 +34,9 @@ export function initTimelapseUi(currentDocName: () => string): void {
   _currentDocName = currentDocName;
   els.menuTimelapse.addEventListener("click", () => { setMenuOpen(false); _openPanel(); });
   els.tlRecChip.addEventListener("click", () => _openPanel());
-  els.tlPanelClose.addEventListener("click", () => els.tlPanel.classList.add("hidden"));
-  _wireDrag();
+  els.tlPanelClose.addEventListener("click", () => _win?.close());
+  // 浮窗生命周期归 ui/floating-window（2026-09-02 C2）：z 栈/点窗置顶/拖/钳制/出血区地板；位置 session 态不持久化。
+  _win = registerFloatingWindow(els.tlPanel, { id: "timelapse", head: els.tlPanelHead, ignoreDragOn: (t) => !!t.closest(".close-x") });
   window.addEventListener("wp:timelapse-changed", () => {
     _renderChip(); _renderMenuState();
     if (!els.tlPanel.classList.contains("hidden")) _renderPanel();
@@ -43,40 +44,16 @@ export function initTimelapseUi(currentDocName: () => string): void {
   _renderChip(); _renderMenuState();
 }
 
-// 开窗即置顶（surfaces window band；pointerdown 置顶由 transient-panels 的 registerWindow 统一挂）。
+// 开窗即置顶（floating-window：open = 显示 + 置顶 + 钳视口）。
 // 2026-08-28（Claude Opus 5）：修 user 2026-08-23 反馈「录制窗被图层面板遮挡」。
+let _win: FloatingWindowHandle | null = null;
 function _openPanel(): void {
   _moreOpen = false;
-  els.tlPanel.classList.remove("hidden");
-  raiseWindow(els.tlPanel);
+  _win?.open();
   _renderPanel();
 }
 
-// 拖标题栏移动（同 colorPanel 手势；位置 session 态不持久化）
-function _wireDrag(): void {
-  let drag: { id: number; sx: number; sy: number; ol: number; ot: number } | null = null;
-  els.tlPanelHead.addEventListener("pointerdown", (e: PointerEvent) => {
-    if ((e.target as HTMLElement | null)?.closest(".close-x")) return;
-    const r = els.tlPanel.getBoundingClientRect();
-    drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, ol: r.left, ot: r.top };
-    els.tlPanelHead.setPointerCapture(e.pointerId);
-    e.preventDefault();
-  });
-  els.tlPanelHead.addEventListener("pointermove", (e: PointerEvent) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    const w = els.tlPanel.offsetWidth, h = els.tlPanel.offsetHeight;
-    const left = Math.max(0, Math.min(window.innerWidth - w, drag.ol + (e.clientX - drag.sx)));
-    const top = Math.max(60, Math.min(window.innerHeight - h, drag.ot + (e.clientY - drag.sy)));   // top 地板=出血区（同 colorPanel）
-    els.tlPanel.style.left = left + "px";
-    els.tlPanel.style.top = top + "px";
-  });
-  els.tlPanelHead.addEventListener("pointerup", (e: PointerEvent) => {
-    if (drag && e.pointerId === drag.id) {
-      try { els.tlPanelHead.releasePointerCapture(e.pointerId); } catch { /* 已释放 */ }
-      drag = null;
-    }
-  });
-}
+// （拖动把手 2026-09-02 C2 进 ui/floating-window，自家那份删）
 
 // ---- HUD 录制 chip（护栏 C，2026-08-25 user 拍板「常驻指示灯，on/off 一眼可见」，
 //   覆盖 2026-08-19「stop=无 chip」细则）：这张画**开过录就常显**——录制中=红点呼吸「录制中」、

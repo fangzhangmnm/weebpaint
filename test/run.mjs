@@ -89,6 +89,7 @@ import "./pointer-route.test.mjs";
 import "./pressure-probe.test.mjs";     // 2026-09-02 压感自诊探针：pen-flat / absolute-mouse 判定边界 + 鼠绘零误报钉子
 import "./md-lite.test.mjs";            // 2026-09-02 in-app 说明书极简 md 渲染：转义先行/块/行内
 import "./panel-gizmo.test.mjs";        // 2026-09-02 浮窗把手深模块：视口钳制纯函数 + 拖动/缩放把手接线
+import "./floating-window.test.mjs";    // 2026-09-02 C2 浮窗深模块：出血区地板纯函数/z 栈/transient 去留/restore·open·视口钳制
 import "./stroke-input-smooth.test.mjs";
 import "./stroke-smoother.test.mjs";
 import "./stroke-session.test.mjs";

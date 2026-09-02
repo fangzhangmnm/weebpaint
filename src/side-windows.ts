@@ -25,7 +25,7 @@ import { readImageFromClipboard } from "./session.ts";
 import { humanSize } from "./gallery/gallery-view-model.ts";
 import { setColor } from "./color-panel.ts";
 import { setMenuOpen } from "./settings-menu.ts";
-import { raiseWindow } from "./surfaces.ts";
+import { registerFloatingWindow, floatingTopFloor, type FloatingWindowHandle } from "./ui/floating-window.ts";   // 2026-09-02 C2 浮窗深模块
 import { togglePopupMenu } from "./ui/popup-menu.ts";   // 参考窗 ＋ 菜单端口（挂 body；组件 frontend/ 不得 import ui/）
 import { desk } from "./workbench-state.ts";
 import { renderNodesToCanvas } from "./backend/doc-render.ts";
@@ -40,11 +40,18 @@ let setStatus: AppContext["setStatus"], editMode: AppContext["editMode"], state:
 // ---- 参考小窗 ----
 // 元素在 index.html（slot 文案吃宿主 i18n）；import 上面的组件模块已 define → 此处已升级。
 export const referenceWindow = document.getElementById("referencePanel") as WpReferenceWindow;
+// 浮窗生命周期端口（2026-09-02 C2）：z 栈 + 点窗置顶 + 视口变时把「出血区地板」推给组件。组件按 C2 目录格律自钳，
+//   但地板只准一个出处（floating-window 运行时量顶栏下缘）；open/close 走组件自己的 open 属性，不经 handle。
+const _refWin: FloatingWindowHandle = registerFloatingWindow(referenceWindow, {
+  id: "reference",
+  onViewport: (floor) => { referenceWindow.topFloor = floor; },
+});
+referenceWindow.topFloor = floatingTopFloor();
 
 // 开/关的**用户路径**（menu/快捷键/菜单关闭项）写 desk（per-doc 标脏）；程序性回灌不经这里。
 function refSetOpen(open: boolean) {
   referenceWindow.open = open;
-  if (open) raiseWindow(referenceWindow);   // v232：开窗即置顶（surfaces window band）
+  if (open) _refWin.raise();   // v232：开窗即置顶（window band）
   desk.refPanel.enabled = open;
 }
 
@@ -197,7 +204,7 @@ export function initSideWindows(ctx: AppContext) {
   window.addEventListener("wp:applyEditorState", () => {
     ref.rect = desk.refPanel.position;
     ref.open = desk.refPanel.enabled;
-    if (desk.refPanel.enabled) raiseWindow(ref);
+    if (desk.refPanel.enabled) _refWin.raise();
   });
   window.addEventListener("wp:toggleReference", () => refSetOpen(!ref.open));
 

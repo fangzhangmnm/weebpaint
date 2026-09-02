@@ -105,6 +105,10 @@ _Avoid_: editorState / createEditorState（旧名，T5d 换毕）, 把 dial 写�
 render 侧三件（T6，ADR-0008 §8）：**GlRoom** = 机房（GLContext/GpuTilePool/CpuGpuTileBridge/GLCompositor 五件套唯一实例 + 共享台面：叶驻留 leaves+sync 族、pseudo 装置 overlay·float·selMask·fillTex、composeSteps 合成机、onInvalidate 失效信号、HUD 观测口）；**RenderTree** = tree composite（renderFrame/段缓存/display 快路径/pin provider）；**RasterService** = 一次性算像素（bakeStamps/rasterizeStampsToBytes/warpToBytes/compositeOnce/pickColor——零帧状态，C 骑士 headless 的显形接缝）。**两 facade 必须共享同一 bridge/pool 实例**（烤定搭 base-tile 便车；拆两套缓存=每笔整层重传）。workpiece/引擎零 GL：GPU 只算不管账，账本永远是 CPU 句柄。
 _Avoid_: render-tree-gl（T6 拆除）, facade 各持缓存, GPU 侧记账, `(tree as any)._bridge` 私字段挖法（走 room.bridge 正路）
 
+**FloatingWindow（浮窗）**:
+编辑器里可拖的浮动 UI 面（图层 / 颜色 / 调色板 / 调整 / 录像 / Blender / 参考窗）的**唯一生命周期 module**（`src/ui/floating-window.ts`，2026-09-02 UI 纪元 C2）。注册一次 = z 栈（window band 内归一化，原 surfaces.ts）+ 点窗置顶 + 拖/缩把手（内部原语 panel-gizmo）+ 视口钳制 + **出血区地板**（运行时量 `#topBar` 下缘 + safe-area 硬底线，不手填常数——iPadOS 顶部触摸死区没有 API 可查）+ transient 去留（每窗自述 `keepDuring`）+ 持久化几何的 restore 钳制。互斥（panel-state）是另一根轴，不归它。参考窗按 frontend/ 目录格律自钳，但地板由宿主端口注入同一出处。
+_Avoid_: surfaces（已并入）, _bringPanelTop 之外再手写 z-index, 每窗自抄拖动/钳制, 常数 60（出血区地板旧写法）
+
 **EditMode**:
 独占编辑状态机的 SSoT（`src/edit-mode.js`）。**单轴**：`current()` 是一个 enum（CAPS 的 key），持久工具（brush/eraser/lasso/...）和 transient（transform/crop/adjust）平级。能力表 CAPS（canDraw/allowsColor/cursor/ctrlZ/transient）按 current() 查表 → 谓词。输入 gating、UI 显隐/cursor、ctrl-z 语义全从 current() 派生。叫 EditMode 不叫 Mode 因为 "mode" 在本仓重载（L.mode 混合 / liquify.mode / body.dataset.mode）。提案见 [[ai-docs/20260531-tool-mode-state-machine.md]]。
 _Avoid_: tool state, app state, mode manager, Mode（裸"mode"歧义）

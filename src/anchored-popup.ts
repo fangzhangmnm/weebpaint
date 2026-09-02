@@ -12,7 +12,7 @@
 //   旧名留作薄 wrapper（老调用点零改动，白捡 safe-area + 夹视口）。
 
 // env(safe-area-inset-top) 在 JS 拿不到解析后的字面值 → 一次性探针量 padding-top（旋转 / 机型变了也准）。
-function safeAreaTop(): number {
+export function safeAreaTop(): number {
   const probe = document.createElement("div");
   probe.style.cssText =
     "position:fixed;top:0;left:0;height:0;padding-top:env(safe-area-inset-top,0px);visibility:hidden;pointer-events:none;";

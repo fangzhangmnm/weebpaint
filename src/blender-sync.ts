@@ -14,6 +14,7 @@
 // 协议立场（别在这重新发明）：贴图靠 name 识别；推 = 整张覆盖，无冲突解决 by design。
 // 不碰 store 红线：只调 session.markEdited() 公共 API（同 import-image.ts），其余持久化全走库。
 
+import { registerFloatingWindow, type FloatingWindowHandle } from "./ui/floating-window.ts";   // 2026-09-02 C2 浮窗深模块
 import type { AppContext } from "./app-context.ts";
 import { preferences } from "./app-prefs.ts";   // blender-panel-url（gallery scope+无库 cascade，残留审计 F）
 import { reportError } from "./error-badge.ts";
@@ -63,6 +64,7 @@ let built = false;
 
 // ─── DOM 引用（buildPanel 填充）───
 let panel: HTMLDivElement;
+let _win: FloatingWindowHandle | null = null;   // 浮窗句柄（buildPanel 注册）
 let connBtn: HTMLButtonElement;
 let remoteUrl: HTMLInputElement;
 let nameInput: HTMLInputElement;
@@ -108,19 +110,12 @@ function applyBlenderPanelFromEditorState() {
   if (!built) return;
   remoteUrl.value = preferences.get("blender-panel-url") || "";
   const show = desk.blenderPanel.show;
-  panel.classList.toggle("hidden", !show);
+  if (!_win) return;
   if (show) {
-    document.body.appendChild(panel);   // 置顶
     const saved = desk.blenderPanel.position;
-    if (saved) {
-      const w = panel.offsetWidth, h = panel.offsetHeight;
-      const left = Math.max(0, Math.min(window.innerWidth - w, saved.left));
-      const top = Math.max(0, Math.min(window.innerHeight - h, saved.top));
-      panel.style.left = left + "px";
-      panel.style.right = "auto";
-      panel.style.top = top + "px";
-    }
-  }
+    if (saved) _win.restore(saved);   // 钳视口 + 出血区地板（module 一处）
+    _win.open();                      // 显示 + 置顶（取代 appendChild 搬 DOM 的置顶 hack）
+  } else _win.close();
 }
 
 // ───────────────────────── 连接（单键多态）─────────────────────────
@@ -399,10 +394,9 @@ function wirePopup(wrench: HTMLElement, popup: HTMLElement) {
 }
 
 function togglePanel(force?: boolean) {
-  const hidden = panel.classList.contains("hidden");
-  const show = force === undefined ? hidden : force;
-  panel.classList.toggle("hidden", !show);
-  if (show) document.body.appendChild(panel);   // 置顶
+  if (!_win) return;
+  const show = force === undefined ? !_win.isOpen() : force;
+  if (show) _win.open(); else _win.close();
   desk.blenderPanel.show = show;         // 随文档持久化（标脏）
 }
 
@@ -539,45 +533,17 @@ function buildPanel() {
     sizePreset.selectedIndex = 0;
   });
 
-  attachDrag(q<HTMLDivElement>("#btpHead"));
-  restorePos();
+  // 浮窗生命周期归 ui/floating-window（2026-09-02 C2；以前自带一份拖动且没注册进 window band → 会被别的浮窗压住）
+  _win = registerFloatingWindow(panel, {
+    id: "blender",
+    head: q<HTMLDivElement>("#btpHead"),
+    ignoreDragOn: (t) => !!t.closest(".float-panel-close"),
+    onMove: ({ left, top }) => { desk.blenderPanel.position = { left, top }; },   // 随文档持久化（标脏）
+  });
+  if (desk.blenderPanel.position) _win.restore(desk.blenderPanel.position);
   built = true;
   setConnState("off");
   syncConfigUI();
 }
 
-// 拖动面板头（沿用 layers-panel / color-panel 模式）。
-function attachDrag(head: HTMLElement) {
-  let drag: { id: number; sx: number; sy: number; ol: number; ot: number } | null = null;
-  head.addEventListener("pointerdown", (e: PointerEvent) => {
-    if ((e.target as HTMLElement | null)?.closest(".float-panel-close")) return;
-    const r = panel.getBoundingClientRect();
-    drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, ol: r.left, ot: r.top };
-    head.setPointerCapture(e.pointerId);
-    e.preventDefault();
-  });
-  head.addEventListener("pointermove", (e: PointerEvent) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    const w = panel.offsetWidth, h = panel.offsetHeight;
-    const left = Math.max(0, Math.min(window.innerWidth - w, drag.ol + (e.clientX - drag.sx)));
-    const top = Math.max(0, Math.min(window.innerHeight - h, drag.ot + (e.clientY - drag.sy)));
-    panel.style.left = left + "px";
-    panel.style.right = "auto";
-    panel.style.top = top + "px";
-    desk.blenderPanel.position = { left, top };   // 随文档持久化（标脏）
-  });
-  head.addEventListener("pointerup", (e: PointerEvent) => {
-    if (drag && e.pointerId === drag.id) {
-      try { head.releasePointerCapture(e.pointerId); } catch { /* noop */ }
-      drag = null;
-    }
-  });
-}
-
-function restorePos() {
-  const saved = desk.blenderPanel.position;
-  if (!saved) return;
-  panel.style.left = saved.left + "px";
-  panel.style.right = "auto";
-  panel.style.top = saved.top + "px";
-}
+// （attachDrag / restorePos 2026-09-02 C2 进 ui/floating-window，自家那份删）
