@@ -107,7 +107,7 @@
     <link rel="icon" href="./icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=b7ff729cfcdf" />
+    <link rel="stylesheet" href="./styles.css?v=2fd983d2a0f2" />
     <!-- zip.js UMD bundle：自挂 window.zip。必须在 module bundle 之前。
          defer（v417）：原来是 parser-blocking 的，硬刷新时 SW 被绕过 → 直奔网络 → 网络一卡整个
          文档解析就停住（浏览器标签页转圈）。defer 后它与下面的 type=module bundle 同属延迟脚本、
@@ -444,6 +444,7 @@
   <symbol id="chevron-left" data-cat="stopgap" data-src="baked:DroidSansFallbackFull(Apache-2.0)/DejaVuSans-Bold(Bitstream-Vera)" data-note="参考窗翻页 chip ‹（stopgap 字形；库裸 chevron 曾 sunset，待美工裁小尺寸版）" viewBox="0 0 24 24"><path d="M16.79 3V7.7L11.1 12L16.79 16.3V21L7.21 13.83V10.21Z" fill="currentColor" stroke="none"/></symbol>
   <symbol id="chevron-right" data-cat="stopgap" data-src="baked:DroidSansFallbackFull(Apache-2.0)/DejaVuSans-Bold(Bitstream-Vera)" data-note="参考窗翻页 chip ›（stopgap 字形）" viewBox="0 0 24 24"><path d="M7.21 3 16.79 10.21V13.83L7.21 21V16.3L12.88 12L7.21 7.7Z" fill="currentColor" stroke="none"/></symbol>
   <symbol id="one-to-one" data-cat="stopgap" data-src="baked:DroidSansFallbackFull(Apache-2.0)/DejaVuSans-Bold(Bitstream-Vera)" data-note="参考窗菜单「1:1 像素」（stopgap 字形；待像素隐喻真图）" viewBox="0 0 24 24"><path d="M2.05 14.91H4.12V9.06L2 9.5V7.91L4.1 7.47H6.33V14.91H8.39V16.53H2.05Z M10.63 9.73H12.82V12.08H10.63ZM10.63 14.18H12.82V16.53H10.63Z M15.67 14.91H17.73V9.06L15.61 9.5V7.91L17.72 7.47H19.94V14.91H22V16.53H15.67Z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="help" data-cat="stopgap" data-src="baked:DroidSansFallbackFull(Apache-2.0)/DejaVuSans-Bold(Bitstream-Vera)" data-note="设置菜单「帮助」= in-app 说明书入口（stopgap 字形；待 help/question 真图）" viewBox="0 0 24 24"><path d="M13.31 15.03H9.04V14.45Q9.04 13.48 9.43 12.73Q9.82 11.98 11.08 10.82L11.83 10.13Q12.51 9.51 12.82 8.97Q13.14 8.42 13.14 7.88Q13.14 7.05 12.57 6.58Q12 6.11 10.98 6.11Q10.02 6.11 8.91 6.51Q7.8 6.91 6.59 7.69V3.97Q8.02 3.47 9.21 3.24Q10.39 3 11.49 3Q14.38 3 15.9 4.18Q17.41 5.36 17.41 7.62Q17.41 8.78 16.95 9.7Q16.49 10.61 15.38 11.67L14.62 12.34Q13.81 13.08 13.56 13.52Q13.31 13.97 13.31 14.5ZM9.04 16.78H13.31V21H9.04Z" fill="currentColor" stroke="none"/></symbol>
 </svg>
 <!-- ICON-SPRITE:END -->
 
@@ -854,12 +855,7 @@
       <button class="lasso-tool-btn" id="lassoAntsBtn" type="button" role="menuitem" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#select-rectangle"/></svg><span data-i18n="la.antsToggle">蚂蚁线</span></button>
     </div>
     <!-- v0.5.14 组槽下拉（紧凑菜单深模块三形态：row=横排图标 / grid / list=竖排带解说；JS 锚定槽下） -->
-    <!-- v0.5.37 in-app 下拉（原生 select 打开态=chrome 域，UCSUR 必豆腐；夜间白底/装不了SVG 同根）：
-         主题/语言两处；条目 JS 现建（i18n/endonym 动态） -->
-    <div class="lasso-icon-menu lasso-icon-list hidden" id="menuThemeMenu" role="menu"></div>
-    <div class="lasso-icon-menu lasso-icon-list hidden" id="galleryThemeMenu" role="menu"></div>
-    <div class="lasso-icon-menu lasso-icon-list hidden" id="galleryLanguageMenu" role="menu"></div>
-    <div class="lasso-icon-menu lasso-icon-list hidden" id="menuLanguageMenu" role="menu"></div>
+    <!-- v0.5.37 in-app 下拉（主题/语言）：2026-09-02 起弹层由 ui/popup-menu 运行时挂 body，静态节点退役 -->
     <!-- v0.7.8 魔棒算法弹出（lassoAlgoBtn 组槽；文字行，选项 JS 从 MAGIC_ALGORITHMS SSoT 填） -->
     <div class="lasso-icon-menu lasso-icon-list hidden" id="lassoAlgoMenu" role="menu" data-i18n-aria="la.algoSel"></div>
     <div class="lasso-icon-menu hidden" id="lassoSetOpMenu" role="menu" data-i18n-aria="la.setOpSlot">
@@ -1102,7 +1098,6 @@
       <button class="sheet-action ghost sheet-action-with-icon" id="explodeCancel" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#x"/></svg><span data-i18n="common.cancel">取消</span></button>
     </div>
 
-    <div class="lasso-icon-menu lasso-icon-list hidden" id="explodeCultureMenu" role="menu"></div>
 
     <!-- 统一导入入口：iPad 上 accept="image/*,.ora" 会同时给出 "Photo Library"
          / "Take Photo" / "Choose File" 三选项；桌面是标准 file picker。
@@ -1496,6 +1491,10 @@
         <button class="menu-item menu-item-with-icon" id="menuShortcuts" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#shortcut"/></svg>
         <span class="menu-item-label" data-i18n="menu.shortcuts">快捷键</span>
       </button>
+        <!-- 2026-09-02 内置说明书（readme-panel.ts；内容 SSoT = readme-docs.ts；深链 #help/<id>）。#help 图标 = 烤字 stopgap，待库真图 -->
+        <button class="menu-item menu-item-with-icon" id="menuReadme" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#help"/></svg>
+        <span class="menu-item-label" data-i18n="menu.readme">帮助</span>
+      </button>
         <!-- v0.9.26 PWA 安装入口（user 2026-08-20）：beforeinstallprompt 捕获后才显形（Chromium）；已安装/装态恒隐 -->
         <button class="menu-item menu-item-with-icon" id="menuInstallApp" type="button" role="menuitem" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#download"/></svg>
         <span class="menu-item-label" data-i18n="menu.installApp">安装 WeebPaint 到桌面</span>
@@ -1549,6 +1548,16 @@
         <button type="button" id="shortcutsClose" class="sheet-close" data-i18n-aria="common.close.aria" aria-label="关闭"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#x"/></svg></button>
       </div>
       <div class="sheet-body" id="shortcutsBody"><!-- JS 渲染 --></div>
+    </div>
+
+    <!-- 2026-09-02 内置说明书 sheet（readme-panel.ts 渲染 readme-docs.ts；快捷键 sheet 同形） -->
+    <div class="backdrop hidden" id="readmeBackdrop"></div>
+    <div class="sheet shortcuts-sheet readme-sheet hidden" id="readmeSheet" role="dialog" aria-labelledby="readmeTitle">
+      <div class="sheet-head">
+        <span id="readmeTitle" class="sheet-title" data-i18n="readme.title">帮助</span>
+        <button type="button" id="readmeClose" class="sheet-close" data-i18n-aria="common.close.aria" aria-label="关闭"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#x"/></svg></button>
+      </div>
+      <div class="sheet-body readme-body" id="readmeBody"><!-- JS 渲染 --></div>
     </div>
 
     <!-- v124 吸色 pin (Google Maps 风格)：picker tool / 长按吸色时手指上方浮一个 pin -->
@@ -1606,10 +1615,16 @@
       <button id="updateToastReload" type="button" data-i18n="upd.reload">刷新</button>
       <button id="updateToastDismiss" type="button" class="dismiss" data-i18n-aria="upd.dismiss"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#x"/></svg></button>
     </div>
+    <!-- 2026-09-02 压感自诊 toast（pressure-toast.ts；证据 = input.ts PressureProbe）：整条点哪都关，「详情」跳说明书 windows-ink 节 -->
+    <div id="pressureToast" class="toast hidden" role="status" aria-live="polite">
+      <span id="pressureToastText"></span>
+      <button id="pressureToastMore" type="button" data-i18n="pressure.toast.more">详情</button>
+      <button id="pressureToastDismiss" type="button" class="dismiss" data-i18n-aria="upd.dismiss"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#x"/></svg></button>
+    </div>
 
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-012ff533acce.mjs"></script>
+    <script type="module" src="./dist/weebpaint-2aab8808c6a3.mjs"></script>
   </body>
 </html>
