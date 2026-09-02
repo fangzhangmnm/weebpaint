@@ -34,6 +34,7 @@ import { allows, intentForPointerRole } from "./ui/interaction-lock.ts";   // 20
 import { inputSmooth } from "./stroke-input-smooth.ts";
 import { t } from "./i18n/index.ts";
 import { SMOOTH } from "./smooth-config.ts";
+import { effectivePressure } from "./common/effective-pressure.ts";   // 2026-09-02 压感取值抽成纯函数（可单测）+ coalesced 无 pressure 回退派发事件
 import type { GestureViewport, TapRef } from "./common/pointer-gesture.ts";
 import type { PaintingView, ViewLeaf } from "./backend/workpiece/painting-view.ts";
 import type { Board } from "./board.ts";
@@ -806,7 +807,8 @@ export class InputController {
         const { x: dx, y: dy } = this.board.screenToDoc(psx, psy);
         // 活动 engine 统一接口：liquify/filterBrush/像素 忽略多余的 pressure/时间戳参数
         //   ev.timeStamp 给主笔刷时间常数平滑用（dt 取真实事件间隔，含 coalesced）
-        const pressure = effectivePressureFor(rec, ev);
+        //   e.pressure 当 fallback：coalesced 样本没带 pressure（0/缺失）时退回派发事件的值，不整笔冻住（2026-09-02）。
+        const pressure = effectivePressureFor(rec, ev, e.pressure);
         this._activeStroke?.extend(dx, dy, pressure, ev.timeStamp);
       }
       // 把活动 engine 累的 dirty bbox 送进 board
@@ -1671,24 +1673,10 @@ export class InputController {
 //   thunk，开 = 恒压 0.5）已整条撤除，总账 §3 #12【分两支笔，笔压toggle sunset】。「不要压感」现在
 //   是**笔的属性**：选笔架里的「固定xx」（builtin-brushes.json 的 -fixed 变体，三个 coeff 归零）。
 //   鼠标分支保留——鼠标没有传感器，恒 0.5 是它的真值，不是开关。
-function effectivePressureFor(rec: PointerRec, ev: { pointerType?: string; pressure?: number }): number {
-  let raw: number;
-  if (ev.pointerType === "mouse") {
-    raw = 0.5;
-  } else {
-    const r = typeof ev.pressure === "number" ? ev.pressure : null;
-    if (r == null || r === 0) {
-      raw = rec.lastP != null ? rec.lastP : 0.2;
-    } else {
-      raw = Math.max(0.05, Math.min(1, r));
-      rec.lastP = raw;
-    }
-  }
-  // v0.7.26 硬化：smP 未初始化/NaN 一律重置（v0.7.25 选区笔漏初始化 → NaN 压感 → 引擎 spacing
-  //   走步 while(true) 的 break 条件遇 NaN 永假 → 鼠标一点就死循环。负号哨兵语义不变。
-  if (!(rec.smP! >= 0)) rec.smP = raw;
-  else rec.smP! += SMOOTH.pressureAlpha * (raw - rec.smP!);
-  return rec.smP!;
+// 2026-09-02：本体抽到 common/effective-pressure.ts（纯函数，test/effective-pressure.test.ts 钉语义）。
+//   fallback = 派发事件本身的 pressure：coalesced 样本不带 pressure 的浏览器不再整笔冻在落笔值（见该文件头）。
+function effectivePressureFor(rec: PointerRec, ev: { pointerType?: string; pressure?: number }, fallback?: number): number {
+  return effectivePressure(rec, ev.pointerType, ev.pressure, fallback, SMOOTH.pressureAlpha);
 }
 
 function parseHex(hex: string | null | undefined) {
