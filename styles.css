@@ -1690,12 +1690,7 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
 }
 
 /* v110 重采样对话框 */
-.resample-backdrop {
-  position: fixed; inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  z-index: calc(var(--z-modal) - 2);   /* 低于确认 sheet，resample 上还能弹确认 */
-}
-.resample-backdrop.hidden { display: none; }
+/* （.resample-backdrop 2026-09-02 C3 退役：唯一 backdrop 由 ui/sheet 建，z 随最上层 sheet 的 band） */
 .resample-sheet {
   position: fixed; z-index: calc(var(--z-modal) - 1);
   top: 50%; left: 50%; transform: translate(-50%, -50%);

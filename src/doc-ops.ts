@@ -9,6 +9,7 @@
 //   - viewport 还原走 **step.hint**（提案 .h：docTransform 是 hint 的唯一住户，T4d 后只剩视口）。
 // 守卫（无选区/尺寸非法/没变化）留调用方。crop/resample 是 EditMode transient（enter/apply/cancel 走 editMode）。
 
+import { openSheet, closeSheet } from "./ui/sheet.ts";   // 2026-09-02 C3
 import { els } from "./els.ts";
 import { bumpDoc } from "./signals.ts";
 import { t } from "./i18n/index.ts";
@@ -208,11 +209,9 @@ export function _updateMenuCropLabel() {
 
 // 重采样对话框 ----
 function _openResampleDialog() {
-  els.resampleBackdrop.classList.remove("hidden");
-  els.resampleSheet.classList.remove("hidden");
   els.resampleW.value = String(doc.width);
   els.resampleH.value = String(doc.height);
-  els.resampleW.focus();
+  openSheet(els.resampleSheet, { focus: els.resampleW });
   // 锁比例：变 W 自动改 H
   const aspect = doc.width / doc.height;
   const onW = () => {
@@ -229,26 +228,22 @@ function _openResampleDialog() {
   els.resampleH.oninput = onH;
 }
 function _closeResampleDialog() {
-  els.resampleBackdrop.classList.add("hidden");
-  els.resampleSheet.classList.add("hidden");
+  closeSheet(els.resampleSheet);
 }
 
 // 偏移接缝（环绕）对话框 ----
 // 默认预填半幅（dx=W/2, dy=H/2）：seamless 贴图最常用的「把四边接缝汇到中央」一步。
 function _openOffsetDialog() {
-  els.offsetBackdrop.classList.remove("hidden");
-  els.offsetSheet.classList.remove("hidden");
   els.offsetX.value = String(Math.round(doc.width / 2));
   els.offsetY.value = String(Math.round(doc.height / 2));
-  els.offsetX.focus();
+  openSheet(els.offsetSheet, { focus: els.offsetX });
   els.offsetHalf.onclick = () => {
     els.offsetX.value = String(Math.round(doc.width / 2));
     els.offsetY.value = String(Math.round(doc.height / 2));
   };
 }
 function _closeOffsetDialog() {
-  els.offsetBackdrop.classList.add("hidden");
-  els.offsetSheet.classList.add("hidden");
+  closeSheet(els.offsetSheet);
 }
 
 export function initDocOps(ctx: AppContext) {
@@ -500,7 +495,6 @@ export function initDocOps(ctx: AppContext) {
     _openResampleDialog();
   });
   els.resampleCancel.addEventListener("click", () => _closeResampleDialog());
-  els.resampleBackdrop.addEventListener("click", () => _closeResampleDialog());
   els.resampleConfirm.addEventListener("click", () => {
     const nw = parseFloat(els.resampleW.value) | 0;
     const nh = parseFloat(els.resampleH.value) | 0;
@@ -540,7 +534,6 @@ export function initDocOps(ctx: AppContext) {
     _openOffsetDialog();
   });
   els.offsetCancel.addEventListener("click", () => _closeOffsetDialog());
-  els.offsetBackdrop.addEventListener("click", () => _closeOffsetDialog());
   els.offsetConfirm.addEventListener("click", () => {
     const dx = parseFloat(els.offsetX.value) | 0;
     const dy = parseFloat(els.offsetY.value) | 0;

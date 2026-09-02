@@ -14,7 +14,8 @@ import { applyTheme, themeLabel, THEMES, currentTheme } from "./theme.ts";
 import { t, lang, setLang, LANGS, langDisplayName, type Key } from "./i18n/index.ts";
 import { KEYBOARD_SHORTCUTS } from "./input.ts";
 import { _updateMenuCropLabel } from "./doc-ops.ts";
-import { openAdoptedPopup, closePopupMenuOf, isPopupOpen } from "./ui/popup-menu.ts";   // 2026-09-02 C1：主菜单收养进 popup-menu（外点关/Escape/栈/定位一处）
+import { openAdoptedPopup, closePopupMenuOf, isPopupOpen } from "./ui/popup-menu.ts";
+import { openSheet, closeSheet } from "./ui/sheet.ts";   // 2026-09-02 C3   // 2026-09-02 C1：主菜单收养进 popup-menu（外点关/Escape/栈/定位一处）
 import { wireInlineSelect } from "./inline-select.ts";
 import { openInputSheet } from "./sheets.ts";
 import { reportError } from "./error-badge.ts";   // 全 app 唯一错误汇拢点（CLAUDE.md）
@@ -30,17 +31,7 @@ interface ShortcutLike { category?: string; desc: string; combo: string; }
 
 let state: AppContext["state"], board: AppContext["board"], setStatus: AppContext["setStatus"], updateSaveStatus: AppContext["updateSaveStatus"];
 
-// openSheet/closeSheet：app.js-local 小工具被快捷键 sheet 用，inline 复制一份（app 仍各自保留）
-function openSheet(sheet: HTMLElement | null, backdrop: HTMLElement | null) {
-  if (!sheet || !backdrop) return;
-  backdrop.classList.remove("hidden");
-  sheet.classList.remove("hidden");
-}
-function closeSheet(sheet: HTMLElement | null, backdrop: HTMLElement | null) {
-  if (!sheet || !backdrop) return;
-  backdrop.classList.add("hidden");
-  sheet.classList.add("hidden");
-}
+// （openSheet/closeSheet 拷贝 2026-09-02 C3 退役：走 ui/sheet）
 
 function setMenuItem(btn: HTMLElement, on: boolean, stateLabel = on ? t("common.on") : t("common.off")) {
   btn.setAttribute("aria-pressed", on ? "true" : "false");
@@ -155,7 +146,6 @@ window.addEventListener(GALLERY_CAPABILITY_EVENT, renderCurrentGallery);   // �
 
 // v124 快捷键 sheet：从 KEYBOARD_SHORTCUTS 自动渲染（input.js 注册的唯一真理源）
 const _shortcutsSheet = document.getElementById("shortcutsSheet");
-const _shortcutsBackdrop = document.getElementById("shortcutsBackdrop");
 const _shortcutsBody = document.getElementById("shortcutsBody");
 function _renderShortcutsSheet() {
   if (!_shortcutsBody) return;
@@ -337,10 +327,9 @@ export function initSettingsMenu(ctx: AppContext) {
   document.getElementById("menuShortcuts")?.addEventListener("click", () => {
     setMenuOpen(false);
     _renderShortcutsSheet();
-    openSheet(_shortcutsSheet, _shortcutsBackdrop);
+    if (_shortcutsSheet) openSheet(_shortcutsSheet);
   });
-  document.getElementById("shortcutsClose")?.addEventListener("click", () => closeSheet(_shortcutsSheet, _shortcutsBackdrop));
-  _shortcutsBackdrop?.addEventListener("click", () => closeSheet(_shortcutsSheet, _shortcutsBackdrop));
+  document.getElementById("shortcutsClose")?.addEventListener("click", () => closeSheet(_shortcutsSheet));
 
   // ⚠ boot 期**不**在这读 pref —— collection 还没 hydrate（v409 拆了 TLA 门），读到的是 DEFAULTS。
   //   真值由 app.ts 的 fixup 相（await prefsReady 后）调 renderSettingsFromPrefs() 灌入。

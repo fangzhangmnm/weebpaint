@@ -7,13 +7,14 @@ import { t } from "./i18n/index.ts";
 import { entries, toText, clear } from "./diag-log.ts";
 import { reportError } from "./error-badge.ts";
 import { setMenuOpen } from "./settings-menu.ts";
+import { openSheet, closeSheet } from "./ui/sheet.ts";   // 2026-09-02 C3
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement | null;
 
 export function initDiagLogSheet(deps: { status: (msg: string, persist?: boolean) => void }): void {
-  const btn = $("menuDiagLog"), sheet = $("diagLogSheet"), backdrop = $("diagLogBackdrop"),
+  const btn = $("menuDiagLog"), sheet = $("diagLogSheet"),
     pre = $("diagLogText"), hint = $("diagLogHint"), copyBtn = $("diagLogCopy"), clearBtn = $("diagLogClear"), closeBtn = $("diagLogClose");
-  if (!btn || !sheet || !backdrop || !pre || !hint || !copyBtn || !clearBtn || !closeBtn) return;   // 标记缺席（single-html 裁剪等）→ 功能静默不在
+  if (!btn || !sheet || !pre || !hint || !copyBtn || !clearBtn || !closeBtn) return;   // 标记缺席（single-html 裁剪等）→ 功能静默不在
 
   function render(): void {
     const n = entries().length;
@@ -21,8 +22,8 @@ export function initDiagLogSheet(deps: { status: (msg: string, persist?: boolean
     pre!.textContent = n ? toText() : t("diag.empty");
     pre!.scrollTop = pre!.scrollHeight;   // 最新在底
   }
-  function open(): void { setMenuOpen(false); render(); backdrop!.classList.remove("hidden"); sheet!.classList.remove("hidden"); }
-  function close(): void { backdrop!.classList.add("hidden"); sheet!.classList.add("hidden"); }
+  function open(): void { setMenuOpen(false); render(); openSheet(sheet!); }
+  function close(): void { closeSheet(sheet!); }
 
   async function copy(): Promise<void> {
     const text = toText();
@@ -46,5 +47,4 @@ export function initDiagLogSheet(deps: { status: (msg: string, persist?: boolean
   copyBtn.addEventListener("click", () => { void copy(); });
   clearBtn.addEventListener("click", () => { clear(); render(); deps.status(t("diag.cleared")); });
   closeBtn.addEventListener("click", close);
-  backdrop.addEventListener("click", close);
 }

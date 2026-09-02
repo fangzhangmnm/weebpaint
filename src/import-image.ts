@@ -12,6 +12,7 @@
 
 import { els } from "./els.ts";
 import { withBusy } from "./fullscreen-busy.ts";
+import { openSheet, closeSheet } from "./ui/sheet.ts";   // 2026-09-02 C3
 import { reportError } from "./error-badge.ts";
 import { t } from "./i18n/index.ts";
 import { session } from "./session-state.ts";
@@ -96,7 +97,6 @@ export async function importImageAsNewDoc(file: File, opts?: { nameOverride?: st
 //   不超护栏静默原尺寸进。fit 选项 = 适配护栏（fit-to-canvas 作废：photobash 常态是素材比画布大、
 //   摆位后裁溢出，进门先缩到画布 = 后续放大 = 糊）。resolve { w, h, mode } 或 null（取消）。
 function _openBigImportSheet(ow: number, oh: number, docW: number, docH: number, limit: number): Promise<BigImportChoice | null> {
-  const backdrop = document.getElementById("bigImportBackdrop") as HTMLElement;
   const sheet = document.getElementById("bigImportSheet") as HTMLElement;
   const wIn = document.getElementById("bigImportW") as HTMLInputElement;
   const hIn = document.getElementById("bigImportH") as HTMLInputElement;
@@ -137,16 +137,14 @@ function _openBigImportSheet(ow: number, oh: number, docW: number, docH: number,
   for (const r of sheet.querySelectorAll('input[name="bigImportChoice"]')) {
     r.addEventListener("change", () => setChoice((r as HTMLInputElement).value));
   }
-  backdrop.classList.remove("hidden");
-  sheet.classList.remove("hidden");
   return new Promise<BigImportChoice | null>((resolve) => {
     const cleanup = () => {
-      backdrop.classList.add("hidden");
-      sheet.classList.add("hidden");
+      closeSheet(sheet);
       okBtn.onclick = null;
       cancelBtn.onclick = null;
-      backdrop.onclick = null;
     };
+    // busy 期开这个 sheet = 08-19 死锁案（sheet 被遮罩盖住）——现在 ui/sheet 经交互锁响亮 throw，不再静默转圈
+    openSheet(sheet, { onDismiss: () => { cleanup(); resolve(null); } });
     okBtn.onclick = () => {
       const w = Math.max(1, Math.min(8192, parseFloat(wIn.value) | 0));
       const h = Math.max(1, Math.min(8192, parseFloat(hIn.value) | 0));
@@ -155,7 +153,6 @@ function _openBigImportSheet(ow: number, oh: number, docW: number, docH: number,
       resolve({ w, h, mode });
     };
     cancelBtn.onclick = () => { cleanup(); resolve(null); };
-    backdrop.onclick  = () => { cleanup(); resolve(null); };
   });
 }
 

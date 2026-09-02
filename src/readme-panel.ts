@@ -5,6 +5,7 @@ import { README_SECTIONS } from "./readme-docs.ts";
 import { renderMdLite, escapeHtml } from "./ui/md-lite.ts";
 import { tEntry } from "./i18n/index.ts";
 import { setMenuOpen } from "./settings-menu.ts";
+import { openSheet, closeSheet } from "./ui/sheet.ts";   // 2026-09-02 C3
 
 const byId = (id: string) => document.getElementById(id);
 let _rendered = false;
@@ -20,11 +21,10 @@ function render() {
 
 /** 打开说明书；带 sectionId 则滚到该节并闪一下（id 见 readme-docs.ts）。 */
 export function openReadmePanel(sectionId?: string): void {
-  const sheet = byId("readmeSheet"), backdrop = byId("readmeBackdrop");
-  if (!sheet || !backdrop) return;
+  const sheet = byId("readmeSheet");
+  if (!sheet) return;
   if (!_rendered) render();
-  backdrop.classList.remove("hidden");
-  sheet.classList.remove("hidden");
+  openSheet(sheet);
   if (sectionId) {
     const sec = byId(`readme-${sectionId}`);
     if (sec) {
@@ -36,8 +36,7 @@ export function openReadmePanel(sectionId?: string): void {
   }
 }
 export function closeReadmePanel(): void {
-  byId("readmeSheet")?.classList.add("hidden");
-  byId("readmeBackdrop")?.classList.add("hidden");
+  closeSheet(byId("readmeSheet"));
 }
 
 /** 深链：#help 或 #help/<id>。返回是否命中。 */
@@ -49,7 +48,6 @@ export function readmeSectionFromHash(hash: string): { section: string | null } 
 export function initReadmePanel(): void {
   byId("menuReadme")?.addEventListener("click", () => { setMenuOpen(false); openReadmePanel(); });
   byId("readmeClose")?.addEventListener("click", closeReadmePanel);
-  byId("readmeBackdrop")?.addEventListener("click", closeReadmePanel);
   const fromHash = () => {
     const h = readmeSectionFromHash(location.hash);
     if (h) openReadmePanel(h.section ?? undefined);

@@ -43,7 +43,6 @@ export const els = {
   topAdjustBtn: byId("topAdjustBtn"),
   adjustPopup: byId("adjustPopup"),
   // v110 crop / resample / adjust
-  resampleBackdrop: byId("resampleBackdrop"),
   resampleSheet: byId("resampleSheet"),
   resampleW: byId<HTMLInputElement>("resampleW"),
   resampleH: byId<HTMLInputElement>("resampleH"),
@@ -52,7 +51,6 @@ export const els = {
   resampleCancel: byId("resampleCancel"),
   resampleConfirm: byId("resampleConfirm"),
   // 偏移接缝（环绕）对话框
-  offsetBackdrop: byId("offsetBackdrop"),
   offsetSheet: byId("offsetSheet"),
   offsetX: byId<HTMLInputElement>("offsetX"),
   offsetY: byId<HTMLInputElement>("offsetY"),
@@ -99,7 +97,6 @@ export const els = {
   menuGenAI: byId("menuGenAI"),
   galleryMenuLock: byId("galleryMenuLock"),
   galleryMenuBackup: byId("galleryMenuBackup"),   // #18 全库备份入口（2026-08-28）
-  newDocBackdrop: byId("newDocBackdrop"),
   newDocSheet: byId("newDocSheet"),
   newDocName: byId<HTMLInputElement>("newDocName"),
   newDocCustomRow: byId("newDocCustomRow"),
@@ -139,6 +136,5 @@ export const els = {
   colorPanelBody: document.querySelector("#colorPanel .float-panel-body"),  // 色轮 Vue 组件挂载点
   // clear sheet
   clearSheet: byId("clearSheet"),
-  clearBackdrop: byId("clearBackdrop"),
   // （update toast 2026-09-02 C7 退役：通知走 ui/notice.ts）
 };

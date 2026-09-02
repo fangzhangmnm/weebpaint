@@ -34,7 +34,8 @@ import { sessionNameConflict } from "./session-name.ts";
 import { supportsFileSystemAccess, pickLocalOraFile } from "./local-file-session.ts";
 import { intakeOraDoc } from "./import-image.ts";
 import { openAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";   // 2026-09-02 C1
-import { isBusyActive } from "./fullscreen-busy.ts";
+import { allows } from "./ui/interaction-lock.ts";   // 2026-09-02 C8
+import { openSheet as openModalSheet, closeSheet as closeModalSheet } from "./ui/sheet.ts";   // 2026-09-02 C3
 import { reportError } from "./error-badge.ts";
 import { decodeOraToPainting } from "./backend/ora.ts";
 import { t } from "./i18n/index.ts";
@@ -52,10 +53,7 @@ let setStatus: AppContext["setStatus"], updateSaveStatus: AppContext["updateSave
 let _signInNav = false;   // v0.6.22：登录 redirect 导航中，beforeunload 别挡
 let rack: AppContext["rack"];
 
-function closeSheet(sheet: HTMLElement, backdrop: HTMLElement) {
-  backdrop.classList.add("hidden");
-  sheet.classList.add("hidden");
-}
+// （closeSheet 拷贝 2026-09-02 C3 退役：走 ui/sheet）
 
 // ============ smart save（2026-08-21 user 拍板）：save 按钮 / Ctrl+S 共用的唯一入口 ============
 // 分支（smart 逻辑全在 handler 层，session-state 不动）：
@@ -137,11 +135,10 @@ export function initTopbarMenu(ctx: AppContext) {
   els.undoBtn.disabled = true;
   els.redoBtn.disabled = true;
 
-  els.clearBackdrop.addEventListener("click", () => closeSheet(els.clearSheet, els.clearBackdrop));
   els.clearSheet.addEventListener("click", (e: Event) => {
     const a = (e.target as HTMLElement | null)?.closest("[data-clear]") ? ((e.target as HTMLElement).closest("[data-clear]") as HTMLElement).dataset.clear : undefined;
     if (!a) return;
-    closeSheet(els.clearSheet, els.clearBackdrop);
+    closeModalSheet(els.clearSheet);
     if (a !== "confirm") return;
     const layer = doc.activeLayer as ViewLeaf | null;
     if (!layer || layer.isGroup) return;
@@ -168,7 +165,7 @@ export function initTopbarMenu(ctx: AppContext) {
   window.addEventListener("keydown", (e: KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S")) {
       e.preventDefault();               // busy 期也吞掉，否则漏给浏览器的「保存网页」
-      if (isBusyActive()) return;       // busy 遮罩挡不住 window keydown（QA 2026-08-21）
+      if (!allows("persist")) return;   // busy 遮罩挡不住 window keydown（QA 2026-08-21）→ 交互锁一处回答
       // commitPending：Ctrl+Shift+S 也是显式保存 → fill 预览一并收口（saveAndPush 在 session 内自收）
       // Ctrl+Shift+S=只本地（不弹不变）；Ctrl+S=smart save（与 save 按钮同一个函数，2026-08-21）
       if (e.shiftKey) session.save({ commitPending: true }); else smartSaveAndPush();

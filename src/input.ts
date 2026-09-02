@@ -30,7 +30,7 @@ import { isPixelStroke, pixelStrokeSpec } from "./engine-registry.ts";
 import { computePinchViewport, snapRotation, isTap, isDoubleTap, gestureTapAction } from "./common/pointer-gesture.ts";
 import { assignRole, effectiveTool, toolToRole, strokeMode, eraserTapOnRelease } from "./pointer-route.ts";
 import { PressureProbe, sampleFromPointerEvent, isWindowsPlatform } from "./pressure-probe.ts";   // 2026-09-02 压感自诊（pen-flat / absolute-mouse）
-import { isBusyActive } from "./fullscreen-busy.ts";
+import { allows, intentForPointerRole } from "./ui/interaction-lock.ts";   // 2026-09-02 C8：拦什么由交互锁一处回答（busy/只读同一把锁）
 import { inputSmooth } from "./stroke-input-smooth.ts";
 import { t } from "./i18n/index.ts";
 import { SMOOTH } from "./smooth-config.ts";
@@ -591,6 +591,8 @@ export class InputController {
       spaceDown: this.spaceDown, altDown: this.altDown, penEverSeen: this.penEverSeen,
       singleFingerDraw: this.getSingleFingerDraw(),
     });
+    // 交互锁（2026-09-02 C8）：busy 期遮罩几何上挡 pointer，这里是结构性的第二道（遮罩下面/只读模式都不靠几何）
+    { const intent = intentForPointerRole(role); if (intent && !allows(intent)) { e.preventDefault(); return; } }
 
     const now = performance.now();
     const rec: PointerRec = {
@@ -1478,7 +1480,7 @@ export class InputController {
     // busy 遮罩只能几何挡 pointer；键盘监听绑在 window 上穿得进来（QA 2026-08-21：同步/加密/导入的
     //   busy 段里 Ctrl+Z/Y 是唯一还能改 doc 的活口，曾撞上 encode await 窗口被乐观清脏吞编辑）。
     //   busy 期间键盘快捷键一律不收；_keyup 不拦——修饰键（Space/Alt/Shift）的清位必须永远能落地。
-    if (isBusyActive()) return;
+    if (!allows("key:shortcut")) return;   // busy：全禁；readonly：下方逐条按类再问
     // 只对**真文本输入**吞快捷键（它们需要打字 + 自己的 Ctrl+Z）。range/checkbox/radio/button
     // 也是 INPUT，但不吃文本——不能整体 return：画布 pointerdown 是 preventDefault 的，点画布
     // **夺不回焦点**，一旦点过工具条滑条/勾选框，焦点就永久困在控件里 → 全部快捷键假死
@@ -1521,6 +1523,7 @@ export class InputController {
     for (const sc of KEYBOARD_SHORTCUTS) {
       if (sc.when && !sc.when(this)) continue;
       if (!_matchCombo(e, sc.combo)) continue;
+      if (!allows("key:shortcut", { shortcutCategory: sc.category })) { e.preventDefault(); return; }   // 只读：编辑/套索类禁
       try { sc.run(this); } catch (err) { reportError(new Error("[shortcut] " + sc.combo + " " + String(err)), "log"); }
       e.preventDefault();
       return;
@@ -1542,7 +1545,7 @@ export class InputController {
       if (this.eraserHold) {
         this.eraserHold = false;
         if (eraserTapOnRelease(performance.now() - this._eHoldStart, this._eHoldUsed)
-            && !isBusyActive() && _editMode(this) && !_floating(this)) {
+            && allows("key:shortcut", { shortcutCategory: "sc.cat.tools" }) && _editMode(this) && !_floating(this)) {
           this._emitTool("eraser");   // 工具已是 eraser 时 = settool 幂等 no-op（维持现状）
         }
       }

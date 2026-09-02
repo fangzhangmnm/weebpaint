@@ -27,7 +27,6 @@ export declare const els: {
     topSaveBtn: HTMLElement;
     topAdjustBtn: HTMLElement;
     adjustPopup: HTMLElement;
-    resampleBackdrop: HTMLElement;
     resampleSheet: HTMLElement;
     resampleW: HTMLInputElement;
     resampleH: HTMLInputElement;
@@ -35,7 +34,6 @@ export declare const els: {
     resampleMode: HTMLSelectElement;
     resampleCancel: HTMLElement;
     resampleConfirm: HTMLElement;
-    offsetBackdrop: HTMLElement;
     offsetSheet: HTMLElement;
     offsetX: HTMLInputElement;
     offsetY: HTMLInputElement;
@@ -81,7 +79,6 @@ export declare const els: {
     menuGenAI: HTMLElement;
     galleryMenuLock: HTMLElement;
     galleryMenuBackup: HTMLElement;
-    newDocBackdrop: HTMLElement;
     newDocSheet: HTMLElement;
     newDocName: HTMLInputElement;
     newDocCustomRow: HTMLElement;
@@ -116,5 +113,4 @@ export declare const els: {
     colorPanelClose: HTMLElement;
     colorPanelBody: Element | null;
     clearSheet: HTMLElement;
-    clearBackdrop: HTMLElement;
 };

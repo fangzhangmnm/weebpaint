@@ -1,6 +1,8 @@
 // 职责（单一）：全屏 busy 遮罩 + withBusy 长操作包装——纯 DOM，无 app-state 依赖。
 // 全屏 block overlay：拉云端时显示 spinner + 文字，防误操作
 import { t } from "./i18n/index.ts";
+import { acquireLock, isLocked } from "./ui/interaction-lock.ts";   // 2026-09-02 C8：busy = 交互锁的一个 adapter
+let _releaseLock: (() => void) | null = null;
 export function showFullscreenBusy(msg?: string): void {
   let el = document.getElementById("fullscreenBusy");
   if (!el) {
@@ -13,10 +15,12 @@ export function showFullscreenBusy(msg?: string): void {
   const m = el.querySelector(".fullscreen-busy-msg");
   if (m) m.textContent = msg || t("busy.working");
   el.classList.remove("hidden");
+  if (!_releaseLock) _releaseLock = acquireLock("busy");   // 遮罩可见 ⇔ busy 锁在场（进度文案重复调用不重复拉锁）
 }
 export function hideFullscreenBusy() {
   const el = document.getElementById("fullscreenBusy");
   if (el) el.classList.add("hidden");
+  _releaseLock?.(); _releaseLock = null;
 }
 
 // withBusy: 长 op 包装 → 全屏 spinner + 防误点 + 报状态。统一所有 trash/rename/卸载 等长操作。
@@ -28,8 +32,7 @@ let _busyDepth = 0;
 // **按遮罩 DOM 可见性判**，不只看 _busyDepth——showFullscreenBusy/hideFullscreenBusy（手动对，pull
 //   等用）不走 withBusy 的计数，但同样拉起同一个 z-540 遮罩，也得算 busy。
 export function isBusyActive() {
-  const el = document.getElementById("fullscreenBusy");
-  return !!el && !el.classList.contains("hidden");
+  return isLocked("busy");   // 2026-09-02 C8：真相 = 交互锁（遮罩显隐与锁同步拉放）；老调用方名字保留
 }
 export async function withBusy<T>(label: string, fn: () => Promise<T> | T): Promise<T> {
   _busyDepth++;

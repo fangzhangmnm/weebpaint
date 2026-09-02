@@ -90,6 +90,8 @@ import "./pressure-probe.test.mjs";     // 2026-09-02 压感自诊探针：pen-f
 import "./md-lite.test.mjs";            // 2026-09-02 in-app 说明书极简 md 渲染：转义先行/块/行内
 import "./panel-gizmo.test.mjs";        // 2026-09-02 浮窗把手深模块：视口钳制纯函数 + 拖动/缩放把手接线
 import "./floating-window.test.mjs";    // 2026-09-02 C2 浮窗深模块：出血区地板纯函数/z 栈/transient 去留/restore·open·视口钳制
+import "./interaction-lock.test.mjs";   // 2026-09-02 C8 交互锁：白名单策略表 + 运行时 + busy 期开对话框 throw
+import "./sheet.test.mjs";              // 2026-09-02 C3 Sheet 系统：单 backdrop / 栈与 band / 与交互锁 / dismiss
 import "./stroke-input-smooth.test.mjs";
 import "./stroke-smoother.test.mjs";
 import "./stroke-session.test.mjs";

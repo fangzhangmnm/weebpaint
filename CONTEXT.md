@@ -109,6 +109,14 @@ _Avoid_: render-tree-gl（T6 拆除）, facade 各持缓存, GPU 侧记账, `(tr
 编辑器里可拖的浮动 UI 面（图层 / 颜色 / 调色板 / 调整 / 录像 / Blender / 参考窗）的**唯一生命周期 module**（`src/ui/floating-window.ts`，2026-09-02 UI 纪元 C2）。注册一次 = z 栈（window band 内归一化，原 surfaces.ts）+ 点窗置顶 + 拖/缩把手（内部原语 panel-gizmo）+ 视口钳制 + **出血区地板**（运行时量 `#topBar` 下缘 + safe-area 硬底线，不手填常数——iPadOS 顶部触摸死区没有 API 可查）+ transient 去留（每窗自述 `keepDuring`）+ 持久化几何的 restore 钳制。互斥（panel-state）是另一根轴，不归它。参考窗按 frontend/ 目录格律自钳，但地板由宿主端口注入同一出处。
 _Avoid_: surfaces（已并入）, _bringPanelTop 之外再手写 z-index, 每窗自抄拖动/钳制, 常数 60（出血区地板旧写法）
 
+**Sheet（模态 sheet 系统）**:
+居中模态对话（新建 / 重采样 / 偏移 / 大图确认 / 通用 input·confirm·choice / 快捷键 / 说明书 / 诊断 / 拆分 / 同步 gate）的**唯一生命周期 module**（`src/ui/sheet.ts`，2026-09-02 UI 纪元 C3）。收养式：内容仍是 index.html 静态节点；module 管**一个 backdrop**（随最上层 sheet 的 band：modal / gate）、栈（z = band 基底 + 序号）、Escape / 点 backdrop 的 dismiss 语义（onDismiss 交给消费者的取消）、关时 blur（iOS 键盘）、与 [[InteractionLock（交互锁）]] 的关系（开模态 = intent dialog，busy 期响亮 throw；gate 传 allowDuringBusy）。底部笔架弹层不是它（那是 panel-state 互斥面）。
+_Avoid_: 各写一份 openSheet/closeSheet, 每个 sheet 配一个 backdrop div, `_assertNotBusy` 之外再手写 busy 判断
+
+**InteractionLock（交互锁）**:
+「此刻允许用户做什么」的唯一裁决（`src/ui/interaction-lock.ts`，2026-09-02 UI 纪元 C8）。锁 = kind（`busy` | `readonly`），动作 = intent（pointer:draw / navigate / pick、key:shortcut（按快捷键类）/ modifier、paste / copy、doc:mutate / persist / export:read、menu / dialog / gate / notice），策略 = 纯数据表 POLICY[kind][intent]（测试钉住 = 白名单 SSoT）。busy 是它的一个 adapter（fullscreen-busy 拉/放锁，`isBusyActive()` = `isLocked("busy")`）；**readonly（毕业的画只读）策略已定、入口 park**——它只是瑞士奶酪的 UI 层一片，「护栏不写 ora」归持久化/workbench 层另做。消费者（input / topbar / selection-ops / sheet）只问 `allows(intent)`，不再各自 isBusyActive。
+_Avoid_: 散在各处的 isBusyActive 判断, 把 busy 遮罩当成锁（它只是视觉 adapter）, readonly 在 UI 层「顺手」挡住写 ora（那是别的层的护栏）
+
 **EditMode**:
 独占编辑状态机的 SSoT（`src/edit-mode.js`）。**单轴**：`current()` 是一个 enum（CAPS 的 key），持久工具（brush/eraser/lasso/...）和 transient（transform/crop/adjust）平级。能力表 CAPS（canDraw/allowsColor/cursor/ctrlZ/transient）按 current() 查表 → 谓词。输入 gating、UI 显隐/cursor、ctrl-z 语义全从 current() 派生。叫 EditMode 不叫 Mode 因为 "mode" 在本仓重载（L.mode 混合 / liquify.mode / body.dataset.mode）。提案见 [[ai-docs/20260531-tool-mode-state-machine.md]]。
 _Avoid_: tool state, app state, mode manager, Mode（裸"mode"歧义）

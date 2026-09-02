@@ -33,6 +33,7 @@ import { humanSize } from "./gallery-view-model.ts";   // 展示格式化（纯�
 import { requireStore, galleryBackend, isCachedSyncState } from "../app-store.ts";
 import { galleryOnline } from "../gallery-capability.ts";
 import { toggleAdoptedPopup, closePopupMenuOf, isPopupOpen } from "../ui/popup-menu.ts";   // 2026-09-02 C1：图库四 popup 收养
+import { openSheet, closeSheet } from "../ui/sheet.ts";   // 2026-09-02 C3
 import { wireInlineSelect } from "../inline-select.ts";
 import { applyTheme, themeLabel, THEMES, currentTheme } from "../theme.ts";
 import { lang, setLang, LANGS, langDisplayName } from "../i18n/index.ts";
@@ -102,14 +103,9 @@ export function openNewDocSheet() {
   els.newDocCustomRow.style.display = "none";
   els.newDocW.value = String(doc.width);
   els.newDocH.value = String(doc.height);
-  els.newDocBackdrop.classList.remove("hidden");
-  els.newDocSheet.classList.remove("hidden");
-  setTimeout(() => { els.newDocName.focus(); els.newDocName.select(); }, 50);
+  openSheet(els.newDocSheet, { focus: els.newDocName });
 }
-function closeNewDocSheet() {
-  els.newDocBackdrop.classList.add("hidden");
-  els.newDocSheet.classList.add("hidden");
-}
+function closeNewDocSheet() { closeSheet(els.newDocSheet); }
 const DEFAULT_PRESET = "screen-1024sq";   // user 2026-08-19：2048 默认护栏没意义，每次都手动改回 1024
 let _presetVal = DEFAULT_PRESET;   // #21：preset 单一真相（confirm 读它）。值 = 模板 id 或 "custom"。
 // #21 终版（v0.5.10）：全部预设进一个下拉框（#newDocPreset，三 optgroup + 自定义）——chips 已删。
@@ -413,7 +409,6 @@ export function initGalleryShell(ctx: AppContext) {
     });
   }
   presetSel?.addEventListener("change", () => { if (presetSel.value) _selectPreset(presetSel.value); });
-  els.newDocBackdrop.addEventListener("click", closeNewDocSheet);
   els.newDocCancel.addEventListener("click", closeNewDocSheet);
   // v0.5.40（user：「确认总是要点好几下」）：名字输入框聚焦时点按钮，pointerdown 默认行为先 blur →
   //   键盘收起 → 底部 sheet 位移 → click 落空。preventDefault 挡掉焦点转移，按钮原位吃到 click。

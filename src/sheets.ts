@@ -2,23 +2,18 @@
 // 守红线「不用系统 alert/prompt/confirm」（iPad PWA 全屏体验烂）。纯 DOM，自持元素引用。
 // sync 决策编排（gateCloudSyncOnOpen / checkCloudETag / 闲置锁屏）= store-coupled，留在 app，调本模块的 lockSyncGate。
 
-import { isBusyActive } from "./fullscreen-busy.ts";
+import { openSheet as openModalSheet, closeSheet as closeModalSheet } from "./ui/sheet.ts";   // 2026-09-02 C3：backdrop/栈/焦点/busy 互斥归 ui/sheet
 
 // **busy/sheet 互斥护栏（2026-06-12 死锁修复）**：fullscreen-busy 遮罩 z(540) 高于 input/confirm
 //   sheet z(500)，busy 激活时弹输入框 = 框被盖住、用户点不到 → await 永不 resolve → 无限转圈。
 //   这是**编程错误**（"我在忙" 与 "请输入" 自相矛盾）：交互输入必须在 withBusy 之外做。
 //   → 这里**响亮 throw**，把静默转圈变成定位到调用栈的报错。（lockSyncGate 不受此限——它是 sync
 //   冲突 gate，自带 spinner、设计上与 busy 协同，不走这条。）
-function _assertNotBusy(kind: string) {
-  if (isBusyActive()) {
-    throw new Error(`cannot open ${kind} during withBusy (fullscreen overlay covers it -> deadlock). Move interactive input outside withBusy.`);
-  }
-}
+// （_assertNotBusy 2026-09-02 C3/C8 进 ui/sheet → interaction-lock.assertAllows("dialog")：所有 sheet 都过这道，不止三原语）
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 const g = {
   sheet: () => $("genericSheet"),
-  backdrop: () => $("genericBackdrop"),
   title: () => $("genericSheetTitle"),
   message: () => $("genericSheetMessage"),
   input: () => $("genericSheetInput") as HTMLInputElement,
@@ -27,24 +22,15 @@ const g = {
   cancel: () => $("genericSheetCancel"),
 };
 
-function openSheet(sheet: HTMLElement, backdrop: HTMLElement) {
-  backdrop.classList.remove("hidden");
-  sheet.classList.remove("hidden");
-}
-function closeSheet(sheet: HTMLElement, backdrop: HTMLElement) {
-  backdrop.classList.add("hidden");
-  sheet.classList.add("hidden");
-}
 function resolveAndClose<T>(resolve: (v: T) => void, value: T, cleanup: () => void) {
   cleanup();
-  closeSheet(g.sheet(), g.backdrop());
+  closeModalSheet(g.sheet());
   resolve(value);
 }
 
 // 输入框对话框 → Promise<string|null>（取消 = null）。
 // opts.password：输入框打码（type=password，关闭时还原）；opts.message：输入框上方说明行。
 export function openInputSheet(title: string, defaultValue = "", { placeholder = "", password = false, message = "" } = {}): Promise<string | null> {
-  _assertNotBusy("input sheet");
   return new Promise((resolve) => {
     g.title().textContent = title;
     if (message) { g.message().classList.remove("hidden"); g.message().textContent = message; }
@@ -58,7 +44,7 @@ export function openInputSheet(title: string, defaultValue = "", { placeholder =
     g.input().autocomplete = "off";
     g.input().value = defaultValue;
     g.input().placeholder = placeholder;
-    openSheet(g.sheet(), g.backdrop());
+    openModalSheet(g.sheet(), { onDismiss: () => onCancel() });
     setTimeout(() => { g.input().focus(); g.input().select(); }, 0);
     const onConfirm = () => resolveAndClose(resolve, g.input().value, cleanup);
     const onCancel = () => resolveAndClose(resolve, null, cleanup);
@@ -69,7 +55,6 @@ export function openInputSheet(title: string, defaultValue = "", { placeholder =
     const cleanup = () => {
       g.confirm().removeEventListener("click", onConfirm);
       g.cancel().removeEventListener("click", onCancel);
-      g.backdrop().removeEventListener("click", onCancel);
       g.input().removeEventListener("keydown", onKey);
       g.input().type = "text";
       g.input().style.setProperty("-webkit-text-security", "");   // 打码态不残留到下一个输入框
@@ -77,30 +62,26 @@ export function openInputSheet(title: string, defaultValue = "", { placeholder =
     };
     g.confirm().addEventListener("click", onConfirm);
     g.cancel().addEventListener("click", onCancel);
-    g.backdrop().addEventListener("click", onCancel);
     g.input().addEventListener("keydown", onKey);
   });
 }
 
 // 确认对话框 → Promise<boolean>。
 export function openConfirmSheet(title: string, message: string): Promise<boolean> {
-  _assertNotBusy("confirm sheet");
   return new Promise((resolve) => {
     g.title().textContent = title;
     g.input().classList.add("hidden");
     g.message().classList.remove("hidden");
     g.message().textContent = message;
-    openSheet(g.sheet(), g.backdrop());
+    openModalSheet(g.sheet(), { onDismiss: () => onCancel() });
     const onConfirm = () => resolveAndClose(resolve, true, cleanup);
     const onCancel = () => resolveAndClose(resolve, false, cleanup);
     const cleanup = () => {
       g.confirm().removeEventListener("click", onConfirm);
       g.cancel().removeEventListener("click", onCancel);
-      g.backdrop().removeEventListener("click", onCancel);
     };
     g.confirm().addEventListener("click", onConfirm);
     g.cancel().addEventListener("click", onCancel);
-    g.backdrop().addEventListener("click", onCancel);
   });
 }
 
@@ -111,7 +92,6 @@ export function openConfirmSheet(title: string, message: string): Promise<boolea
 //   （Promise resolve 的微任务续体可能丢 transient activation → Safari 静默拦）。要保手势的
 //   副作用走 onPick，别走返回值。
 export function openChoiceSheet<T>(title: string, message: string, choices: { label: string; value: T; primary?: boolean; onPick?: () => void }[]): Promise<T | null> {
-  _assertNotBusy("choice sheet");
   return new Promise((resolve) => {
     g.title().textContent = title;
     g.input().classList.add("hidden");
@@ -123,7 +103,6 @@ export function openChoiceSheet<T>(title: string, message: string, choices: { la
     g.confirm().classList.add("hidden");
     const cleanup = () => {
       g.cancel().removeEventListener("click", onCancel);
-      g.backdrop().removeEventListener("click", onCancel);
       box.innerHTML = "";
       box.classList.add("hidden");
       g.confirm().classList.remove("hidden");
@@ -137,9 +116,8 @@ export function openChoiceSheet<T>(title: string, message: string, choices: { la
       btn.addEventListener("click", () => { c.onPick?.(); resolveAndClose(resolve, c.value as T | null, cleanup); });   // onPick 同步先跑（保 user-gesture）
       box.appendChild(btn);
     }
-    openSheet(g.sheet(), g.backdrop());
+    openModalSheet(g.sheet(), { onDismiss: () => onCancel() });
     g.cancel().addEventListener("click", onCancel);
-    g.backdrop().addEventListener("click", onCancel);
   });
 }
 
@@ -149,10 +127,9 @@ export function openChoiceSheet<T>(title: string, message: string, choices: { la
 interface SyncGateAction<T = string> { label: string; value: T; primary?: boolean; }
 interface SyncGateOpts<T = string> { title: string; message: string; showSpinner?: boolean; actions: SyncGateAction<T>[]; note?: string; }
 const syncGate: {
-  backdrop: HTMLElement; sheet: HTMLElement; title: HTMLElement; message: HTMLElement;
+  sheet: HTMLElement; title: HTMLElement; message: HTMLElement;
   spinner: HTMLElement; actions: HTMLElement; note: HTMLElement; _pendingResolve: ((value: unknown) => void) | null;
 } = {
-  backdrop: $("syncGateBackdrop"),
   sheet: $("syncGateSheet"),
   title: $("syncGateTitle"),
   message: $("syncGateMessage"),
@@ -178,14 +155,13 @@ export function lockSyncGate<T = string>({ title, message, showSpinner, actions,
       btn.addEventListener("click", () => { unlockSyncGate(); resolve(a.value); });
       syncGate.actions.appendChild(btn);
     }
-    syncGate.backdrop.classList.remove("hidden");
-    syncGate.sheet.classList.remove("hidden");
+    // gate band + 允许穿透 busy（冲突必 surface；不可 dismiss——决策只能按钮选）
+    openModalSheet(syncGate.sheet, { band: "gate", allowDuringBusy: true, dismissible: false });
     syncGate._pendingResolve = resolve as (value: unknown) => void;   // 让 fetch 完成时从外部 unlock 并返回
   });
 }
 export function unlockSyncGate() {
-  syncGate.backdrop.classList.add("hidden");
-  syncGate.sheet.classList.add("hidden");
+  closeModalSheet(syncGate.sheet);
   syncGate._pendingResolve = null;
 }
 export function settleSyncGate(value: unknown) {

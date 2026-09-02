@@ -6,6 +6,7 @@
 // 预览是**采样估计**（≤5 万样本，毫秒级，k 拖动即时重算）；commit 才对 bbox 全像素做
 //   最终硬分配，占比按全分辨率重数、全空簇丢弃——所以落地层数可能 < k（sheet 里如实说明）。
 
+import { openSheet, closeSheet } from "./ui/sheet.ts";   // 2026-09-02 C3
 import { clusterColors, partitionByNearest, hexOf, type ColorCluster } from "./backend/algorithms/color-cluster.ts";
 import { colorNameIn, defaultCulture, namingCategories, categoryLabel } from "./color-name.ts";
 import { wireInlineSelect } from "./inline-select.ts";
@@ -25,7 +26,6 @@ let _culture: string | null = null;
 function culture(): string { return _culture ?? defaultCulture(); }
 
 const el = {
-  backdrop: () => byId("explodeBackdrop"),
   sheet: () => byId("explodeSheet"),
   kRow: () => byId("explodeKRow"),
   swatches: () => byId("explodeSwatches"),
@@ -48,8 +48,7 @@ let _kSlider: RampSliderHandle | null = null;
 let _k = 4;
 
 function _close() {
-  el.backdrop().classList.add("hidden");
-  el.sheet().classList.add("hidden");
+  closeSheet(el.sheet());
   document.removeEventListener("keydown", _onKey);
   _state = null;   // 释放 region 引用
   _kSlider?.dispose();
@@ -104,8 +103,7 @@ export function openExplodeSheet(L: ViewLeaf | null) {
   el.kRow().appendChild(_kSlider.el);
   el.msg().classList.add("hidden");
   el.cultureLabel().textContent = categoryLabel(culture());
-  el.backdrop().classList.remove("hidden");
-  el.sheet().classList.remove("hidden");
+  openSheet(el.sheet(), { onDismiss: _close });
   document.addEventListener("keydown", _onKey);
   _recompute();
 }
@@ -154,5 +152,4 @@ export function initExplodeSheet(c: AppContext) {
     { band: "modal" });   // sheet(--z-modal) 内的下拉：popover band 会被 sheet+backdrop 盖住（真机「点不开」）
   el.confirm().addEventListener("click", _commit);
   el.cancel().addEventListener("click", _close);
-  el.backdrop().addEventListener("click", _close);
 }
