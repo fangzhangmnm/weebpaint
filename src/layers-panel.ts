@@ -23,7 +23,8 @@
 
 import { createApp, defineComponent, reactive, computed, watch, nextTick, ref } from "../vendor/vue/vue.esm-browser.prod.js";
 import { positionPopup } from "./anchored-popup.ts";
-import { registerFloatingWindow, type FloatingWindowHandle } from "./ui/floating-window.ts";   // 2026-09-02 C2 浮窗深模块（z/拖缩/钳制/出血区/transient 一处）
+import { registerFloatingWindow, type FloatingWindowHandle } from "./ui/floating-window.ts";
+import { toggleAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";   // 2026-09-02 C1：＋ 菜单收养（搬 body，锚到 ＋ 钮）   // 2026-09-02 C2 浮窗深模块（z/拖缩/钳制/出血区/transient 一处）
 
 // （出血区地板常数 PANEL_MIN_TOP=60 退役 2026-09-02：iPadOS 顶部死区没有 API 可查，地板由 ui/floating-window 运行时量顶栏下缘）
 import { countViewLeaves, findViewNodeById, flattenViewLeaves, type ViewNode, type ViewLeaf, type ViewGroup } from "./backend/workpiece/painting-view.ts";
@@ -872,10 +873,12 @@ export function initLayersPanel(ctx: AppContext) {
 
   // v267 指令栏：+（弹菜单：新图层 / 导入图片）· 上移 · 下移 · 删除。命令全走深模块 caller，UI 只调。
   const addPopup = document.getElementById("layerAddPopup");
-  const closeAddPopup = () => addPopup?.classList.add("hidden");
+  const closeAddPopup = () => closePopupMenuOf(addPopup);
+  // 2026-09-02 C1：收养进 popup-menu。节点原嵌在 .float-panel 里（backdrop-filter = fixed 的包含块，
+  //   坐标被扭成面板相对——图层 ⋯ 菜单 v0.4.11 同病靠 Teleport 逃的）→ mountToBody 一次性搬出，锚到 ＋ 钮。
   els.layerAddBtn.addEventListener("click", (e: Event) => {
     e.stopPropagation();
-    addPopup?.classList.toggle("hidden");
+    if (addPopup) toggleAdoptedPopup(addPopup, { anchor: els.layerAddBtn, align: "left", offsetY: 6, mountToBody: true, band: "menu" });
   });
   document.getElementById("layerAddNewBtn")?.addEventListener("click", () => { closeAddPopup(); _settlePendingTransient(); _addEmptyLayer(); });
   document.getElementById("layerAddGroupBtn")?.addEventListener("click", () => { closeAddPopup(); _addEmptyGroup(); });
@@ -885,12 +888,7 @@ export function initLayersPanel(ctx: AppContext) {
   document.getElementById("layerImportCloudBtn")?.addEventListener("click", closeAddPopup);
   // #25：盖印全部为新层（置顶 + 其他层自动隐藏）
   document.getElementById("layerStampAllBtn")?.addEventListener("click", () => { closeAddPopup(); _settlePendingTransient(); _stampAllToNewLayer(); });
-  // 点别处收起 "+" 菜单
-  document.addEventListener("pointerdown", (e: Event) => {
-    if (addPopup?.classList.contains("hidden")) return;
-    const tgt = e.target as HTMLElement | null;
-    if (!tgt?.closest("#layerAddPopup") && !tgt?.closest("#layerAddBtn")) closeAddPopup();
-  }, true);
+  // （＋ 菜单外点关 2026-09-02 C1 归 popup-menu）
 
   document.getElementById("layerMoveUpBtn")?.addEventListener("click", () => {
     if (doc.activeLayer) _moveLayerDelta(doc.activeLayer, 1);

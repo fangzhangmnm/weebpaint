@@ -84,12 +84,4 @@ export function positionPopup(popupEl: HTMLElement | null, opts: PositionOpts = 
   popupEl.style.top = top + "px";
 }
 
-// ---- 兼容 wrapper：老调用点零改动 ----
-// 锚到按钮下方右对齐（图库 新建/云账号/回收站/菜单 popup）。
-export function anchorPopupToBtn(popup: HTMLElement | null, btn: HTMLElement | null, opts: PositionOpts = {}) {
-  positionPopup(popup, { anchor: btn, align: "right", ...opts });
-}
-// 锚到按钮下方右对齐，但让到所有可见顶栏条以下（fx 选单）。
-export function anchorPopupBelowToolbars(popup: HTMLElement | null, btn: HTMLElement | null, offsetY = 4) {
-  positionPopup(popup, { anchor: btn, align: "right", belowToolbars: true, offsetY });
-}
+// （anchorPopupToBtn / anchorPopupBelowToolbars 兼容 wrapper 2026-09-02 C1 退役：菜单锚定全走 ui/popup-menu → positionPopup；零消费者）

@@ -45,7 +45,8 @@ import { initSettingsMenu, applyCheckerboard, renderSettingsFromPrefs } from "./
 import { initReadmePanel } from "./readme-panel.ts";       // 2026-09-02 内置说明书（菜单「帮助」+ #help/<id> 深链）
 import { initPressureToast } from "./pressure-toast.ts";   // 2026-09-02 压感自诊 toast（input.ts 探针 → wp:pressure-doubt）
 import { initFiltersAdjust } from "./filters-adjust.ts";
-import { initToolbar, RACK_PANEL_BY_TOOL, closeTransientMenus } from "./toolbar.ts";
+import { initToolbar, RACK_PANEL_BY_TOOL } from "./toolbar.ts";
+import { closePopupMenu } from "./ui/popup-menu.ts";   // 2026-09-02 C1：下笔一把关所有 popup（组槽/变体/stepper/主菜单/⋯）
 import { setColor, initColorPanel } from "./color-panel.ts";
 import { session, initSession, setSessionGallery } from "./session-state.ts";   // candidate 3 · 活动文档生命周期 SSoT
 import { setDocCompositor, setDocCompositorBytes } from "./backend/doc-render.ts";
@@ -605,7 +606,7 @@ rack.init({
 //   v0.6.27：浮出小菜单（组槽/变体/stepper/⋯）同待遇——下笔一把关（user：「slot 在下笔时也应该自动关」）
 els.board.addEventListener("pointerdown", () => {
   if (getCurrentExclusive()) closeExclusive();
-  closeTransientMenus();
+  closePopupMenu();
 }, { capture: true });   // capture 在 input.js 处理 stroke 之前
 
 

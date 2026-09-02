@@ -19,7 +19,7 @@ import { desk } from "./workbench-state.ts";   // pickMode → desk.colorPicker.
 import { fillResampleSelect } from "./frontend/resample-modes.ts";
 import { t, tLatin } from "./i18n/index.ts";
 import { fillPreviewActive, commitFillNow, sendSelectionToFill } from "./fill-mode.ts";
-import { anchorPopupToBtn } from "./anchored-popup.ts";
+import { openAdoptedPopup, toggleAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";   // 2026-09-02 C1：组槽/配置菜单收养（外点关/Escape/栈/定位归 module）
 import { configFromModeState, planesForMode, defaultVpsForMode } from "./perspective-frame.ts";
 import type { PerspMode } from "./perspective-frame.ts";
 import type { AppContext } from "./app-context.ts";
@@ -83,10 +83,7 @@ function _pushSelToolToEngine(tool: string) {
 //   **长按 ≈450ms=开该控件的菜单**；菜单开着再点=关。共享 helper：返回 consume()——
 //   长按已触发时吞掉随后的 click。
 // v0.6.27（user：下笔时 slot 菜单也该自动关）：全部浮出小菜单的统一登记 + 一把关
-const _transientMenus: HTMLElement[] = [];
-export function closeTransientMenus() {
-  for (const m of _transientMenus) m.classList.add("hidden");
-}
+// （_transientMenus / closeTransientMenus 2026-09-02 C1 退役：菜单开合归 popup-menu，下笔一把关 = closePopupMenu()）
 const SETOP_ICON: Record<string, string> = { new: "#selection-new", union: "#selection-union", subtract: "#selection-difference", intersect: "#selection-union" };
 const SUBTOOL_ICON: Record<string, string> = { freehand: "#select-freehand", rect: "#select-rectangle", ellipse: "#select-ellipse", polygon: "#select-polygon", magic: "#magic-wand", pen: "#pencil" };
 // 形状笔（ADR-0005/0006）：组槽 + 约束钮（图标按子工具换义）+ grid 配置 + 透视平面槽
@@ -108,7 +105,7 @@ export function updateShapeToolbar() {
   if (!shapeToolbarStack) return;
   const active = editMode.current() === "shapeBrush";
   shapeToolbarStack.classList.toggle("hidden", !active);
-  if (!active) { shapeGridMenu?.classList.add("hidden"); return; }
+  if (!active) { closePopupMenuOf(shapeGridMenu); return; }
   const sub = input.shapeBrush.getSubTool();
   const gPersp = desk.persp;
   const perspMode = (["p1", "p2", "p3", "iso"].includes(gPersp.mode) ? gPersp.mode : "off") as PerspMode;
@@ -129,7 +126,7 @@ export function updateShapeToolbar() {
         mb.setAttribute("aria-pressed", (mb.dataset.shapeVar === "constrain") === on ? "true" : "false");
       }
     }
-    if (s2 !== sub) menu.classList.add("hidden");   // 切子工具收起别家的菜单
+    if (s2 !== sub) closePopupMenuOf(menu);   // 切子工具收起别家的菜单
   }
   if (sub === "grid") {
     shapeGridNuVal.textContent = String(desk.shapeBrush.gridNu);
@@ -158,8 +155,8 @@ export function updateShapeToolbar() {
     shapePerspShowUse.setAttribute("href", g.showGizmo ? "#visibility-show" : "#visibility-hide");
   }
 }
-function closeSubMenu() { lassoSubMenu?.classList.add("hidden"); }
-function closeSetOpMenu() { lassoSetOpMenu?.classList.add("hidden"); }
+function closeSubMenu() { closePopupMenuOf(lassoSubMenu); }
+function closeSetOpMenu() { closePopupMenuOf(lassoSetOpMenu); }
 
 // ===== 套索/选区工具栏（v65 重做）=====
 // 三个 section 按状态切换：subToolBar（lasso 激活）/ selectionActions（有选区且非 floating）/ transformCtrl（floating）
@@ -214,7 +211,7 @@ export function updateLassoToolbar() {
   lassoSetOpSlot.setAttribute("aria-haspopup", fillActive ? "false" : "true");
   lassoSetOpSlot.setAttribute("title", fillActive
     ? t(setOp === "subtract" ? "la.subtract" : "la.union") : t("la.setOpSlot"));
-  if (fillActive) lassoSetOpMenu.classList.add("hidden");
+  if (fillActive) closePopupMenuOf(lassoSetOpMenu);
   // ⋯ 菜单：v0.7.2 起只剩命令（算法配置搬进扳手弹出）；按选区有无禁用
   const magicOn = sub === "magic";
   for (const menu of [lassoSelEditMenu, fillSelEditMenu]) {
@@ -229,7 +226,7 @@ export function updateLassoToolbar() {
     if (lbl && cur) lbl.textContent = t(cur.labelKey as Parameters<typeof t>[0]);
     const algoMenu = document.getElementById("lassoAlgoMenu");
     if (algoMenu) {
-      if (!magicOn) algoMenu.classList.add("hidden");
+      if (!magicOn) closePopupMenuOf(algoMenu);
       for (const b of algoMenu.querySelectorAll<HTMLElement>("[data-lasso-algo]")) {
         b.setAttribute("aria-pressed", b.dataset.lassoAlgo === algo ? "true" : "false");
       }
@@ -245,7 +242,7 @@ export function updateLassoToolbar() {
   // v0.7.2 算法配置扳手：magic 时显（VIS 表）；弹出行按当前算法显隐 + 值同步（关掉时收弹出）
   const cfgBtn = document.getElementById("lassoAlgoCfgBtn");
   const cfgMenu = document.getElementById("lassoAlgoCfgMenu");
-  if (!magicOn) cfgMenu?.classList.add("hidden");
+  if (!magicOn) closePopupMenuOf(cfgMenu);
   if (cfgMenu) {
     const lineartOn = input.lasso.getMagicAlgorithm() === "lineart";
     // v0.7.21：algo-cfg-classic 行退役（容差外提 Row1）；色差度量行 classic/similar 显（lineart 按亮度二值化不吃）
@@ -289,12 +286,12 @@ export function updateLassoToolbar() {
   // v0.7.21：similar 也给扩张（全图同色 + 扩 1px = 盖 AA 白边再填）
   const expandApplies = magicOn && algoNow !== "lineart";
   lassoExpandToggle.setAttribute("aria-pressed", desk.magicWand.expand ? "true" : "false");
-  if (!expandApplies || !desk.magicWand.expand) lassoMagicExpandMenu?.classList.add("hidden");
+  if (!expandApplies || !desk.magicWand.expand) closePopupMenuOf(lassoMagicExpandMenu);
   // v0.7.24 容隙钮：classic 专属（lineart 自带论文闭合、similar 无连通概念）
   const gapApplies = magicOn && algoNow === "classic";
   const gapToggle = document.getElementById("lassoGapToggle");
   gapToggle?.setAttribute("aria-pressed", desk.magicWand.fillGap ? "true" : "false");
-  if (!gapApplies || !desk.magicWand.fillGap) document.getElementById("lassoGapMenu")?.classList.add("hidden");
+  if (!gapApplies || !desk.magicWand.fillGap) closePopupMenuOf(document.getElementById("lassoGapMenu"));
   // ⋯ 菜单钮：modal 开着时(_selEdit)恒亮（预览 shrink 到空不能把 modal 撕掉）。
   const showSelEdit = !!_selEdit || (showRow1 && !otherToolSel);
   if (!showSelEdit) closeSelEditUI();
@@ -456,7 +453,7 @@ function _setSelEditOp(op: "expand" | "shrink") {
 function _openSelEdit(op: "expand" | "shrink") {
   if (!doc.selection) return;
   const { menu, popup, title, amount } = _selEditEls();
-  menu?.classList.add("hidden");
+  closePopupMenuOf(menu);
   if (_selEdit) _finishSelEdit(false);    // 已开着另一个 → 先取消旧的（还原）再开新的
   const tx = wp2.selection.beginPreview();
   _selEdit = { tx, before: tx.origin() as Selection, op, rafId: 0 };
@@ -491,8 +488,8 @@ function _finishSelEdit(applied: boolean) {
 }
 // 收起齿轮菜单（updateLassoToolbar 在选区没了/切走时调；此时 _selEdit 必为 null，不碰 modal）
 function closeSelEditUI() {
-  document.getElementById("lassoSelEditMenu")?.classList.add("hidden");
-  document.getElementById("fillSelEditMenu")?.classList.add("hidden");
+  closePopupMenuOf(document.getElementById("lassoSelEditMenu"));
+  closePopupMenuOf(document.getElementById("fillSelEditMenu"));
 }
 function initSelEditUI() {
   const { amount } = _selEditEls();
@@ -501,10 +498,8 @@ function initSelEditUI() {
     if (_selEdit) return;                   // modal 开着时不响应
     const menu = _selEditEls().menu;        // v0.6.30：开当前工具的菜单（另一份先收）
     const other = document.getElementById(editMode.current() === "fill" ? "lassoSelEditMenu" : "fillSelEditMenu");
-    other?.classList.add("hidden");
-    const wasHidden = menu?.classList.contains("hidden");
-    menu?.classList.toggle("hidden");
-    if (wasHidden && menu) anchorPopupToBtn(menu, lassoSelEditBtn, { align: "left", offsetY: 6 });   // v0.5.14 贴钮
+    closePopupMenuOf(other);
+    if (menu) toggleAdoptedPopup(menu, { anchor: lassoSelEditBtn, align: "left", offsetY: 6 });   // v0.5.14 贴钮
   });
   // 蚂蚁线 toggle（v0.6.19，ADR-0004 修订；v0.7.40 per-tool 分家）：写 desk（per-doc）+ 重绘；
   //   不关菜单（toggle 类操作连按友好）。fill 菜单钮管 fillTool、selection 菜单钮管 lassoTool。
@@ -526,18 +521,10 @@ function initSelEditUI() {
   const lassoAlgoCfgBtn = document.getElementById("lassoAlgoCfgBtn");
   const lassoAlgoCfgMenu = document.getElementById("lassoAlgoCfgMenu");
   if (lassoAlgoCfgBtn && lassoAlgoCfgMenu) {
-    _transientMenus.push(lassoAlgoCfgMenu);
     lassoAlgoCfgBtn.addEventListener("click", (e: Event) => {
       e.stopPropagation();
-      const wasHidden = lassoAlgoCfgMenu.classList.contains("hidden");
-      lassoAlgoCfgMenu.classList.toggle("hidden");
-      if (wasHidden) anchorPopupToBtn(lassoAlgoCfgMenu, lassoAlgoCfgBtn, { align: "left", offsetY: 6 });
+      toggleAdoptedPopup(lassoAlgoCfgMenu, { anchor: lassoAlgoCfgBtn, align: "left", offsetY: 6 });   // stepper 连按不关（点在菜单内）
       updateLassoToolbar();   // 行显隐/值同步
-    });
-    document.addEventListener("pointerdown", (e: Event) => {
-      if (lassoAlgoCfgMenu.classList.contains("hidden")) return;
-      if (lassoAlgoCfgMenu.contains(e.target as Node) || lassoAlgoCfgBtn.contains(e.target as Node)) return;
-      lassoAlgoCfgMenu.classList.add("hidden");
     });
     const bleedLabel = (v: number) => (v < 0 ? t("la.bleedAuto") : String(v));
     // 闭合距离 stepper（±16；8..256 clamp 在引擎侧，写回 clamp 后的真值）
@@ -639,15 +626,7 @@ function initSelEditUI() {
   });
   document.getElementById("lassoSelOpApply")?.addEventListener("click", () => _finishSelEdit(true));
   document.getElementById("lassoSelOpCancel")?.addEventListener("click", () => _finishSelEdit(false));
-  // 点菜单外侧 → 关菜单（modal 自有 apply/cancel，不在此关）；v0.6.30 两份都管
-  document.addEventListener("pointerdown", (e: Event) => {
-    for (const id of ["lassoSelEditMenu", "fillSelEditMenu"]) {
-      const menu = document.getElementById(id);
-      if (!menu || menu.classList.contains("hidden")) continue;
-      if (menu.contains(e.target as Node) || lassoSelEditBtn.contains(e.target as Node)) continue;
-      menu.classList.add("hidden");
-    }
-  });
+  // （齿轮菜单外点关 2026-09-02 C1 归 popup-menu）
 }
 
 // Rack 工具 → 对应的 exclusive panel id
@@ -681,8 +660,6 @@ export function initToolbar(ctx: AppContext) {
   lassoSelEditBtn = byId("lassoSelEditBtn");
   lassoSelEditMenu = byId("lassoSelEditMenu");
   fillSelEditMenu = byId("fillSelEditMenu");
-  _transientMenus.push(lassoSelEditMenu);
-  _transientMenus.push(fillSelEditMenu);
   lassoTransformBtn = byId("lassoTransformBtn");
   lassoDeselectBtn = byId("lassoDeselectBtn");
   lassoFillCommitBtn = byId("lassoFillCommitBtn");
@@ -695,21 +672,14 @@ export function initToolbar(ctx: AppContext) {
   // v0.5.14 组槽通用：点槽 → 锚定槽下方弹紧凑图标排（user：下拉要贴槽、图标不要文字）。
   // v0.7.40 拆成两半：wireMenuItems（菜单项+外点关）+ openSlotMenu（开合锚定）——
   //   为 setOp 槽的 mode-aware 单击让路；其余 3 个调用点经 wireSlotMenu 合体，行为逐 bit 不变。
+  //   2026-09-02 C1：开合/锚定/外点关全归 popup-menu（收养静态节点）；这里只剩「选了 → 回调 + 关 + 重派生」。
   const openSlotMenu = (slot: HTMLElement, menu: HTMLElement) => {
-    const wasHidden = menu.classList.contains("hidden");
-    menu.classList.toggle("hidden");
-    if (wasHidden) anchorPopupToBtn(menu, slot, { align: "left", offsetY: 6 });
+    toggleAdoptedPopup(menu, { anchor: slot, align: "left", offsetY: 6 });
   };
-  const wireMenuItems = (slot: HTMLElement, menu: HTMLElement, onPick: (b: HTMLElement) => void) => {
-    _transientMenus.push(menu);
+  const wireMenuItems = (_slot: HTMLElement, menu: HTMLElement, onPick: (b: HTMLElement) => void) => {
     for (const b of [...menu.querySelectorAll<HTMLElement>("button")]) {
-      b.addEventListener("click", () => { onPick(b); menu.classList.add("hidden"); updateLassoToolbar(); });
+      b.addEventListener("click", () => { onPick(b); closePopupMenuOf(menu); updateLassoToolbar(); });
     }
-    document.addEventListener("pointerdown", (e: Event) => {
-      if (menu.classList.contains("hidden")) return;
-      if (menu.contains(e.target as Node) || slot.contains(e.target as Node)) return;
-      menu.classList.add("hidden");
-    });
   };
   const wireSlotMenu = (slot: HTMLElement, menu: HTMLElement, onPick: (b: HTMLElement) => void) => {
     // 纯选择槽（v0.6.31 唯一的小三角语义）：单击=开/关菜单
@@ -755,7 +725,7 @@ export function initToolbar(ctx: AppContext) {
       const next = input.lasso.getSetOpMode() === "subtract" ? "union" : "subtract";
       input.lasso.setSetOpMode(next);
       _selToolRec().setOp = next;
-      lassoSetOpMenu.classList.add("hidden");
+      closePopupMenuOf(lassoSetOpMenu);
       updateLassoToolbar();
       return;
     }
@@ -791,7 +761,6 @@ export function initToolbar(ctx: AppContext) {
   shapeSubCircleUse = byId("shapeSubCircleUse") as unknown as SVGUseElement;
   shapeGridMenu = byId("shapeGridMenu");
   shapeVarMenus = { line: byId("shapeLineVarMenu"), rect: byId("shapeRectVarMenu"), circle: byId("shapeCircleVarMenu"), grid: shapeGridMenu };
-  for (const m of Object.values(shapeVarMenus)) _transientMenus.push(m);
   // v0.6.25：已选中的子工具再点 = 开变体/配置菜单（grid=行列配置 steppers 连按不关——外点关统一挂这）
   for (const [s2, menu] of Object.entries(shapeVarMenus)) {
     if (s2 !== "grid") {
@@ -801,18 +770,12 @@ export function initToolbar(ctx: AppContext) {
           const v = mb.dataset.shapeVar === "constrain";
           input.shapeBrush.setConstrainFor(s2 as "line" | "rect" | "circle", v);
           desk.shapeBrush[CONSTRAIN_KEY[s2]] = v;
-          menu.classList.add("hidden");
+          closePopupMenuOf(menu);
           updateShapeToolbar();
         });
       }
     }
-    document.addEventListener("pointerdown", (e: Event) => {
-      if (menu.classList.contains("hidden")) return;
-      const anchor = shapeSubBtns.find((sb) => sb.dataset.shapeSub === s2);
-      if (menu.contains(e.target as Node) || anchor?.contains(e.target as Node)) return;
-      menu.classList.add("hidden");
-    });
-  }
+  }   // （变体菜单外点关 2026-09-02 C1 归 popup-menu）
   // v0.6.31：单击=切换子工具；已选中再点=开变体/配置菜单（长按撤，回 v0.6.26 形态）
   for (const b of shapeSubBtns) {
     const sub2 = b.dataset.shapeSub as Parameters<typeof input.shapeBrush.setSubTool>[0];
@@ -821,11 +784,7 @@ export function initToolbar(ctx: AppContext) {
       if (input.isStrokeActive()) input.abortActiveStroke();
       if (input.shapeBrush.getSubTool() === sub2) {
         e.stopPropagation();
-        if (menu2) {
-          const wasHidden = menu2.classList.contains("hidden");
-          menu2.classList.toggle("hidden");
-          if (wasHidden) anchorPopupToBtn(menu2, b, { align: "left", offsetY: 6 });
-        }
+        if (menu2) toggleAdoptedPopup(menu2, { anchor: b, align: "left", offsetY: 6 });
         return;
       }
       input.shapeBrush.setSubTool(sub2);
@@ -970,24 +929,17 @@ export function initToolbar(ctx: AppContext) {
     pushMagicExpandToEngine();
     updateLassoToolbar();   // toggle pressed 态/stepper 显隐在 updateLassoToolbar 派生
   };
-  _transientMenus.push(lassoMagicExpandMenu);
   lassoExpandToggle.addEventListener("click", (e: Event) => {
     e.stopPropagation();
     desk.magicWand.expand = !desk.magicWand.expand;
     pushMagicExpandToEngine();
     if (desk.magicWand.expand) {
-      // 开的瞬间顺势弹 stepper 调 px（v0.6.26；外点关，steppers 连按不关）
-      lassoMagicExpandMenu.classList.remove("hidden");
-      anchorPopupToBtn(lassoMagicExpandMenu, lassoExpandToggle, { align: "left", offsetY: 6 });
+      // 开的瞬间顺势弹 stepper 调 px（v0.6.26；外点关归 popup-menu，steppers 连按不关）
+      openAdoptedPopup(lassoMagicExpandMenu, { anchor: lassoExpandToggle, align: "left", offsetY: 6 });
     } else {
-      lassoMagicExpandMenu.classList.add("hidden");
+      closePopupMenuOf(lassoMagicExpandMenu);
     }
     updateLassoToolbar();
-  });
-  document.addEventListener("pointerdown", (e: Event) => {
-    if (lassoMagicExpandMenu.classList.contains("hidden")) return;
-    if (lassoMagicExpandMenu.contains(e.target as Node) || lassoExpandToggle.contains(e.target as Node)) return;
-    lassoMagicExpandMenu.classList.add("hidden");
   });
   // −1+ stepper（v0.6.19 文本框退役——文本框吞快捷键+弹键盘；样板 = shapeGrid steppers 连按不关菜单）
   const stepMagicExpand = (d: number) => {
@@ -1010,23 +962,16 @@ export function initToolbar(ctx: AppContext) {
     pushGapToEngine();
     updateLassoToolbar();
   };
-  _transientMenus.push(lassoGapMenu);
   lassoGapToggle.addEventListener("click", (e: Event) => {
     e.stopPropagation();
     desk.magicWand.fillGap = !desk.magicWand.fillGap;
     pushGapToEngine();
     if (desk.magicWand.fillGap) {
-      lassoGapMenu.classList.remove("hidden");
-      anchorPopupToBtn(lassoGapMenu, lassoGapToggle, { align: "left", offsetY: 6 });
+      openAdoptedPopup(lassoGapMenu, { anchor: lassoGapToggle, align: "left", offsetY: 6 });
     } else {
-      lassoGapMenu.classList.add("hidden");
+      closePopupMenuOf(lassoGapMenu);
     }
     updateLassoToolbar();
-  });
-  document.addEventListener("pointerdown", (e: Event) => {
-    if (lassoGapMenu.classList.contains("hidden")) return;
-    if (lassoGapMenu.contains(e.target as Node) || lassoGapToggle.contains(e.target as Node)) return;
-    lassoGapMenu.classList.add("hidden");
   });
   const stepGap = (d: number) => {
     desk.magicWand.fillGapPx = Math.max(2, Math.min(32, desk.magicWand.fillGapPx + d));

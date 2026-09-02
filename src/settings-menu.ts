@@ -14,7 +14,7 @@ import { applyTheme, themeLabel, THEMES, currentTheme } from "./theme.ts";
 import { t, lang, setLang, LANGS, langDisplayName, type Key } from "./i18n/index.ts";
 import { KEYBOARD_SHORTCUTS } from "./input.ts";
 import { _updateMenuCropLabel } from "./doc-ops.ts";
-import { positionPopup } from "./anchored-popup.ts";
+import { openAdoptedPopup, closePopupMenuOf, isPopupOpen } from "./ui/popup-menu.ts";   // 2026-09-02 C1：主菜单收养进 popup-menu（外点关/Escape/栈/定位一处）
 import { wireInlineSelect } from "./inline-select.ts";
 import { openInputSheet } from "./sheets.ts";
 import { reportError } from "./error-badge.ts";   // 全 app 唯一错误汇拢点（CLAUDE.md）
@@ -189,15 +189,16 @@ export function renderSettingsFromPrefs(): void {
 }
 
 export function setMenuOpen(open: boolean) {
-  els.menuPanel.classList.toggle("hidden", !open);
-  els.menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
-  if (open) {
-    // v124 menu panel 跟随菜单按钮屏坐标（top-bar 居中 transform，写死 left 在宽屏对不齐图标）。
-    // v270：改走统一 positionPopup（左对齐到按钮 + safe-area + 夹视口），不再手搓坐标。
-    positionPopup(els.menuPanel, { anchor: els.menuBtn, align: "left", offsetY: 6 });
-    _updateMenuCropLabel?.();
-    updateCloudAuthUI();   // v0.6.26：登录项显隐每次开菜单重派生（auth 静默恢复不触发 wp:auth-changed 的路径漏网——真机：登录后没隐藏）
-  }
+  if (!open) { closePopupMenuOf(els.menuPanel); return; }
+  // 2026-09-02 C1：主菜单 = popup-menu 收养的静态节点——定位（v270 positionPopup：左对齐按钮 + safe-area + 夹视口）、
+  //   外点关、Escape、与菜单内下拉（主题/语言 = 子 popup，父留着）的栈关系全在 module。内容仍在 index.html。
+  openAdoptedPopup(els.menuPanel, {
+    anchor: els.menuBtn, align: "left", offsetY: 6,
+    onClose: () => els.menuBtn.setAttribute("aria-expanded", "false"),
+  });
+  els.menuBtn.setAttribute("aria-expanded", "true");
+  _updateMenuCropLabel?.();
+  updateCloudAuthUI();   // v0.6.26：登录项显隐每次开菜单重派生（auth 静默恢复不触发 wp:auth-changed 的路径漏网——真机：登录后没隐藏）
 }
 
 // v0.6C tab 分页状态（module 级：init 建，renderSettingsFromPrefs 回灌持久化值）
@@ -347,11 +348,7 @@ export function initSettingsMenu(ctx: AppContext) {
 
   els.menuBtn.addEventListener("click", (e: Event) => {
     e.stopPropagation();
-    setMenuOpen(els.menuPanel.classList.contains("hidden"));
+    setMenuOpen(!isPopupOpen(els.menuPanel));
   });
-  document.addEventListener("pointerdown", (e: Event) => {
-    if (els.menuPanel.classList.contains("hidden")) return;
-    if (els.menuPanel.contains(e.target as Node) || els.menuBtn.contains(e.target as Node)) return;
-    setMenuOpen(false);
-  });
+  // （外点关 2026-09-02 C1 归 popup-menu；这里那份删）
 }

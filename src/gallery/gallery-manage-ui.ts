@@ -16,7 +16,7 @@
 import { t } from "../i18n/index.ts";
 import { els } from "../els.ts";
 import { openChoiceSheet, openConfirmSheet } from "../sheets.ts";
-import { anchorPopupToBtn } from "../anchored-popup.ts";
+import { openAdoptedPopup, closePopupMenuOf } from "../ui/popup-menu.ts";   // 2026-09-02 C1
 import { iconHtml } from "../ui/icon.ts";
 import { galleryAttachment } from "../gallery-attachment-host.ts";
 import { galleryRegistry } from "../gallery-registry.ts";
@@ -184,8 +184,7 @@ async function switchFlowBody(entry: GalleryEntry): Promise<void> {
  *  编辑器里没有断开（断开只在图库页，user 0830）——本入口本就只在无库时可见（settings-menu 反相 gating）。 */
 export function openConnectMenuFromEditor(anchor: HTMLElement): void {
   renderGalleryManage();
-  els.cloudAccountPopup.classList.remove("hidden");
-  anchorPopupToBtn(els.cloudAccountPopup, anchor);
+  openAdoptedPopup(els.cloudAccountPopup, { anchor });   // 2026-09-02 C1：收养（外点关/Escape/栈归 module）
 }
 
 /** redirect 回程续办（app.ts wp:auth-changed 接线；2026-08-28 iPad「点两次」修）：
@@ -210,7 +209,7 @@ export async function resumePendingOneDriveConnect(): Promise<void> {
 // ---- 连接选项（user 0830 拍板：菜单项形制、平权、无模态；全 codebase 唯一 connect 路径）----
 // 手势红线（sheets.ts 头注释）：signIn / FSA picker 都要活着的 user activation——菜单项 click 直调
 //   mint*（同步栈起跳），旧 choice-sheet 的 onPick 补丁随模态一起退役。
-function _closePopup(): void { els.cloudAccountPopup.classList.add("hidden"); }
+function _closePopup(): void { closePopupMenuOf(els.cloudAccountPopup); }
 function _menuItem(label: string, icon: string, onClick: () => void): HTMLButtonElement {
   const b = document.createElement("button");
   b.type = "button";

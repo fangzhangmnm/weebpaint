@@ -8,11 +8,17 @@
 //   z 走 band 表（styles.css --z-*），坐标走 anchored-popup（全仓唯一定位入口）。本模块把这条路封装死，
 //   消费者只描述「锚在谁下面、有哪些项、选了怎么办」，不碰 DOM/坐标/z。
 //
-// 关闭纪律（内建，消费者不用再各写一份）：点外面关（capture 相，可选吞掉那一击）、Escape 关、
-//   同一时刻只有一个 popup-menu（开新的自动关旧的）、视口 resize 重定位、锚按钮再点一下 = toggle。
-//   shadow DOM 友好：外点判定用 composedPath（锚可以在 shadow 里，如参考窗的 ＋）。
+// 两个 adapter = 真 seam（UI 纪元 C1，2026-09-02）：
+//   · **现建**（openPopupMenu）：items 函数现算 → module 建节点（参考窗 ＋ 菜单、主题/语言/词库下拉）；
+//   · **收养**（openAdoptedPopup）：内容仍是 index.html 里的静态节点（汉堡主菜单 / 图库三 popup / 调整 popup /
+//     图层 ＋ / 套索·形状组槽 ×13），生命周期归 module——外点关 / Escape / 定位 / 栈 / 显隐一处，消费者的
+//     15 份外点关手抄与 _transientMenus 由此退役。
 //
-// 两种形态：list（.menu-item 行，带前缀图标，与汉堡菜单同款）/ compact（药丸行，主题/语言下拉旧观感）。
+// 关闭纪律（内建）：点外面关（capture 相，可选吞掉那一击）、Escape 关最上层、**栈**（开新的会关掉所有
+//   「不包含新锚」的旧菜单——主菜单里再弹主题下拉，主菜单留着；点别处两层一起关）、视口 resize 重定位、
+//   锚按钮再点一下 = toggle。shadow DOM 友好：外点判定用 composedPath（锚可以在 shadow 里，如参考窗的 ＋）。
+//
+// 形态：list（.menu-item 行，带前缀图标，与汉堡菜单同款）/ compact（药丸行，主题/语言下拉旧观感）。
 // 图标 = sprite id（<use>，菜单在 light DOM 所以直接引用得到）。
 // 二段确认之类「选了但别关」：onPick 返回 "keep"，随后 handle.refresh() 重绘（items 是函数，开/刷新时现算）。
 
@@ -33,52 +39,78 @@ export interface PopupMenuItem<Id extends string = string> {
   separatorBefore?: boolean;
 }
 
-export interface PopupMenuOpts<Id extends string = string> {
+/** 现建 / 收养共用的锚定与关闭选项。 */
+export interface PopupAnchorOpts {
   anchor: HTMLElement;
+  align?: "left" | "right";          // 默认 right（对齐锚右缘）
+  offsetY?: number;                  // 默认 4
+  belowToolbars?: boolean;           // 让到所有可见顶栏条以下（调整 popup）
+  edgeMargin?: number;
+  /** z band：现建默认 menu；收养默认 "css"（保留节点自己的 CSS z）。菜单内再弹 = popover；sheet(modal) 内 = modal。 */
+  band?: PopupBand | "css";
+  swallowOutsideTap?: boolean;       // 关菜单的那一击是否吞掉（默认透传）
+  onClose?: () => void;
+  ariaLabel?: string;
+}
+
+export interface PopupMenuOpts<Id extends string = string> extends PopupAnchorOpts {
   items: () => PopupMenuItem<Id>[];
   /** 返回 "keep" = 选了但菜单不关（随后请 refresh）。 */
   onPick: (id: Id, item: PopupMenuItem<Id>) => void | "keep";
-  onClose?: () => void;
-  align?: "left" | "right";          // 默认 right（对齐锚右缘）
-  offsetY?: number;                  // 默认 4
-  band?: PopupBand;                  // 默认 menu；菜单内再弹 = popover；sheet(modal) 内 = modal
   variant?: PopupVariant;            // 默认 list
-  swallowOutsideTap?: boolean;       // 关菜单的那一击是否吞掉（默认透传）
-  ariaLabel?: string;
+}
+
+export interface AdoptedPopupOpts extends PopupAnchorOpts {
+  /** 节点原本嵌在某容器里（backdrop-filter / overflow 会困住它）→ 收养时搬到 body（一次性）。 */
+  mountToBody?: boolean;
+  /** 不重定位（节点由 CSS 钉死）——只要外点关/Escape/栈。 */
+  position?: "anchor" | "css";
 }
 
 export interface PopupMenuHandle {
   close(): void;
+  /** 现建：重绘 items + 重定位；收养：重定位。 */
   refresh(): void;
   readonly isOpen: boolean;
   readonly el: HTMLElement;
   readonly anchor: HTMLElement;
 }
 
-let _current: PopupMenuHandle | null = null;
+// ---- 栈（末位最上）----
+const _open: PopupMenuHandle[] = [];
 
-/** 当前开着的 popup-menu（没有 = null）。 */
-export function currentPopupMenu(): PopupMenuHandle | null { return _current; }
-/** 关掉当前开着的（下笔 / 切页等外部时机用）。 */
-export function closePopupMenu(): void { _current?.close(); }
+/** 最上层的 popup（没有 = null）。 */
+export function currentPopupMenu(): PopupMenuHandle | null { return _open[_open.length - 1] ?? null; }
+/** 全关（下笔 / 切页等外部时机用）。 */
+export function closePopupMenu(): void { for (const h of [..._open]) h.close(); }
+export const closeAllPopupMenus = closePopupMenu;
+/** 关某个节点的 popup（不在栈里 → 只确保它 hidden；老调用方「menu.classList.add("hidden")」的替身）。 */
+export function closePopupMenuOf(el: HTMLElement | null): void {
+  if (!el) return;
+  const h = _open.find((x) => x.el === el);
+  if (h) h.close(); else el.classList.add("hidden");
+}
+export function isPopupOpen(el: HTMLElement | null): boolean { return !!el && _open.some((x) => x.el === el); }
 
 /** 锚按钮 toggle 语义：同一锚已开 → 关并返回 null；否则开。 */
 export function togglePopupMenu<Id extends string>(opts: PopupMenuOpts<Id>): PopupMenuHandle | null {
-  if (_current && _current.anchor === opts.anchor) { _current.close(); return null; }
+  const cur = _open.find((x) => x.anchor === opts.anchor);
+  if (cur) { cur.close(); return null; }
   return openPopupMenu(opts);
+}
+export function toggleAdoptedPopup(el: HTMLElement, opts: AdoptedPopupOpts): PopupMenuHandle | null {
+  const cur = _open.find((x) => x.el === el);
+  if (cur) { cur.close(); return null; }
+  return openAdoptedPopup(el, opts);
 }
 
 export function openPopupMenu<Id extends string>(opts: PopupMenuOpts<Id>): PopupMenuHandle {
-  _current?.close();
   const variant: PopupVariant = opts.variant ?? "list";
-  const band: PopupBand = opts.band ?? "menu";
+  const band = opts.band ?? "menu";
   const el = document.createElement("div");
   el.className = (variant === "compact" ? "lasso-icon-menu lasso-icon-list " : "menu-panel ")
-    + `popup-menu popup-menu--${variant} band-${band}`;
+    + `popup-menu popup-menu--${variant}` + (band === "css" ? "" : ` band-${band}`);
   el.setAttribute("role", "menu");
-  if (opts.ariaLabel) el.setAttribute("aria-label", opts.ariaLabel);
-  let open = true;
-
   const render = () => {
     const items = opts.items().filter((it) => !it.hidden);
     const anyIcon = variant === "list" && items.some((it) => !!it.icon);
@@ -95,13 +127,60 @@ export function openPopupMenu<Id extends string>(opts: PopupMenuOpts<Id>): Popup
       const icon = variant === "list" && anyIcon
         ? (it.icon ? iconHtml(it.icon) : `<span class="menu-item-icon-blank"></span>`)
         : "";
-      html += `<button type="button" class="${cls}" role="${role}" data-id="${escapeAttr(it.id)}"${checkAttr}${it.disabled ? " disabled" : ""}>`
+      html += `<button type="button" class="${cls}" role="${role}" data-id="${escapeHtml(it.id)}"${checkAttr}${it.disabled ? " disabled" : ""}>`
         + icon + `<span class="menu-item-label">${escapeHtml(it.label)}</span></button>`;
     }
     el.innerHTML = html;
   };
-  const position = () => positionPopup(el, { anchor: opts.anchor, align: opts.align ?? "right", offsetY: opts.offsetY ?? 4, clampViewport: true });
+  render();
+  document.body.appendChild(el);
+  const handle = _mount(el, opts, {
+    reposition: true,
+    onRefresh: render,
+    onClosed: () => el.remove(),
+  });
+  el.addEventListener("click", (e) => {
+    const b = (e.target as Element).closest("[data-id]") as HTMLButtonElement | null;
+    if (!b || b.disabled) return;
+    e.stopPropagation();
+    const id = b.dataset.id as Id;
+    const item = opts.items().find((it) => it.id === id);
+    if (!item) return;
+    const r = opts.onPick(id, item);
+    if (r === "keep") { if (handle.isOpen) handle.refresh(); return; }
+    handle.close();
+  });
+  return handle;
+}
 
+/** 收养静态节点：显示 + 锚定 + 栈 + 外点关/Escape；关 = 加 hidden（节点留在 DOM，内容仍是 index.html 的）。 */
+export function openAdoptedPopup(el: HTMLElement, opts: AdoptedPopupOpts): PopupMenuHandle {
+  const cur = _open.find((x) => x.el === el);
+  if (cur) { cur.refresh(); return cur; }
+  if (opts.mountToBody && el.parentElement !== document.body) document.body.appendChild(el);
+  const band = opts.band ?? "css";
+  if (band !== "css") el.classList.add("popup-menu", `band-${band}`);
+  el.classList.remove("hidden");
+  return _mount(el, opts, {
+    reposition: (opts.position ?? "anchor") === "anchor",
+    onClosed: () => { el.classList.add("hidden"); },
+  });
+}
+
+interface MountHooks { reposition: boolean; onRefresh?: () => void; onClosed: () => void }
+
+function _mount(el: HTMLElement, opts: PopupAnchorOpts, hooks: MountHooks): PopupMenuHandle {
+  // 栈纪律：关掉所有「不包含新锚」的旧菜单（父菜单留着；同级换菜单）。
+  for (const h of [..._open]) if (!h.el.contains(opts.anchor) && h.el !== el) h.close();
+  if (opts.ariaLabel) el.setAttribute("aria-label", opts.ariaLabel);
+  let open = true;
+  const position = () => {
+    if (!hooks.reposition) return;
+    positionPopup(el, {
+      anchor: opts.anchor, align: opts.align ?? "right", offsetY: opts.offsetY ?? 4,
+      belowToolbars: opts.belowToolbars, edgeMargin: opts.edgeMargin, clampViewport: true,
+    });
+  };
   const onDocPointerDown = (e: PointerEvent) => {
     const path = e.composedPath();
     if (path.includes(el) || path.includes(opts.anchor)) return;
@@ -109,6 +188,7 @@ export function openPopupMenu<Id extends string>(opts: PopupMenuOpts<Id>): Popup
     if (opts.swallowOutsideTap) { e.stopPropagation(); e.preventDefault(); }
   };
   const onKey = (e: KeyboardEvent) => {
+    if (currentPopupMenu() !== handle) return;   // 只有最上层响应键盘
     if (e.key === "Escape") { e.preventDefault(); handle.close(); return; }
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       const btns = [...el.querySelectorAll<HTMLButtonElement>("button:not([disabled])")];
@@ -120,38 +200,22 @@ export function openPopupMenu<Id extends string>(opts: PopupMenuOpts<Id>): Popup
     }
   };
   const onResize = () => { if (open) position(); };
-
-  el.addEventListener("click", (e) => {
-    const b = (e.target as Element).closest("[data-id]") as HTMLButtonElement | null;
-    if (!b || b.disabled) return;
-    e.stopPropagation();
-    const id = b.dataset.id as Id;
-    const item = opts.items().find((it) => it.id === id);
-    if (!item) return;
-    const r = opts.onPick(id, item);
-    if (r === "keep") { if (open) handle.refresh(); return; }
-    handle.close();
-  });
-
   const handle: PopupMenuHandle = {
     get isOpen() { return open; },
-    el,
-    anchor: opts.anchor,
-    refresh() { if (!open) return; render(); position(); },
+    el, anchor: opts.anchor,
+    refresh() { if (!open) return; hooks.onRefresh?.(); position(); },
     close() {
       if (!open) return;
       open = false;
       document.removeEventListener("pointerdown", onDocPointerDown, true);
       document.removeEventListener("keydown", onKey, true);
       window.removeEventListener("resize", onResize);
-      el.remove();
-      if (_current === handle) _current = null;
+      const i = _open.indexOf(handle);
+      if (i >= 0) _open.splice(i, 1);
+      hooks.onClosed();
       opts.onClose?.();
     },
   };
-
-  render();
-  document.body.appendChild(el);
   position();
   // 监听延后到本轮事件之后挂：打开菜单的那一击（pointerdown→click）不能反过来把它关掉。
   setTimeout(() => {
@@ -160,11 +224,10 @@ export function openPopupMenu<Id extends string>(opts: PopupMenuOpts<Id>): Popup
     document.addEventListener("keydown", onKey, true);
     window.addEventListener("resize", onResize);
   }, 0);
-  _current = handle;
+  _open.push(handle);
   return handle;
 }
 
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 }
-function escapeAttr(s: string): string { return escapeHtml(s); }

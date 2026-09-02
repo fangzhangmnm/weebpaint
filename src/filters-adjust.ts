@@ -12,7 +12,8 @@ import { t, tLatin } from "./i18n/index.ts";
 import { desk } from "./workbench-state.ts";
 import { PANELS, openExclusive, closeExclusive } from "./panel-state.ts";
 import { getFilter, listFilters, onFilterRegistered } from "./filters.ts";
-import { anchorPopupBelowToolbars, positionPopup } from "./anchored-popup.ts";
+import { positionPopup } from "./anchored-popup.ts";
+import { openAdoptedPopup, closePopupMenuOf, isPopupOpen } from "./ui/popup-menu.ts";   // 2026-09-02 C1：调整 popup 收养
 
 import { setTool } from "./toolbar.ts";   // 命令 = toolbar 的接口（显式 import）
 import { requireEditableLeaf } from "./editable-leaf.ts";
@@ -57,15 +58,14 @@ let _suppressTransientPanels: AppContext["_suppressTransientPanels"], _restoreTr
 // ---- topbar：adjustments popup（液化 / 后续调色 etc）----
 // 单按钮 → 弹一列 menu-item（同 menuPanel 模式）。学 Procreate adjustments icon。
 export function setAdjustOpen(open: boolean) {
-  els.adjustPopup.classList.toggle("hidden", !open);
-  els.topAdjustBtn.setAttribute("aria-expanded", open ? "true" : "false");
-  if (open) {
-    // 锚到按钮下方右对齐，让到所有可见顶栏条（lasso / crop / filterBrush）以下并夹进视口。
-    // v219：换共享 anchorPopupBelowToolbars，取代 v217 只查 lassoToolbarStack 的 bespoke 逻辑
-    // （在液化等 filterBrush 模式下顶栏条是 filterBrushToolbar，旧逻辑漏掉 → 遮挡）。
-    // 先 remove hidden（上面 toggle 已做）才能量 offsetHeight 做底部夹。
-    anchorPopupBelowToolbars(els.adjustPopup, els.topAdjustBtn);
-  }
+  if (!open) { closePopupMenuOf(els.adjustPopup); return; }
+  // 2026-09-02 C1：收养进 popup-menu——锚到按钮下方右对齐、让到所有可见顶栏条以下（v219 belowToolbars：
+  //   液化等 filterBrush 模式下顶栏条是 filterBrushToolbar）、夹视口；外点关/Escape 归 module。
+  openAdoptedPopup(els.adjustPopup, {
+    anchor: els.topAdjustBtn, align: "right", belowToolbars: true,
+    onClose: () => els.topAdjustBtn.setAttribute("aria-expanded", "false"),
+  });
+  els.topAdjustBtn.setAttribute("aria-expanded", "true");
 }
 
 // ===== v110/114 crop / resample / adjust =====
@@ -392,13 +392,9 @@ export function initFiltersAdjust(ctx: AppContext) {
 
   els.topAdjustBtn.addEventListener("click", (e: Event) => {
     e.stopPropagation();
-    setAdjustOpen(els.adjustPopup.classList.contains("hidden"));
+    setAdjustOpen(!isPopupOpen(els.adjustPopup));
   });
-  document.addEventListener("pointerdown", (e: Event) => {
-    if (els.adjustPopup.classList.contains("hidden")) return;
-    if (els.adjustPopup.contains(e.target as Node) || els.topAdjustBtn.contains(e.target as Node)) return;
-    setAdjustOpen(false);
-  });
+  // （调整 popup 外点关 2026-09-02 C1 归 popup-menu；这里那份删）
 
   _renderFilterMenu();
   onFilterRegistered(_renderFilterMenu);

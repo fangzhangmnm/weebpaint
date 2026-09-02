@@ -33,7 +33,7 @@ import { galleryAttachment } from "./gallery-attachment-host.ts";
 import { sessionNameConflict } from "./session-name.ts";
 import { supportsFileSystemAccess, pickLocalOraFile } from "./local-file-session.ts";
 import { intakeOraDoc } from "./import-image.ts";
-import { anchorPopupToBtn } from "./anchored-popup.ts";
+import { openAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";   // 2026-09-02 C1
 import { isBusyActive } from "./fullscreen-busy.ts";
 import { reportError } from "./error-badge.ts";
 import { decodeOraToPainting } from "./backend/ora.ts";
@@ -227,11 +227,11 @@ export function initTopbarMenu(ctx: AppContext) {
     e.stopPropagation();
     setMenuOpen(false);
     els.addNewFolder.hidden = true;
-    els.galleryAddPopup.classList.remove("hidden");
+    // 2026-09-02 C1：popup 收养（锚到汉堡钮左对齐；外点关/Escape 归 module）
     // align:"left"（2026-08-21 v0.10.20）：汉堡钮在工具栏左段，默认右对齐会让 popup 从按钮**向左悬出**
     //   （headless 截图实锤 popup 落 248..448 而按钮在 416..448），与菜单板（按钮正下）脱节。
     //   左对齐 = 与 menuPanel 同一落点，读作「菜单的下一级」。
-    anchorPopupToBtn(els.galleryAddPopup, els.menuBtn, { align: "left" });
+    openAdoptedPopup(els.galleryAddPopup, { anchor: els.menuBtn, align: "left" });
   });
   // 菜单「登录 OneDrive」行（v0.6.22 menuSignIn）已删（2026-08-21 拍板）：编辑器内登录入口
   //   统一走 smart save 的「现在登录同步？」sheet（见 smartSaveAndPush）；图库云账号 popup 的
@@ -252,7 +252,7 @@ export function initTopbarMenu(ctx: AppContext) {
     openLocalBtn.hidden = false;
     openLocalBtn.addEventListener("click", async () => {
       setMenuOpen(false);
-      els.galleryAddPopup.classList.add("hidden");   // popup 语境：点了即收
+      closePopupMenuOf(els.galleryAddPopup);   // popup 语境：点了即收
       try {
         if (supportsFileSystemAccess()) {
           const h = await pickLocalOraFile();
@@ -352,7 +352,7 @@ export function initTopbarMenu(ctx: AppContext) {
   // menuBrushSettings 僵尸（hidden 空 button + no-op handler）已删 2026-06（HTML/els/listener 一并清）。
 
   els.menuForcePwaReset.addEventListener("click", async () => {
-    els.menuPanel?.classList.add("hidden");
+    setMenuOpen(false);
     const ok = await openConfirmSheet(
       t("tm.forceResetTitle"),
       t("tm.forceResetBody"),
@@ -378,11 +378,11 @@ export function initTopbarMenu(ctx: AppContext) {
 
   // P7 还原出厂设置（factory-reset.ts 主流程；前置=无开画+无挂库，各走正门收口）
   document.getElementById("menuFactoryReset")?.addEventListener("click", () => {
-    els.menuPanel?.classList.add("hidden");
+    setMenuOpen(false);
     void runFactoryReset(setStatus);
   });
   els.menuResetBrushRack.addEventListener("click", async () => {
-    els.menuPanel?.classList.add("hidden");
+    setMenuOpen(false);
     // 打字 consent（0825 §2.10「还原笔刷同款护栏」；破坏性动作不给一键直达）
     const phrase = t("br.resetPhrase");
     const typed = await openInputSheet(t("tm.resetRackTitle"), "", { placeholder: phrase, message: t("br.resetConsentPrompt", { phrase }) });

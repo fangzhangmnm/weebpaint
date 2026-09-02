@@ -1,5 +1,4 @@
 import type { AppContext } from "./app-context.ts";
-export declare function closeTransientMenus(): void;
 export declare function updateShapeToolbar(): void;
 export declare function updateLassoToolbar(): void;
 export declare function setTool(tool: string): void;

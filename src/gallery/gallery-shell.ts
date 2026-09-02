@@ -32,7 +32,7 @@ import { galleryDefaultName } from "../naming.ts";     // P1 命名器官：yyyy
 import { humanSize } from "./gallery-view-model.ts";   // 展示格式化（纯·KiB/MiB）；此前本模块私有一份逐字节拷贝，2026-08-21 收敛
 import { requireStore, galleryBackend, isCachedSyncState } from "../app-store.ts";
 import { galleryOnline } from "../gallery-capability.ts";
-import { anchorPopupToBtn } from "../anchored-popup.ts";
+import { toggleAdoptedPopup, closePopupMenuOf, isPopupOpen } from "../ui/popup-menu.ts";   // 2026-09-02 C1：图库四 popup 收养
 import { wireInlineSelect } from "../inline-select.ts";
 import { applyTheme, themeLabel, THEMES, currentTheme } from "../theme.ts";
 import { lang, setLang, LANGS, langDisplayName } from "../i18n/index.ts";
@@ -81,9 +81,9 @@ export async function setGalleryOpen(open: boolean) {
     els.galleryFull.classList.add("hidden");
     delete document.body.dataset.mode;
     // 关闭可能打开的 popup
-    els.galleryAddPopup.classList.add("hidden");
-    els.cloudAccountPopup.classList.add("hidden");
-    els.galleryMenuPopup?.classList.add("hidden");
+    closePopupMenuOf(els.galleryAddPopup);
+    closePopupMenuOf(els.cloudAccountPopup);
+    closePopupMenuOf(els.galleryMenuPopup);
     board.requestRender();
   }
 }
@@ -289,65 +289,50 @@ export function initGalleryShell(ctx: AppContext) {
   withBusy = ctx.withBusy;
 
   // 加号 popup
-  els.galleryAddBtn.addEventListener("click", (e: Event) => {
-    e.stopPropagation();
-    const hidden = els.galleryAddPopup.classList.contains("hidden");
-    els.cloudAccountPopup.classList.add("hidden");
-    els.galleryAddPopup.classList.toggle("hidden", !hidden);
-    // v0.9.25：编辑器「新建…」入口复用本 popup 时会藏起「新建文件夹」（图库视图操作）——图库侧打开时恢复
-    if (hidden) { els.addNewFolder.hidden = false; anchorPopupToBtn(els.galleryAddPopup, els.galleryAddBtn); }
-    els.galleryAddBtn.setAttribute("aria-expanded", hidden ? "true" : "false");
-  });
+  // 2026-09-02 C1：四个 popup 收养进 popup-menu——定位/外点关/Escape/互斥（开一个关别的）全在 module。
+  const _wireGalleryPopup = (btn: HTMLElement | null, popup: HTMLElement | null, beforeOpen?: () => void) => {
+    if (!btn || !popup) return;
+    btn.addEventListener("click", (e: Event) => {
+      e.stopPropagation();
+      const opening = !isPopupOpen(popup);
+      if (opening) beforeOpen?.();
+      toggleAdoptedPopup(popup, { anchor: btn, onClose: () => btn.setAttribute("aria-expanded", "false") });
+      btn.setAttribute("aria-expanded", opening ? "true" : "false");
+    });
+  };
+  // v0.9.25：编辑器「新建…」入口复用本 popup 时会藏起「新建文件夹」（图库视图操作）——图库侧打开时恢复
+  _wireGalleryPopup(els.galleryAddBtn, els.galleryAddPopup, () => { els.addNewFolder.hidden = false; });
   // 云 icon popup
-  els.cloudIconBtn.addEventListener("click", (e: Event) => {
-    e.stopPropagation();
-    const hidden = els.cloudAccountPopup.classList.contains("hidden");
-    els.galleryAddPopup.classList.add("hidden");
-    els.cloudAccountPopup.classList.toggle("hidden", !hidden);
-    if (hidden) anchorPopupToBtn(els.cloudAccountPopup, els.cloudIconBtn);
-    els.cloudIconBtn.setAttribute("aria-expanded", hidden ? "true" : "false");
-  });
+  _wireGalleryPopup(els.cloudIconBtn, els.cloudAccountPopup);
   // 回收站视图：进/出 + 清空。v211/v214 把图库收成 Vue 深模块时，trash 按钮的接线漏搬
   // （setView/getView/emptyTrash 已在 GalleryHandle 上，只是 chrome 这层没人调）→「回收站打不开」。
   // chrome 可见性 _galleryChrome + 视图切 gallery.setView 两件一起（与 setGalleryOpen 进库同模式）。
   const _switchView = (view: "files" | "trash") => { _galleryChrome(view); gallery.setView(view); };
   els.galleryTrashBtn?.addEventListener("click", () => _switchView("trash"));
   els.galleryTrashBack?.addEventListener("click", () => _switchView("files"));
-  els.galleryTrashMenuBtn?.addEventListener("click", (e: Event) => {
-    e.stopPropagation();
-    const hidden = els.galleryTrashMenuPopup.classList.contains("hidden");
-    els.galleryTrashMenuPopup.classList.toggle("hidden", !hidden);
-    if (hidden) anchorPopupToBtn(els.galleryTrashMenuPopup, els.galleryTrashMenuBtn);
-  });
+  _wireGalleryPopup(els.galleryTrashMenuBtn, els.galleryTrashMenuPopup);
   els.galleryEmptyTrashLocalBtn?.addEventListener("click", () => {
-    els.galleryTrashMenuPopup.classList.add("hidden");
+    closePopupMenuOf(els.galleryTrashMenuPopup);
     gallery.emptyTrash("local");
   });
   els.galleryEmptyTrashCloudBtn?.addEventListener("click", () => {
-    els.galleryTrashMenuPopup.classList.add("hidden");
+    closePopupMenuOf(els.galleryTrashMenuPopup);
     gallery.emptyTrash("cloud");
   });
 
   // 图库菜单 popup（版本号 + 强制更新 + 文件无关设置）
-  els.galleryMenuBtn?.addEventListener("click", (e: Event) => {
-    e.stopPropagation();
-    const hidden = els.galleryMenuPopup.classList.contains("hidden");
-    els.galleryAddPopup.classList.add("hidden");
-    els.cloudAccountPopup.classList.add("hidden");
-    els.galleryMenuPopup.classList.toggle("hidden", !hidden);
-    if (hidden) anchorPopupToBtn(els.galleryMenuPopup, els.galleryMenuBtn);
-    els.galleryMenuBtn.setAttribute("aria-expanded", hidden ? "true" : "false");
+  _wireGalleryPopup(els.galleryMenuBtn, els.galleryMenuPopup, () => {
     // 解锁/锁定按钮的标签随锁态（每次开菜单刷一次即可）
     const lockLabel = els.galleryMenuLock?.querySelector(".menu-item-label");
     if (lockLabel) lockLabel.textContent = isUnlocked() ? t("gs.lockLabel") : t("gs.unlockLabel");
   });
 
   // v0.9.26 PWA 安装入口（user 2026-08-20；capture 在 settings-menu init 挂，这里只绑图库那颗按钮）
-  bindInstallButton(document.getElementById("galleryMenuInstallApp"), () => els.galleryMenuPopup.classList.add("hidden"));
+  bindInstallButton(document.getElementById("galleryMenuInstallApp"), () => closePopupMenuOf(els.galleryMenuPopup));
 
   // 加密作品 解锁/锁定（ADR-0012 统一图库密码；密码只在内存，锁定 = 清掉）
   els.galleryMenuLock?.addEventListener("click", async () => {
-    els.galleryMenuPopup.classList.add("hidden");
+    closePopupMenuOf(els.galleryMenuPopup);
     if (isUnlocked()) {
       lock();
       setStatus(t("gs.locked"));
@@ -378,17 +363,17 @@ export function initGalleryShell(ctx: AppContext) {
 
   // #18 全库备份（2026-08-28）：只读，整库打一个 zip；库太大改逐件下载。逻辑 = ./library-backup.ts
   els.galleryMenuBackup?.addEventListener("click", () => {
-    els.galleryMenuPopup.classList.add("hidden");
+    closePopupMenuOf(els.galleryMenuPopup);
     void runFullLibraryBackup();
   });
 
   // 加号 → 新建：弹 sheet 选名字 + 分辨率
   els.addNew.addEventListener("click", () => {
-    els.galleryAddPopup.classList.add("hidden");
+    closePopupMenuOf(els.galleryAddPopup);
     openNewDocSheet();
   });
   els.addImportPhoto.addEventListener("click", () => {
-    els.galleryAddPopup.classList.add("hidden");
+    closePopupMenuOf(els.galleryAddPopup);
     // 复用 oraFileInput 但限定 accept = image only。实际上 oraFileInput accept 包含 image
     els.oraFileInput.value = "";
     els.oraFileInput.click();
@@ -398,7 +383,7 @@ export function initGalleryShell(ctx: AppContext) {
     setAddImportAsNewDoc(true);
   });
   els.addImportClipboard.addEventListener("click", async () => {
-    els.galleryAddPopup.classList.add("hidden");
+    closePopupMenuOf(els.galleryAddPopup);
     try {
       const blob = await readImageFromClipboard();
       if (!blob) { setStatus(t("gs.clipboardNoImage")); return; }
@@ -468,12 +453,12 @@ export function initGalleryShell(ctx: AppContext) {
 
   // 回收站入口（0828 收进菜单；header 图标已撤，els.galleryTrashBtn 两处 ?. 兼容空缺）。
   document.getElementById("galleryMenuTrash")?.addEventListener("click", () => {
-    els.galleryMenuPopup.classList.add("hidden");
+    closePopupMenuOf(els.galleryMenuPopup);
     _switchView("trash");
   });
   // 图库菜单 popup 内动作代理到主菜单已有 handler（.click() 即触发，不重复逻辑/状态）。
   els.galleryMenuForceUpdate?.addEventListener("click", () => {
-    els.galleryMenuPopup.classList.add("hidden");
+    closePopupMenuOf(els.galleryMenuPopup);
     els.menuForcePwaReset?.click();
   });
   // v0.5.40：主题/语言 in-app 下拉（同设置页机制）；gen-AI 代理主菜单同一 handler。
@@ -487,33 +472,11 @@ export function initGalleryShell(ctx: AppContext) {
     () => LANGS.map((l) => ({ value: l, label: langDisplayName(l) })),
     () => lang(),
     (l) => { void setLang(l).catch((e) => reportError(e)); });
-  // 三个 popup 的 outside-click 关闭
-  document.addEventListener("pointerdown", (e: Event) => {
-    if (!els.galleryAddPopup.classList.contains("hidden") &&
-        !els.galleryAddPopup.contains(e.target as Node) &&
-        !els.galleryAddBtn.contains(e.target as Node)) {
-      els.galleryAddPopup.classList.add("hidden");
-    }
-    if (!els.cloudAccountPopup.classList.contains("hidden") &&
-        !els.cloudAccountPopup.contains(e.target as Node) &&
-        !els.cloudIconBtn.contains(e.target as Node)) {
-      els.cloudAccountPopup.classList.add("hidden");
-    }
-    if (els.galleryMenuPopup && !els.galleryMenuPopup.classList.contains("hidden") &&
-        !els.galleryMenuPopup.contains(e.target as Node) &&
-        !els.galleryMenuBtn.contains(e.target as Node)) {
-      els.galleryMenuPopup.classList.add("hidden");
-    }
-    if (els.galleryTrashMenuPopup && !els.galleryTrashMenuPopup.classList.contains("hidden") &&
-        !els.galleryTrashMenuPopup.contains(e.target as Node) &&
-        !els.galleryTrashMenuBtn.contains(e.target as Node)) {
-      els.galleryTrashMenuPopup.classList.add("hidden");
-    }
-  });
+  // （四个 popup 的外点关 2026-09-02 C1 归 popup-menu；这里那份删）
 
   // + 新建文件夹（云端真文件夹为准：在 OneDrive 上建真文件夹，需登录+在线）
   els.addNewFolder?.addEventListener("click", async () => {
-    els.galleryAddPopup.classList.add("hidden");
+    closePopupMenuOf(els.galleryAddPopup);
     // 文件夹模型「远端真文件夹为准」→ 库必须在线才能建（folder 库=磁盘权限已授即在线；0828 修）
     if (!galleryOnline()) {
       setStatus(t("gs.folderNeedSignin"), true);
