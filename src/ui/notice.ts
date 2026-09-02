@@ -65,10 +65,10 @@ function _ensureStack(): HTMLElement {
     _observer = new MutationObserver((muts) => {
       for (const m of muts) {
         const t = m.target as Element;
-        if (t.matches?.(".backdrop, .sync-gate-backdrop")) { _relayout(); return; }
+        if (t.matches?.(".backdrop")) { _relayout(); return; }
       }
     });
-    _observer.observe(document.body, { attributes: true, attributeFilter: ["class"], subtree: true });
+    _observer.observe(document.body, { attributes: true, attributeFilter: ["data-open"], subtree: true });
   }
   return s;
 }
@@ -76,7 +76,7 @@ let _observer: MutationObserver | null = null;
 
 /** 有模态/gate 开着 → 顶部停靠（不盖 sheet 的按钮行）；否则底部。 */
 function _modalOpen(): boolean {
-  return !!document.querySelector(".backdrop:not(.hidden), .sync-gate-backdrop:not(.hidden)");
+  return !!document.querySelector(".backdrop[data-open]");
 }
 function _relayout(): void {
   const s = _stack;

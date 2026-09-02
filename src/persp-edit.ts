@@ -12,6 +12,7 @@
 //     拖一次可以undo一次」）**：每次拖动/重置/锁切换 = 一步（PerspComponent.commitPreApplied，
 //     拖动期 desk 直写当 transient 预览、pointerup 收口），undo 逐拖回退——supersede ADR-0006
 //     「取消/ctrl-z=回快照」（快照回滚从未实现，census §7 分歧#2 裁决）。工具条 = 重置/锁/✓/✕。
+import { registerContextToolbar } from "./ui/context-toolbar.ts";   // 2026-09-02 C4
 import { desk } from "./workbench-state.ts";
 import { clampPixelCenter } from "./shape-geometry.ts";
 import { defaultVpsForMode, boxAxesForMode, boxCorners, solveBoxDrag, BOX_EDGES, ISO_AXES } from "./perspective-frame.ts";
@@ -387,6 +388,7 @@ export function enterPerspEdit(): void {
 export function initPerspEdit(ctx: AppContext): void {
   _ctx = ctx;
   _toolbar = document.getElementById("perspToolbar")!;
+  registerContextToolbar(_toolbar);   // C4：透视条登记（原 _TOP_TOOLBAR_IDS 漏了它）
   _layer = document.getElementById("perspHandles")!;
   _lockBtn = document.getElementById("perspLockBtn")!;
   _lockUse = document.getElementById("perspLockUse") as unknown as SVGUseElement;

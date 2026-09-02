@@ -49,6 +49,17 @@ else
   echo "[build] ⚠ 未装 tsc（node_modules 缺）——跳过类型检查。装一下：npm install" >&2
 fi
 
+# 0.4 可见性 lint（2026-09-02 C5）：.hidden / [hidden] 在 styles.css 只准有基类那两条（已 !important），
+#     不许再出现 `.x.hidden{display:none}` / `.x[hidden]{…}` 补丁——那是「组件 display 压过 .hidden」一族（T5）复发的信号。
+echo "[build] 可见性 lint（.hidden/[hidden] 只准基类，禁补丁）…"
+VIS_HITS=$(grep -nE '(\.[A-Za-z0-9_-]+\.hidden|\.[A-Za-z0-9_-]+\[hidden\])[^{]*\{[^}]*display' styles.css | grep -vE '^[0-9]+:\s*(/\*|\*|//)' || true)   # 注释行豁免
+if [ -n "$VIS_HITS" ]; then
+  echo "[build] ✗ styles.css 里出现 .hidden/[hidden] 补丁规则（基类已 !important，补丁 = 隐藏语义分叉）：" >&2
+  echo "$VIS_HITS" >&2
+  exit 1
+fi
+echo "[build] ✓ 可见性规则单一"
+
 # 0.5 deep-import lint（红线封口的**真**守卫）。
 #     store 引擎 = @internal/store 包（cutover 2026-08-14：src/store/ 已删，tgz 走 vendor-pkgs/）。
 #     合法入口只有两个：`@internal/store`（主门牌）和 `@internal/store/testing`（测试替身）。

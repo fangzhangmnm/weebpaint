@@ -14,6 +14,7 @@ import { PANELS, openExclusive, closeExclusive } from "./panel-state.ts";
 import { getFilter, listFilters, onFilterRegistered } from "./filters.ts";
 import { positionPopup } from "./anchored-popup.ts";
 import { openAdoptedPopup, closePopupMenuOf, isPopupOpen } from "./ui/popup-menu.ts";   // 2026-09-02 C1：调整 popup 收养
+import { registerContextToolbar } from "./ui/context-toolbar.ts";   // 2026-09-02 C4
 
 import { setTool } from "./toolbar.ts";   // 命令 = toolbar 的接口（显式 import）
 import { requireEditableLeaf } from "./editable-leaf.ts";
@@ -386,6 +387,7 @@ export function initFiltersAdjust(ctx: AppContext) {
      _suppressTransientPanels, _restoreTransientPanels } = ctx);
   // 调整面板 = 浮窗（2026-09-02 C2）：z/拖/钳制归 ui/floating-window；初始摆位仍走 positionPopup（钉右、让顶栏）。
   //   不进 transient 抑制（它本身就是 adjust-color transient 的 UI）。拖动那份原在 topbar-menu.ts，已删。
+  registerContextToolbar(document.getElementById("filterBrushToolbar"));   // C4：滤镜笔条登记
   _adjustWin = registerFloatingWindow(els.adjustPanel, {
     id: "adjust", head: els.adjustPanelHead, ignoreDragOn: (t) => !!t.closest(".float-panel-close"), fallbackSize: { w: 320, h: 300 },
   });

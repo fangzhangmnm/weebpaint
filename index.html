@@ -107,7 +107,7 @@
     <link rel="icon" href="./icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=dc721295e1a4" />
+    <link rel="stylesheet" href="./styles.css?v=f5172eb56f72" />
     <!-- zip.js UMD bundle：自挂 window.zip。必须在 module bundle 之前。
          defer（v417）：原来是 parser-blocking 的，硬刷新时 SW 被绕过 → 直奔网络 → 网络一卡整个
          文档解析就停住（浏览器标签页转圈）。defer 后它与下面的 type=module bundle 同属延迟脚本、
@@ -644,7 +644,7 @@
     </div>
 
     <!-- 新建作品 sheet：名字 + 分辨率（预设 + 自定义） -->
-    <div class="sheet hidden" id="newDocSheet" role="dialog" aria-modal="true" data-i18n-aria="nd.title">
+    <div class="sheet" id="newDocSheet" role="dialog" aria-modal="true" data-i18n-aria="nd.title">
       <h3 data-i18n="nd.title">新建作品</h3>
       <label class="brush-slider-row" style="grid-template-columns: 80px 1fr;">
         <span class="brush-slider-label" data-i18n="bs.name">名字</span>
@@ -1048,7 +1048,7 @@
 
     <!-- Sync gate（OneDrive 状态决策；详见 ai-docs/20260528-sync-design.md） -->
     <!-- 锁屏 backdrop 拦住所有 input；sheet 给 user 显式选项。 -->
-    <div class="sheet sync-gate-sheet hidden" id="syncGateSheet" role="dialog" aria-modal="true">
+    <div class="sheet sync-gate-sheet" id="syncGateSheet" role="dialog" aria-modal="true">
       <h3 id="syncGateTitle">同步状态</h3>
       <p id="syncGateMessage" class="sheet-hint"></p>
       <div id="syncGateSpinner" class="sync-gate-spinner hidden"><div class="spinner-ring"></div><span data-i18n="sg.checking">正在检查云端…</span></div>
@@ -1057,7 +1057,7 @@
     </div>
 
     <!-- 通用 in-app 对话（替代 alert / prompt / confirm；见 feedback-no-system-dialog） -->
-    <div class="sheet hidden" id="genericSheet" role="dialog" aria-modal="true">
+    <div class="sheet" id="genericSheet" role="dialog" aria-modal="true">
       <h3 id="genericSheetTitle" data-i18n="common.notice">提示</h3>
       <p id="genericSheetMessage" class="sheet-hint hidden"></p>
       <input id="genericSheetInput" type="text" class="generic-sheet-input hidden" />
@@ -1068,7 +1068,7 @@
     </div>
 
     <!-- 诊断日志窗口（diag-log-sheet.ts）：环形黑匣子 + 复制 + 清空。created 2026-08-31 by Claude Fable 5 -->
-    <div class="sheet hidden diag-log-sheet" id="diagLogSheet" role="dialog" aria-modal="true">
+    <div class="sheet diag-log-sheet" id="diagLogSheet" role="dialog" aria-modal="true">
       <h3 data-i18n="diag.title">诊断日志</h3>
       <p class="sheet-hint" id="diagLogHint"></p>
       <pre class="diag-log-pre" id="diagLogText"></pre>
@@ -1078,7 +1078,7 @@
     </div>
 
     <!-- 按颜色拆分图层 sheet（explode-layers.ts）：选 k → 预览中心色/占比 → 拆分/取消 -->
-    <div class="sheet hidden" id="explodeSheet" role="dialog" aria-modal="true" data-i18n-aria="ex.title">
+    <div class="sheet" id="explodeSheet" role="dialog" aria-modal="true" data-i18n-aria="ex.title">
       <h3 data-i18n="ex.title">按颜色拆分图层</h3>
       <p class="sheet-hint" data-i18n="ex.hint">像素按最近的中心色硬分配到多张新图层，叠加显示与原层一致</p>
       <!-- 颜色数滑杆：ramp-slider 深模块动态挂载（max 随图层余量变，每次开 sheet 重建） -->
@@ -1172,7 +1172,7 @@
     </div>
 
     <!-- v134 导入超大图片 sheet（图片 > 画布时弹）：保持原 / fit-to-canvas（默认）/ 自定义 + 锁比例 + 插值 -->
-    <div class="resample-sheet hidden" id="bigImportSheet" role="dialog" aria-modal="true">
+    <div class="resample-sheet" id="bigImportSheet" role="dialog" aria-modal="true">
       <div class="resample-head" data-i18n="ri.title">大图片导入</div>
       <div class="resample-body">
         <div class="resample-row" style="font-size:12px; color:var(--ink-soft);">
@@ -1211,7 +1211,7 @@
     </div>
 
     <!-- v110 重采样对话框 -->
-    <div class="resample-sheet hidden" id="resampleSheet" role="dialog" aria-modal="true">
+    <div class="resample-sheet" id="resampleSheet" role="dialog" aria-modal="true">
       <div class="resample-head" data-i18n="rs2.title">画布重采样</div>
       <div class="resample-body">
         <div class="resample-row">
@@ -1238,7 +1238,7 @@
     </div>
 
     <!-- 偏移接缝（环绕）对话框 —— 沿用 .resample-* 样式。dx/dy 像素，向右/下为正，环绕。 -->
-    <div class="resample-sheet hidden" id="offsetSheet" role="dialog" aria-modal="true">
+    <div class="resample-sheet" id="offsetSheet" role="dialog" aria-modal="true">
       <div class="resample-head" data-i18n="off.title">偏移接缝（环绕）</div>
       <div class="resample-body">
         <div class="resample-row">
@@ -1534,7 +1534,7 @@
 
     <!-- 静态 backdrop div ×11 已退役（2026-09-02 C3）：唯一 backdrop 由 src/ui/sheet.ts 运行时建，随最上层 sheet 的 band 走 -->
     <!-- v124 快捷键面板（从 KEYBOARD_SHORTCUTS 自动渲染） -->
-    <div class="sheet shortcuts-sheet hidden" id="shortcutsSheet" role="dialog" aria-labelledby="shortcutsTitle">
+    <div class="sheet shortcuts-sheet" id="shortcutsSheet" role="dialog" aria-labelledby="shortcutsTitle">
       <div class="sheet-head">
         <span id="shortcutsTitle" class="sheet-title" data-i18n="menu.shortcuts">快捷键</span>
         <button type="button" id="shortcutsClose" class="sheet-close" data-i18n-aria="common.close.aria" aria-label="关闭"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#x"/></svg></button>
@@ -1543,7 +1543,7 @@
     </div>
 
     <!-- 2026-09-02 内置说明书 sheet（readme-panel.ts 渲染 readme-docs.ts；快捷键 sheet 同形） -->
-    <div class="sheet shortcuts-sheet readme-sheet hidden" id="readmeSheet" role="dialog" aria-labelledby="readmeTitle">
+    <div class="sheet shortcuts-sheet readme-sheet" id="readmeSheet" role="dialog" aria-labelledby="readmeTitle">
       <div class="sheet-head">
         <span id="readmeTitle" class="sheet-title" data-i18n="readme.title">帮助</span>
         <button type="button" id="readmeClose" class="sheet-close" data-i18n-aria="common.close.aria" aria-label="关闭"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#x"/></svg></button>
@@ -1592,7 +1592,7 @@
     </div>
 
     <!-- 清空确认（只清当前图层；可撤销） -->
-    <div id="clearSheet" class="sheet hidden" role="dialog" data-i18n-aria="clr.aria">
+    <div id="clearSheet" class="sheet" role="dialog" data-i18n-aria="clr.aria">
       <h3 data-i18n="clr.title">清空当前图层？</h3>
       <p class="sheet-hint" id="clearSheetMessage" data-i18n="clr.msg">把当前图层的像素全部抹掉。可以 Ctrl+Z 撤销。</p>
       <button class="sheet-action danger" data-clear="confirm" data-i18n="clr.confirm">清空</button>
@@ -1604,6 +1604,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-402cca067010.mjs"></script>
+    <script type="module" src="./dist/weebpaint-21967f05e544.mjs"></script>
   </body>
 </html>

@@ -22,19 +22,10 @@ export function safeAreaTop(): number {
   return v;
 }
 
-// 顶部固定工具栏的最大 bottom（lasso stack / crop toolbar / filter brush toolbar 都 fixed 在顶栏下）。
-// belowToolbars 的 popup 要让到这些条以下，否则遮挡。
-const _TOP_TOOLBAR_IDS = ["lassoToolbarStack", "cropToolbar", "filterBrushToolbar"];
-export function topToolbarBottom(): number {
-  let bottom = 0;
-  for (const id of _TOP_TOOLBAR_IDS) {
-    const el = document.getElementById(id);
-    if (el && !el.classList.contains("hidden")) {
-      bottom = Math.max(bottom, el.getBoundingClientRect().bottom);
-    }
-  }
-  return bottom;
-}
+// 顶部固定工具栏的最大 bottom：2026-09-02 C4 起问登记表（ui/context-toolbar），不再手填 id 数组
+//   （原 _TOP_TOOLBAR_IDS 六条只登记三条，shape/picker/persp 漏——新增一条要记得改数组 = 下一次 T2）。
+import { contextToolbarBottom } from "./ui/context-toolbar.ts";
+export function topToolbarBottom(): number { return contextToolbarBottom(); }
 
 interface PositionOpts {
   anchor?: HTMLElement | null;  // 锚按钮（量其 bottom/left/right）；null = 不锚按钮，钉视口边

@@ -220,7 +220,6 @@ body[data-tool="fill"] .board { cursor: crosshair; }
   z-index: var(--z-toolbar);
   max-width: calc(100vw - 24px);
 }
-.lasso-toolbar-stack.hidden { display: none; }
 
 .lasso-toolbar {
   /* 内部 pill；stack 里堆两行。v124 padding 6→4 收一格 */
@@ -242,7 +241,6 @@ body[data-tool="fill"] .board { cursor: crosshair; }
   overscroll-behavior-x: contain;
 }
 .lasso-toolbar::-webkit-scrollbar { display: none; }
-.lasso-toolbar.hidden { display: none; }
 .lasso-tool-btn {
   background: transparent;
   border: none;
@@ -289,7 +287,6 @@ body[data-tool="fill"] .board { cursor: crosshair; }
 .lasso-tool-cancel { color: var(--ink); }   /* v0.5.14 user：去选不要半透明观感 */
 .lasso-tool-label { font-size: 13px; color: var(--ink); font-weight: 600; padding: 0 8px; }
 .lasso-picker, .lasso-transform-ctrl { display: flex; align-items: center; gap: 4px; }
-.lasso-picker.hidden, .lasso-transform-ctrl.hidden { display: none; }
 .lasso-section { display: flex; align-items: center; gap: 4px; }
 /* v0.5.14 工具组槽：右下角小三角=「这是组 toggle 不是指令」；紧凑图标下拉（JS 锚定槽下方） */
 .lasso-slot { position: relative; }
@@ -304,12 +301,10 @@ body[data-tool="fill"] .board { cursor: crosshair; }
 .lasso-icon-menu.lasso-icon-list { flex-direction: column; align-items: stretch; min-width: 168px; }
 .lasso-icon-menu.lasso-icon-list > button { display: flex; align-items: center; justify-content: flex-start; gap: 8px; padding: 5px 8px; font-size: 12px; }
 .lasso-icon-menu.lasso-icon-list > button svg { width: 18px; height: 18px; flex: 0 0 auto; }
-.lasso-icon-menu.hidden { display: none; }
 /* v0.5.12 魔棒配置内联（阈值滑条+扩张toggle+px）+ ⋯ 菜单禁用态 */
 .lasso-magic-ctx { display: flex; align-items: center; gap: 6px; }
 .lasso-magic-ctx input[type="range"] { width: 88px; }
 #lassoSelEditMenu button[disabled] { opacity: .38; pointer-events: none; }
-.lasso-section.hidden { display: none; }
 /* 其他工具模式下有选区：lasso 工具栏只露"取消选区"（选区只是蒙板，不给 lasso 全套） */
 #lassoSubToolBar.lasso-deselect-only > *:not(#lassoDeselectBtn) { display: none !important; }
 /* v218 没选区：选区操作行只露"变换"（点了会隐式全选），其余需选区的按钮藏起来 */
@@ -319,7 +314,6 @@ body[data-tool="fill"] .board { cursor: crosshair; }
   font-size: 12px; color: var(--ink-soft);
   padding: 0 8px;
 }
-.lasso-tool-threshold.hidden { display: none; }
 .lasso-tool-threshold input[type="range"] { width: 100px; }
 /* 魔术棒设置弹出小卡片：位于 lasso-toolbar 下方居中 */
 /* v271 (user)：弹框外观统一成「实底」——所有锚定/菜单类弹框共享这一套观感（去毛玻璃）。
@@ -345,7 +339,6 @@ body[data-tool="fill"] .board { cursor: crosshair; }
   color: var(--ink);
   min-width: 220px;
 }
-.lasso-popup.hidden { display: none; }
 .lasso-popup-row {
   display: grid;
   grid-template-columns: 32px 1fr 28px;
@@ -356,12 +349,10 @@ body[data-tool="fill"] .board { cursor: crosshair; }
 /* v0.7.3 扳手算法配置行：flex 布局走类不走 inline style——inline display 会压死 .hidden，
    行按当前算法显隐就失效（v0.7.2 两套参数同显的根因） */
 .algo-cfg-row { display: flex; align-items: center; gap: 6px; }
-.algo-cfg-row.hidden { display: none; }
 .algo-cfg-row > span:first-child { color: var(--ink-soft); }
 /* v0.7.21 容差滑条外提到 Row1（user：值要一直可见）；v0.7.22 换 ramp-slider 分段模式：
    宿主是 .brush-slider-row（grid 100px 标签列），内联场景压成 flex、空标签不占位 */
 .lasso-tol-inline { display: inline-flex; align-items: center; gap: 6px; }
-.lasso-tol-inline.hidden { display: none; }
 .lasso-tol-inline .brush-slider-row { display: flex; align-items: center; gap: 6px; }
 .lasso-tol-inline .brush-slider-label { display: none; }
 .lasso-tol-inline .ramp-slider { width: 120px; }
@@ -437,7 +428,6 @@ body[data-input-touchscreen="1"] .tool-hand-conditional { display: none; }
   width: 40px;
   box-sizing: border-box;
 }
-.left-sidebar.hidden { display: none; }
 /* gallery 模式隐藏 */
 body[data-mode="gallery"] .left-sidebar { display: none; }
 
@@ -508,7 +498,6 @@ body[data-mode="gallery"] .left-sidebar { display: none; }
   letter-spacing: 0.6px;
   margin-left: 4px;
 }
-.env-chip.hidden { display: none; }
 
 .tool {
   display: inline-flex;
@@ -604,7 +593,7 @@ input[type=range] {
   opacity: 1;
   transition: opacity 0.18s ease;
 }
-.backdrop.hidden {
+.backdrop:not([data-open]) {
   opacity: 0;
   pointer-events: none;
 }
@@ -626,7 +615,7 @@ input[type=range] {
   z-index: calc(var(--z-modal) + 1);
   transition: transform 0.22s ease, opacity 0.18s ease;
 }
-.sheet.hidden {
+.sheet:not([data-open]) {
   transform: translate(-50%, 20px);
   opacity: 0;
   pointer-events: none;
@@ -796,8 +785,11 @@ input[type=range] {
   white-space: nowrap;
 }
 
-.hidden { display: none; }
-.sheet.hidden, .backdrop.hidden { display: block; }
+/* 2026-09-02 C5 可见性唯一规则（src/ui/visibility.ts）：.hidden / [hidden] 永远赢——组件的 display:flex 曾多次压过它
+   （v419 menu-item、v0.6.54 crop-toolbar-icon、v0.10.21 menuGallery…），逐组件「hidden 时 display none」补丁 ×41 已全删，
+   build.sh lint 禁再加。动画类面（sheet/backdrop）改 data-open 状态属性，不借用 .hidden。 */
+.hidden { display: none !important; }
+[hidden] { display: none !important; }
 
 /* v217 新建文件 preset 按钮组（取代 <select>） */
 .new-doc-preset-section { display: flex; flex-direction: column; gap: 4px; }
@@ -850,7 +842,6 @@ input[type=range] {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
-.menu-panel.hidden { display: none; }
 /* 2026-09-02 popup-menu 深模块（src/ui/popup-menu.ts）：运行时挂 body 的菜单。外观复用 .menu-panel（list）/
    .lasso-icon-menu.lasso-icon-list（compact）；这里只定 z band 与几个附件。双类 specificity 压过基类的 z。 */
 .popup-menu.band-menu    { z-index: var(--z-menu); }
@@ -883,9 +874,7 @@ input[type=range] {
   cursor: pointer;
   text-align: left;
 }
-/* .menu-item 的 display:flex 会压过 hidden 属性的 UA display:none —— 带 hidden 的菜单项
-   （menuRevertToOpen / menuCheckUpdate）其实一直显示着。既存 bug，v419 加前缀图标时发现。 */
-.menu-item[hidden] { display: none; }
+/* （.menu-item[hidden] 补丁 2026-09-02 C5 退役：[hidden] 基类已 !important） */
 .menu-item:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
 /* v132 (user：「··· 删除会有不可用的清空，要灰」) menu item disabled = 灰 + 禁交互 */
 .menu-item:disabled { opacity: 0.35; cursor: not-allowed; }
@@ -996,7 +985,6 @@ body:not([data-gen-ai="1"]) .needs-gen-ai { display: none !important; }
 .menu-tab svg { width: 18px; height: 18px; display: block; }
 .menu-tab[aria-pressed="true"] { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .menu-page { display: flex; flex-direction: column; }
-.menu-page.hidden { display: none; }
 
 .menu-config-select {
   font: inherit; font-size: 12px; padding: 4px 6px; border-radius: 4px;
@@ -1260,8 +1248,6 @@ input[type="range"].color-ramp::-moz-range-thumb {
   color: var(--ink);
   box-sizing: border-box;
 }
-.generic-sheet-input.hidden,
-#genericSheetMessage.hidden { display: none; }
 
 /* 内联重命名输入框。**必须与 .layer-name 等高**（2026-08-28）：行高由 .layer-vis 的 24px 撑着
    （24 + row padding 3×2 + border 1×2 = 32px）。原先 `font: inherit` + padding + border 把 input
@@ -1307,7 +1293,6 @@ input[type="range"].color-ramp::-moz-range-thumb {
   border: 1px solid var(--line);
   border-radius: 6px;
 }
-.layer-row-expand.hidden { display: none; }
 .layer-slider-row {
   display: grid;
   grid-template-columns: 36px 1fr 30px;
@@ -1412,8 +1397,6 @@ input[type="range"].color-ramp::-moz-range-thumb {
   padding-top: env(safe-area-inset-top, 0);
   padding-bottom: env(safe-area-inset-bottom, 0);
 }
-.gallery-full.hidden,
-.cloud-full.hidden { display: none; }
 /* z-index 层级表已收敛到文件顶部 :root 的 --z-* band 变量（v232 surfaces 深模块）。
    图库内的 popup（加号 / 云端账号 / 图库菜单）都是 .menu-panel → menu band，天然 > overlay。 */
 
@@ -1494,7 +1477,6 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
   grid-template-rows: auto auto 1fr;
   overflow: hidden;
 }
-.brush-rack-sheet.hidden { display: none; }
 .brush-rack-head {
   display: flex; align-items: center;
   /* v124 (user：「小屏 brush rack 空间不够」) 10×12 → 6×10 */
@@ -1623,7 +1605,6 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
   overflow: hidden;
   touch-action: pan-y;        /* 全 view 允许竖向 pan，body 触摸侧边也能滚 */
 }
-.brush-settings-view.hidden { display: none; }
 .brush-settings-head {
   display: flex; align-items: center;
   padding: 12px 16px; gap: 12px;
@@ -1701,7 +1682,7 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
   display: flex; flex-direction: column;
   overflow: hidden;
 }
-.resample-sheet.hidden { display: none; }
+.resample-sheet:not([data-open]) { display: none; }
 .resample-head {
   padding: 12px 16px; font-weight: 600;
   border-bottom: 1px solid var(--line);
@@ -1749,7 +1730,6 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
   box-shadow: var(--shadow);
   display: flex; flex-direction: column;
 }
-.adjust-panel.hidden { display: none; }
 /* 排版紧凑（2026-08-19 user）：标签列 6.4em（=76px@12px；em 随字号缩放，user 拍板）。
    宽度地板 = コントラスト / ボケ ⟷ 鮮鋭 / 模糊 ⟷ 锐化 三条 72px（playwright 实测），
    其余标签已按语言缩写（cb 三轴 en/ja=CMY/RGB 单字母，v0.9.10）；长说明走 section title 整行。
@@ -1828,7 +1808,6 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
   background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 3px;
   white-space: nowrap; pointer-events: none;
 }
-.crop-overlay.hidden { display: none; }
 .crop-rect {
   position: absolute;
   border: 2px dashed #fff;
@@ -1890,7 +1869,6 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
   box-shadow: var(--shadow);
   font-size: 13px;
 }
-.crop-toolbar.hidden { display: none; }
 .crop-toolbar-label { color: var(--ink-soft); }
 .crop-toolbar-sep { color: var(--line); }
 .crop-toolbar-btn {
@@ -1916,7 +1894,6 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
   padding-bottom: 56px;
   transition: opacity 0.15s ease-out;
 }
-.picker-pin.hidden { display: none; }
 .picker-pin-head {
   width: 36px; height: 36px; border-radius: 50%;
   background: var(--head-color, #fff);
@@ -1959,7 +1936,6 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
   gap: 4px;
   pointer-events: none;
 }
-.size-popup.hidden { display: none; }
 .size-popup-circle-frame {
   width: 64px; height: 64px;
   display: flex; align-items: center; justify-content: center;
@@ -1991,7 +1967,6 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
   z-index: var(--z-window);
   display: flex; flex-direction: column;
 }
-.palette-window.hidden { display: none; }
 .palette-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 6px 10px;
@@ -2038,7 +2013,6 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
   display: flex; align-items: center; gap: 10px;
   padding: 12px 0; color: var(--ink-soft); font-size: 12px;
 }
-.sync-gate-spinner.hidden { display: none; }
 .spinner-ring {
   width: 18px; height: 18px;
   border: 2px solid color-mix(in srgb, var(--ink) 18%, transparent);
@@ -2053,7 +2027,6 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
   color: var(--ink-soft);
   opacity: 0.85;
 }
-.sync-gate-note.hidden { display: none; }
 .sync-gate-actions {
   display: flex; flex-direction: column;
   gap: 8px; margin-top: 8px;
@@ -2224,7 +2197,6 @@ body[data-mode="gallery"] .board { display: none !important; }
   display: flex; flex-direction: column;
   overflow: hidden;
 }
-.gallery-tile-menu-popup.hidden { display: none; }
 /* #14：卡片贴屏幕下缘时菜单向上翻（JS 量 bbox 超视口底 → 加 .up），底部行不再伸出屏外 */
 .gallery-tile-menu-popup.up { top: auto; bottom: 34px; }
 .gallery-tile-menu-popup button {
@@ -2328,7 +2300,6 @@ body[data-mode="gallery"] .board { display: none !important; }
   font-size: 13px;
   color: var(--ink-soft);
 }
-.gallery-breadcrumb.hidden { display: none; }
 .gallery-breadcrumb button {
   background: transparent;
   border: none;
@@ -2385,7 +2356,6 @@ body[data-mode="gallery"] .board { display: none !important; }
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, #c0392b 4%, var(--bg-soft));
 }
-.gallery-trash-bar.hidden { display: none; }
 .gallery-back-btn {
   background: transparent; border: 1px solid var(--line);
   color: var(--ink); padding: 4px 10px;
@@ -2417,7 +2387,6 @@ body[data-mode="gallery"] .board { display: none !important; }
   display: flex; flex-direction: column;
   overflow: hidden;
 }
-.gallery-trash-menu-popup.hidden { display: none; }
 .gallery-trash-menu-item {
   padding: 10px 14px;
   text-align: left;
@@ -2444,7 +2413,6 @@ body[data-mode="gallery"] .board { display: none !important; }
   z-index: var(--z-busy);
   color: white;
 }
-.fullscreen-busy.hidden { display: none; }
 .fullscreen-busy-spinner {
   width: 48px; height: 48px;
   border: 4px solid rgba(255,255,255,0.2);
@@ -2459,7 +2427,6 @@ body[data-mode="gallery"] .board { display: none !important; }
   font-size: 14px;
   text-align: center;
 }
-.gallery-empty.hidden { display: none; }
 
 /* 浮动可拖面板（color picker / 未来的 layers / brush params 等都走这套） */
 .float-panel {
@@ -2477,7 +2444,6 @@ body[data-mode="gallery"] .board { display: none !important; }
   box-shadow: var(--shadow);
   z-index: var(--z-window);
 }
-.float-panel.hidden { display: none; }
 .float-panel-head {
   display: flex;
   align-items: center;
@@ -2571,7 +2537,6 @@ body[data-mode="gallery"] .board { display: none !important; }
 
 /* ⋯ 弹层（复用 .menu-config-popup 外观；远程配对的更宽以容下文本框） */
 .btp-popup { min-width: 168px; }
-.btp-popup.hidden { display: none; }
 .close-x {
   background: transparent;
   border: none;
@@ -2649,7 +2614,6 @@ body[data-mode="gallery"] .board { display: none !important; }
   z-index: var(--z-toast);
   font-size: 13px;
 }
-.toast.hidden { display: none; }
 .toast button {
   background: transparent;
   border: 1px solid color-mix(in srgb, var(--bg) 40%, transparent);
@@ -2700,7 +2664,6 @@ body[data-mode="gallery"] .board { display: none !important; }
   pointer-events: none;
   z-index: calc(var(--z-toolbar) - 1);   /* 同 crop overlay：在画布上、toolbar/弹窗下 */
 }
-.persp-handles.hidden { display: none; }
 .persp-handle {
   position: absolute;
   width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px;
@@ -2751,7 +2714,6 @@ body[data-mode="gallery"] .board { display: none !important; }
   display: inline-flex; align-items: center; justify-content: center;
 }
 /* 本规则与全局 .hidden 同特异性且靠后 → 必须显式补回（否则 fit 钮在自由模式漏显，v0.6.54 修） */
-.crop-toolbar-icon.hidden { display: none; }
 .crop-toolbar-icon svg { width: 20px; height: 20px; }
 
 /* ── timelapse（宣发轮 2026-08-19，spec=ai-docs/20260819-timelapse-spec.md） ── */
@@ -2764,7 +2726,6 @@ body[data-mode="gallery"] .board { display: none !important; }
   background: transparent; color: var(--ink-soft);
   font-size: 11px; line-height: 1.6; cursor: pointer;
 }
-.tl-rec-chip.hidden { display: none; }
 .tl-rec-dot {
   width: 8px; height: 8px; border-radius: 50%;
   background: #e5484d;
@@ -2805,7 +2766,6 @@ body[data-mode="gallery"] .board { display: none !important; }
   background: rgba(0, 0, 0, 0.88);
   display: flex; align-items: center; justify-content: center;
 }
-.tl-preview-overlay.hidden { display: none; }
 .tl-preview-video {
   max-width: min(96vw, 100%); max-height: 92vh;
   background: #000; border-radius: 6px;

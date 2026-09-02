@@ -12,11 +12,11 @@ describe("sheet · 单 backdrop + 栈", () => {
     _resetLocksForTest(); closeAllSheets();
     const s = $("shortcutsSheet");
     openSheet(s);
-    assert(backdrop() && !backdrop().classList.contains("hidden"), "backdrop 可见");
-    assert(!s.classList.contains("hidden") && isSheetOpen(s));
+    assert(backdrop() && backdrop().hasAttribute("data-open"), "backdrop 可见");
+    assert(s.hasAttribute("data-open") && isSheetOpen(s));
     eq(backdrop().style.zIndex, "500"); eq(s.style.zIndex, "501");
     closeSheet(s);
-    assert(backdrop().classList.contains("hidden") && !anySheetOpen() && s.classList.contains("hidden"));
+    assert(!backdrop().hasAttribute("data-open") && !anySheetOpen() && !s.hasAttribute("data-open"));
   });
   it("叠：gate 压在普通 sheet 上——backdrop 升到 gate band 并戴 sync-gate-backdrop；关 gate 后回 modal", () => {
     closeAllSheets();

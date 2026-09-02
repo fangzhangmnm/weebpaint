@@ -10,6 +10,7 @@
 // 守卫（无选区/尺寸非法/没变化）留调用方。crop/resample 是 EditMode transient（enter/apply/cancel 走 editMode）。
 
 import { openSheet, closeSheet } from "./ui/sheet.ts";   // 2026-09-02 C3
+import { registerContextToolbar } from "./ui/context-toolbar.ts";   // 2026-09-02 C4
 import { els } from "./els.ts";
 import { bumpDoc } from "./signals.ts";
 import { t } from "./i18n/index.ts";
@@ -249,6 +250,7 @@ function _closeOffsetDialog() {
 export function initDocOps(ctx: AppContext) {
   ({ editMode, doc, board, history, setStatus, wp2,
      _suppressTransientPanels, _restoreTransientPanels } = ctx);
+  registerContextToolbar(document.getElementById("cropToolbar"));   // C4：裁切条登记（popup 让位高度）
 
   // 裁到选区 ----
   document.getElementById("adjustCropToSelection")!.addEventListener("click", () => {

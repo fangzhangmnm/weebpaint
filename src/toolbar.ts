@@ -19,7 +19,8 @@ import { desk } from "./workbench-state.ts";   // pickMode → desk.colorPicker.
 import { fillResampleSelect } from "./frontend/resample-modes.ts";
 import { t, tLatin } from "./i18n/index.ts";
 import { fillPreviewActive, commitFillNow, sendSelectionToFill } from "./fill-mode.ts";
-import { openAdoptedPopup, toggleAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";   // 2026-09-02 C1：组槽/配置菜单收养（外点关/Escape/栈/定位归 module）
+import { openAdoptedPopup, toggleAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";
+import { registerContextToolbar } from "./ui/context-toolbar.ts";   // 2026-09-02 C4：顶栏条登记（让位高度由登记表算）   // 2026-09-02 C1：组槽/配置菜单收养（外点关/Escape/栈/定位归 module）
 import { configFromModeState, planesForMode, defaultVpsForMode } from "./perspective-frame.ts";
 import type { PerspMode } from "./perspective-frame.ts";
 import type { AppContext } from "./app-context.ts";
@@ -651,6 +652,7 @@ export function initToolbar(ctx: AppContext) {
   // ---- 套索/选区工具栏 DOM ----
   // 两行 toolbar stack（v93）：row1 = 选区方式，row2 = 操作 / 变换
   lassoToolbarStack = byId("lassoToolbarStack");
+  registerContextToolbar(lassoToolbarStack);
   lassoToolbarRow1 = byId("lassoToolbarRow1");
   lassoToolbarRow2 = byId("lassoToolbarRow2");
   lassoSubToolBar = byId("lassoSubToolBar");
@@ -755,6 +757,7 @@ export function initToolbar(ctx: AppContext) {
   //   desk + 灌引擎；换文档 wp:applyEditorState 回灌（对齐魔棒阈值样板）。
   //   画一半切子工具/约束 = cancel 不进 undo（user 拍板，同两指手势接管语义）。
   shapeToolbarStack = byId("shapeToolbarStack");
+  registerContextToolbar(shapeToolbarStack);
   shapeSubBtns = [...byId("shapeSubCtl").querySelectorAll<HTMLElement>("[data-shape-sub]")];
   shapeSubLineUse = byId("shapeSubLineUse") as unknown as SVGUseElement;
   shapeSubRectUse = byId("shapeSubRectUse") as unknown as SVGUseElement;
@@ -1156,6 +1159,7 @@ export function initToolbar(ctx: AppContext) {
   //   持久化 = desk.colorPicker.layerMode（per-doc desk，进 .weebpaint/editor-state.json）——**不是 LS**，
   //   v406 起设备级 webpaint.pickMode 已删。input._doPick 经 getPickMode 读（走 bindEditorReactive 的桥）。
   pickerToolbar = document.getElementById("pickerToolbar");
+  registerContextToolbar(pickerToolbar);
   pickModeSel = document.getElementById("pickModeSel") as HTMLSelectElement | null;
   if (pickModeSel) {
     const psel = pickModeSel;

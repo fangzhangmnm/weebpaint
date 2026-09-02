@@ -12,7 +12,8 @@
 //   · **Escape** 关最上层（可 dismiss 时）；消费者给 onDismiss 则把「取消」语义交给它（confirm 的 resolve(null) 之类）。
 //   · **交互锁**：开模态 = intent "dialog"——busy 期 = 自相矛盾 → 响亮 throw（沿 sheets.ts 老护栏，现在所有 sheet 都过这道）；
 //     gate 传 allowDuringBusy（它就是要穿透 busy 的决策面）。
-//   · 通知栈让位（ui/notice）靠观察 backdrop 的 class，无需本模块记得调。
+//   · 通知栈让位（ui/notice）靠观察 backdrop 的 data-open，无需本模块记得调。
+//   · 显隐 = data-open 状态属性（2026-09-02 C5：.hidden 已 !important，动画面不借用它）。
 
 import { assertAllows } from "./interaction-lock.ts";
 
@@ -41,7 +42,7 @@ function _ensureBackdrop(): HTMLElement {
   if (_backdrop && _backdrop.isConnected) return _backdrop;
   const b = document.createElement("div");
   b.id = "sheetBackdrop";
-  b.className = "backdrop hidden";
+  b.className = "backdrop";   // 关态 = 无 data-open（CSS :not([data-open]) 淡出）；不借用 .hidden
   b.addEventListener("click", () => _dismissTop());
   (document.body || document.documentElement).appendChild(b);
   _backdrop = b;
@@ -64,10 +65,10 @@ function _dismissTop() {
 }
 function _relayout() {
   const b = _ensureBackdrop();
-  if (!_stack.length) { b.classList.add("hidden"); b.classList.remove("sync-gate-backdrop"); b.style.zIndex = ""; return; }
+  if (!_stack.length) { b.removeAttribute("data-open"); b.classList.remove("sync-gate-backdrop"); b.style.zIndex = ""; return; }
   const top = _stack[_stack.length - 1];
   const band = top.opts.band ?? "modal";
-  b.classList.remove("hidden");
+  b.setAttribute("data-open", "1");
   b.classList.toggle("sync-gate-backdrop", band === "gate");
   b.style.zIndex = String(_zBase(band));
   _stack.forEach((en, i) => { en.el.style.zIndex = String(_zBase(en.opts.band ?? "modal") + 1 + i); });
@@ -86,7 +87,7 @@ export function openSheet(el: HTMLElement, opts: SheetOpts = {}): SheetHandle {
       open = false;
       const i = _stack.findIndex((e) => e.el === el);
       if (i >= 0) _stack.splice(i, 1);
-      el.classList.add("hidden");
+      el.removeAttribute("data-open");
       el.style.zIndex = "";
       const ae = document.activeElement as HTMLElement | null;
       if (ae && el.contains(ae)) ae.blur?.();   // 关 sheet 收键盘（iOS 两课）
@@ -95,7 +96,7 @@ export function openSheet(el: HTMLElement, opts: SheetOpts = {}): SheetHandle {
     },
   };
   _stack.push({ el, opts, handle });
-  el.classList.remove("hidden");
+  el.setAttribute("data-open", "1");
   _relayout();
   if (opts.focus) { const f = opts.focus; setTimeout(() => { f.focus?.(); (f as HTMLInputElement).select?.(); }, 0); }
   return handle;
