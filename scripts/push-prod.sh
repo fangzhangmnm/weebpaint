@@ -12,6 +12,8 @@
 #   （GH release + itch 上传）。用在改动只影响线上站点、单文件版拿不到任何好处的场合——典型 =
 #   SEO / og 卡片元数据（og 标签在 file:// 打开的单文件版里是死的，永远不会被 unfurl）。
 #   代价可接受：itch 与 GH release 停在**旧版本号**上，只是「旧」，不会出现同号异物。
+# release notes（2026-09-02 立）：本版手写稿放 `release-notes/<vX.Y.Z>.md`，GH release 自动取用；
+#   没有该文件则退回通用一句。写它 = 给这一版的用户讲人话，不是 changelog 转录。
 #   edited by Claude Opus 5 (claude-opus-5[1m]) 2026-08-30。
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -44,12 +46,22 @@ if [ "$SITE_ONLY" = "1" ]; then
 fi
 # GH release：单文件版自动挂 release（与 itch zip 同一份构建，GH 放裸 html）。
 # release 失败只警告不炸 ritual——prod 此刻已经推完，别让收尾步骤谎报整场失败。
+# release notes：优先用本版手写稿 release-notes/<vX.Y.Z>.md（版本号即身份，故不带日期前缀；
+#   family doc 命名约定的 ADR 同款例外）。没有就退回一句通用说明——不编造本版改了什么。
+#   edited by Claude Opus 5 (claude-opus-5[1m]) 2026-09-02。
+NOTES_FILE="release-notes/$VER.md"
+if [ -f "$NOTES_FILE" ]; then
+  RELEASE_NOTES_ARG=(--notes-file "$NOTES_FILE")
+  echo "[push-prod] release notes ← $NOTES_FILE"
+else
+  RELEASE_NOTES_ARG=(--notes "Single-file offline build. Download the .html and open it in a browser. Same build as the itch.io upload.")
+  echo "[push-prod] ⚠ 没有 $NOTES_FILE——release notes 用通用文案"
+fi
 if command -v gh >/dev/null 2>&1; then
   if gh release view "$VER" >/dev/null 2>&1; then
     echo "[push-prod] ⚠ GH release $VER 已存在，跳过（重传资产：gh release upload $VER \"dist/weebpaint-standalone-$VER.html\" --clobber）"
   elif gh release create "$VER" --target prod "dist/weebpaint-standalone-$VER.html" \
-        --title "$VER" \
-        --notes "Single-file offline build. Download the .html and open it in a browser. Same build as the itch.io upload."; then
+        --title "$VER" "${RELEASE_NOTES_ARG[@]}"; then
     echo "[push-prod] ✓ GH release $VER 已挂 standalone"
   else
     echo "[push-prod] ⚠ GH release 创建失败——手动补：gh release create $VER --target prod \"dist/weebpaint-standalone-$VER.html\" --title $VER"
