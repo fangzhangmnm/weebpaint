@@ -5,6 +5,9 @@
 //   - install：fetch index.html → 抠出当前 bundle 文件名 → precache 入口 + bundle + statics
 //   - cache name = "weebpaint-<bundleHash>"。新 bundle = 新 cache name；activate 时清老的。
 //   - fetch：cache-first + 后台 revalidate；ETag 变了通知 page。
+//   - SW 空闲 ~30s 被浏览器杀掉再重启时顶层重跑，CACHE_NAME 会回落 "weebpaint-boot"（install 只在 SW 字节变了才重跑）
+//     → fetch 全开空 cache、预缓存成孤儿、离线开得开靠运气。fetch 侧一律经 currentCacheName() 从 caches.keys() 找回
+//     （审计 L4，家族级坑；同 WebXiaoHeiWu v0.1.7 修法）。edited by Claude Fable 5.1 2026-09-04
 //
 // 跟 sibling family 抄：基本可以 1:1 拷，改 STATIC_PRECACHE 列表就行。
 // 论证见 ai-docs/20260529-why-content-hash-bundle.md。
@@ -27,13 +30,30 @@ const STATIC_PRECACHE = [
   // msal / 其它惰性加载的库 SW 不预缓存。用到才下，那时候 fetch 会自动 cache。
 ];
 
-let CACHE_NAME = "weebpaint-boot";   // install 时会被替换为 weebpaint-<bundleHash>
+let CACHE_NAME = "weebpaint-boot";   // install 时会被替换为 weebpaint-<bundleHash>；重启后由 currentCacheName() 找回
 
 // 同一个 SW 文件部署到 /(prod) 和 /dev/ 两处；按**自己的作用域**选策略（owner: docs + src/pwa-shell.ts）：
 //   - prod(scope=/)      → cache-first：秒开 + 离线稳，更新靠 asset-updated toast。
 //   - dev(scope 含 /dev/) → network-first：在线永远先抓网（「改完即见」/强制更新不变），离线才回退缓存
 //     （崩溃后能离线重开——修「/dev/ 按设计无 SW → 闪退离线打不开」的坑，见 ai-docs/20260630-pwa-offline-dev-sw.md）。
 const SCOPE_IS_DEV = self.location.pathname.includes("/dev/");
+// SW 脚本所在目录 = 本 app 的路径前缀。同源但 scope 外的请求（家族模型包主机 /pwa-models/ 与本站同源 fangzhangmnm.github.io）
+// 一律不接管、不复制进壳缓存（审计 L5，同 WebXiaoHeiWu）。
+const SCOPE_PATH = self.location.pathname.replace(/[^/]*$/, "");
+
+// 审计 L4：SW 重启后 CACHE_NAME 回落 boot 值。activate 已把老 cache 清光，所以 caches.keys() 里唯一的
+// weebpaint-<hash> 就是当前那份；找回并回写 CACHE_NAME。并发的 fetch 共享同一次解析（cacheNameResolved）。
+// 只认 weebpaint-（activate 同时清 0.10.0 之前的 webpaint- 旧前缀，重启时不可能还留着它）。
+let cacheNameResolved = null;
+async function currentCacheName() {
+  if (CACHE_NAME !== "weebpaint-boot") return CACHE_NAME;
+  if (!cacheNameResolved) cacheNameResolved = (async () => {
+    const keys = (await caches.keys()).filter((k) => k.startsWith("weebpaint-") && k !== "weebpaint-boot");
+    if (keys.length) CACHE_NAME = keys[keys.length - 1];
+    return CACHE_NAME;
+  })().finally(() => { cacheNameResolved = null; });
+  return cacheNameResolved;
+}
 
 async function getCurrentBundleUrl() {
   const res = await fetch("./index.html", { cache: "no-store" });
@@ -91,6 +111,7 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  if (!url.pathname.startsWith(SCOPE_PATH)) return;   // 同源但 scope 外（/pwa-models/ 等）：不接管
   // prod 根 SW(scope=/)不碰 /dev/——留给 /dev/ 作用域的 dev SW 自己处理（dev SW 的 scope 已限在 /dev/，故只 prod 需此跳）。
   if (!SCOPE_IS_DEV && url.pathname.includes("/dev/")) return;
   event.respondWith(SCOPE_IS_DEV ? networkFirst(req) : cacheFirst(req));
@@ -98,7 +119,7 @@ self.addEventListener("fetch", (event) => {
 
 // prod：cache-first + 后台 revalidate（ETag/长度变 → 通知 page 弹更新 toast）。
 async function cacheFirst(req) {
-  const cache = await caches.open(CACHE_NAME);
+  const cache = await caches.open(await currentCacheName());
   const cached = await cache.match(req, { ignoreSearch: true });
   const networkPromise = fetch(req).then((resp) => {
     if (resp && resp.ok) {
@@ -138,7 +159,7 @@ async function cacheFirst(req) {
 const NETWORK_FIRST_TIMEOUT_MS = self.__NETWORK_FIRST_TIMEOUT_MS ?? 60000;
 
 async function networkFirst(req) {
-  const cache = await caches.open(CACHE_NAME);
+  const cache = await caches.open(await currentCacheName());
   try {
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), NETWORK_FIRST_TIMEOUT_MS);
