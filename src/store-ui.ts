@@ -4,6 +4,7 @@
 //   ③ 错误 surface——塌进这一个模块。app 只在 app-store 装配时把它传进 createStore。
 import type { StoreUI, StoreTextKey, StoreTextParams } from "@internal/store";
 import { withBusy } from "./fullscreen-busy.ts";
+import { showNotice, type NoticeHandle } from "./ui/notice.ts";
 import { lockSyncGate, settleSyncGate } from "./sheets.ts";
 import { t, type Key } from "./i18n/index.ts";
 import { stripSessionExt } from "./config.ts";
@@ -28,9 +29,30 @@ const STORE_TEXT_KEYS: Record<StoreTextKey, Key> = {
   "folder.deleting": "st.folderDeleting",
 };
 
+// busy 按 key 路由（store 0.11.4 第三参数；审计 L1 家族级，同 WebXiaoHeiWu QUIET_KEYS；edited by Claude Fable 5.1 2026-09-04）：
+//   · sync.pushing（保存的自动/显式推云）与 file.renaming（tryMove）是后台节律——**不上全屏遮罩**（遮罩吃输入，推云那几秒
+//     不能画 = 不可接受）。但「有事在飞」仍必须可见：走 2026-09-02 UI 纪元的 notice 栈（非模态、不抢输入、同 id 原地更新、
+//     完成即收——不像状态行那样没有「收回」语义、会把「正在同步…」永久留在那）。显式保存时顶栏徽章的 saving 态
+//     （save-status.ts ICON_CLOUD_SAVING，判据 session.saving）照旧并行呈现。
+//   · 其余 key（加解密 / 回收站 / 建删夹 / 拉取）= 用户动作，遮罩合理，仍走 withBusy（可重入 ref-count）。
+//   · 老宿主忽略第三参数照常；这里 key 缺席（库更老/未知路径）= 保守走遮罩。
+const QUIET_KEYS = new Set<StoreTextKey>(["sync.pushing", "file.renaming"]);
+let _quietDepth = 0;
+let _quietNotice: NoticeHandle | null = null;
+async function quietBusy<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  _quietDepth++;
+  if (_quietNotice?.isOpen()) _quietNotice.setText(label);   // 并发/嵌套的后台操作共用一条，显最新文案
+  else _quietNotice = showNotice({ id: "store-quiet-busy", level: "info", text: label, dismissible: false, tapToDismiss: false });
+  try { return await fn(); }
+  finally {
+    _quietDepth--;
+    if (_quietDepth <= 0) { _quietDepth = 0; _quietNotice?.close(); _quietNotice = null; }
+  }
+}
+
 export const storeUI: StoreUI = {
-  // 用户态写流强制锁屏（可重入 ref-count）。深模块内部 push/rename/del/加密都包这个。
-  busy: withBusy,
+  // 用户态写流：按 key 路由——后台节律走 notice（不遮罩），用户动作走全屏遮罩（可重入 ref-count）。
+  busy: (label, fn, key) => (key && QUIET_KEYS.has(key) ? quietBusy(label, fn) : withBusy(label, fn)),
 
   // busy 文案翻译注入（库 0.3.0 出库的 14 处硬编码中文 → 宿主 i18n SSoT）。未知 key（库新加、
   //   本表还没跟上——理论上被上面的穷举 Record 编译期挡死）返回 undefined = 落回库内英文缺省。
