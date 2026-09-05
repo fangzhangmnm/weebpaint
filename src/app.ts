@@ -61,6 +61,7 @@ import { updateSaveStatus, updateNewerBanner } from "./save-status.ts";
 import { initErrorBadge, reportError } from "./error-badge.ts";
 import { initDiagLog, note as diagNote } from "./diag-log.ts";   // 黑匣子（2026-08-31）
 import { initDiagLogSheet } from "./diag-log-sheet.ts";           // dev 页「诊断日志」窗口
+import { holdUntilSettled } from "./common/settle-hold.ts";         // 2026-09-05：更新通知/reload 等 auth boot 落地
 import { initTransientPanels, _suppressTransientPanels, _restoreTransientPanels, _bringPanelTop, _commitTransform, _cancelTransform } from "./transient-panels.ts";
 import { initImportImage, importImageAsLayer } from "./import-image.ts";   // importImageAsNewDoc/setAddImportAsNewDoc 仅 gallery-shell/export-menu 用
 import { initExportImportMenu, exportBaseName } from "./export-import-menu.ts";
@@ -484,8 +485,10 @@ updateZoomLabel();
 updateSaveStatus();
 updateCloudAuthUI();
 // MSAL init（懒；只在配了 CLIENT_ID 才 load script），失败安静吞
+// 2026-09-05：boot 期 auth 初始化 promise 单份持有——PWA 外壳的更新通知 / reload 要等它落地（见下方 PwaShell 接线）。
+const authBootP: Promise<unknown> = isAuthConfigured() ? initAuth() : Promise.resolve();
 if (isAuthConfigured()) {
-  initAuth().then(() => {
+  authBootP.then(() => {
     updateCloudAuthUI();
     _seedGalleryRegistry();                                   // P3 播种（幂等）：既有登录态 → legacy OneDrive 名册条目
     // gallery-first: boot 时 gallery 可能已经渲染过（auth 没好 → 只有本地）；
@@ -612,15 +615,28 @@ els.board.addEventListener("pointerdown", () => {
 
 
 // ---- PWA 外壳：service-worker 注册 + 更新 toast + dev chip（src/pwa-shell.ts）----
+// 2026-09-05（user iPad 报「reconnect 与 update 同时弹，点了 reconnect 刷新后一直斜杠云」）：更新通知与 reload
+//   都等 boot 期 auth 初始化落地（成功/失败都算；8s 封顶防 hang）。危险窗口 = MSAL redirect 回程
+//   handleRedirectPromise 正用 URL 里的 code 换 token，此时 reload 会把 code 丢掉 → 回来只剩「有缓存账号
+//   但没登上」的假离线。根因待 iPad 诊断日志确认；这条是对该窗口的护栏，合规时序下零行为变化（等待≈0）。
+const AUTH_BOOT_HOLD_MS = 8000;
+const authBootSettled = () => holdUntilSettled(authBootP, AUTH_BOOT_HOLD_MS);
 new PwaShell({
   // 2026-09-02 C7：更新提示走通知栈（ui/notice）——与压感 toast / 错误横幅 / 离线横幅同一条栈、同一样式
-  showUpdateNotice: ({ onReload, onDismiss }) => showNotice({
-    id: "sw-update", text: t("upd.available"),
-    actions: [{ label: t("upd.reload"), primary: true, onClick: onReload }],
-    dismissLabel: t("upd.dismiss"), tapToDismiss: false, onDismiss,
-  }),
+  showUpdateNotice: ({ onReload, onDismiss }) => {
+    void authBootSettled().then((how) => {
+      diagNote("sw", `update available → notice (auth boot ${how})`);
+      showNotice({
+        id: "sw-update", text: t("upd.available"),
+        actions: [{ label: t("upd.reload"), primary: true, onClick: onReload }],
+        dismissLabel: t("upd.dismiss"), tapToDismiss: false, onDismiss,
+      });
+    });
+  },
   envChip: document.getElementById("envChip"),
   onBeforeReload: async () => {
+    const how = await authBootSettled();
+    diagNote("sw", `reload requested (auth boot ${how}) → apply+save`);
     editMode.applyPendingTransient();
     await session.save();   // saveNow 内含 blank/dirty 守卫（es.flushLocal 不脏 no-op）
   },
