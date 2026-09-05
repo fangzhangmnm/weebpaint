@@ -12,6 +12,10 @@ export declare const PREF_REGISTRY: {
         readonly scope: "device";
         readonly def: Record<string, number>;
     };
+    readonly "pressure-level": {
+        readonly scope: "device";
+        readonly def: string;
+    };
     readonly lang: {
         readonly scope: "gallery";
         readonly def: string | null;
@@ -21,6 +25,10 @@ export declare const PREF_REGISTRY: {
         readonly def: boolean;
     };
     readonly "blender-panel-url": {
+        readonly scope: "gallery";
+        readonly def: string;
+    };
+    readonly "smudge-mix": {
         readonly scope: "gallery";
         readonly def: string;
     };

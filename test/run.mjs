@@ -154,6 +154,11 @@ import "./color-cluster.test.ts";    // v0.7.9 按颜色拆分：确定性 k-mea
 import "./color-name.test.ts";       // v0.7.10 颜色命名：xkcd top-120 表完整性/四语互异 + OKLab nearest + 四语 parse。
 import "./effective-pressure.test.ts";   // 2026-09-02 压感取值纯函数：coalesced 样本无 pressure 回退派发事件（iPad 测试者无压感案）。
 import "./settle-hold.test.ts";             // 2026-09-05 更新通知/reload 等 auth boot 落地（holdUntilSettled 契约）
+import "./pressure-level.test.ts";          // 2026-09-05 压感四档（无/弱/中/强）纯函数 + 当前档
+import "./color-mix.test.ts";               // 2026-09-05 混色空间（srgb / oklab 保色度 / 颜料谱 WGM）
+import "./smudge-engine.test.mjs";          // 2026-09-05 手指/涂抹引擎（smear/dull/paint，premult，夹 doc，选区，lockAlpha）
+import "./smudge-plugin.test.mjs";          // 2026-09-05 手指插件：ResolvedBrush→设置映射 + Filter brush 契约跑一笔
+import "./color-brush-premul.test.mjs";     // 2026-09-05 滤镜笔混回图层末步预乘（模糊黑边残留回归）
 
 console.log("\n  WeebPaint —— vendored OneDriveProvider 适配验收（lib 契约在 sync-store/test/）\n");
 await run();

@@ -136,7 +136,7 @@
     <!-- ICON-SPRITE:BEGIN — 由 tools/inline-sprites.py 生成，勿手改 -->
 <svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none">
 <!--
-  140 icons extracted from the family icon library (../20260708 SVG Icons/icons.svg) by extract-icons.py — do not hand-edit; re-run the script instead.
+  141 icons extracted from the family icon library (../20260708 SVG Icons/icons.svg) by extract-icons.py — do not hand-edit; re-run the script instead.
   Family SVG Icons — MIT License, Copyright (c) 2026 fangzhangmnm.
   Contains work derived from (per-icon provenance in data-src):
     Bootstrap Icons — MIT License, Copyright (c) 2019-2024 The Bootstrap Authors · https://github.com/twbs/icons
@@ -167,6 +167,8 @@
   <symbol id="pencil" data-cat="drawing-tool" data-src="bootstrap:pencil" data-note="铅笔 Bootstrap Icons MIT" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><g transform="scale(1.5)" fill="currentColor" stroke="none"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325"/></g></symbol>
   <!-- stamp — 橡皮图章 -->
   <symbol id="stamp" data-cat="drawing-tool" data-src="own" data-note="橡皮图章" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5.2 21 h13.6"/><path d="M4.9 18 Q4.5 18 4.5 17.4 L4.5 14.9 Q4.5 13.7 5.7 13.7 L9.8 13.7 L10.5 9.4 A3.8 3.8 0 1 1 13.5 9.4 L14.2 13.7 L18.3 13.7 Q19.5 13.7 19.5 14.9 L19.5 17.4 Q19.5 18 19.1 18 Z"/></symbol>
+  <!-- pen-pressure — 笔压启用·案D:库内 pencil(Bootstrap 实心, 尖本就朝左下)缩到 0.60 置右上 + 笔尖 (9.4,14.6) 处两道同心波纹环(r4.8/7.6, 缺口 100° 让给笔身); 20260728 候选 4 号入库(甲方参考图思路) -->
+  <symbol id="pen-pressure" data-cat="drawing-tool" data-src="bootstrap:pencil" data-note="笔压启用·案D:库内 pencil(Bootstrap 实心, 尖本就朝左下)缩到 0.60 置右上 + 笔尖 (9.4,14.6) 处两道同心波纹环(r4.8/7.6, 缺口 100° 让给笔身); 20260728 候选 4 号入库(甲方参考图思路)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(8.95 0.65) scale(0.6)"><g transform="scale(1.5)" fill="currentColor" stroke="none"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325"/></g></g><g stroke-width="1.4"><path d="M8.98 9.82 A4.8 4.8 0 1 0 14.18 15.02"/><path d="M8.74 7.03 A7.6 7.6 0 1 0 16.97 15.26"/></g></symbol>
   <!-- tool -->
   <!-- hand — 手/抓取:食指左线裁到与拇指指尖弧交点 y=11.44,不再穿出 -->
   <symbol id="hand" data-cat="tool" data-src="lucide:hand" data-note="手/抓取:食指左线裁到与拇指指尖弧交点 y=11.44,不再穿出" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V6a2 2 0 0 0-4 0v5.44"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-1-5.6-2.8l-3.4-5.4a2 2 0 0 1 3.4-2L8 14"/></symbol>
@@ -477,7 +479,10 @@
         <button class="tool" id="toolShape" type="button" data-tool="shapeBrush" data-i18n-title="tool.shapeBrush">
           <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#shapes"/></svg>
         </button>
-        <!-- v309: smudge 工具（一直 disabled、从未实装）已 purge，待将来重写时连按钮一起加回 -->
+        <!-- 2026-09-05 手指（smudge）回归：payload 进 filterBrush 模式（toolbar setTool("smudge") → filters-adjust）；图标 = 图标库 finger -->
+        <button class="tool" id="toolSmudge" type="button" data-tool="smudge" data-i18n-title="tool.smudge">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#finger"/></svg>
+        </button>
         <button class="tool" id="toolEraser" type="button" data-tool="eraser" data-i18n-title="tool.eraser">
           <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#eraser"/></svg>
         </button>
@@ -1460,6 +1465,12 @@
         <svg class="menu-scope-badge" viewBox="0 0 24 24" aria-hidden="true" data-i18n-title="menu.scopeDeviceTip"><use href="#device"/></svg>
         <span class="menu-item-state" data-state-for="singleFingerDraw">关</span>
       </button>
+        <!-- 2026-09-05 压感强度四档（无/弱/中/强）：device 层，跟板子/跟人；下拉形制同主题行（settings-menu.ts wireInlineSelect） -->
+        <label class="menu-item menu-lang-row menu-item-with-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#pen-pressure"/></svg>
+          <span class="menu-item-label" data-i18n="menu.pressureLevel">压感强度</span>
+          <button class="menu-lang-select menu-inline-select" id="menuPressureBtn" type="button" aria-haspopup="true"><span id="menuPressureBtnLabel" data-i18n="pressure.mid">中</span><svg class="menu-inline-caret" viewBox="0 0 8 8" aria-hidden="true"><path d="M1.4 2.8 L4 5.6 L6.6 2.8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <svg class="menu-scope-badge" viewBox="0 0 24 24" aria-hidden="true" data-i18n-title="menu.scopeDeviceTip"><use href="#device"/></svg>
+        </label>
         <!-- P3 sunset（§9.8）：cloud-enabled toggle 退役——「关云」的真身 = 没挂图库；动词（连接/卸下）
              住 gallery 页管理面。此处只留只读当前库行（Q1 拍板：设置页不管库的生死）。 -->
         <label class="menu-item menu-lang-row menu-item-with-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#globe-speech"/></svg>

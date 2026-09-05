@@ -1,6 +1,6 @@
 # 本 app 的图标
 
-139 icons · 提取自家族图标库 `../20260708 SVG Icons/icons.svg` · 由 `extract-icons.py` 生成，别手改。
+141 icons · 提取自家族图标库 `../20260708 SVG Icons/icons.svg` · 由 `extract-icons.py` 生成，别手改。
 
 用法：把 sprite 整段内联到 `<body>` 顶部，然后按 id 引用；
 ⚠ sprite 根自带的隐藏样式（1×1 + `opacity:0`）别换成 `display:none`——
@@ -28,6 +28,7 @@
 | `paint-bucket` | 线描桶+实心水滴 (定稿:把手弧高≈4.9=原 -3) |
 | `pencil` | 铅笔 Bootstrap Icons MIT |
 | `stamp` | 橡皮图章 |
+| `pen-pressure` | 笔压启用·案D:库内 pencil(Bootstrap 实心, 尖本就朝左下)缩到 0.60 置右上 + 笔尖 (9.4,14.6) 处两道同心波纹环(r4.8/7.6, 缺口 100° 让给笔身); 20260728 候选 4 号入库(甲方参考图思路) |
 
 ## tool
 
@@ -131,6 +132,7 @@
 | `copy-picture` | 合并复制(WebPaint v0.9.22 Ctrl+Shift+C / 双击 Ctrl+C, 合成图∩选区→剪贴板): copy 双文档**原版坐标不动** + 太阳山画片(image 母题同比例 18:14, 内部细节 1.35)压在左下遮挡, 画框处 mask 挖 3.2 白边。⚠原登记名 copy-merged, 甲方 20260821 定名 copy-picture; 与 copy 并排时文档对不挪位=只多一枚画片。大画片版(w13)入库, 中(w11.6)/小(w10)两档落选; 更早的三层文档/iso 层板/层棱线四案落选 |
 | `cut` | 剪切到剪贴板(WebPaint v0.9.22 Ctrl+X): 剪刀 CCW 转 145°(甲方 20260821 拍板取向, 刃朝左下/柄朝右上); 圆环柄 r2.3+描边把手+实心渐尖刃(枢轴半宽 0.85 收到尖), 刃比柄粗=纸剪不是医疗剪。⚠改动时注意: 几何先按 k=0.82 纵向压短再转 —— 原尺寸直接转墨迹会到 20.6x22.0(全家族最大), 而整体 scale 会连线宽一起缩(select-pen 缩放笔即因此落选), 故压几何保线宽恒 1.7; 转后 19.05x19.75 与 grid 同级。落选: 纯描边 X 型(偏医疗剪)、家用不对称柄版、宽刃版 |
 | `move-to-file` | 文件+绕行箭头(移到文件) |
+| `paste` | 粘贴:剪贴板不缩(库尺寸)+文档探出右下角, 按 copy 的前后件比例 |
 
 ## media
 
@@ -146,6 +148,7 @@
 | name | 说明 |
 |------|------|
 | `export` | 导出:向上箭头离开托盘(import 的上下镜像) |
+| `file` | 文档:单张纸+折角(copy/paste/clear-canvas 共用母题) |
 | `floppy-disk` | 软盘/保存:滑盖左右对称(7/17)且两竖线顶到顶边 + 防呆角 k=3 |
 | `folder` | 文件夹:左边 tab + 矩形主体 |
 | `folder-open` | 打开的文件夹:背板止于盖顶 T 接,不再互相压线 |
@@ -157,7 +160,6 @@
 | `restore-trash` | 同上但盖只掀 -16° |
 | `save-as` | 另存为(floppy-disk=保存 的配对键):双软盘叠放(copy 的前后件语法), 后盘右上探出, 前盘遮罩留白; 20260724 候选 3 号入库 |
 | `trash-can` | 垃圾桶:桶身收口(feather 是直筒);与 fluent(圆提手/更低)、heroicons(弧形透视)亦不同 — own |
-| `file` | 文档:单张纸+折角(copy/paste/clear-canvas 共用母题) |
 
 ## hierarchy
 
@@ -189,6 +191,8 @@
 | `cloud` | 云 |
 | `cloud-busy-base` | 云端忙 静态件:云轮廓中心挖圆洞, 与 cloud-busy-spinner 叠放合成一个资产 |
 | `cloud-busy-spinner` | 云端忙 旋转件:弧+箭头, 圆心正在 (12,12) 所以 CSS rotate 原地转不甩 |
+| `cloud-conflict` | 云+感叹号(2.4 描边整体收在云内不破轮廓, 点半径=描边半宽; 与 cloud-pending 问号云成对但云为实线); WeebPaint gallery 同步徽章 conflict, 12px 用量 (甲方 20260825 拍板候选 5 号=大号收内) |
+| `cloud-download` | 云+下载箭头:cloud-upload 的精确上下镜像(箭头绕 y=14 翻转); WeebPaint gallery 同步徽章 newer-on-cloud, 12px 用量 (甲方 20260825 拍板候选 1 号) |
 | `cloud-pending` | 待判定:虚线云 + 云内问号(加粗 2.4, 遮罩描边留白与云脱开;问号下点的半径=描边半宽) |
 | `cloud-synced` | 云+勾 |
 | `cloud-unavailable` | — |
@@ -198,8 +202,6 @@
 | `sign-out` | 退出登录:门框+向外箭头(通用 logout 图元) |
 | `unload-local-cache` | 卸载本地副本:database(=本地) + 斜删除线(mask 留 gap)【非垃圾桶, 云端仍保留】 |
 | `upload` | 上传 |
-| `cloud-download` | 云+下载箭头:cloud-upload 的精确上下镜像(箭头绕 y=14 翻转); WeebPaint gallery 同步徽章 newer-on-cloud, 12px 用量 (甲方 20260825 拍板候选 1 号) |
-| `cloud-conflict` | 云+感叹号(2.4 描边整体收在云内不破轮廓, 点半径=描边半宽; 与 cloud-pending 问号云成对但云为实线); WeebPaint gallery 同步徽章 conflict, 12px 用量 (甲方 20260825 拍板候选 5 号=大号收内) |
 
 ## globalization
 
@@ -222,13 +224,13 @@
 | name | 说明 |
 |------|------|
 | `database` | — |
+| `device` | 这台设备(WeebPaint P5 设置项 scope 微章, 答「这设置跟谁走」):横屏 18x12.4 rx1.6 **屏内留空** + 细颈 + 宽底脚连成一笔 T。与 image(这幅画)/gallery(这个图库) 组成 scope 三件套 —— 三者在 13px 下靠**轮廓**分辨, 故此件与 image 的区别全在屏下那个 T, **屏内不许再放东西**(image 已是「框里有画」, 再来一个「框里放东西」就分不出了)。⚠ 用量硬约束 = 13px + opacity .5 + --ink-soft(WeebPaint styles.css .menu-scope-badge), 实渲结论: 1x 非 retina 下**任何内部细节都会糊掉**, 能站住的只有轮廓 —— 改动时别往屏里加细节。20260827 甲方拍板候选 1 号入库; 落选: 2(梯形实脚)/3(平板竖+底部指示条)/4(平板竖纯轮廓)/5(平板竖+home 圆点)/6(笔记本), 考古回 git 2a9d559 |
 | `fps` | fps 帧率·纯字母 手绘几何圆角大写(7 段数码管骨架连笔无断口+圆角转角, F/P/S bbox 对齐; 字体/7段断口/点阵/手绘幼圆方案均落选); 20260725 候选 6 号入库 |
 | `menu` | 汉堡菜单:三条等长横线(y=7/12/17) |
 | `more` | 溢出菜单:横向三点(原 ⋯ 字符跨平台字形不一) |
 | `shortcut` | 快捷键:键帽圆角方块内放 V |
 | `theme` | 主题日月同辉:细月牙(大圆挖近等大圆) + 八芒太阳嵌在缺口里, 光芒是与太阳脱开的短线。日月直径比 1.00, 分离角 -30°, 分离距离 1.05 倍月半径;太阳用遮罩描边留白从月牙上抠出白边 |
 | `wrench` | 扳手:斜置组合扳手轮廓(feather:wrench 衍生), 20260724 候选 1 号入库 |
-| `device` | 这台设备(WeebPaint P5 设置项 scope 微章, 答「这设置跟谁走」):横屏 18x12.4 rx1.6 **屏内留空** + 细颈 + 宽底脚连成一笔 T。与 image(这幅画)/gallery(这个图库) 组成 scope 三件套 —— 三者在 13px 下靠**轮廓**分辨, 故此件与 image 的区别全在屏下那个 T, **屏内不许再放东西**(image 已是「框里有画」, 再来一个「框里放东西」就分不出了)。⚠ 用量硬约束 = 13px + opacity .5 + --ink-soft(WeebPaint styles.css .menu-scope-badge), 实渲结论: 1x 非 retina 下**任何内部细节都会糊掉**, 能站住的只有轮廓 —— 改动时别往屏里加细节。20260827 甲方拍板候选 1 号入库; 落选: 2(梯形实脚)/3(平板竖+底部指示条)/4(平板竖纯轮廓)/5(平板竖+home 圆点)/6(笔记本), 考古回 git 2a9d559 |
 
 ## ai
 

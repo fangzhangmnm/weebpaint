@@ -345,9 +345,11 @@ export function setTool(tool: string) {
   if (tool === "airbrush") tool = "brush";
   // v120：shapes 撤了。老 doc 持久化里可能存了 "shapes" → 透明回退 brush
   if (tool === "shapes") tool = "brush";
-  // v309：smudge 工具（一直只是 disabled 占位、从未实装）整体 purge，待将来重写。
-  //   老 doc 持久化里可能存了 "smudge" → 透明回退 brush（同 airbrush/shapes）
-  if (tool === "smudge") tool = "brush";
+  // 2026-09-05 手指（smudge）回归：不是独立 mode，是 filterBrush 的 smudge payload（tool-mode 表 filterBrush 行；
+  //   liquify/smudge 都是 payload，见 ai-docs/20260531-tool-mode-state-machine.md）。进模式的编排（variant/mix
+  //   持久化）在 filters-adjust，这里只发事件——toolbar 不 import filters-adjust（它 import 本模块，防环）。
+  //   老 doc 持久化里存的 "smudge"（v309 前）也走这条：进手指模式而不是回退 brush。
+  if (tool === "smudge") { window.dispatchEvent(new CustomEvent("wp:enter-filter-brush", { detail: "smudge" })); return; }
   // v0.5.11 曾把 "bucket" 回退 brush；v0.5.12 油漆桶以 "fill" 第一类工具回归。老 doc 的 "bucket" → fill。
   if (tool === "bucket") tool = "fill";
   // 切工具 = 决定性动作 → editMode.setTool 内部按 onToolSwitch 把停驻 transient apply/cancel（不在这单独调）
@@ -383,9 +385,14 @@ export function _syncEditModeUI() {
   const transient = editMode.isTransient();
   // 工具按钮高亮：transient 时一个都不亮；持久工具高亮对应按钮
   // v0.6.31：四工具并列（fill 有自己的顶栏钮），高亮 = data-tool 直配
-  for (const b of els.toolBtns) b.setAttribute("aria-pressed", (!transient && b.dataset.tool === m) ? "true" : "false");
-  // 液化 / filterBrush 没独立 data-tool 按钮，用 adjust 按钮高亮（transient 期间也不亮）
-  els.topAdjustBtn?.setAttribute("aria-pressed", (m === "filterBrush") ? "true" : "false");
+  // 2026-09-05 手指：filterBrush 模式 + smudge payload 时高亮工具栏「手指」钮（而不是 adjust 钮）
+  const smudgeActive = m === "filterBrush" && (state.filterBrush?.Filter as { id?: string } | null | undefined)?.id === "smudge";
+  for (const b of els.toolBtns) {
+    const on = !transient && (b.dataset.tool === m || (b.dataset.tool === "smudge" && smudgeActive));
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+  // 液化 / 其它 filterBrush 没独立 data-tool 按钮，用 adjust 按钮高亮（transient 期间也不亮）
+  els.topAdjustBtn?.setAttribute("aria-pressed", (m === "filterBrush" && !smudgeActive) ? "true" : "false");
   // 注：body.dataset.tool 保持"持久工具"（在 setTool 里设），不在这改成 transient 名——避免扰乱
   // 依赖 body[data-tool] 的 CSS（且 data-mode 被图库占用）。transient 的 UI 抑制走面板 suppress + 按钮高亮。
   // slider 禁用：size/opacity 仅 canDraw 模式可调 → 反应式镜像，<LeftDial> 绑 :disabled。color 仅 allowsColor 可点。
@@ -1185,6 +1192,12 @@ export function initToolbar(ctx: AppContext) {
   for (const b of els.toolBtns) {
     b.addEventListener("click", () => {
       const tool = b.dataset.tool!;   // .tool[data-tool] 选择器保证存在
+      // 2026-09-05 手指：激活态 = filterBrush + smudge payload；二次点 = 开滤镜笔架（同画笔二次点语义）
+      if (tool === "smudge" && editMode.current() === "filterBrush"
+          && (state.filterBrush?.Filter as { id?: string } | null | undefined)?.id === "smudge") {
+        openExclusive(PANELS.RACK_FILTER_BRUSH);
+        return;
+      }
       if (editMode.current() === tool) {
         // v0.7.28：lasso/fill 二次点不开笔架（context-unaware 别扭，user 回滚）——选区笔笔架
         //   走 pen 子模式旁挂的 #selPenRackBtn；映射保留在 RACK_PANEL_BY_TOOL 只为 panel 注册。

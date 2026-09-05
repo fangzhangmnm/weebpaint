@@ -43,7 +43,9 @@ const CAPS: Record<string, Cap> = {
   // eraser allowsColor:true（2026-06-06 user 改）：橡皮本身不吃 state.color，但禁用色板按钮**误导**
   //   （看着像坏了/弹不出来）。放开 = 橡皮时可预选下一笔颜色，免去 iPad 来回切工具。别改回 false。
   eraser:      { canDraw: true,  allowsColor: true,  cursor: "brush", ctrlZ: "history",         transient: false },
-  filterBrush: { canDraw: true,  allowsColor: false, cursor: "brush", ctrlZ: "history",         transient: false }, // liquify/色彩笔 = payload
+  // filterBrush allowsColor:true（2026-09-05）：手指的「带颜料」变体吃 state.color；液化/模糊不吃但禁用色板
+  //   按钮误导（同 eraser 那条 2026-06-06 的理由）。
+  filterBrush: { canDraw: true,  allowsColor: true,  cursor: "brush", ctrlZ: "history",         transient: false }, // liquify/色彩笔/手指 = payload
   // 形状笔（ADR-0005）：一个 shape = 一个 stroke 的笔（对标滤镜笔），非 gizmo 对象——本行=克隆 brush
   shapeBrush:  { canDraw: true,  allowsColor: true,  cursor: "brush", ctrlZ: "history",         transient: false },
   // 非绘画持久工具

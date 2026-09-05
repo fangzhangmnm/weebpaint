@@ -9,6 +9,7 @@
 import { updateCloudAuthUI } from "./gallery/cloud-auth-ui.ts";
 import { els } from "./els.ts";
 import { preferences } from "./app-prefs.ts";   // P5 唯一门面：scope 由 registry 定（手势/视图/开关各归其层）
+import { setPressureLevel, PRESSURE_LEVELS, isPressureLevel, type PressureLevel } from "./common/pressure-level.ts";   // 2026-09-05 压感四档
 import { desk } from "./workbench-state.ts";   // checkboard = per-doc desk（载入时经 wp:applyEditorState 应用到 board）
 import { applyTheme, themeLabel, THEMES, currentTheme } from "./theme.ts";
 import { t, lang, setLang, LANGS, langDisplayName, type Key } from "./i18n/index.ts";
@@ -168,6 +169,14 @@ function _renderShortcutsSheet() {
 
 // collection hydrate 后由 app.ts 的 fixup 相调：把 4 个 synced 开关的**真值**灌进 RAM/DOM/board。
 //   **只 render 不写盘**（见上方纪律）——这是 P0-1 的修复核心：boot 路径永不 setItem。
+// 2026-09-05 压感四档（user：「压感设置进settings，给无弱中强四档」）：device 偏好 → 进程级当前档 + 下拉标签。
+const PRESSURE_KEYS = { none: "pressure.none", weak: "pressure.weak", mid: "pressure.mid", strong: "pressure.strong" } as const;
+function renderPressureLevel(v: unknown): void {
+  const l: PressureLevel = isPressureLevel(v) ? v : "mid";
+  setPressureLevel(l);
+  const lbl = document.getElementById("menuPressureBtnLabel");
+  if (lbl) lbl.textContent = t(PRESSURE_KEYS[l]);
+}
 export function renderSettingsFromPrefs(): void {
   // P5 Slice C：pixel-grid/long-press-pick/menu-tab 已 per-doc（desk）——由 wp:applyEditorState
   //   处的 _renderPerDocFromDesk 随每次载入回灌，不在本函数（本函数只管非 per-doc 层）。
@@ -175,6 +184,7 @@ export function renderSettingsFromPrefs(): void {
   renderGenAI(genAiEnabled());
   renderCurrentGallery();   // P3：当前库只读行 + gating 重贴
   renderSingleFingerDraw(preferences.get("single-finger-draw"));
+  renderPressureLevel(preferences.get("pressure-level"));   // 2026-09-05 压感四档
   _renderPerDocFromDesk();   // boot 首帧也灌一次（此刻 desk=工厂默认；开画后 applyEditorState 再灌真值）
 }
 
@@ -300,6 +310,11 @@ export function initSettingsMenu(ctx: AppContext) {
   // v0.5.37（user）：主题/语言换 in-app 下拉——原生 select 打开态是 chrome 域（iPad 弹层系统字体，
   //   UCSUR 必豆腐；夜间白底、装不了 SVG 同根性坑）。弹层复用紧凑菜单 list 形态 + 锚定。
   //   条目开时现建 → 标签永远新鲜（字体门迟到翻转后 endonym/主题名自动带字形）。
+  // 2026-09-05 压感四档下拉（同主题下拉形制；device 层：跟板子/跟人）
+  wireInlineSelect("menuPressureBtn",
+    () => PRESSURE_LEVELS.map((l) => ({ value: l, label: t(PRESSURE_KEYS[l]) })),
+    () => { const v = preferences.get("pressure-level"); return isPressureLevel(v) ? v : "mid"; },
+    (l) => { preferences.set("pressure-level", l); renderPressureLevel(l); setStatus(t("status.pressureLevel", { s: t(PRESSURE_KEYS[l]) })); });
   wireInlineSelect("menuThemeBtn",
     () => THEMES.map((th) => ({ value: th, label: themeLabel(th) })),
     () => currentTheme(),

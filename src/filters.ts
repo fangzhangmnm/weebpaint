@@ -102,6 +102,13 @@ export interface BrushSettings {
   hardness?: number;
   flow?: number;
   opacity?: number;
+  // 2026-09-05（手指）：实际传入的是 ResolvedBrush（input.getResolvedBrush），下面几项它都有；
+  //   声明成可选让插件不必 cast 整个对象。spacing = 直径比例（ResolvedBrush 字段名；spacingValue 是旧名）。
+  spacing?: number;
+  sizeCoeff?: number;
+  opaCoeff?: number;
+  pressureGamma?: number;
+  color?: string;
 }
 
 export interface BrushSelection {
@@ -290,10 +297,17 @@ function _colorBrushStamp(state: ColorBrushState, cx: number, cy: number, pressu
       blended = true;
       const lo = (j * sw + i) * 4;
       const fo = ((j + oy) * ew + (i + ox)) * 4;
-      layerData[lo]     = layerData[lo]     * (1 - a) + dstImg.data[fo]     * a;
-      layerData[lo + 1] = layerData[lo + 1] * (1 - a) + dstImg.data[fo + 1] * a;
-      layerData[lo + 2] = layerData[lo + 2] * (1 - a) + dstImg.data[fo + 2] * a;
-      layerData[lo + 3] = layerData[lo + 3] * (1 - a) + dstImg.data[fo + 3] * a;
+      // 2026-09-05 预乘（模糊黑边残留，v0.12.3 只修了卷积内部）：straight 逐通道 lerp 会把透明像素的 RGB(0,0,0)
+      //   按 (1−a) 掺进来——模糊扩进原本透明像素的软边被拉黑。改成「premult lerp 再去预乘」的等价式：
+      //   颜色权 = 各自 alpha × 混合权 / 新 alpha；透明像素颜色权为 0，永不参与。回归测 test/color-brush-premul.test.mjs。
+      const la = layerData[lo + 3] / 255, fa = dstImg.data[fo + 3] / 255;
+      const na = la * (1 - a) + fa * a;
+      if (na <= 0) { layerData[lo] = 0; layerData[lo + 1] = 0; layerData[lo + 2] = 0; layerData[lo + 3] = 0; continue; }
+      const wl = (la * (1 - a)) / na, wf = (fa * a) / na;
+      layerData[lo]     = layerData[lo]     * wl + dstImg.data[fo]     * wf;
+      layerData[lo + 1] = layerData[lo + 1] * wl + dstImg.data[fo + 1] * wf;
+      layerData[lo + 2] = layerData[lo + 2] * wl + dstImg.data[fo + 2] * wf;
+      layerData[lo + 3] = na * 255;
     }
   }
   if (!blended) return;   // 零像素混合 → 不写回、不标 dirty（见上）

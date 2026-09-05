@@ -30,6 +30,11 @@ export interface BrushSettings {
     hardness?: number;
     flow?: number;
     opacity?: number;
+    spacing?: number;
+    sizeCoeff?: number;
+    opaCoeff?: number;
+    pressureGamma?: number;
+    color?: string;
 }
 export interface BrushSelection {
     bboxX: number;

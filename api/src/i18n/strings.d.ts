@@ -42,6 +42,12 @@ export declare const S: {
         readonly ja: "投げ縄 (L)";
         readonly tok: "ilo pi ma wile (L)";
     };
+    readonly "tool.smudge": {
+        readonly zh: "手指";
+        readonly en: "Smudge";
+        readonly ja: "指先";
+        readonly tok: "ilo luka";
+    };
     readonly "tool.shapeBrush": {
         readonly zh: "形状笔";
         readonly en: "Shape brush";
@@ -173,6 +179,36 @@ export declare const S: {
         readonly en: "One-finger drawing";
         readonly ja: "一本指で描画";
         readonly tok: "luka wan li sitelen";
+    };
+    readonly "menu.pressureLevel": {
+        readonly zh: "压感强度";
+        readonly en: "Pressure sensitivity";
+        readonly ja: "筆圧感度";
+        readonly tok: "wawa pi ilo sitelen";
+    };
+    readonly "pressure.none": {
+        readonly zh: "无";
+        readonly en: "None";
+        readonly ja: "なし";
+        readonly tok: "ala";
+    };
+    readonly "pressure.weak": {
+        readonly zh: "弱";
+        readonly en: "Weak";
+        readonly ja: "弱";
+        readonly tok: "lili";
+    };
+    readonly "pressure.mid": {
+        readonly zh: "中";
+        readonly en: "Medium";
+        readonly ja: "中";
+        readonly tok: "meso";
+    };
+    readonly "pressure.strong": {
+        readonly zh: "强";
+        readonly en: "Strong";
+        readonly ja: "強";
+        readonly tok: "wawa";
     };
     readonly "menu.pixelGrid": {
         readonly zh: "像素栅格（放大时）";
@@ -766,6 +802,12 @@ export declare const S: {
         readonly en: "Theme · {s}";
         readonly ja: "テーマ · {s}";
         readonly tok: "nasin kule · {s}";
+    };
+    readonly "status.pressureLevel": {
+        readonly zh: "压感强度 · {s}";
+        readonly en: "Pressure sensitivity · {s}";
+        readonly ja: "筆圧感度 · {s}";
+        readonly tok: "wawa pi ilo sitelen · {s}";
     };
     readonly "menu.tab.file": {
         readonly zh: "文件";
@@ -3781,6 +3823,41 @@ export declare const S: {
         readonly en: "Filter brush";
         readonly ja: "フィルターブラシ";
         readonly tok: "ilo sitelen pi ante kule";
+    };
+    readonly "flt.smudge.title": {
+        readonly zh: "手指 / 涂抹";
+        readonly en: "Smudge";
+        readonly ja: "指先 / 色混ぜ";
+    };
+    readonly "flt.smudge.smear": {
+        readonly zh: "手指（拖）";
+        readonly en: "Finger (smear)";
+        readonly ja: "指先（引きずり）";
+    };
+    readonly "flt.smudge.dull": {
+        readonly zh: "混色（揉）";
+        readonly en: "Blend (dull)";
+        readonly ja: "色混ぜ（なじませ）";
+    };
+    readonly "flt.smudge.paint": {
+        readonly zh: "带颜料的手指";
+        readonly en: "Wet finger (paint)";
+        readonly ja: "絵の具つき指先";
+    };
+    readonly "flt.smudge.mix.srgb": {
+        readonly zh: "直接混合";
+        readonly en: "Plain mix";
+        readonly ja: "そのまま混色";
+    };
+    readonly "flt.smudge.mix.oklab": {
+        readonly zh: "保饱和度";
+        readonly en: "Vivid mix";
+        readonly ja: "鮮やか混色";
+    };
+    readonly "flt.smudge.mix.spectral": {
+        readonly zh: "颜料谱";
+        readonly en: "Pigment mix";
+        readonly ja: "顔料混色";
     };
     readonly "color.title": {
         readonly zh: "颜色";

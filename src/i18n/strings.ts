@@ -17,6 +17,7 @@ export const S = {
   "tool.picker":    { zh: "吸色 (I)",          en: "Eyedropper (I)",  ja: "スポイト (I)", tok: "ilo pi kama kule (I)" },
   "tool.fill":      { zh: "油漆桶 (G)", en: "Paint bucket (G)", ja: "塗りつぶし (G)", tok: "ilo pi kule ma (G)" },
   "tool.lasso":     { zh: "套索 (L)",          en: "Lasso (L)",       ja: "投げ縄 (L)", tok: "ilo pi ma wile (L)" },
+  "tool.smudge":    { zh: "手指",              en: "Smudge",          ja: "指先", tok: "ilo luka" },   // 2026-09-05 手指/涂抹（filterBrush smudge payload）
   "tool.shapeBrush": { zh: "形状笔",           en: "Shape brush",     ja: "図形ブラシ", tok: "ilo selo" },
   "tool.pan":       { zh: "平移 (H / Space)",  en: "Pan (H / Space)", ja: "手のひら (H / Space)", tok: "ilo tawa (H / Space)" },
   "tool.adjust":    { zh: "调整",              en: "Adjust",          ja: "調整", tok: "ante kule" },
@@ -44,6 +45,11 @@ export const S = {
   "menu.checkerboard":     { zh: "显示透明背景", en: "Show transparency", ja: "透明部分を表示", tok: "lukin e kule kon" },
   "menu.longPressPick":    { zh: "单指长按吸色", en: "Long-press to pick color", ja: "長押しでスポイト", tok: "luka awen li kama e kule" }, 
   "menu.singleFingerDraw": { zh: "单指绘画",   en: "One-finger drawing", ja: "一本指で描画", tok: "luka wan li sitelen" }, 
+  "menu.pressureLevel":    { zh: "压感强度",   en: "Pressure sensitivity", ja: "筆圧感度", tok: "wawa pi ilo sitelen" },   // 2026-09-05 四档
+  "pressure.none":         { zh: "无", en: "None", ja: "なし", tok: "ala" },
+  "pressure.weak":         { zh: "弱", en: "Weak", ja: "弱", tok: "lili" },
+  "pressure.mid":          { zh: "中", en: "Medium", ja: "中", tok: "meso" },
+  "pressure.strong":       { zh: "强", en: "Strong", ja: "強", tok: "wawa" },
   "menu.pixelGrid":        { zh: "像素栅格（放大时）", en: "Pixel grid (when zoomed)", ja: "ピクセルグリッド（拡大時）", tok: "kulupu leko lili (lon lukin suli)" }, 
   "menu.docGrid":          { zh: "主栅格（对齐网格）", en: "Main grid (alignment)", ja: "メイングリッド（整列）", tok: "kulupu leko suli" }, 
   "nd.grp.painting":    { zh: "绘画", en: "Painting", ja: "ペイント", tok: "sitelen" },
@@ -178,6 +184,7 @@ export const S = {
   "status.docGridCell":   { zh: "主栅格尺寸 · {n}px", en: "Main grid size · {n}px", ja: "メイングリッドのサイズ · {n}px", tok: "suli pi kulupu leko · {n}px" },
   "status.fps":           { zh: "FPS 计 · {s}", en: "FPS meter · {s}", ja: "FPS 表示 · {s}", tok: "nanpa pi sitelen tawa · {s}" },
   "status.theme":         { zh: "主题 · {s}",  en: "Theme · {s}",     ja: "テーマ · {s}", tok: "nasin kule · {s}" },
+  "status.pressureLevel": { zh: "压感强度 · {s}", en: "Pressure sensitivity · {s}", ja: "筆圧感度 · {s}", tok: "wawa pi ilo sitelen · {s}" },   // 2026-09-05
   // ── ⋯ 菜单：文件段（切片 2）────────────────────────────────────
   "menu.tab.file":     { zh: "文件", en: "File", ja: "ファイル", tok: "sitelen" }, 
   "menu.tab.canvas":   { zh: "画布", en: "Canvas", ja: "キャンバス", tok: "supa" }, 
@@ -722,6 +729,14 @@ export const S = {
   "crop.templated":  { zh: "已裁剪并缩放到 {w}×{h}", en: "Cropped & scaled to {w}×{h}", ja: "{w}×{h} に切り抜き＆拡縮した", tok: "kipisi pini: suli li {w}×{h}" },
   // 滤镜笔刷工具栏
   "fb.title":        { zh: "滤镜笔刷", en: "Filter brush", ja: "フィルターブラシ", tok: "ilo sitelen pi ante kule" },
+  // 2026-09-05 手指 / 涂抹（plugins/smudge.ts）
+  "flt.smudge.title":        { zh: "手指 / 涂抹", en: "Smudge", ja: "指先 / 色混ぜ" },
+  "flt.smudge.smear":        { zh: "手指（拖）", en: "Finger (smear)", ja: "指先（引きずり）" },
+  "flt.smudge.dull":         { zh: "混色（揉）", en: "Blend (dull)", ja: "色混ぜ（なじませ）" },
+  "flt.smudge.paint":        { zh: "带颜料的手指", en: "Wet finger (paint)", ja: "絵の具つき指先" },
+  "flt.smudge.mix.srgb":     { zh: "直接混合", en: "Plain mix", ja: "そのまま混色" },
+  "flt.smudge.mix.oklab":    { zh: "保饱和度", en: "Vivid mix", ja: "鮮やか混色" },
+  "flt.smudge.mix.spectral": { zh: "颜料谱", en: "Pigment mix", ja: "顔料混色" },
   // 颜色浮窗
   "color.title":     { zh: "颜色", en: "Color", ja: "カラー", tok: "kule" },
   // 清空确认 sheet

@@ -21,6 +21,7 @@ export const PREF_REGISTRY = {
   "color-theme":          { scope: "device", def: "auto" as string },            // 环境耦合（OLED/暗房），一键可切
   "single-finger-draw":   { scope: "device", def: false as boolean },            // 硬件耦合：同人 iPad 开/台式关（VS Code machine-scope 先例）
   "stylus-smooth-params": { scope: "device", def: {} as Record<string, number> },// 数位板/笔硬件调参
+  "pressure-level":       { scope: "device", def: "mid" as string },            // 2026-09-05 压感四档 none/weak/mid/strong：跟板子/跟人，不跟画（common/pressure-level.ts）
   // gallery（跟身份/库走；P3 per-gallery，现 = synced collection）
   "lang":                 { scope: "gallery", def: null as string | null },
   "gen-ai":               { scope: "gallery", def: false as boolean },
@@ -29,6 +30,7 @@ export const PREF_REGISTRY = {
   //   有库照旧跨设备同步 + 无库经 §9.7 cascade 落 device 层（丢写根除）。旧 collection 值不迁移
   //   （唯一用户重填一次）。
   "blender-panel-url":    { scope: "gallery", def: "" as string },
+  "smudge-mix":           { scope: "gallery", def: "srgb" as string },          // 2026-09-05 手指混色空间 srgb/oklab/spectral：口味跟人走（backend/algorithms/color-mix.ts）
   // （ora scope 三项 pixel-grid / long-press-pick / menu-tab 不在本表：per-doc 归 desk（Slice C），
   //   老的 collection 偏好按拍板不迁移——工厂默认起。）
   // session（不持久化；「不持久化档不设」的唯一例外 = show-fps，user 明允）

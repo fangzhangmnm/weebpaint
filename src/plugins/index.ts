@@ -13,5 +13,6 @@ import "./curves.ts";
 // 笔刷类（modes=["brush"]）：sharpenBlur 和 liquify 走 filter brush engine
 import "./sharpen-blur.ts";
 import "./liquify.ts";
+import "./smudge.ts";        // 2026-09-05 手指 / 涂抹（smear / dull / paint；toolbar 手指钮 + fx 菜单两入口）
 // 风格化组（category="artist"）—— 3 个同主题合一个 plugin 文件
 import "./stylize-filters.ts";

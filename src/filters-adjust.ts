@@ -24,6 +24,8 @@ import type { ViewLeafSnap as LayerSnap } from "./backend/workpiece/painting-vie
 import type { WriteToken } from "./backend/workpiece/workpiece.ts";
 import type { AppContext } from "./app-context.ts";
 import { iconHtml } from "./ui/icon.ts";
+import { preferences } from "./app-prefs.ts";   // 2026-09-05：手指混色空间偏好 smudge-mix（gallery scope）
+import { isMixSpace } from "./backend/algorithms/color-mix.ts";
 
 // Filter 对象（filters.js 未类型化 → 描述本面板用到的接口）。
 interface FilterLike {
@@ -35,6 +37,7 @@ interface FilterLike {
   brushVariants?: { id: string; title: string; params: Record<string, unknown> }[];
   boundaryModes?: { id: string; title: string }[];
   sampleModes?: boolean;   // v0.6.36：声明即渲染采样核下拉（液化；选项 = RESAMPLE_MODES 的 liquify context）
+  mixModes?: { id: string; title: string }[];   // 2026-09-05：混色空间下拉（手指 smudge 声明；值经 params.mix，持久化 preferences "smudge-mix"）
 }
 // adjust panel 操作的 doc 活层（doc.js 未类型化 → 只描述用到的）。
 interface AdjustLayer { id: number; name: string; bboxX: number; bboxY: number; bboxW: number; bboxH: number; snapshot(): LayerSnap; }
@@ -280,6 +283,7 @@ function _enterFilterBrushMode(Filter: FilterLike) {
     ? { ...variant.params, bleed: desk.liquify.bleed }
     : variant.params;
   if (Filter.sampleModes) params = { ...params, sample: desk.liquify.sample };
+  if (Filter.mixModes) params = { ...params, mix: _currentMixSpace() };   // 2026-09-05 手指：混色空间跟偏好
   state.filterBrush = { Filter, params, variantId: variant.id, variantLabel: variant.title };
   if (state.toolStates.filterBrush) state.toolStates.filterBrush.variantId = variant.id;
   setTool("filterBrush");
@@ -287,6 +291,10 @@ function _enterFilterBrushMode(Filter: FilterLike) {
   // v132 (user：「点 filter brush 不要自动弹笔架」) 进入时不开 rack
   //   user 想换笔点 toolbar 的「笔架」button
   setStatus(t("mi.filterBrushMode", { title: Filter.title }));
+}
+function _currentMixSpace(): string {
+  const v = preferences.get("smudge-mix");
+  return isMixSpace(v) ? v : "srgb";
 }
 function _exitFilterBrushMode() {
   state.filterBrush = null;
@@ -329,6 +337,7 @@ function _renderFilterBrushToolbar() {
         ? { ...v.params, bleed: fb.params.bleed }
         : v.params;
       if (Filter.sampleModes) np = { ...np, sample: fb.params.sample };
+      if (Filter.mixModes) np = { ...np, mix: fb.params.mix };
       fb.params = np;
       fb.variantId = v.id;
       fb.variantLabel = v.title;
@@ -344,6 +353,20 @@ function _renderFilterBrushToolbar() {
       items: () => resampleItems("liquify", tLatin as (key: string) => string),
       value: () => (fb.params.sample as string) || "bicubic",
       onChange: (v) => { fb.params = { ...fb.params, sample: v }; desk.liquify.sample = v; },
+    });
+  }
+  // ②b 2026-09-05 混色空间下拉：声明了 mixModes 的 filter（手指 smudge）常驻渲染；值 → params.mix，
+  //   持久化 preferences "smudge-mix"（gallery scope：混色口味跟人走，不跟画）。
+  if (Filter.mixModes) {
+    mkField("filterBrushMixSel", {
+      items: () => Filter.mixModes!.map((m) => ({ value: m.id, label: m.title })),
+      value: () => (fb.params.mix as string) || "srgb",
+      onChange: (v) => {
+        fb.params = { ...fb.params, mix: v };
+        preferences.set("smudge-mix", v);
+        const m = Filter.mixModes!.find((x) => x.id === v);
+        setStatus(t("mi.switchedTo", { title: m ? m.title : v }));
+      },
     });
   }
   // ③ v147 边界取样下拉：仅当 filter 声明 boundaryModes（液化）且有选区时渲染。
@@ -369,6 +392,14 @@ export function initFiltersAdjust(ctx: AppContext) {
   // 调整面板 = 浮窗（2026-09-02 C2）：z/拖/钳制归 ui/floating-window；初始摆位仍走 positionPopup（钉右、让顶栏）。
   //   不进 transient 抑制（它本身就是 adjust-color transient 的 UI）。拖动那份原在 topbar-menu.ts，已删。
   registerContextToolbar(document.getElementById("filterBrushToolbar"));   // C4：滤镜笔条登记
+  // 2026-09-05 手指工具：toolbar setTool("smudge") 发事件进 filterBrush 模式（payload = smudge 插件）。
+  //   toolbar 不 import 本模块（本模块 import 它的 setTool，防环），故走 window 事件（同 wp:settool 姿势）。
+  window.addEventListener("wp:enter-filter-brush", (e: Event) => {
+    const id = String((e as CustomEvent).detail ?? "");
+    const F = getFilter(id) as FilterLike | null | undefined;
+    if (F && (F.modes || []).includes("brush")) _enterFilterBrushMode(F);
+    else setStatus(t("st.filterBrushErr", { msg: `unknown filter brush "${id}"` }));
+  });
   _adjustWin = registerFloatingWindow(els.adjustPanel, {
     id: "adjust", head: els.adjustPanelHead, ignoreDragOn: (t) => !!t.closest(".float-panel-close"), fallbackSize: { w: 320, h: 300 },
   });

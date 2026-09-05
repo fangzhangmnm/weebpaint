@@ -35,6 +35,7 @@ import { inputSmooth } from "./stroke-input-smooth.ts";
 import { t } from "./i18n/index.ts";
 import { SMOOTH } from "./smooth-config.ts";
 import { effectivePressure } from "./common/effective-pressure.ts";   // 2026-09-02 压感取值抽成纯函数（可单测）+ coalesced 无 pressure 回退派发事件
+import { shapePressure } from "./common/pressure-level.ts";   // 2026-09-05 压感四档（无/弱/中/强）：输入层出口统一整形
 import type { GestureViewport, TapRef } from "./common/pointer-gesture.ts";
 import type { PaintingView, ViewLeaf } from "./backend/workpiece/painting-view.ts";
 import type { Board } from "./board.ts";
@@ -1676,7 +1677,8 @@ export class InputController {
 // 2026-09-02：本体抽到 common/effective-pressure.ts（纯函数，test/effective-pressure.test.ts 钉语义）。
 //   fallback = 派发事件本身的 pressure：coalesced 样本不带 pressure 的浏览器不再整笔冻在落笔值（见该文件头）。
 function effectivePressureFor(rec: PointerRec, ev: { pointerType?: string; pressure?: number }, fallback?: number): number {
-  return effectivePressure(rec, ev.pointerType, ev.pressure, fallback, SMOOTH.pressureAlpha);
+  // 2026-09-05：全局压感档（settings 无/弱/中/强）在 EMA 之后整形；mid = 原样，none = 恒 1。rec.smP 仍存原始平滑值。
+  return shapePressure(effectivePressure(rec, ev.pointerType, ev.pressure, fallback, SMOOTH.pressureAlpha));
 }
 
 function parseHex(hex: string | null | undefined) {
