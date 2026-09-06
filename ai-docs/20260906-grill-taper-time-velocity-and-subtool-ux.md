@@ -159,5 +159,5 @@ tap 套索位                             →  ┌ [套索][矩形][椭圆][魔�
 3. §3 Q5：鼠标默认走速度档还是留 0.5 常量。
 4. 速度归一化档位的数字（慢手/中/快手的 v_ref）——先由我填，上手后你改。
 5. 「顿 = 积墨」（无压感输入下速度→压感的极限）接受为 feature？（有真压感的笔不受影响）
-6. 图库案 §4：pagehide abort 在飞事务 / pageshow 复活 reload / RT 过期仍掺 stale 云帧——三条各自批不批（ai-docs/20260906-gallery-idb-wedge-log-analysis.md）。
+6. ~~图库案 §4：pagehide abort 在飞事务 / RT 过期仍掺 stale 云帧~~ **已批已落（store 0.11.6）**；剩 pageshow 复活 reload（app 侧，未批，非必要）。
 7. 黑匣子复制的老账：复制的是纯文本，微信/QQ 吃不下是长度（60KB）；现在改成分享 .txt 文件——够不够，还是要「只复制最近 100 条」。

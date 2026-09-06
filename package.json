@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@internal/encryption": "file:./vendor-pkgs/internal-encryption-0.1.0.tgz",
-    "@internal/store": "file:./vendor-pkgs/internal-store-0.11.5.tgz"
+    "@internal/store": "file:./vendor-pkgs/internal-store-0.11.6.tgz"
   },
   "devDependencies": {
     "playwright": "^1.61.1",

@@ -33,7 +33,9 @@
 - store：每次 open / 每笔事务 3s deadline → abort + 丢连接 + `IdbTimeoutError`；重开重试一次；再超时 warning 上报 + 抛。`onversionchange` 老连接自关；`onblocked` 记一笔。**效果**：挂死时 6s 内库先给 onError（图库立刻进卡住态、三钮可用），不再 8s 看门狗 + 99s 干等；但若锁在别的（冻结）页面手里，重开也解不开——它治的是「后端连接坏了」这一类，不治 bfcache 持锁。
 - WeebPaint：卡住态三钮 + 图库菜单诊断日志（v0.13.15）；黑匣子分享改 .txt 文件（v0.14.0）。
 
-## 4. 待 user 拍板（下一刀）
+## 4. 第二刀（user 2026-09-06 深夜「批准」→ store 0.11.6 / WeebPaint v0.14.2 已落地）
+> 落地记：① pagehide → abort 在飞 **readonly** 事务（IdbSuspendedError）、readwrite 放行（抢救写不腰斩）、无 readwrite 时关连接，下一 op 重开；② 本地帧与「云不可达」的远端帧都**缓存在就掺** stale 云帧，不再看 signedIn()；③ provider 新增可选 `onAuthChanged`（reason 透传），store 只在 reason "signOut" 时清 dir-index-cache 分区并重画在看的夹——凭证过期（expired）不清。pageshow reload（下 2）未做（app 侧，没批）。
+
 1. **pagehide → abort 在飞事务 + 关连接**（store 内，浏览器专用一行监听）：让被冻进 bfcache 的老页面**不持锁**。被 abort 的写 = 没落盘 = reject（dirty 不清，下次重推），符合「resolve 只认 oncomplete」契约，数据零风险。这是对 §2-B 机制的直接治法。
 2. `pageshow persisted=true`（bfcache 复活）→ app 侧 `location.reload()` 取干净状态（很多 PWA 的做法）。
 3. §2-A：RT 过期但账号仍在 → 本地帧掺 stale 云帧。
