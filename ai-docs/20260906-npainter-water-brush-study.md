@@ -168,7 +168,7 @@ Water：**blending 51、dilution 32、persistence 20、watering 68**、colouring
 | 成本 | 全图 O(N)：两趟 DT + 两趟 flood，他说「huge images 也够快」 | per 层 prepare（EDT + 边界参数化 + 配对）缓存，query 查表 | — |
 | 交互 | 每次点击全算，gap 滑杆 + AA 勾选 | tap → 查 label map | — |
 
-两派**互补**：几何派补大缺口、形态学派补 U 型开口。**候选（未决策）**：把 npainter 形做成魔棒第三个 option（经典 / 线稿闭合 / 容隙），或作为线稿闭合的 fallback（ω 排除的开口交给开运算）。作者 2025-05-23 Mastodon 说 PoC 已久、另有「更好的 gap detection 且更快」的想法，未公开细节。
+两派**互补**：几何派补大缺口、形态学派补 U 型开口。**user 2026-09-06 拍板：做，排在湿画笔之后，作为魔棒第三 option 供用户选择，不急；spec = `20260906-gap-closing-morphological-handoff.md`。本仓 v0.7.24 已有形态学容隙，差只在回贴步（详该 handoff §2）。**原候选表述：把 npainter 形做成魔棒第三个 option（经典 / 线稿闭合 / 容隙），或作为线稿闭合的 fallback（ω 排除的开口交给开运算）。作者 2025-05-23 Mastodon 说 PoC 已久、另有「更好的 gap detection 且更快」的想法，未公开细节。
 
 ### 10.2 演示视频（找到的全部）
 
