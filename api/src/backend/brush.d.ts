@@ -1,3 +1,4 @@
+import { type PressureShaper } from "../common/pressure-curve.ts";
 import { StrokeSmoother, PressureLPF } from "./stroke-smoother.ts";
 import type { ViewLeaf } from "./workpiece/painting-view.ts";
 import type { ResolvedBrush } from "../common/resolved-brush.ts";
@@ -17,6 +18,7 @@ type Rect = [number, number, number, number];
 interface StrokeState {
     layer: ViewLeaf;
     settings: ResolvedBrush;
+    pShape: PressureShaper;
     mode: string;
     buffered: boolean;
     lastX: number;
@@ -34,7 +36,7 @@ interface StrokeState {
 export declare class BrushEngine {
     _stroke: StrokeState | null;
     constructor();
-    _stepFor(s: ResolvedBrush, pressure: number): number;
+    _stepFor(s: ResolvedBrush, pressure: number, shape: PressureShaper): number;
     beginStroke(layer: ViewLeaf, settings: ResolvedBrush, x: number, y: number, pressure: number, mode?: string, smooth?: {
         tau?: number;
         deadzone?: number;

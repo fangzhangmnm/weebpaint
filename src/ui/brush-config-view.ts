@@ -10,18 +10,46 @@
 //
 // 工具链同色轮：vendor vue.esm-browser.prod + template 字符串 + esbuild bundle。
 
-import { createApp, defineComponent, ref } from "../../vendor/vue/vue.esm-browser.prod.js";
+import { createApp, defineComponent, ref, toRaw, onMounted, onUnmounted } from "../../vendor/vue/vue.esm-browser.prod.js";
 import { SelectFieldVue } from "./select-field.ts";   // 2026-09-02 C6 下拉标准件（Vue v-model 包装）
 import { quantizeSize } from "./brush-size.ts";
 import { t } from "../i18n/index.ts";
 import { ensureBrushConfigDefaults } from "../common/current-brush-config.ts";
 import type { BrushDraft } from "../common/current-brush-config.ts";
+import { makeCurveEditor, type CurveEditorHandle } from "./curve-editor.ts";   // 2026-09-05 批 4：压感曲线
+import { curveFromGamma } from "../common/pressure-curve.ts";
+import type { AnimCurve } from "../common/anim-curve.ts";
 
 const SECTION = "brush-settings-section";
 const TITLE = "brush-settings-section-title";
 const ROW = "brush-settings-row";
 const ROW_FULL = "brush-settings-row brush-settings-row-full";
 const VAL = "brush-settings-val";
+
+// 压感曲线编辑器的 Vue 壳（DOM 工厂 ui/curve-editor 挂进来；曲线**原地改 raw 对象**——形状不进模板，不需要反应式，
+//   也免得拖一帧触发一次整表 patch）。draft.pressureCurve 由「改用曲线」写入 / 「改回 gamma」删键（opt-in，不迁移旧笔）。
+const CurveEditorVue = defineComponent({
+  name: "CurveEditor",
+  props: { curve: { type: Object, required: true } },
+  setup(props: { curve: AnimCurve }) {
+    const host = ref<HTMLElement | null>(null);
+    let h: CurveEditorHandle | null = null;
+    onMounted(() => {
+      if (!host.value) return;
+      h = makeCurveEditor({
+        curve: toRaw(props.curve) as AnimCurve,
+        lockEndpointsT: true,
+        fmt: (t, v) => `${Math.round(t * 100)}% → ${Math.round(v * 100)}%`,
+        onInput: () => {},
+        onCommit: () => {},
+      });
+      host.value.appendChild(h.el);
+    });
+    onUnmounted(() => { h?.dispose(); h = null; });
+    return { host };
+  },
+  template: `<div ref="host" class="brush-settings-curve"></div>`,
+});
 
 export const BrushSettings = defineComponent({
   name: "BrushSettings",
@@ -30,8 +58,8 @@ export const BrushSettings = defineComponent({
     blendModes: { type: Object, default: () => ({}) },   // { mode: 中文label }
   },
   emits: ["delete", "export"],
-  components: { SelectField: SelectFieldVue },
-  setup() {
+  components: { SelectField: SelectFieldVue, CurveEditor: CurveEditorVue },
+  setup(props: { draft: BrushDraft }) {
     // i18n：t() 在 setup 建 L manifest（§5a，key 受 tsc 检查），模板引 L.*。
     // 纯 latin 参数名(size/opacity/flow/streamline/stabilization/pressure LPF/pressureGamma/
     //   pixelMode/compositeMode)有意不译——它们在中文 UI 里本就是 latin identifier。
@@ -44,9 +72,13 @@ export const BrushSettings = defineComponent({
       composite: t("bs.composite"), wash: t("bs.wash"), buildup: t("bs.buildup"), pixelModeHelp: t("bs.pixelModeHelp"),
       spacingTitle: t("bs.spacingTitle"), spacing: t("bs.spacing"), taper: t("bs.taper"), taperIn: t("bs.taperIn"), taperOut: t("bs.taperOut"), taperFloor: t("bs.taperFloor"),
       exportBrush: t("bs.exportBrush"), deleteBrush: t("bs.deleteBrush"), on: t("common.on"), off: t("common.off"),
+      pressureCurve: t("bs.pressureCurve"), useCurve: t("bs.useCurve"), useGamma: t("bs.useGamma"),
     };
+    // 压感曲线 opt-in：起点 = 现 gamma 采样成 5 key（gamma 1 → 精确恒等）；改回 = 删键（引擎回落 gamma 路径）
+    const useCurve = () => { props.draft.pressureCurve = curveFromGamma(props.draft.pressureGamma ?? 1); };
+    const dropCurve = () => { delete props.draft.pressureCurve; };
     // quantizeSize 暴露给 template（size base/max 的 fmt + onInput 都用它）
-    return { quantizeSize, L };
+    return { quantizeSize, L, useCurve, dropCurve };
   },
   template: `
   <div>
@@ -111,7 +143,15 @@ export const BrushSettings = defineComponent({
       <div class="${ROW_FULL}"><label>{{ L.composite }}</label>
         <SelectField v-model="draft.compositeMode" :options="{ wash: L.wash, buildup: L.buildup }" band="modal" />
       </div>
-      <div class="${ROW}"><label>pressureGamma</label><input type="range" min="0.2" max="3" step="0.05" v-model.number="draft.pressureGamma"><span class="${VAL}">{{ draft.pressureGamma.toFixed(2) }}</span></div>
+      <!-- 压感曲线（2026-09-05 批 4，user 0830「压感同意用anim-curve」）：有曲线 → 编辑器替代 gamma 行；无 → gamma 滑条 + 「改用曲线」 -->
+      <template v-if="draft.pressureCurve">
+        <div class="${ROW_FULL}"><label>{{ L.pressureCurve }}</label><button type="button" class="brush-rack-action" style="justify-self:end;" @click="dropCurve">{{ L.useGamma }}</button></div>
+        <CurveEditor :curve="draft.pressureCurve" />
+      </template>
+      <template v-else>
+        <div class="${ROW}"><label>pressureGamma</label><input type="range" min="0.2" max="3" step="0.05" v-model.number="draft.pressureGamma"><span class="${VAL}">{{ draft.pressureGamma.toFixed(2) }}</span></div>
+        <div class="${ROW_FULL}"><label>{{ L.pressureCurve }}</label><button type="button" class="brush-rack-action" style="justify-self:end;" @click="useCurve">{{ L.useCurve }}</button></div>
+      </template>
       <div class="${ROW_FULL}">
         <label>pixelMode<br><span style="font-size:11px;color:var(--ink-soft);">{{ L.pixelModeHelp }}</span></label>
         <button type="button" class="brush-rack-action" style="justify-self:end;" :aria-pressed="draft.pixelMode" @click="draft.pixelMode = !draft.pixelMode">{{ draft.pixelMode ? L.on : L.off }}</button>

@@ -1843,6 +1843,8 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
 .ce-btn[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
 .ce-btn:disabled { opacity: 0.4; cursor: default; }
 .ce-row-end { justify-content: flex-end; }
+.brush-settings-curve { padding: 2px 0 6px; }   /* 笔设置里的压感曲线编辑器（批 4） */
+.brush-settings-curve .curve-editor { max-width: 380px; margin: 0 auto; }   /* 设置表很宽（600px），方形编辑器别撑成 600 高（截图实测） */
 /* 色带编辑器（ui/ramp-editor.ts，2026-09-05）：条 + 条下小旗色标；gizmo/行控件复用 .ce-* 标准件 */
 .ramp-editor { display: flex; flex-direction: column; gap: 6px; outline: none; user-select: none; -webkit-user-select: none; }
 .ramp-editor:focus-visible .re-bar-wrap { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }

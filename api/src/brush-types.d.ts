@@ -1,3 +1,4 @@
+import type { AnimCurve } from "./common/anim-curve.ts";
 export interface BrushSize {
     base: number;
     max?: number;
@@ -27,6 +28,7 @@ export interface Brush {
     opaCoeff?: number;
     flowCoeff?: number;
     pressureGamma?: number;
+    pressureCurve?: AnimCurve;
     pressureLPF?: number;
     defaultOpa?: number;
     compositeMode?: string;

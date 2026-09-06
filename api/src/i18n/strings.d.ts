@@ -1697,6 +1697,21 @@ export declare const S: {
         readonly ja: "ビルドアップ（累積；100%まで、エアブラシ感）";
         readonly tok: "\"Build-Up\" (kule li kama mute. ken ale 100%.)";
     };
+    readonly "bs.pressureCurve": {
+        readonly zh: "压感曲线";
+        readonly en: "Pressure curve";
+        readonly ja: "筆圧カーブ";
+    };
+    readonly "bs.useCurve": {
+        readonly zh: "改用曲线";
+        readonly en: "Use curve";
+        readonly ja: "カーブを使う";
+    };
+    readonly "bs.useGamma": {
+        readonly zh: "改回 gamma";
+        readonly en: "Back to gamma";
+        readonly ja: "gamma に戻す";
+    };
     readonly "bs.pixelModeHelp": {
         readonly zh: "开 = 整数 snap + fillRect 无 AA（像素艺术）";
         readonly en: "On = integer snap + fillRect, no AA (pixel art)";

@@ -8,6 +8,7 @@ export function ref<T>(value: T): Ref<T>;
 //   如笔架的 Brush[] 镜像：每次 collection 变就整体重算换上，不需要也不该深代理每支笔。
 export function shallowRef<T>(value: T): Ref<T>;
 export function reactive<T extends object>(target: T): T;
+export function toRaw<T>(observed: T): T;   // 2026-09-05：brush-config-view 压感曲线编辑器要 raw 对象（曲线原地改，不走反应式）
 export interface ComputedRef<T> { readonly value: T; }
 export function computed<T>(getter: () => T): ComputedRef<T>;
 export function watch(

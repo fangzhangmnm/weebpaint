@@ -1,3 +1,4 @@
+import { type AnimCurve } from "./anim-curve.ts";
 export interface BrushPreset {
     shape?: {
         kind?: string;
@@ -14,6 +15,7 @@ export interface BrushPreset {
     opaCoeff?: number;
     flowCoeff?: number;
     pressureGamma?: number;
+    pressureCurve?: unknown;
     pressureLPF?: number;
     compositeMode?: string;
     blendMode?: string;
@@ -42,6 +44,7 @@ export interface ResolvedBrush {
     opaCoeff: number;
     flowCoeff: number;
     pressureGamma: number;
+    pressureCurve: AnimCurve | null;
     pressureLPF: number;
     compositeMode: string;
     blendMode: string;

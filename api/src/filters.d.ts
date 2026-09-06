@@ -35,6 +35,7 @@ export interface BrushSettings {
     flowCoeff?: number;
     opaCoeff?: number;
     pressureGamma?: number;
+    pressureCurve?: unknown;
     color?: string;
 }
 export interface BrushSelection {

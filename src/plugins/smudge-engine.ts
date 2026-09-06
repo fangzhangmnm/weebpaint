@@ -21,6 +21,8 @@
 // 性能（CPU）：每 dab B² 像素 × 一次 mix（smear 再 + 一次记忆 mix）。srgb 档 = 4 mul-add/px；oklab/spectral 档
 //   每像素十几个超越函数，大笔会慢——这是「先 CPU 原型」的已知代价，GPU 契约等手感定了再看（survey §5 候选 B）。
 
+import { makePressureShaper, type PressureShaper } from "../common/pressure-curve.ts";
+import type { AnimCurve } from "../common/anim-curve.ts";
 import { mixPremultInto, type MixSpace } from "../backend/algorithms/color-mix.ts";
 
 export interface SmudgeLayer {
@@ -44,6 +46,7 @@ export interface SmudgeSettings {
   flowCoeff: number;     // 压感→强度（滤镜笔预设把压感写在 flowCoeff 上；2026-09-05 user「对强度需要有压感一定要有」）
   opaCoeff: number;      // 压感→强度（第二乘子，同画笔 opa_mul）
   pressureGamma: number;
+  pressureCurve?: AnimCurve | null;   // 2026-09-05 可选压感曲线（有则替代 gamma）
   colorRate: number;     // paint 模式：每 dab 掺入画笔色的比例（0..1）
   color: readonly [number, number, number];   // 画笔色 straight sRGB 0..1
   mix: MixSpace;
@@ -55,6 +58,7 @@ type Rect = [number, number, number, number];   // x0,y0,x1,y1（x1/y1 exclusive
 interface StrokeState {
   layer: SmudgeLayer;
   s: SmudgeSettings;
+  pShape: PressureShaper;   // 压感整形（begin 烤一次）
   selection: SmudgeSelection | null;
   Rmax: number;
   B: number;                 // 窗口边长（整数）
@@ -87,7 +91,7 @@ export class SmudgeEngine {
     const B = Math.ceil(2 * Rmax) + 2;
     const n = B * B;
     const st: StrokeState = {
-      layer, s: settings, selection, Rmax, B, half: Math.floor(B / 2),
+      layer, s: settings, pShape: makePressureShaper(settings), selection, Rmax, B, half: Math.floor(B / 2),
       accum: new Float32Array(settings.mode === "dull" ? 0 : n * 4),
       accumColor: new Float32Array(4),
       paint: new Float32Array([settings.color[0], settings.color[1], settings.color[2], 1]),
@@ -135,14 +139,14 @@ export class SmudgeEngine {
   }
 
   private _radius(st: StrokeState, pressure: number): number {
-    const pc = Math.pow(clamp01(pressure), Math.max(0.01, st.s.pressureGamma || 1));
+    const pc = st.pShape(pressure);
     return Math.max(0.5, st.Rmax * signedLerp(st.s.sizeCoeff || 0, pc));
   }
 
   // 一颗 dab。step = 距上颗 dab 的笔程（首颗 0）。
   private _dab(st: StrokeState, cx: number, cy: number, pressure: number, step: number): void {
     const s0 = st.s;
-    const pc = Math.pow(clamp01(pressure), Math.max(0.01, s0.pressureGamma || 1));
+    const pc = st.pShape(pressure);
     const r = Math.max(0.5, st.Rmax * signedLerp(s0.sizeCoeff || 0, pc));
     const strength = clamp01(s0.strength * signedLerp(s0.flowCoeff || 0, pc) * signedLerp(s0.opaCoeff || 0, pc));
     const B = st.B;

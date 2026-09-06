@@ -34,6 +34,7 @@
 //   平滑核 v249 = 时间常数指数追踪（详 ai-docs/20260613-brush-procreate-smoothing.md）：smoother 给平滑中心线 C；
 //     抬笔 finish() 收尾把直线桥换成动量弧尾、钉终点。
 
+import { makePressureShaper, type PressureShaper } from "../common/pressure-curve.ts";
 import { StrokeSmoother, PressureLPF } from "./stroke-smoother.ts";
 import type { ViewLeaf } from "./workpiece/painting-view.ts";
 import type { ResolvedBrush } from "../common/resolved-brush.ts";
@@ -58,6 +59,7 @@ type Rect = [number, number, number, number];
 interface StrokeState {
   layer: ViewLeaf;
   settings: ResolvedBrush;
+  pShape: PressureShaper;   // 2026-09-05 压感整形（pressureCurve LUT 或 p^gamma），begin 时烤一次
   mode: string;
   buffered: boolean;
   lastX: number;
@@ -93,9 +95,9 @@ export class BrushEngine {
   }
 
   // step = size_eff × spacing；低压感 size 小 → step 小，不会出豆豆链
-  _stepFor(s: ResolvedBrush, pressure: number) {
+  _stepFor(s: ResolvedBrush, pressure: number, shape: PressureShaper) {
     const p = Math.max(0, Math.min(1, pressure));
-    const pCurve = Math.pow(p, Math.max(0.01, s.pressureGamma || 1.0));
+    const pCurve = shape(p);
     const sizeMul = signedLerp(s.sizeCoeff || 0, pCurve);
     const effSize = s.size * sizeMul;
     return Math.max(0.5, effSize * s.spacing);
@@ -110,6 +112,7 @@ export class BrushEngine {
     const pLPF0 = pressure;
     this._stroke = {
       layer, settings, mode,
+      pShape: makePressureShaper(settings),
       buffered,
       lastX: x, lastY: y, lastP: pLPF0,
       // 压感 LPF（backend 手感数学，C5）：事件钟，起点锚在 down 事件的 t
@@ -150,7 +153,7 @@ export class BrushEngine {
     if (L === 0) return;
     let pos = 0;
     while (true) {
-      const step = this._stepFor(st.settings, pEff);
+      const step = this._stepFor(st.settings, pEff, st.pShape);
       if (st.accumDist + (L - pos) < step) break;
       const need = step - st.accumDist;
       pos += need;
@@ -197,7 +200,7 @@ export class BrushEngine {
         let pos = 0;
         while (true) {
           const curP = p0 + (p1 - p0) * (pos / L);
-          const step = this._stepFor(st.settings, curP);
+          const step = this._stepFor(st.settings, curP, st.pShape);
           if (walk.accumDist + (L - pos) < step) break;
           pos += step - walk.accumDist;
           walk.strokeDist += step;
@@ -357,7 +360,7 @@ export class BrushEngine {
         p *= taperFloor + (1 - taperFloor) * t;
       }
     }
-    const pCurve = Math.pow(p, Math.max(0.01, s.pressureGamma || 1.0));
+    const pCurve = st.pShape(p);   // pressureCurve LUT 或 p^gamma（common/pressure-curve.ts）
     const size = Math.max(0.5, s.size * signedLerp(s.sizeCoeff || 0, pCurve));
     const effFlow = Math.max(0, Math.min(1, s.flow * signedLerp(s.flowCoeff || 0, pCurve)));
     const stampAlpha = effFlow * signedLerp(s.opaCoeff || 0, pCurve);

@@ -1,3 +1,4 @@
+import type { AnimCurve } from "./anim-curve.ts";
 export declare const DEFAULT_CONFIG: {
     size: number;
     color: string;
@@ -7,6 +8,7 @@ export declare const DEFAULT_CONFIG: {
     opaCoeff: number;
     flowCoeff: number;
     pressureGamma: number;
+    pressureCurve: AnimCurve | null;
     pressureLPF: number;
     hardness: number;
     shapeKind: string;
@@ -43,6 +45,7 @@ export interface BrushDraft {
     pressureGamma?: number;
     pressureLPF?: number;
     compositeMode?: string;
+    pressureCurve?: AnimCurve | null;
     defaultOpa?: number;
     pixelMode?: boolean;
     spacing?: number | {

@@ -3,6 +3,8 @@
 //   ② 编辑器 draft 模型（BrushDraft + ensureBrushConfigDefaults 幂等补缺）
 // 纯模块：无 DOM / 无 IDB / 无 cloud。view = ui/brush-config-view.ts，派生 = resolved-brush.ts。
 
+import type { AnimCurve } from "./anim-curve.ts";
+
 // 引擎默认参数袋 = ResolvedBrush 的 base（resolved-brush.ts import 之）。
 // 当前笔（state.brush 旧单例）已收敛成不可变 ResolvedBrush（见 ai-docs/CONTEXT [[当前笔]]）；
 // 这张表是「无 preset / 无笔架」时也能画的兜底默认（user mental model：console 设工具即可绘画）。
@@ -17,6 +19,7 @@ export const DEFAULT_CONFIG = {
   opaCoeff: 0.6,
   flowCoeff: 0,
   pressureGamma: 1.0,
+  pressureCurve: null as AnimCurve | null,   // 2026-09-05 压感曲线：有则替代 gamma（common/pressure-curve.ts）
   // v102: 压感时间域 LPF (ms，一阶 IIR)
   // 0 = raw，正值 = 平滑（解 "转角顿一下 out-leg 突然细" 的问题）
   pressureLPF: 50,
@@ -55,6 +58,7 @@ export interface BrushDraft {
   size?: { base?: number; max?: number };
   sizeCoeff?: number; opaCoeff?: number; flowCoeff?: number;
   pressureGamma?: number; pressureLPF?: number; compositeMode?: string;
+  pressureCurve?: AnimCurve | null;   // 可选：编辑器「改用曲线」才写入；「改回 gamma」删键
   defaultOpa?: number; pixelMode?: boolean;
   spacing?: number | { value?: number };
   taper?: { in?: number; out?: number };

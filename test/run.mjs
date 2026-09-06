@@ -85,6 +85,7 @@ import "./anim-curve.test.mjs";   // 2026-09-05 Unity 式关键帧曲线数学�
 import "./curve-editor.test.mjs"; // 2026-09-05 曲线编辑器皮：把手几何互逆/＋🗑 规则/键盘微调 + dom-shim 构造不抛
 import "./color-ramp.test.mjs";   // 2026-09-05 色带：constant 二分 LUT 精确/sRGB·OKLab 端点回归/verb + 渐变映射 kernel（luma 查表、alpha 原样、mask）
 import "./ramp-editor.test.mjs";  // 2026-09-05 色带编辑器皮：256 段硬边渐变串/插入位置/hex + dom-shim 构造不抛
+import "./pressure-curve.test.mjs"; // 2026-09-05 压感曲线：LUT 恒等/gamma 回落/常数=无压感/笔刷 JSON 可选键透传（resolveBrush·smudge）
 import "./brush-settings-model.test.mjs";
 import "./brush-rack-view.test.mjs";
 import "./brush-rack-reactive.test.mjs";   // ★笔架↔collection 绑定回归（v415 漏接过）

@@ -109,6 +109,7 @@ export interface BrushSettings {
   flowCoeff?: number;
   opaCoeff?: number;
   pressureGamma?: number;
+  pressureCurve?: unknown;   // 2026-09-05 可选压感曲线（ResolvedBrush.pressureCurve；插件经 sanitizeCurve 读）
   color?: string;
 }
 

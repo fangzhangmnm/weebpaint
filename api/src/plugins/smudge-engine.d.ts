@@ -1,3 +1,4 @@
+import type { AnimCurve } from "../common/anim-curve.ts";
 import { type MixSpace } from "../backend/algorithms/color-mix.ts";
 export interface SmudgeLayer {
     docW: number;
@@ -19,6 +20,7 @@ export interface SmudgeSettings {
     flowCoeff: number;
     opaCoeff: number;
     pressureGamma: number;
+    pressureCurve?: AnimCurve | null;
     colorRate: number;
     color: readonly [number, number, number];
     mix: MixSpace;

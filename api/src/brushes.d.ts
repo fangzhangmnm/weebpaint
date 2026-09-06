@@ -1,4 +1,5 @@
 import type { Brush, BrushRackData } from "./brush-types.ts";
+import type { AnimCurve } from "./common/anim-curve.ts";
 export interface BrushInitItem {
     id: string;
     value: unknown;
@@ -19,6 +20,7 @@ interface MakeBrushArgs {
     opaCoeff?: number;
     flowCoeff?: number;
     pressureGamma?: number;
+    pressureCurve?: AnimCurve;
     pressureLPF?: number;
     compositeMode?: string;
     blendMode?: string;
@@ -62,7 +64,7 @@ interface BrushSizeLegacy {
 }
 export declare const DEFAULT_FOLDER = "\u6211\u7684\u5E38\u7528";
 export declare function newBrushId(): string;
-export declare function makeBrush({ id, name, tool, folder, size, sizeBaseMax, sizeCoeff, opaCoeff, flowCoeff, pressureGamma, pressureLPF, // v416 四处统一 50（此前这里是 0，导致**新建笔**没有压感 LPF，而出厂笔/UI 默认都是 50）
+export declare function makeBrush({ id, name, tool, folder, size, sizeBaseMax, sizeCoeff, opaCoeff, flowCoeff, pressureGamma, pressureCurve, pressureLPF, // v416 四处统一 50（此前这里是 0，导致**新建笔**没有压感 LPF，而出厂笔/UI 默认都是 50）
 compositeMode, blendMode, // v163: per-brush 混合模式（multiply/screen/... ＝ Canvas2D globalCompositeOperation）
 shapeKind, aspect, rotation, hardness, // 与 DEFAULT_CONFIG / ensureBrushConfigDefaults / resolveBrush 统一（v415：此前三处 0.75/1.0/1.0 各说各话）
 spacingValue, pixelMode, taperIn, taperOut, streamline, stabilization, defaultOpa, }: MakeBrushArgs): Brush;

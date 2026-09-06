@@ -61,6 +61,7 @@ export function buildRackCode(rack: BrushRackData): string {
     args.opaCoeff = b.opaCoeff ?? 0.6;
     args.flowCoeff = b.flowCoeff ?? 0;
     if (b.pressureGamma != null && b.pressureGamma !== 1.0) args.pressureGamma = b.pressureGamma;
+    if (b.pressureCurve) args.pressureCurve = b.pressureCurve;   // 2026-09-05 压感曲线（可选顶层键）
     if (b.defaultOpa != null && b.defaultOpa !== 1.0) args.defaultOpa = b.defaultOpa;
     args.compositeMode = b.compositeMode || "wash";
     if (b.blendMode && b.blendMode !== "source-over") args.blendMode = b.blendMode;

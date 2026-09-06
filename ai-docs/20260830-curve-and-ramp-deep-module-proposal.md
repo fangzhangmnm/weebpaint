@@ -1,7 +1,8 @@
 # 曲线 + 色带深模块提案（anim-curve / color-ramp / 两张编辑器皮）
 
 > 作者：Claude Fable 5（claude-fable-5）· 2026-08-30 · 讨论轮产物，未动码
-> as-of v0.12.10 / 2026-08-30 · 状态：**提案待 user 说「没问题」**
+> as-of v0.12.10 / 2026-08-30 · 状态：~~提案待 user 说「没问题」~~ → **四批全部落地 dev v0.13.5–v0.13.7（2026-09-05，user「可以把曲线做一下吗，以及那一轮讨论的其他东西也看一下」）**。
+> 实现中形状与提案的差异回写在 **§6**（edited by Claude Fable 5.1 2026-09-05）；§2 保留为当时 pin 的契约，现值以 `api/` 为准。
 
 ## 0. 本轮拍板（2026-08-30 user 原话，只记这一轮）
 
@@ -191,3 +192,16 @@ export function makeRampEditor(o: RampEditorOpts): RampEditorHandle;
 - `common/` 入册两个纯数学模块不碰 `backend/algorithms` 的「像素算法需 consent」条——它们不是像素算法；渐变映射 kernel 与现有 hsb/curves kernel 同形（per-pixel LUT）。
 - 批 4 动笔刷持久化形状（新增可选字段）——user 本轮已口头同意，落地时再报一次字段名。
 - OKLab 反变换要补代码（`color-dist.ts` 只有正向），端点回归原色靠测试锁。
+
+## 6. 落地回写（2026-09-05，Claude Fable 5.1；对照 §2/§3，形状变了的地方）
+
+| 批 | 落地版本 | 与提案的差异 / 备注 |
+|---|---|---|
+| 0 | v0.13.5 | 照提案：`hsb-kernel` defaults `satMode: "linear"`。 |
+| 1 | v0.13.5 | `common/anim-curve.ts`：§2.1 全部 + 新增 `sanitizeCurve(raw)`（读持久化/MCP 参数用）、`cloneCurve`/`curveEquals`、`TANGENT_MODES`/`DEFAULT_TANGENT_MODE`；`removeKey` 返回 boolean 且至少留 1 key；`moveKey` 返回新 index。**insertKey「不改形状」松成「新点落在原曲线上，auto 邻居切线随之重算（Unity AddKey 同）」**——测试锁 S 曲线 LUT 偏差 ≤4/255、恒等曲线逐字节不变。wrap `loop`/`pingPong` 顺手实现（各 3 行 + 测试），不只是接口站住。 |
+| 2 | v0.13.5 | `ui/curve-editor.ts`：§2.4 全部（把手 40px 定长、drag-value rel 状态机 shift 细调、＋🗑、切线模式行 + 断开 + 复位、方向键/Delete）。**＋🗑 落左上角而非右上角**：(1,1) 是恒等曲线的末端键，右上会盖住键（截图实测）。键/把手是 HTML 元素（CSS px 命中面），只有曲线/网格/把手线是 SVG。handle 多两个方法 `select(i)`、opts 多 `keyStep`。`curves-kernel` `CurvesParams` 通道曲线 = `AnimCurve`，`curveOf()` 兼容旧 `[x,y][]` 点表（MCP 回放）。`hiddenInMenu` 撤。真浏览器探针 `tools/probes/curve-editor.mjs`。 |
+| 3 | v0.13.6 | `common/color-ramp.ts`：§2.2 全部 + `sanitizeRamp`/`cloneRamp`/`hexToRgba8`/`rgba8ToCss`/`RAMP_INTERPS`/`RAMP_SPACES`；`color-dist.ts` +`oklabToSrgb`（往返 ≤1/255 测试锁）。`gradient-map-kernel` id=`gradientMap`，`FILTER_KERNELS` 封闭集 6→7。`ui/ramp-editor.ts`：**＋🗑 不 overlay 在条上**（条 36px 高、渐变就是内容，盖起点色=遮内容，截图实测）→ 放读数行右侧；其余照 §2.5（256 段硬边 CSS 渐变、小旗色标、插值/色彩空间 select、翻转、取前景色）。「取前景色」读口 = `filters.ts setFilterForegroundColorProvider`（filters-adjust init 注入 `state.color`，插件不 import app 层）。探针 `tools/probes/gradient-map.mjs`。 |
+| 4 | v0.13.7 | 新模块 `common/pressure-curve.ts`：`makePressureShaper({pressureGamma, pressureCurve})` → 有合法曲线烤 256 Float32 LUT 线性插值查表，否则 `p^gamma`（同旧引擎地板 0.01）；`curveFromGamma(g)` 5 key 采样（g=1 精确恒等）。消费者 = `backend/brush.ts`（StrokeState.pShape，`_stepFor`/`_stampParams` 两处 pow 换掉）+ `plugins/smudge-engine.ts`（手指也吃）。**笔刷 JSON 新顶层可选键 `pressureCurve: AnimCurve`**（`Brush`/`BrushPreset`/`ResolvedBrush.pressureCurve: AnimCurve|null`/`BrushDraft`/`makeBrush` 缺省不写键/`brush-io` 导出）；旧 `size.pressureCurve`/`flow.pressureCurve` 数字字段与迁移代码不碰。**UI 不是直接把 gamma 行换成编辑器，而是 opt-in**：笔设置「高级」保留 pressureGamma 滑条 + 「改用曲线」钮（起点 = 现 gamma 采样）；有曲线时编辑器替代滑条 + 「改回 gamma」钮（删键→引擎回落 gamma）。理由：不静默迁移任何旧笔（出厂笔 JSON 形状不变、`builtin-brushes.test` 逐字段契约不动）。探针 `tools/probes/pressure-curve.mjs`。 |
+
+未做（照 §4 park）：预设库、加权切线 UI、HSV 色空间、B-spline/Cardinal、时间轴皮（pan/zoom）、双击加点/拖出删、色轮内嵌 ramp 编辑器。
+

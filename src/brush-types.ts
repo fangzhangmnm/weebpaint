@@ -4,6 +4,8 @@
 // 实际读写到的字段，挂 `[k]: unknown` index 兜底动态/未列字段——非穷举、非新契约，只是把抄在多处的
 // 隐式 any 收成一处可复用的形状。改 brushes.ts 的字段时同步收紧此处（as-of v305 / 2026-06-19）。
 
+import type { AnimCurve } from "./common/anim-curve.ts";
+
 export interface BrushSize { base: number; max?: number; }
 // kind: "round" | "ellipse"。**没有 texture** —— 纹理笔尚未实现，v415 把那条死线整条清了
 //   （下拉项选了没反应、textureB64 存而不读）。将来真做纹理笔时 greenfield 重来，别复活这些残骸。
@@ -24,6 +26,7 @@ export interface Brush {
   opaCoeff?: number;
   flowCoeff?: number;
   pressureGamma?: number;
+  pressureCurve?: AnimCurve;   // 2026-09-05 顶层可选：压感曲线（有则替代 pressureGamma；common/pressure-curve.ts）
   pressureLPF?: number;
   defaultOpa?: number;
   compositeMode?: string;

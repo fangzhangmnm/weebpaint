@@ -15,6 +15,7 @@
 //   这里用 DEFAULT_CONFIG 兜底出一个完整可画的笔。rack 只是 ResolvedBrush 的**生产者之一**。
 
 import { DEFAULT_CONFIG } from "./current-brush-config.ts";
+import { type AnimCurve, sanitizeCurve } from "./anim-curve.ts";
 
 // 笔架里的一把预设（黑盒；只读这里用到的字段）。
 export interface BrushPreset {
@@ -25,6 +26,7 @@ export interface BrushPreset {
   opaCoeff?: number;
   flowCoeff?: number;
   pressureGamma?: number;
+  pressureCurve?: unknown;             // 2026-09-05 可选压感曲线（黑盒读入，resolve 时 sanitizeCurve）
   pressureLPF?: number;
   compositeMode?: string;
   blendMode?: string;
@@ -50,6 +52,7 @@ export interface ResolvedBrush {
   opaCoeff: number;
   flowCoeff: number;
   pressureGamma: number;
+  pressureCurve: AnimCurve | null;     // 有则替代 gamma（common/pressure-curve.ts makePressureShaper）
   pressureLPF: number;
   compositeMode: string;
   blendMode: string;
@@ -101,6 +104,7 @@ export function resolveBrush({
     b.opaCoeff      = preset.opaCoeff ?? 0.6;
     b.flowCoeff     = preset.flowCoeff ?? 0;
     b.pressureGamma = preset.pressureGamma ?? 1.0;
+    b.pressureCurve = preset.pressureCurve == null ? null : sanitizeCurve(preset.pressureCurve);   // 坏形状 → null = 走 gamma
     b.pressureLPF   = preset.pressureLPF ?? 50;
     b.compositeMode = preset.compositeMode || "wash";
     b.blendMode     = preset.blendMode || "source-over";

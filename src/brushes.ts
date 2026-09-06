@@ -25,6 +25,7 @@
 import { embeddedText } from "./standalone-html.ts";   // P6 单文件内嵌读口
 import { t, lang } from "./i18n/index.ts";
 import type { Brush, BrushRackData } from "./brush-types.ts";
+import type { AnimCurve } from "./common/anim-curve.ts";
 import { reportError } from "./error-badge.ts";
 
 // getInitData 的初始项形状（与 store 的 CollectionInitItem 结构等价；不 import 库类型免耦合）。
@@ -45,6 +46,7 @@ interface MakeBrushArgs {
   opaCoeff?: number;
   flowCoeff?: number;
   pressureGamma?: number;
+  pressureCurve?: AnimCurve;   // 2026-09-05 可选：有则替代 gamma（缺省不写键）
   pressureLPF?: number;
   compositeMode?: string;
   blendMode?: string;
@@ -123,6 +125,7 @@ export function makeBrush({
   size = 12, sizeBaseMax = 200,
   sizeCoeff = 0.6, opaCoeff = 0.6, flowCoeff = 0,
   pressureGamma = 1.0,
+  pressureCurve,
   // v102+: pressure low-pass filter（ms，时间域 IIR）
   // 解 "勾线转角顿一下 out-leg 变细" —— LPF 让落点过去几十毫秒的高 pressure 仍留尾巴
   pressureLPF = 50,   // v416 四处统一 50（此前这里是 0，导致**新建笔**没有压感 LPF，而出厂笔/UI 默认都是 50）
@@ -143,6 +146,7 @@ export function makeBrush({
     size: { base: size, max: sizeBaseMax },
     sizeCoeff, opaCoeff, flowCoeff,
     pressureGamma,
+    ...(pressureCurve ? { pressureCurve } : {}),   // 缺省不写键：出厂笔/旧笔 JSON 形状不变
     pressureLPF,
     defaultOpa,
     compositeMode,

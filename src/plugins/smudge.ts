@@ -11,6 +11,7 @@
 //     size / hardness / spacing / 压感系数来自滤镜笔架当前选的笔（getResolvedBrush）；lockAlpha 跟图层属性。
 // 数学与候选比较：ai-docs/20260905-smudge-math-survey.md。
 
+import { sanitizeCurve } from "../common/anim-curve.ts";
 import { registerFilter } from "../filters.ts";
 import { t, tLatin } from "../i18n/index.ts";
 import type { Filter, FilterParams, BrushLayer, BrushSettings, BrushSelection, DirtyRect } from "../filters.ts";
@@ -47,6 +48,7 @@ export function smudgeSettingsFrom(params: FilterParams, bs: BrushSettings, laye
     flowCoeff: num(bs.flowCoeff, 0),
     opaCoeff: num(bs.opaCoeff, 0),
     pressureGamma: num(bs.pressureGamma, 1),
+    pressureCurve: bs.pressureCurve == null ? null : sanitizeCurve(bs.pressureCurve),   // 2026-09-05 压感曲线透传
     colorRate: mode === "paint" ? clamp01(num(params.colorRate, 0.5)) : 0,
     color: parseHexColor(bs.color),
     mix: isMixSpace(params.mix) ? params.mix : "srgb",

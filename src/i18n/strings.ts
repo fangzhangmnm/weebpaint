@@ -348,6 +348,9 @@ export const S = {
   "bs.composite":    { zh: "重叠模式 compositeMode", en: "Overlap (compositeMode)", ja: "重なり (compositeMode)", tok: "nasin pi wan linja (\"compositeMode\")" }, 
   "bs.wash":         { zh: "Wash（max；自交不变深，有上限）", en: "Wash (max; self-overlap won’t darken, capped)", ja: "ウォッシュ（max；自己重なりで濃くならない、上限あり）", tok: "\"Wash\" (sewi li lon. linja sama li pimeja ala.)" }, 
   "bs.buildup":      { zh: "Build-Up（累积；可达 100%，喷枪 feel）", en: "Build-Up (accumulates; up to 100%, airbrush feel)", ja: "ビルドアップ（累積；100%まで、エアブラシ感）", tok: "\"Build-Up\" (kule li kama mute. ken ale 100%.)" }, 
+  "bs.pressureCurve": { zh: "压感曲线", en: "Pressure curve", ja: "筆圧カーブ" },   // 2026-09-05 批 4
+  "bs.useCurve":      { zh: "改用曲线", en: "Use curve", ja: "カーブを使う" },
+  "bs.useGamma":      { zh: "改回 gamma", en: "Back to gamma", ja: "gamma に戻す" },
   "bs.pixelModeHelp":{ zh: "开 = 整数 snap + fillRect 无 AA（像素艺术）", en: "On = integer snap + fillRect, no AA (pixel art)", ja: "オン = 整数スナップ + fillRect、AAなし（ドット絵）", tok: "lon = leko kiwen (sitelen leko)" }, 
   "bs.spacingTitle": { zh: "间距 (% 直径)", en: "Spacing (% of diameter)", ja: "間隔 (% 直径)", tok: "weka pi sitelen lili (% suli)" }, 
   "bs.spacing":      { zh: "间距",     en: "Spacing",      ja: "間隔", tok: "weka pi sitelen lili" }, 
