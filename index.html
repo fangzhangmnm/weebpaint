@@ -107,7 +107,7 @@
     <link rel="icon" href="./icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=95e69fd1b326" />
+    <link rel="stylesheet" href="./styles.css?v=67ca4b2a441e" />
     <!-- zip.js UMD bundle：自挂 window.zip。必须在 module bundle 之前。
          defer（v417）：原来是 parser-blocking 的，硬刷新时 SW 被绕过 → 直奔网络 → 网络一卡整个
          文档解析就停住（浏览器标签页转圈）。defer 后它与下面的 type=module bundle 同属延迟脚本、
@@ -1276,21 +1276,24 @@
     </div>
 
     <!-- v110 自由裁切：toolbar (8-handle crop) -->
-    <div class="crop-toolbar hidden" id="cropToolbar">
-      <button class="crop-toolbar-btn crop-toolbar-icon" id="cropModeFree" type="button" aria-pressed="true" data-i18n-title="crop.modeFree"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#crop"/></svg></button>
-      <button class="crop-toolbar-btn crop-toolbar-icon" id="cropModeTemplate" type="button" aria-pressed="false" data-i18n-title="crop.modeTemplate"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#crop-fixed-size"/></svg></button>
-      <span class="crop-toolbar-sep" aria-hidden="true">|</span>
-      <button type="button" class="crop-toolbar-btn hidden select-field" id="cropTemplateSel"></button>
+    <!-- 2026-09-06 U1：裁切条换 .lasso-toolbar-stack 皮（与套索/形状/滤镜笔同位同高），控件 id 不变 -->
+    <div class="lasso-toolbar-stack hidden" id="cropToolbar" role="toolbar">
+      <div class="lasso-toolbar">
+      <button class="lasso-tool-btn lasso-tool-icon" id="cropModeFree" type="button" aria-pressed="true" data-i18n-title="crop.modeFree"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#crop"/></svg></button>
+      <button class="lasso-tool-btn lasso-tool-icon" id="cropModeTemplate" type="button" aria-pressed="false" data-i18n-title="crop.modeTemplate"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#crop-fixed-size"/></svg></button>
+      <span class="ct-sep" aria-hidden="true">|</span>
+      <button type="button" class="lasso-tool-btn hidden select-field" id="cropTemplateSel"></button>
       <input class="crop-toolbar-btn crop-wh-input hidden" id="cropCustomW" type="number" min="1" max="8192" placeholder="宽px" data-i18n-ph="crop.widthPh" />
       <span class="hidden" id="cropCustomX" aria-hidden="true">×</span>
       <input class="crop-toolbar-btn crop-wh-input hidden" id="cropCustomH" type="number" min="1" max="8192" placeholder="高px" data-i18n-ph="crop.heightPh" />
-      <button class="crop-toolbar-btn crop-toolbar-icon hidden" id="cropFitCover" type="button" data-i18n-title="crop.fitCover"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#fit-fill"/></svg></button>
-      <button class="crop-toolbar-btn crop-toolbar-icon hidden" id="cropFitContain" type="button" data-i18n-title="crop.fitContain"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#fit-contain"/></svg></button>
+      <button class="lasso-tool-btn lasso-tool-icon hidden" id="cropFitCover" type="button" data-i18n-title="crop.fitCover"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#fit-fill"/></svg></button>
+      <button class="lasso-tool-btn lasso-tool-icon hidden" id="cropFitContain" type="button" data-i18n-title="crop.fitContain"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#fit-contain"/></svg></button>
       <!-- v0.6.64 resample toggle（默认关）：关=模板只当比例参考、保原分辨率；开=裁后重采样到目标 -->
-      <button class="crop-toolbar-btn crop-toolbar-icon hidden" id="cropResampleToggle" type="button" aria-pressed="false" data-i18n-title="crop.resample"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#resample"/></svg></button>
-      <span class="crop-toolbar-sep" aria-hidden="true">|</span>
-      <button class="crop-toolbar-btn crop-toolbar-icon" id="cropToolbarApply" type="button" data-i18n-title="crop.apply"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#check"/></svg></button>
-      <button class="crop-toolbar-btn crop-toolbar-icon crop-toolbar-cancel" id="cropToolbarCancel" type="button" data-i18n-title="common.cancel"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#x"/></svg></button>
+      <button class="lasso-tool-btn lasso-tool-icon hidden" id="cropResampleToggle" type="button" aria-pressed="false" data-i18n-title="crop.resample"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#resample"/></svg></button>
+      <span class="ct-sep" aria-hidden="true">|</span>
+      <button class="lasso-tool-btn lasso-tool-icon" id="cropToolbarApply" type="button" data-i18n-title="crop.apply"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#check"/></svg></button>
+      <button class="lasso-tool-btn lasso-tool-icon crop-toolbar-cancel" id="cropToolbarCancel" type="button" data-i18n-title="common.cancel"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#x"/></svg></button>
+    </div>
     </div>
 
     <!-- ADR-0006 VP 编辑 toolbar（UI v2.2：lasso 图标风格同形状笔工具条）：重置/锁地平线/✓/✕ -->
@@ -1305,17 +1308,7 @@
     <!-- VP 拖拽手柄层（screen 坐标 DOM；VP 常在画布外也能拖） -->
     <div class="persp-handles hidden" id="perspHandles"></div>
 
-    <!-- v132 Filter brush toolbar：进入模糊笔刷 / 锐化笔刷等 filter brush 模式时浮在顶栏下方。
-         v0.6.62 模板化（user）：所有滤镜笔共用一个固定槽位模板——
-         title | #filterBrushControls（variant/sample/bleed 按序重建）| sep | 笔架(SVG) | ✓(SVG，对齐裁切工具条图标化)。 -->
-    <div class="crop-toolbar hidden" id="filterBrushToolbar">
-      <span class="crop-toolbar-label" id="filterBrushTitle" data-i18n="fb.title">滤镜笔刷</span>
-      <span id="filterBrushControls" style="display:contents"></span>
-      <span class="crop-toolbar-sep" aria-hidden="true">|</span>
-      <!-- v132 (user：「ui 里有一个开笔架的功能，不然笔架关了开不了」) -->
-      <button class="crop-toolbar-btn crop-toolbar-icon" id="filterBrushOpenRack" type="button" data-i18n-title="rack.sheet"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#brush-rack"/></svg></button>
-      <button class="crop-toolbar-btn crop-toolbar-icon" id="filterBrushExit" type="button" data-i18n-title="common.exit"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#check"/></svg></button>
-    </div>
+    <!-- 滤镜笔上下文工具条：2026-09-06 U1 起由 ui/context-toolbar 工厂在 filters-adjust init 生成（id=filterBrushToolbar），不再是静态 HTML。 -->
 
     <!-- v110 自由裁切 overlay：rect + 8 handles + dimmed mask -->
     <div class="crop-overlay hidden" id="cropOverlay">
@@ -1603,6 +1596,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-a420f9cb47db.mjs"></script>
+    <script type="module" src="./dist/weebpaint-2b751f033343.mjs"></script>
   </body>
 </html>

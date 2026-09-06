@@ -12,10 +12,9 @@ import { t, tLatin } from "./i18n/index.ts";
 import { desk } from "./workbench-state.ts";
 import { PANELS, openExclusive, closeExclusive } from "./panel-state.ts";
 import { getFilter, listFilters, onFilterRegistered } from "./filters.ts";
-import { makeRampSlider } from "./ui/ramp-slider.ts";   // 2026-09-05 滤镜笔条连续旋钮（brushSliders）
 import { positionPopup } from "./anchored-popup.ts";
 import { openAdoptedPopup, closePopupMenuOf, isPopupOpen } from "./ui/popup-menu.ts";   // 2026-09-02 C1：调整 popup 收养
-import { registerContextToolbar } from "./ui/context-toolbar.ts";   // 2026-09-02 C4
+import { mountContextToolbar, type ContextToolbarHandle, type ToolbarItem } from "./ui/context-toolbar.ts";   // 2026-09-02 C4 登记 → 2026-09-06 U1 工厂
 
 import { setTool } from "./toolbar.ts";   // 命令 = toolbar 的接口（显式 import）
 import { requireEditableLeaf } from "./editable-leaf.ts";
@@ -276,14 +275,14 @@ function _openArtistPicker() {
 //        + toolbar 渲染子算法 dropdown（user：「不同算法是 toolbar dropdown」）
 //   退出：清 state.filterBrush；关 rack；setTool 回前一个
 let _filterBrushPreviousTool: string | null = null;
-function _enterFilterBrushMode(Filter: FilterLike) {
+function _enterFilterBrushMode(Filter: FilterLike, variantId?: string) {
   editMode.applyPendingTransient();
   _filterBrushPreviousTool = editMode.current() === "filterBrush" ? "brush" : editMode.current();
-  // 取持久化的 variantId（user 上次选过的；新 doc 默认第一个）
+  // 取持久化的 variantId（user 上次选过的；新 doc 默认第一个）；显式传入（顶栏子工具）优先
   const variants = Filter.brushVariants || [{ id: "default", title: Filter.title, params: Filter.defaults() }];
   const tsKey = _toolStateKeyFor(Filter);   // 2026-09-05：手指的 variant/dial 记在 toolStates.smudge
   const savedVid = state.toolStates[tsKey]?.variantId;
-  let variant = variants.find((v) => v.id === savedVid) || variants[0];
+  let variant = (variantId ? variants.find((v) => v.id === variantId) : undefined) || variants.find((v) => v.id === savedVid) || variants[0];
   // v147 声明了 boundaryModes 的 filter（液化）→ params 带上持久化的 bleed；其他 filter 不掺这个 key
   let params = Filter.boundaryModes
     ? { ...variant.params, bleed: desk.liquify.bleed }
@@ -308,44 +307,29 @@ function _toolStateKeyFor(Filter: FilterLike): string { return Filter.id === "sm
 function _exitFilterBrushMode() {
   state.filterBrush = null;
   dialReactive.payload = null;
-  const tb = document.getElementById("filterBrushToolbar");
-  if (tb) tb.classList.add("hidden");
+  _fbToolbar?.hide();
   closeExclusive();   // 收 rack
   setTool(_filterBrushPreviousTool || "brush");
   _filterBrushPreviousTool = null;
   setStatus(t("mi.exitedFilterBrush"));
 }
-// 渲染 toolbar（v0.6.62 模板化，user：「抽一个所有滤镜笔共用的模板」）：
-//   固定槽位 #filterBrushControls，按 filter 声明的能力**按序**重建 variant → sample → bleed；
-//   笔架/✓ 是模板静态件（index.html）。废掉旧的 insertAdjacentElement 链——位置由模板定，不由插入顺序拼。
-function _renderFilterBrushToolbar() {
-  if (!state.filterBrush) return;
-  const fb = state.filterBrush;                  // 捕获非空引用（闭包里 state.filterBrush 不被收窄）
-  const Filter = fb.Filter as FilterLike;        // filterBrush.Filter 在 AppContext 里是 unknown（owner=filters.js）
-  const variantId = fb.variantId;
-  const tb = document.getElementById("filterBrushToolbar");
-  const title = document.getElementById("filterBrushTitle");
-  const slot = document.getElementById("filterBrushControls");
-  if (!tb || !title || !slot) return;
-  tb.classList.remove("hidden");
-  title.textContent = Filter.title;
-  slot.innerHTML = "";
-  // 2026-09-02 C6：滤镜笔条里的三个下拉全走 select-field 标准件（原 mkSel 造原生 <select> 退役）
-  const mkField = (id: string, opts: SelectFieldOpts) => {
-    const f = createSelectField({ id, className: "crop-toolbar-btn", ...opts });
-    slot.appendChild(f.el);
-    return f;
-  };
-  // ① 子算法 dropdown（多 variant 才显）
+// 滤镜笔上下文工具条（v0.6.62 模板化 → 2026-09-06 U1 走 ui/context-toolbar 工厂）：
+//   按 filter 声明的能力**按序**出 spec：title → variant → sample → mix → 连续旋钮 → bleed（有选区）→ | → 笔架 → ✓。
+//   chrome/定位/「…」溢出全归工厂（与套索/形状条同皮同位——user 2026-09-05「smudge 笔刷工具条位置不对」的病根是 .crop-toolbar 皮）。
+let _fbToolbar: ContextToolbarHandle | null = null;
+function _fbRows(): ToolbarItem[][] {
+  const fb = state.filterBrush;
+  if (!fb) return [];
+  const Filter = fb.Filter as FilterLike;
+  const items: ToolbarItem[] = [{ kind: "title", text: Filter.title }];
+  // ① 子算法（多 variant 才显）
   const variants = Filter.brushVariants || [];
   if (variants.length > 1) {
-    mkField("filterBrushVariantSel", { items: () => variants.map((v) => ({ value: v.id, label: v.title })), value: () => fb.variantId || variantId || "", onChange: (id) => {
+    items.push({ kind: "select", id: "filterBrushVariantSel", title: tLatin("fb.variant"), items: () => variants.map((v) => ({ value: v.id, label: v.title })), value: () => fb.variantId || "", onChange: (id) => {
       const v = variants.find((x) => x.id === id);
       if (!v) return;
-      // 切 variant 别丢 bleed/sample（声明了对应能力的 filter 才有这些 key）
-      let np = Filter.boundaryModes
-        ? { ...v.params, bleed: fb.params.bleed }
-        : v.params;
+      // 切 variant 别丢 bleed/sample/mix（声明了对应能力的 filter 才有这些 key）
+      let np = Filter.boundaryModes ? { ...v.params, bleed: fb.params.bleed } : v.params;
       if (Filter.sampleModes) np = { ...np, sample: fb.params.sample };
       if (Filter.mixModes) np = { ...np, mix: fb.params.mix };
       fb.params = np;
@@ -354,60 +338,50 @@ function _renderFilterBrushToolbar() {
       { const k = _toolStateKeyFor(Filter); if (state.toolStates[k]) state.toolStates[k].variantId = v.id; }
       // UI 态不 mark dirty（user 2026-06-10）：variant 选择是工具态，保存时顺手捞；真应用滤镜走 histchange 门。
       setStatus(t("mi.switchedTo", { title: v.title }));
-      if (Filter.brushSliders) _renderFilterBrushToolbar();   // 旋钮值随 variant 预设变 → 重画条
+      _renderFilterBrushToolbar();   // 旋钮值随 variant 预设变 → 重画条
     } });
   }
-  // ①b 2026-09-05 连续旋钮：声明了 brushSliders 的 filter（手指 smear↔dull「揉匀」）常驻渲染；值 → params[key]。
-  //   session 态、不持久化（持久化键要 user 点头）；variant 切换会按预设重置。窄条内联样式复用 lasso 容差滑条那套。
-  for (const sl of Filter.brushSliders || []) {
-    const wrap = document.createElement("span");
-    wrap.className = "lasso-tol-inline fb-inline-slider";
-    wrap.title = sl.title;
-    const cur = typeof fb.params[sl.key] === "number" ? (fb.params[sl.key] as number) : sl.min;
-    wrap.appendChild(makeRampSlider({
-      label: sl.title, min: sl.min, max: sl.max, step: sl.step, value: cur, fmt: sl.fmt,
-      onInput: (v) => { fb.params = { ...fb.params, [sl.key]: v }; },
-    }).el);
-    slot.appendChild(wrap);
-  }
-  // ② v0.6.36 采样核下拉：声明了 sampleModes 的 filter（液化）常驻渲染。选项 = RESAMPLE_MODES
-  //   的 liquify context（SSoT 复用，与 transform 下拉同源）；持久化 desk.liquify.sample。
+  // ② 采样核（液化）：选项 = RESAMPLE_MODES 的 liquify context；持久化 desk.liquify.sample
   if (Filter.sampleModes) {
-    mkField("filterBrushSampleSel", {
-      items: () => resampleItems("liquify", tLatin as (key: string) => string),
-      value: () => (fb.params.sample as string) || "bicubic",
-      onChange: (v) => { fb.params = { ...fb.params, sample: v }; desk.liquify.sample = v; },
-    });
+    items.push({ kind: "select", id: "filterBrushSampleSel", title: tLatin("fb.sample"), items: () => resampleItems("liquify", tLatin as (key: string) => string), value: () => (fb.params.sample as string) || "bicubic",
+      onChange: (v) => { fb.params = { ...fb.params, sample: v }; desk.liquify.sample = v; } });
   }
-  // ②b 2026-09-05 混色空间下拉：声明了 mixModes 的 filter（手指 smudge）常驻渲染；值 → params.mix，
-  //   持久化 preferences "smudge-mix"（gallery scope：混色口味跟人走，不跟画）。
+  // ②b 混色空间（手指）：值 → params.mix，持久化 preferences "smudge-mix"（gallery scope）
   if (Filter.mixModes) {
-    mkField("filterBrushMixSel", {
-      items: () => Filter.mixModes!.map((m) => ({ value: m.id, label: m.title })),
-      value: () => (fb.params.mix as string) || "srgb",
+    items.push({ kind: "select", id: "filterBrushMixSel", title: tLatin("fb.mix"), items: () => Filter.mixModes!.map((m) => ({ value: m.id, label: m.title })), value: () => (fb.params.mix as string) || "srgb",
       onChange: (v) => {
         fb.params = { ...fb.params, mix: v };
         preferences.set("smudge-mix", v);
         const m = Filter.mixModes!.find((x) => x.id === v);
         setStatus(t("mi.switchedTo", { title: m ? m.title : v }));
-      },
-    });
+      } });
   }
-  // ③ v147 边界取样下拉：仅当 filter 声明 boundaryModes（液化）且有选区时渲染。
-  //   feature 声明数据 + 通用渲染 → 删 filter 即删 UI，不再像旧 #liquifyPanel 那样静态腐烂。
+  // ②c 连续旋钮（手指 smear↔dull「揉匀」）：值 → params[key]；session 态
+  for (const sl of Filter.brushSliders || []) {
+    items.push({ kind: "slider", id: `filterBrushSlider-${sl.key}`, label: sl.title, min: sl.min, max: sl.max, step: sl.step, fmt: sl.fmt,
+      value: () => (typeof fb.params[sl.key] === "number" ? (fb.params[sl.key] as number) : sl.min),
+      onInput: (v) => { fb.params = { ...fb.params, [sl.key]: v }; } });
+  }
+  // ③ 边界取样（液化且有选区）
   if (Filter.boundaryModes && doc.selection) {
-    const bf = mkField("filterBrushBleedSel", {
-      items: () => Filter.boundaryModes!.map((b) => ({ value: b.id, label: b.title })),
-      value: () => (fb.params.bleed as string) || "edge",
+    items.push({ kind: "select", id: "filterBrushBleedSel", title: tLatin("fb.bleed"), items: () => Filter.boundaryModes!.map((b) => ({ value: b.id, label: b.title })), value: () => (fb.params.bleed as string) || "edge",
       onChange: (v) => {
         fb.params = { ...fb.params, bleed: v };
         desk.liquify.bleed = v;
         const m = Filter.boundaryModes!.find((b) => b.id === v);
         setStatus(t("mi.boundary", { mode: m ? m.title : v }));
-      },
-    });
-    bf.el.title = tLatin("mi.boundaryTooltip");
+      } });
   }
+  items.push({ kind: "sep" });
+  // 笔架（user v132「ui 里有开笔架，不然关了开不了」）+ ✓ 退出
+  items.push({ kind: "button", id: "filterBrushOpenRack", icon: "brush-rack", title: tLatin("rack.sheet"), onClick: () => openExclusive(PANELS.RACK_FILTER_BRUSH), foldPriority: -1 });
+  items.push({ kind: "button", id: "filterBrushExit", icon: "check", title: tLatin("common.exit"), onClick: _exitFilterBrushMode, foldPriority: -2 });
+  return [items];
+}
+function _renderFilterBrushToolbar() {
+  if (!state.filterBrush || !_fbToolbar) return;
+  _fbToolbar.replaceRows(_fbRows());
+  _fbToolbar.show();
 }
 
 export function initFiltersAdjust(ctx: AppContext) {
@@ -415,13 +389,17 @@ export function initFiltersAdjust(ctx: AppContext) {
      _suppressTransientPanels, _restoreTransientPanels, dialReactive } = ctx);
   // 调整面板 = 浮窗（2026-09-02 C2）：z/拖/钳制归 ui/floating-window；初始摆位仍走 positionPopup（钉右、让顶栏）。
   //   不进 transient 抑制（它本身就是 adjust-color transient 的 UI）。拖动那份原在 topbar-menu.ts，已删。
-  registerContextToolbar(document.getElementById("filterBrushToolbar"));   // C4：滤镜笔条登记
+  // 2026-09-06 U1：滤镜笔条 = 工厂造（init 即 mount，hidden；登记自动）。id 保留 "filterBrushToolbar"（toolbar.ts setTool 按 id 藏它）。
+  _fbToolbar = mountContextToolbar({ id: "filterBrushToolbar", rows: [], ariaLabel: tLatin("fb.title") });
   // 2026-09-05 手指工具：toolbar setTool("smudge") 发事件进 filterBrush 模式（payload = smudge 插件）。
   //   toolbar 不 import 本模块（本模块 import 它的 setTool，防环），故走 window 事件（同 wp:settool 姿势）。
+  //   2026-09-06：detail 可带 variant（{ id, variant }）——顶栏「手指」位子工具（模糊/锐化/液化）直接进指定 variant。
   window.addEventListener("wp:enter-filter-brush", (e: Event) => {
-    const id = String((e as CustomEvent).detail ?? "");
+    const d = (e as CustomEvent).detail as string | { id?: string; variant?: string } | undefined;
+    const id = typeof d === "string" ? d : String(d?.id ?? "");
+    const variant = typeof d === "object" && d ? d.variant : undefined;
     const F = getFilter(id) as FilterLike | null | undefined;
-    if (F && (F.modes || []).includes("brush")) _enterFilterBrushMode(F);
+    if (F && (F.modes || []).includes("brush")) _enterFilterBrushMode(F, variant);
     else setStatus(t("st.filterBrushErr", { msg: `unknown filter brush "${id}"` }));
   });
   _adjustWin = registerFloatingWindow(els.adjustPanel, {
@@ -437,11 +415,6 @@ export function initFiltersAdjust(ctx: AppContext) {
   _renderFilterMenu();
   onFilterRegistered(_renderFilterMenu);
 
-  document.getElementById("filterBrushExit")?.addEventListener("click", _exitFilterBrushMode);
-  // v132 笔架 button：再开 rack（user：「ui 里有开笔架，不然关了开不了」）
-  document.getElementById("filterBrushOpenRack")?.addEventListener("click", () => {
-    openExclusive(PANELS.RACK_FILTER_BRUSH);
-  });
   document.getElementById("adjustReset")?.addEventListener("click", () => {
     if (!_adjustState) return;
     _adjustState.Filter.disposeBody?.(_adjustState);

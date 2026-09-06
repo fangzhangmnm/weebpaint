@@ -291,6 +291,12 @@ body[data-tool="fill"] .board { cursor: crosshair; }
 /* v0.5.14 工具组槽：右下角小三角=「这是组 toggle 不是指令」；紧凑图标下拉（JS 锚定槽下方） */
 .lasso-slot { position: relative; }
 .lasso-slot .lasso-slot-caret { position: absolute; right: 1px; bottom: 1px; width: 8px; height: 8px; opacity: .55; pointer-events: none; }
+/* ui/context-toolbar 工厂件（2026-09-06 U1）：chrome 复用 .lasso-toolbar-stack/.lasso-toolbar，这里只补工厂特有小件 */
+.ct-title { color: var(--ink-soft); font-size: 13px; padding: 0 6px 0 8px; white-space: nowrap; }
+.ct-sep { color: var(--line); padding: 0 2px; user-select: none; }
+.ct-select.select-field { border-radius: 999px; }
+.ct-toolbar .fb-inline-slider { padding: 0 4px; }
+.ct-more svg { width: 18px; height: 18px; }
 .lasso-icon-menu {
   position: fixed; display: flex; gap: 2px; padding: 4px;
   z-index: var(--z-popover);   /* v0.5.38：菜单内弹层要压过 menuPanel（同 z 时 DOM 序不可靠） */
@@ -358,7 +364,7 @@ body[data-tool="fill"] .board { cursor: crosshair; }
 .lasso-tol-inline .ramp-slider { width: 120px; }
 .lasso-tol-inline .brush-slider-value { min-width: 24px; }
 /* 滤镜笔条内联旋钮（2026-09-05 手指「揉匀」）：复用 lasso 容差滑条样式，但标签要露出来 */
-.fb-inline-slider .brush-slider-label { display: inline; color: var(--ink-soft); font-size: 12px; }
+.fb-inline-slider .brush-slider-label { display: inline; color: var(--ink-soft); font-size: 12px; white-space: nowrap; }
 .fb-inline-slider .ramp-slider { width: 90px; }
 .lasso-popup-val { text-align: right; font-variant-numeric: tabular-nums; }
 .lasso-popup-row input[type="range"] { width: 100%; }
@@ -1957,17 +1963,7 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
   width: 3px; height: 28px; background: #000; cursor: ew-resize; }
 
 /* v110 自由裁切 toolbar (顶栏下方居中) */
-.crop-toolbar {
-  position: fixed;
-  top: 56px; left: 50%; transform: translateX(-50%);
-  z-index: var(--z-toolbar);
-  display: flex; align-items: center; gap: 10px;
-  padding: 6px 12px;
-  background: var(--bg);
-  border: 1px solid var(--line); border-radius: 8px;
-  box-shadow: var(--shadow);
-  font-size: 13px;
-}
+/* （.crop-toolbar 容器皮 2026-09-06 U1 退役：裁切/滤镜笔条统一走 .lasso-toolbar-stack；控件类 .crop-toolbar-btn 等保留给裁切条的输入框） */
 .crop-toolbar-label { color: var(--ink-soft); }
 .crop-toolbar-sep { color: var(--line); }
 .crop-toolbar-btn {
@@ -2799,7 +2795,6 @@ body[data-mode="gallery"] .board { display: none !important; }
   pointer-events: none;
 }
 .crop-rect.tpl-move { pointer-events: auto; cursor: move; }
-.crop-toolbar { flex-wrap: nowrap; white-space: nowrap; }
 .crop-toolbar-btn { white-space: nowrap; font: inherit; font-size: 13px; }
 
 .crop-toolbar-btn[aria-pressed="true"] {

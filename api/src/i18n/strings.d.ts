@@ -3864,6 +3864,26 @@ export declare const S: {
         readonly en: "Dull";
         readonly ja: "なじませ";
     };
+    readonly "fb.variant": {
+        readonly zh: "算法";
+        readonly en: "Mode";
+        readonly ja: "モード";
+    };
+    readonly "fb.sample": {
+        readonly zh: "采样";
+        readonly en: "Sampling";
+        readonly ja: "サンプリング";
+    };
+    readonly "fb.mix": {
+        readonly zh: "混色";
+        readonly en: "Mixing";
+        readonly ja: "混色";
+    };
+    readonly "fb.bleed": {
+        readonly zh: "边界";
+        readonly en: "Boundary";
+        readonly ja: "境界";
+    };
     readonly "flt.smudge.mix.srgb": {
         readonly zh: "直接混合";
         readonly en: "Plain mix";
