@@ -659,6 +659,16 @@ export declare const S: {
         readonly en: "Share did not complete";
         readonly ja: "共有は完了しませんでした";
     };
+    readonly "diag.download": {
+        readonly zh: "下载 .txt";
+        readonly en: "Download .txt";
+        readonly ja: ".txt をダウンロード";
+    };
+    readonly "diag.downloaded": {
+        readonly zh: "已下载 {name}";
+        readonly en: "Downloaded {name}";
+        readonly ja: "{name} をダウンロードしました";
+    };
     readonly "diag.cleared": {
         readonly zh: "日志已清空";
         readonly en: "Log cleared";

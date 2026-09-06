@@ -65,13 +65,31 @@ export function initDiagLogSheet(deps: { status: (msg: string, persist?: boolean
     reportError(new Error("[diag-log] execCommand copy failed too"), "log");
     say(t("diag.copyFailed"), true);
   }
-  // Web Share（iPad：直接发给备忘录 / 邮件 / 任何 app）；不支持的环境隐掉钮
+  // Web Share（iPad：直接发给文件 / AirDrop / 邮件 / 任何 app）。2026-09-06 user：微信粘贴不吃 60KB 长文本、QQ 把它拆成几百条——
+  //   复制的本来就是纯文本，问题是长度 → 分享改成 **.txt 文件**（canShare files 才走；不支持文件回退纯文本）；
+  //   桌面浏览器没有 share → 钮变「下载 .txt」（a[download]）。
+  const logFile = () => new File([toText()], `weebpaint-diag-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.txt`, { type: "text/plain" });
   const canShare = typeof navigator.share === "function";
   if (shareBtn) {
-    shareBtn.hidden = !canShare;
+    if (!canShare) shareBtn.textContent = t("diag.download");
     shareBtn.addEventListener("click", async () => {
-      try { await navigator.share({ title: t("diag.title"), text: toText() }); }
-      catch (e) { if ((e as { name?: string })?.name !== "AbortError") { reportError(new Error("[diag-log] share failed: " + String(e)), "log"); say(t("diag.shareFailed"), true); } }
+      if (!canShare) {   // 桌面：下载
+        const f = logFile();
+        const url = URL.createObjectURL(f);
+        const a = document.createElement("a"); a.href = url; a.download = f.name; a.style.display = "none";
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 10_000);
+        say(t("diag.downloaded", { name: f.name }));
+        return;
+      }
+      try {
+        const f = logFile();
+        const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
+        if (nav.canShare?.({ files: [f] })) await navigator.share({ title: t("diag.title"), files: [f] });
+        else await navigator.share({ title: t("diag.title"), text: toText() });
+      } catch (e) {
+        if ((e as { name?: string })?.name !== "AbortError") { reportError(new Error("[diag-log] share failed: " + String(e)), "log"); say(t("diag.shareFailed"), true); }
+      }
     });
   }
 

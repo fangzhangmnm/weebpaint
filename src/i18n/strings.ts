@@ -155,6 +155,8 @@ export const S = {
   "diag.copyFailed": { zh: "复制失败：文本已选中，请长按「拷贝」，或用「分享…」", en: "Copy failed: text is selected — long-press to copy, or use Share…", ja: "コピーに失敗：テキストを選択済み。長押しでコピー、または「共有…」を使ってください" },
   "diag.share":      { zh: "分享…", en: "Share…", ja: "共有…" },   // 2026-09-06 Web Share 兜底（iPad 复制路不稳）
   "diag.shareFailed": { zh: "分享未完成", en: "Share did not complete", ja: "共有は完了しませんでした" },
+  "diag.download":   { zh: "下载 .txt", en: "Download .txt", ja: ".txt をダウンロード" },   // 2026-09-06 桌面无 Web Share 时的分享钮文案
+  "diag.downloaded": { zh: "已下载 {name}", en: "Downloaded {name}", ja: "{name} をダウンロードしました" },
   "diag.cleared":    { zh: "日志已清空", en: "Log cleared", ja: "ログを消去しました" },
   "diag.empty":      { zh: "（暂无日志）", en: "(no entries yet)", ja: "（ログはまだありません）" },
   // v0.6.14 去「版本：」前缀（user：只显版本号本体；何物之版本由所在行自明）
