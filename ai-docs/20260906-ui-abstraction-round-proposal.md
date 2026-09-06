@@ -1,6 +1,6 @@
 # UI 抽象轮策划：上下文工具条深模块 · 子工具长按标准件 · 顶栏动词化（现状 .h + 提案 .h）
 
-> 作者：Claude Fable 5.1（claude-fable-5-1）· created 20260906 · as-of dev v0.13.9 · 状态：**策划稿，等 user「没问题」再动码**
+> 作者：Claude Fable 5.1（claude-fable-5-1）· created 20260906 · as-of dev v0.13.11 · 状态：**U1/U3 已落地 v0.13.10–v0.13.11（user 2026-09-06「小三角……放心大胆去做」「desk.subTool 同意」）；U2 按「收编」完成、内容迁 spec 另批；U4 吸色等讨论**。落地差异见 §4。
 > 决策依据：ADR-0012（动词原则）+ `20260905-grill-agenda-toolbar-smudge-routing.md` §0b 拍板栏（context-toolbar 深模块 / 子工具长按 /
 > 单笔位 + 小三角 / 「…」= 工具条自带 / 断点表 / 滤镜笔搬手指位 / 油漆桶进套索 / 吸色不是工具）。
 > 家规：重构策划附「现状 .h + 提案 .h」；实现中形状变了回写 §2。
@@ -157,3 +157,16 @@ export function setVerb(verb: Verb, sub?: string): void;       // setTool 保留
 - toolbar.ts 1230 行：只沿三条工具条渲染的接缝切，不重写 setTool/同步逻辑；input.ts 的画布长按与顶栏钮长按是两套监听，互不干扰。
 - 子工具记忆的持久化字段（§2.3）与吸色左栏钮的位置（左栏现在是 dial：粗细/透明 + undo/redo）都要 user 点头。
 - 「…」折进去的 select 变二级菜单：可用性略降，只在窄屏发生。
+
+## 4. 落地回写（2026-09-06，Claude Fable 5.1）
+
+| 批 | 版本 | 与 §2 的差异 / 备注 |
+|---|---|---|
+| U1 | v0.13.10 | `mountContextToolbar(spec)` 照 §2.1；chrome **复用 .lasso-toolbar-stack/.lasso-toolbar 现有皮**（没发明 .ct-* 新容器，只补 title/sep/select/more 小件）。溢出只折 button/select（slider/custom 永不折；select 折成 分组标题 + 选项）。滤镜笔条迁工厂（`filters-adjust._fbRows`，init 即 mount hidden，id 保留）；裁切条**只换皮不迁 spec**（控件 id 不变，输入框类保留）。实测手指条 y=50/h=38 与套索条同位。 |
+| U2 | v0.13.10 | 按「收编」完成：套索/形状/吸色/透视/裁切五条静态条同皮同位、继续 registerContextToolbar；**内容迁 spec 另批**（套索双行 + 集合运算 + 变换控件耦合 toolbar.ts 深，U2 原案的 custom 逃生口足够但收益低）。 |
+| U3 | v0.13.11 | 动词表落 `common/verbs.ts`（纯数据，含 mode→verb/subTool 反推，node 测）；标准件落 `ui/subtool-slot.ts`；`setVerb` 在 toolbar.ts。**橡皮位也挂了 slot**（单子工具无小三角，等智能橡皮追加）；**吸色钮暂留顶栏**（U4 等讨论）；抓手条件位不变。子工具记忆 = `desk.subTool`（per-doc）。小三角复用 `.lasso-slot-caret` 形制。缺 4 图标走 stopgap 字形「揉/糊/锐/化」。 |
+| U4 | — | 吸色搬家：等 user 讨论（三设备截图已出）。 |
+| U5 | — | 清账未做：toolbar.ts 仍 1230+ 行（本轮只加不减）；registerContextToolbar 旧路保留给静态条。 |
+
+风险回执：长按曾在 v0.6.31 因「真机难受」回滚——这次是**独立标准件**（回滚 = 不 attach 三行），且 S/G 快捷键、双击笔↔橡皮、菜单入口全部照旧可达，长按只是多一条路。
+
