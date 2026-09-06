@@ -19,6 +19,8 @@ export interface AnimCurve {
 }
 export declare const TANGENT_MODES: readonly TangentMode[];
 export declare const DEFAULT_TANGENT_MODE: TangentMode;
+export declare const DEFAULT_WEIGHT: number;
+export declare const MIN_WEIGHT = 0.05;
 /** 建曲线：按 t 排序；同 t（|Δt| < 1e-9）后者覆盖前者；缺省切线模式 clampedAuto；建完即 refreshTangents。 */
 export declare function makeCurve(pts: Array<{
     t: number;
@@ -51,5 +53,10 @@ export declare function setTangentMode(c: AnimCurve, i: number, mode: TangentMod
 export declare function setTangent(c: AnimCurve, i: number, side: "in" | "out", slope: number): void;
 /** 断开 / 联动。联动回去时若任一侧是 free → 两侧都变 free 取平均斜率（Unity「unify」近似）。 */
 export declare function setBroken(c: AnimCurve, i: number, broken: boolean): void;
+/** 开/关加权（两侧）：开 = 缺的侧补 DEFAULT_WEIGHT（形状不变）；关 = 删两侧权重键（回 Hermite，形状可能变）。 */
+export declare function setWeighted(c: AnimCurve, i: number, on: boolean): void;
+export declare function isWeighted(k: Keyframe, side: "in" | "out"): boolean;
+/** 写某侧权重（钳 [MIN_WEIGHT, 1]；再钳到与该段另一端权重之和 ≤ 1，防控制点交叉）；该侧若非加权则顺手变加权。 */
+export declare function setWeight(c: AnimCurve, i: number, side: "in" | "out", w: number): void;
 /** 运行时校验（读持久化 / 笔刷 JSON 用）：形状合法 → 归一化副本；否则 null。 */
 export declare function sanitizeCurve(raw: unknown): AnimCurve | null;

@@ -15,6 +15,11 @@
 //   · 非 broken 的 key：任一侧被写（模式或斜率）→ 镜像另一侧；auto / clampedAuto 隐含非 broken。
 //   · 外推：首 key 前 / 末 key 后按 pre/postWrap（clamp = 端值；loop / pingPong 按周期折回）。
 //   · 数值域不钳制（调整曲线由 bakeLut8 clamp8；压感由消费方 clamp01）。
+//   · **加权切线**（2026-09-06 user「那么就用加权切线吧」；Unity Weighted / Blender 变长把手）：key 某侧带 inWeight/outWeight
+//     （0..1）= 该侧把手可拉长，段插值从 Hermite 换成三次 Bezier：P1 = P0 + w0·Δt·(1, m0)，P2 = P3 − w1·Δt·(1, m1)。
+//     w = 1/3 两侧 ≡ Hermite（逐位同）；缺省无字段 = 非加权（定长把手，Unity 默认）。x(s) 在加权时非线性于 s，
+//     求值用 Newton 反求 s（三次代数方程，3–5 步；烤 LUT 的消费者照旧 LUT）。两侧权重和 > 1 会让 x(s) 非单调（控制点交叉），
+//     求值时按比例缩到和 = 1。
 
 export type TangentMode = "clampedAuto" | "auto" | "free" | "flat" | "linear" | "constant";
 export type WrapMode = "clamp" | "loop" | "pingPong";
@@ -28,7 +33,7 @@ export interface Keyframe {
   inMode: TangentMode;
   outMode: TangentMode;
   broken: boolean;             // false = 两侧联动（Unity smooth）；true = 左右独立
-  inWeight?: number;           // 预留 Unity weightedMode；v1 evaluate 忽略（缺省 ≡ 非加权）。缺省时不写键（JSON 干净）
+  inWeight?: number;           // 加权切线权重 0..1（有 = 该侧把手可拉长，段走 Bezier）；缺省 = 非加权定长（JSON 不写键）
   outWeight?: number;
 }
 
@@ -40,6 +45,8 @@ export interface AnimCurve {
 
 export const TANGENT_MODES: readonly TangentMode[] = ["clampedAuto", "auto", "free", "flat", "linear", "constant"];
 export const DEFAULT_TANGENT_MODE: TangentMode = "clampedAuto";
+export const DEFAULT_WEIGHT = 1 / 3;   // 加权把手的起始权重 = Hermite 等价点（开关加权时形状不变）
+export const MIN_WEIGHT = 0.05;        // 把手不许缩成零长（拖不动）
 
 const EPS_T = 1e-9;
 
@@ -91,6 +98,7 @@ export function curveEquals(a: AnimCurve, b: AnimCurve): boolean {
     const p = a.keys[i], q = b.keys[i];
     if (!near(p.t, q.t) || !near(p.v, q.v) || !near(p.inTan, q.inTan) || !near(p.outTan, q.outTan)) return false;
     if (p.inMode !== q.inMode || p.outMode !== q.outMode || p.broken !== q.broken) return false;
+    if ((p.inWeight ?? -1) !== (q.inWeight ?? -1) || (p.outWeight ?? -1) !== (q.outWeight ?? -1)) return false;
   }
   return true;
 }
@@ -128,6 +136,8 @@ function hermite(k0: Keyframe, k1: Keyframe, t: number): number {
   if (k0.outMode === "constant" || k1.inMode === "constant") return k0.v;
   const dt = k1.t - k0.t;
   if (dt <= EPS_T) return k0.v;
+  const w0 = k0.outWeight, w1 = k1.inWeight;
+  if (w0 != null || w1 != null) return bezierSegment(k0, k1, t, w0 ?? DEFAULT_WEIGHT, w1 ?? DEFAULT_WEIGHT);
   const s = (t - k0.t) / dt;
   const s2 = s * s, s3 = s2 * s;
   const h00 = 2 * s3 - 3 * s2 + 1;
@@ -135,6 +145,34 @@ function hermite(k0: Keyframe, k1: Keyframe, t: number): number {
   const h01 = -2 * s3 + 3 * s2;
   const h11 = s3 - s2;
   return h00 * k0.v + h10 * dt * k0.outTan + h01 * k1.v + h11 * dt * k1.inTan;
+}
+
+/** 加权段：三次 Bezier，控制点沿切线方向按权重拉出；x(s) 单调（权重和钳到 ≤ 1），Newton 反求 s。 */
+function bezierSegment(k0: Keyframe, k1: Keyframe, t: number, w0: number, w1: number): number {
+  const dt = k1.t - k0.t;
+  w0 = Math.max(0, Math.min(1, w0)); w1 = Math.max(0, Math.min(1, w1));
+  const sum = w0 + w1;
+  if (sum > 1) { w0 /= sum; w1 /= sum; }
+  const x0 = k0.t, x3 = k1.t;
+  const x1 = x0 + w0 * dt, x2 = x3 - w1 * dt;
+  const y0 = k0.v, y3 = k1.v;
+  const y1 = y0 + k0.outTan * w0 * dt, y2 = y3 - k1.inTan * w1 * dt;
+  // 反求 s：x(s) = t（x 控制点有序 → 单调，Newton 从线性猜起，越界回二分）
+  let s = (t - x0) / dt;
+  let lo = 0, hi = 1;
+  for (let it = 0; it < 12; it++) {
+    const u = 1 - s;
+    const xs = u * u * u * x0 + 3 * u * u * s * x1 + 3 * u * s * s * x2 + s * s * s * x3;
+    const err = xs - t;
+    if (Math.abs(err) <= 1e-10 * dt) break;
+    if (err > 0) hi = s; else lo = s;
+    const dxs = 3 * (u * u * (x1 - x0) + 2 * u * s * (x2 - x1) + s * s * (x3 - x2));
+    let ns = dxs > 1e-12 ? s - err / dxs : (lo + hi) / 2;
+    if (!(ns > lo && ns < hi)) ns = (lo + hi) / 2;
+    s = ns;
+  }
+  const u = 1 - s;
+  return u * u * u * y0 + 3 * u * u * s * y1 + 3 * u * s * s * y2 + s * s * s * y3;
 }
 
 export function evaluate(c: AnimCurve, t: number): number {
@@ -304,6 +342,29 @@ export function setBroken(c: AnimCurve, i: number, broken: boolean): void {
   refreshTangents(c);
 }
 
+/** 开/关加权（两侧）：开 = 缺的侧补 DEFAULT_WEIGHT（形状不变）；关 = 删两侧权重键（回 Hermite，形状可能变）。 */
+export function setWeighted(c: AnimCurve, i: number, on: boolean): void {
+  const k = c.keys[i];
+  if (!k) return;
+  if (on) { k.inWeight ??= DEFAULT_WEIGHT; k.outWeight ??= DEFAULT_WEIGHT; }
+  else { delete k.inWeight; delete k.outWeight; }
+}
+export function isWeighted(k: Keyframe, side: "in" | "out"): boolean {
+  return side === "in" ? k.inWeight != null : k.outWeight != null;
+}
+/** 写某侧权重（钳 [MIN_WEIGHT, 1]；再钳到与该段另一端权重之和 ≤ 1，防控制点交叉）；该侧若非加权则顺手变加权。 */
+export function setWeight(c: AnimCurve, i: number, side: "in" | "out", w: number): void {
+  const k = c.keys[i];
+  if (!k) return;
+  let v = Number.isFinite(w) ? Math.max(MIN_WEIGHT, Math.min(1, w)) : DEFAULT_WEIGHT;
+  const nb = side === "out" ? c.keys[i + 1] : c.keys[i - 1];
+  if (nb) {
+    const other = side === "out" ? (nb.inWeight ?? DEFAULT_WEIGHT) : (nb.outWeight ?? DEFAULT_WEIGHT);
+    v = Math.max(MIN_WEIGHT, Math.min(v, 1 - other));
+  }
+  if (side === "in") k.inWeight = v; else k.outWeight = v;
+}
+
 /** 运行时校验（读持久化 / 笔刷 JSON 用）：形状合法 → 归一化副本；否则 null。 */
 export function sanitizeCurve(raw: unknown): AnimCurve | null {
   if (!raw || typeof raw !== "object") return null;
@@ -316,7 +377,12 @@ export function sanitizeCurve(raw: unknown): AnimCurve | null {
     if (typeof t !== "number" || !Number.isFinite(t) || typeof v !== "number" || !Number.isFinite(v)) return null;
     const mode = (m: unknown): TangentMode => (typeof m === "string" && (TANGENT_MODES as readonly string[]).includes(m) ? m as TangentMode : DEFAULT_TANGENT_MODE);
     const num = (x: unknown): number => (typeof x === "number" && Number.isFinite(x) ? x : 0);
-    pts.push({ t, v, inMode: mode(k.inMode), outMode: mode(k.outMode), inTan: num(k.inTan), outTan: num(k.outTan), broken: !!k.broken });
+    const wt = (x: unknown): number | undefined => (typeof x === "number" && Number.isFinite(x) ? Math.max(MIN_WEIGHT, Math.min(1, x)) : undefined);
+    const pt: { t: number; v: number } & Partial<Keyframe> = { t, v, inMode: mode(k.inMode), outMode: mode(k.outMode), inTan: num(k.inTan), outTan: num(k.outTan), broken: !!k.broken };
+    const iw = wt(k.inWeight), ow = wt(k.outWeight);
+    if (iw != null) pt.inWeight = iw;
+    if (ow != null) pt.outWeight = ow;
+    pts.push(pt);
   }
   const wrap = (w: unknown): WrapMode => (w === "loop" || w === "pingPong" ? w : "clamp");
   const c = makeCurve(pts);

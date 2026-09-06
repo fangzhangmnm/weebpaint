@@ -18,8 +18,8 @@
 //   · 宿主持 AnimCurve 引用，本编辑器**原地改**（宿主 params 就是它）；onInput 每变一次、onCommit 每手势收尾。
 
 import {
-  type AnimCurve, type TangentMode, type Keyframe, TANGENT_MODES,
-  evaluate, insertKey, removeKey, moveKey, setTangentMode, setTangent, setBroken, identityCurve,
+  type AnimCurve, type TangentMode, type Keyframe, TANGENT_MODES, DEFAULT_WEIGHT, MIN_WEIGHT,
+  evaluate, insertKey, removeKey, moveKey, setTangentMode, setTangent, setBroken, identityCurve, setWeighted, setWeight, isWeighted,
 } from "../common/anim-curve.ts";
 import { dragMove, type DragState } from "./drag-value.ts";
 import { attachPanelResize } from "./panel-gizmo.ts";
@@ -52,6 +52,20 @@ export function handleOffsetPx(slope: number, side: "in" | "out", size: PlotSize
   const L = Math.hypot(vx, vy) || 1;
   vx = (vx / L) * len; vy = (vy / L) * len;
   return side === "out" ? { dx: vx, dy: vy } : { dx: -vx, dy: -vy };
+}
+
+/** 加权把手：钮 = Bezier 控制点（沿切线拉 w·Δt），随权重变长；dtSeg = 该侧段的 Δt。 */
+export function weightedHandleOffsetPx(slope: number, weight: number, dtSeg: number, side: "in" | "out", size: PlotSize): { dx: number; dy: number } {
+  const m = Number.isFinite(slope) ? slope : 0;
+  const w = Math.max(MIN_WEIGHT, Math.min(1, Number.isFinite(weight) ? weight : DEFAULT_WEIGHT));
+  const dt = w * Math.max(0, dtSeg);
+  const dx = dt * size.w, dy = -m * dt * size.h;
+  return side === "out" ? { dx, dy } : { dx: -dx, dy: -dy };
+}
+/** 加权把手屏幕偏移 → 权重（|Δx| / (Δt_seg · W)，钳 [MIN_WEIGHT, 1]）。 */
+export function weightFromHandlePx(dx: number, dtSeg: number, size: PlotSize): number {
+  const denom = Math.max(1e-9, dtSeg) * (size.w || 1);
+  return Math.max(MIN_WEIGHT, Math.min(1, Math.abs(dx) / denom));
 }
 
 /** 把手钮屏幕偏移 → 斜率（dt 钳到该侧，防翻面/无穷）。 */
@@ -158,6 +172,7 @@ export function makeCurveEditor(o: CurveEditorOpts): CurveEditorHandle {
       `<span class="ce-label"></span>` +
       `<span class="ce-select-slot"></span>` +
       `<button type="button" class="ce-btn" data-act="broken" aria-pressed="false"></button>` +
+      `<button type="button" class="ce-btn" data-act="weighted" aria-pressed="false"></button>` +
       `<button type="button" class="ce-btn" data-act="reset"></button>` +
     `</div>`;
 
@@ -177,11 +192,13 @@ export function makeCurveEditor(o: CurveEditorOpts): CurveEditorHandle {
   const readout = q(".ce-readout");
   const grip = q(".ce-grip");
   const brokenBtn = q<HTMLButtonElement>('.ce-btn[data-act="broken"]');
+  const weightedBtn = q<HTMLButtonElement>('.ce-btn[data-act="weighted"]');
   const resetBtn = q<HTMLButtonElement>('.ce-btn[data-act="reset"]');
 
   // 静态文案
   q(".ce-label").textContent = tr("curve.tangent");
   brokenBtn.textContent = tr("curve.broken");
+  weightedBtn.textContent = tr("curve.weighted");
   resetBtn.textContent = tr("curve.reset");
   addBtn.title = tr("curve.addKey"); addBtn.setAttribute("aria-label", tr("curve.addKey"));
   delBtn.title = tr("curve.removeKey"); delBtn.setAttribute("aria-label", tr("curve.removeKey"));
@@ -261,6 +278,8 @@ export function makeCurveEditor(o: CurveEditorOpts): CurveEditorHandle {
       kel.dataset.v = k.v.toFixed(4);
       kel.dataset.inMode = k.inMode;
       kel.dataset.outMode = k.outMode;
+      kel.dataset.weighted = String(isWeighted(k, "in") || isWeighted(k, "out"));
+      kel.dataset.outWeight = k.outWeight != null ? k.outWeight.toFixed(3) : "";
       kel.style.left = `${clamp01(k.t) * 100}%`;
       kel.style.top = `${(1 - clamp01(k.v)) * 100}%`;
       kel.classList.toggle("selected", i === sel);
@@ -280,8 +299,9 @@ export function makeCurveEditor(o: CurveEditorOpts): CurveEditorHandle {
       const line = side === "in" ? hlineIn : hlineOut;
       if (!k || !showSide(side)) { knob.hidden = true; line.setAttribute("hidden", ""); continue; }
       const kp = dataToPx(clamp01(k.t), clamp01(k.v), size);
-      const off = handleOffsetPx(side === "in" ? k.inTan : k.outTan, side, size);
+      const off = handleOffset(k, sel, side, size);
       knob.hidden = false;
+      knob.classList.toggle("weighted", isWeighted(k, side));
       knob.style.left = `${kp.x + off.dx}px`;
       knob.style.top = `${kp.y + off.dy}px`;
       line.removeAttribute("hidden");
@@ -295,10 +315,23 @@ export function makeCurveEditor(o: CurveEditorOpts): CurveEditorHandle {
     delBtn.disabled = !canDel;
     brokenBtn.disabled = !k;
     brokenBtn.setAttribute("aria-pressed", k && k.broken ? "true" : "false");
+    weightedBtn.disabled = !k;
+    weightedBtn.setAttribute("aria-pressed", k && (isWeighted(k, "in") || isWeighted(k, "out")) ? "true" : "false");
     (modeField.el as HTMLButtonElement).disabled = !k;
     modeField.refresh();
     el.dataset.keyCount = String(keys.length);
     el.dataset.selected = String(sel);
+  }
+
+  /** 该侧段的 Δt（加权把手长度的尺度）；无邻居 → 0。 */
+  function segDt(i: number, side: "in" | "out"): number {
+    const ks = curve.keys;
+    return side === "out" ? (ks[i + 1] ? ks[i + 1].t - ks[i].t : 0) : (ks[i - 1] ? ks[i].t - ks[i - 1].t : 0);
+  }
+  function handleOffset(k: Keyframe, i: number, side: "in" | "out", size: PlotSize): { dx: number; dy: number } {
+    const slope = side === "in" ? k.inTan : k.outTan;
+    if (isWeighted(k, side)) return weightedHandleOffsetPx(slope, (side === "in" ? k.inWeight : k.outWeight) ?? DEFAULT_WEIGHT, segDt(i, side), side, size);
+    return handleOffsetPx(slope, side, size);
   }
 
   function select(i: number): void {
@@ -357,6 +390,7 @@ export function makeCurveEditor(o: CurveEditorOpts): CurveEditorHandle {
       const dx = e.clientX - rect.left - kp.x, dy = e.clientY - rect.top - kp.y;
       const slope = slopeFromHandlePx(dx, dy, drag.side, size);
       setTangent(curve, sel, drag.side, slope);
+      if (isWeighted(k, drag.side)) setWeight(curve, sel, drag.side, weightFromHandlePx(dx, segDt(sel, drag.side), size));   // 加权：拉长 = 改权重
       changedInGesture = true;
       redraw(); o.onInput();
     }
@@ -391,6 +425,12 @@ export function makeCurveEditor(o: CurveEditorOpts): CurveEditorHandle {
     setBroken(curve, sel, !k.broken);
     redraw(); o.onInput(); o.onCommit();
   };
+  const onWeighted = () => {
+    const k = curve.keys[sel];
+    if (!k) return;
+    setWeighted(curve, sel, !(isWeighted(k, "in") || isWeighted(k, "out")));
+    redraw(); o.onInput(); o.onCommit();
+  };
   const onReset = () => {
     const id = identityCurve();
     curve.keys = id.keys;   // 原地换内容（宿主持同一 AnimCurve 引用）
@@ -401,6 +441,7 @@ export function makeCurveEditor(o: CurveEditorOpts): CurveEditorHandle {
   addBtn.addEventListener("click", onAdd);
   delBtn.addEventListener("click", onDel);
   brokenBtn.addEventListener("click", onBroken);
+  weightedBtn.addEventListener("click", onWeighted);
   resetBtn.addEventListener("click", onReset);
 
   // 键盘（桌面）：方向键微调选中 key（shift ×10）；Delete/Backspace 删
@@ -454,6 +495,7 @@ export function makeCurveEditor(o: CurveEditorOpts): CurveEditorHandle {
       addBtn.removeEventListener("click", onAdd);
       delBtn.removeEventListener("click", onDel);
       brokenBtn.removeEventListener("click", onBroken);
+      weightedBtn.removeEventListener("click", onWeighted);
       resetBtn.removeEventListener("click", onReset);
       el.removeEventListener("keydown", onKey);
       el.removeEventListener("pointerenter", onEnter);

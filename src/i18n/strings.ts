@@ -1290,6 +1290,7 @@ export const S = {
   "curve.mode.linear":      { zh: "直线", en: "Linear", ja: "直線" },
   "curve.mode.constant":    { zh: "阶跃", en: "Constant", ja: "階段" },
   "curve.broken":           { zh: "断开", en: "Broken", ja: "分離" },
+  "curve.weighted":         { zh: "加权", en: "Weighted", ja: "重み付き" },   // 2026-09-06 加权切线（把手可拉长）
   "curve.reset":            { zh: "复位", en: "Reset curve", ja: "リセット" },
   "curve.addKey":           { zh: "加点", en: "Add key", ja: "キーを追加" },
   "curve.removeKey":        { zh: "删点", en: "Delete key", ja: "キーを削除" },

@@ -3,6 +3,7 @@ import { describe, it, eq, assert } from "./runner.mjs";
 import {
   makeCurve, identityCurve, cloneCurve, curveEquals, evaluate, bakeLut, bakeLut8,
   insertKey, removeKey, moveKey, setTangentMode, setTangent, setBroken, sanitizeCurve,
+  setWeighted, setWeight, isWeighted, DEFAULT_WEIGHT, MIN_WEIGHT,
 } from "../src/common/anim-curve.ts";
 
 const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
@@ -187,5 +188,51 @@ describe("anim-curve · sanitizeCurve（读持久化）", () => {
     eq(sanitizeCurve({ keys: [] }), null);
     eq(sanitizeCurve({ keys: [{ t: "a", v: 0 }] }), null);
     eq(sanitizeCurve({ keys: [{ t: 0, v: NaN }] }), null);
+  });
+});
+
+describe("anim-curve · 加权切线（Bezier）", () => {
+  it("开加权（w=1/3 两侧）→ 形状逐位不变；关加权删键，JSON 干净", () => {
+    const c = makeCurve([{ t: 0, v: 0 }, { t: 0.35, v: 0.2 }, { t: 0.65, v: 0.8 }, { t: 1, v: 1 }]);
+    const a = bakeLut(c, 1001);
+    for (let i = 0; i < c.keys.length; i++) setWeighted(c, i, true);
+    assert(isWeighted(c.keys[1], "in") && c.keys[1].outWeight === DEFAULT_WEIGHT);
+    const b = bakeLut(c, 1001);
+    for (let i = 0; i < a.length; i++) assert(Math.abs(a[i] - b[i]) <= 1e-9, `i=${i}: ${a[i]} vs ${b[i]}`);
+    setWeighted(c, 1, false);
+    assert(!("inWeight" in c.keys[1]) && !("outWeight" in c.keys[1]));
+    eq(JSON.stringify(JSON.parse(JSON.stringify(c))), JSON.stringify(c));
+  });
+  it("恒等曲线任意权重仍恒等（控制点都在对角线上）", () => {
+    const c = identityCurve();
+    setWeighted(c, 0, true); setWeighted(c, 1, true);
+    setWeight(c, 0, "out", 0.9); setWeight(c, 1, "in", 0.05);
+    const lut = bakeLut8(c);
+    for (let x = 0; x < 256; x++) eq(lut[x], x, `lut[${x}]`);
+  });
+  it("拉长把手改变段内鼓起：出侧权重大 → 曲线更贴近起点切线（同斜率下前段更陡/更平）", () => {
+    const mk = (w) => { const c = makeCurve([{ t: 0, v: 0 }, { t: 1, v: 1 }]); setTangent(c, 0, "out", 0); setTangent(c, 1, "in", 0); setWeighted(c, 0, true); setWeighted(c, 1, true); setWeight(c, 0, "out", w); return c; };
+    const flatStart = evaluate(mk(0.6), 0.3), refStart = evaluate(mk(DEFAULT_WEIGHT), 0.3);
+    assert(flatStart < refStart, `出侧权重 0.6 → t=0.3 处更贴 0 斜率：${flatStart} < ${refStart}`);
+    // 单调 S：值域内、单调
+    const c = mk(0.6); let prev = -1;
+    for (let i = 0; i <= 100; i++) { const v = evaluate(c, i / 100); assert(v >= -1e-9 && v <= 1 + 1e-9 && v >= prev - 1e-9); prev = v; }
+    assert(near(evaluate(c, 1), 1) && near(evaluate(c, 0), 0));
+  });
+  it("setWeight 钳制：[MIN, 1] 且与段另一端之和 ≤ 1；权重和 > 1 的存量数据求值不炸、仍单调", () => {
+    const c = makeCurve([{ t: 0, v: 0 }, { t: 1, v: 1 }]);
+    setWeighted(c, 0, true); setWeighted(c, 1, true);
+    setWeight(c, 1, "in", 0.8);                       // 对端 out=1/3 → 钳到 2/3
+    assert(near(c.keys[1].inWeight, 2 / 3), `in 钳到 1-1/3：${c.keys[1].inWeight}`);
+    setWeight(c, 0, "out", 0.9);                      // 对端 in=2/3 → 钳到 1/3
+    assert(near(c.keys[0].outWeight, 1 / 3), `out 钳到 1-2/3：${c.keys[0].outWeight}`);
+    setWeight(c, 0, "out", 0); eq(c.keys[0].outWeight, MIN_WEIGHT);
+    c.keys[0].outWeight = 1; c.keys[1].inWeight = 1;   // 越过 setWeight 的存量坏数据
+    let prev = -1;
+    for (let i = 0; i <= 200; i++) { const v = evaluate(c, i / 200); assert(Number.isFinite(v) && v >= prev - 1e-9, `t=${i / 200} v=${v}`); prev = v; }
+  });
+  it("sanitizeCurve 读入权重（钳制）；坏值丢弃", () => {
+    const c = sanitizeCurve({ keys: [{ t: 0, v: 0, outWeight: 0.5 }, { t: 1, v: 1, inWeight: 7 }, { t: 0.5, v: 0.5, inWeight: "x" }] });
+    eq(c.keys[0].outWeight, 0.5); eq(c.keys[2].inWeight, 1); assert(!("inWeight" in c.keys[1]));
   });
 });

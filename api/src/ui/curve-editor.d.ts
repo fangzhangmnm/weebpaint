@@ -19,6 +19,13 @@ export declare function handleOffsetPx(slope: number, side: "in" | "out", size: 
     dx: number;
     dy: number;
 };
+/** 加权把手：钮 = Bezier 控制点（沿切线拉 w·Δt），随权重变长；dtSeg = 该侧段的 Δt。 */
+export declare function weightedHandleOffsetPx(slope: number, weight: number, dtSeg: number, side: "in" | "out", size: PlotSize): {
+    dx: number;
+    dy: number;
+};
+/** 加权把手屏幕偏移 → 权重（|Δx| / (Δt_seg · W)，钳 [MIN_WEIGHT, 1]）。 */
+export declare function weightFromHandlePx(dx: number, dtSeg: number, size: PlotSize): number;
 /** 把手钮屏幕偏移 → 斜率（dt 钳到该侧，防翻面/无穷）。 */
 export declare function slopeFromHandlePx(dx: number, dy: number, side: "in" | "out", size: PlotSize): number;
 /** ＋ 钮的插入位置：选中 key 与右邻中点；选中末 key → 与左邻中点；无选中 → 最大间隔中点。 */

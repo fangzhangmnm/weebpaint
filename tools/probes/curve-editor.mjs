@@ -23,7 +23,7 @@ await page.waitForSelector("#adjustParamsBody .curve-editor", { timeout: 5000 })
 
 const readState = () => page.evaluate(() => {
   const ed = document.querySelector("#adjustParamsBody .curve-editor");
-  const keys = [...ed.querySelectorAll(".ce-key")].map((k) => ({ t: +k.dataset.t, v: +k.dataset.v, inMode: k.dataset.inMode, outMode: k.dataset.outMode, sel: k.classList.contains("selected") }));
+  const keys = [...ed.querySelectorAll(".ce-key")].map((k) => ({ t: +k.dataset.t, v: +k.dataset.v, inMode: k.dataset.inMode, outMode: k.dataset.outMode, weighted: k.dataset.weighted, outWeight: k.dataset.outWeight, sel: k.classList.contains("selected") }));
   return {
     keyCount: +ed.dataset.keyCount, selected: +ed.dataset.selected, keys,
     d: ed.querySelector(".ce-curve").getAttribute("d"),
@@ -72,6 +72,27 @@ if (knob) {
 const s3 = await readState();
 c.expect("拖把手后 outMode=free（非 broken 镜像 in 也 free）", s3.keys[1].outMode === "free" && s3.keys[1].inMode === "free", JSON.stringify(s3.keys[1]));
 c.expect("把手改斜率 → path 再变", s3.d !== s2.d);
+
+// 加权切线（2026-09-06）：点「加权」→ 键 data-weighted=true、outWeight=1/3；再把 out 把手拉远 → outWeight 变大（把手长度 = 权重）
+await page.evaluate(() => [...document.querySelectorAll("#adjustParamsBody .ce-btn")].find((b) => (b.textContent || "").trim() === "加权").click());
+await page.waitForTimeout(100);
+const sw0 = await readState();
+c.expect("加权开：键 weighted=true，outWeight=0.333", sw0.keys[1] && sw0.keys[1].weighted === "true" && Math.abs(+sw0.keys[1].outWeight - 1 / 3) < 1e-3, JSON.stringify(sw0.keys[1]));
+{
+  const kb = await page.locator("#adjustParamsBody .ce-key.selected").boundingBox();
+  const kn = await page.locator('#adjustParamsBody .ce-knob[data-side="out"]').boundingBox();
+  const cx = kb.x + kb.width / 2, cy = kb.y + kb.height / 2;
+  const nx = kn.x + kn.width / 2, ny = kn.y + kn.height / 2;
+  // 沿键→钮方向再拉 1.6 倍
+  await page.mouse.move(nx, ny); await page.mouse.down();
+  await page.mouse.move(cx + (nx - cx) * 1.3, cy + (ny - cy) * 1.3);
+  await page.mouse.move(cx + (nx - cx) * 1.6, cy + (ny - cy) * 1.6);
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+}
+const sw1 = await readState();
+c.expect("拉长把手 → outWeight 变大", sw1.keys[1] && +sw1.keys[1].outWeight > 0.4, JSON.stringify(sw1.keys[1]));
+c.expect("拉长后 path 再变", sw1.d !== sw0.d);
 
 // 键盘 Delete 删中点
 await page.evaluate(() => document.querySelector("#adjustParamsBody .curve-editor").focus());

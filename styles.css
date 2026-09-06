@@ -1821,6 +1821,7 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
   cursor: grab; touch-action: none; z-index: 2;
 }
 .ce-knob::before { content: ""; position: absolute; inset: -8px; border-radius: 50%; }   /* 命中面 32px */
+.ce-knob.weighted { border-radius: 3px; }   /* 加权把手钮 = 方形（Unity 同款区分），拖它同时改斜率与长度 */
 /* 右下角 grip（沿 .float-panel-resize 家族斜纹，裁成三角）：拖拽改绘图区边长 */
 .ce-grip {
   position: absolute; right: 0; bottom: 0; width: 19px; height: 19px; z-index: 2;

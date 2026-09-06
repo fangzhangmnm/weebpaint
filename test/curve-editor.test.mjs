@@ -2,7 +2,7 @@
 import { describe, it, eq, assert } from "./runner.mjs";
 import {
   dataToPx, pxToData, handleOffsetPx, slopeFromHandlePx, pickInsertT, canRemoveKey, keyboardNudge, HANDLE_LEN_PX,
-  makeCurveEditor,
+  makeCurveEditor, weightedHandleOffsetPx, weightFromHandlePx,
 } from "../src/ui/curve-editor.ts";
 import { identityCurve, makeCurve } from "../src/common/anim-curve.ts";
 
@@ -88,5 +88,21 @@ describe("curve-editor · dom-shim 构造", () => {
     h.redraw();
     h.dispose();
     eq(inputs, 0); eq(commits, 0);
+  });
+});
+
+describe("curve-editor · 加权把手几何", () => {
+  it("钮 = 控制点：w·Δt 沿切线；权重 ↔ 偏移互逆；in 侧反向", () => {
+    const o = weightedHandleOffsetPx(1, 0.5, 0.4, "out", SZ);   // Δt_seg 0.4 → dt 0.2 → 60px
+    assert(near(o.dx, 60) && near(o.dy, -60));
+    assert(near(weightFromHandlePx(o.dx, 0.4, SZ), 0.5));
+    const i = weightedHandleOffsetPx(1, 0.5, 0.4, "in", SZ);
+    assert(near(i.dx, -60) && near(i.dy, 60));
+    assert(near(weightFromHandlePx(i.dx, 0.4, SZ), 0.5));
+  });
+  it("权重钳 [0.05, 1]；Δt=0 不炸", () => {
+    eq(weightFromHandlePx(10000, 0.4, SZ), 1);
+    eq(weightFromHandlePx(0, 0.4, SZ), 0.05);
+    assert(Number.isFinite(weightedHandleOffsetPx(1, 0.3, 0, "out", SZ).dx));
   });
 });

@@ -6978,6 +6978,11 @@ export declare const S: {
         readonly en: "Broken";
         readonly ja: "分離";
     };
+    readonly "curve.weighted": {
+        readonly zh: "加权";
+        readonly en: "Weighted";
+        readonly ja: "重み付き";
+    };
     readonly "curve.reset": {
         readonly zh: "复位";
         readonly en: "Reset curve";
