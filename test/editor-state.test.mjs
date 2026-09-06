@@ -215,3 +215,16 @@ test("desk P5 三项：老 .ora（缺字段）→ 工厂默认起（拍板：不
   eq(desk.pixelGrid, true); eq(desk.longPressPick, true); eq(desk.menuTab, "file");
   desk.reset();
 });
+
+test("desk.subTool（2026-09-06 ADR-0012，user 批准 per-doc）：工厂默认 + Serialize 往返 + reset 回默认", () => {
+  desk.reset();
+  eq(desk.subTool.brush, "freehand"); eq(desk.subTool.eraser, "pixel"); eq(desk.subTool.smudge, "smear"); eq(desk.subTool.lasso, "select");
+  desk.subTool.brush = "shape"; desk.subTool.smudge = "blur"; desk.subTool.lasso = "fill";
+  const json = desk.Serialize();
+  desk.reset();
+  eq(desk.subTool.brush, "freehand", "reset 回默认");
+  desk.Unserialize(json);
+  eq(desk.subTool.brush, "shape"); eq(desk.subTool.smudge, "blur"); eq(desk.subTool.lasso, "fill");
+  desk.reset();
+});
+

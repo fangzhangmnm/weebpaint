@@ -74,6 +74,7 @@ import "./name-normalization.test.ts";   // P4: 身份在赋值处归一化（�
 import "./boot-restore.test.ts";        // P5: 冷启动恢复的失败路径（幽灵路径纪律 + 不清 currentFile）
 import "./app-state.test.mjs";            // 2026-07-14 app-state struct 门面：冷字段直读写 collection（不落 RAM）+ push/pull
 import "./editor-state.test.mjs";         // 2026-07-14 desk struct：默认/setDirtyFlag/Serialize 往返/Unserialize 容错/reset
+import "./verbs.test.mjs";                // 2026-09-06 ADR-0012 顶栏动词表：路由自洽/mode 反推/图标与 i18n 齐全
 import "./gallery-view-model.test.mjs";
 import "./frame-gate.test.ts";        // 图库帧门（防误触）：按压期扣帧只留最新/尾巴/多指/maxHold 保险丝
 import "./first-frame-watchdog.test.ts";   // 2026-08-31 案：首帧看门狗（到点报 stall/来帧销账/别夹不算/cancel/重 arm）

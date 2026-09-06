@@ -21,7 +21,9 @@ import { mountSelectField, type SelectField } from "./ui/select-field.ts";   // 
 import { t, tLatin } from "./i18n/index.ts";
 import { fillPreviewActive, commitFillNow, sendSelectionToFill } from "./fill-mode.ts";
 import { openAdoptedPopup, toggleAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";
-import { registerContextToolbar } from "./ui/context-toolbar.ts";   // 2026-09-02 C4：顶栏条登记（让位高度由登记表算）   // 2026-09-02 C1：组槽/配置菜单收养（外点关/Escape/栈/定位归 module）
+import { registerContextToolbar } from "./ui/context-toolbar.ts";
+import { attachSubToolSlot, type SubToolSlotHandle } from "./ui/subtool-slot.ts";   // 2026-09-06 U3 动词位长按子工具
+import { VERB_SUBTOOLS, DEFAULT_SUBTOOL, isVerb, subToolDef, verbOfMode, subToolOfMode, type Verb } from "./common/verbs.ts";   // ADR-0012 动词表   // 2026-09-02 C4：顶栏条登记（让位高度由登记表算）   // 2026-09-02 C1：组槽/配置菜单收养（外点关/Escape/栈/定位归 module）
 import { configFromModeState, planesForMode, defaultVpsForMode } from "./perspective-frame.ts";
 import type { PerspMode } from "./perspective-frame.ts";
 import type { AppContext } from "./app-context.ts";
@@ -377,6 +379,27 @@ export function setTool(tool: string) {
   }
 }
 
+// ---- 动词位（ADR-0012，2026-09-06 U3）：动词 → 记忆的子工具 → 老 EditMode / 滤镜笔 payload ----
+const _slots: SubToolSlotHandle[] = [];
+function _currentFilterId(): string | null { return (state.filterBrush?.Filter as { id?: string } | null | undefined)?.id ?? null; }
+function _currentVerb(): Verb | null { return verbOfMode(editMode.current(), _currentFilterId()); }
+/** 切到动词（可指定子工具）：写 desk.subTool 记忆，再按表路由到老入口——行为语义零变更。 */
+export function setVerb(verb: Verb, sub?: string): void {
+  if (sub) desk.subTool[verb] = sub;
+  const def = subToolDef(verb, desk.subTool[verb] || DEFAULT_SUBTOOL[verb]);
+  desk.subTool[verb] = def.id;
+  const r = def.route;
+  if ("mode" in r) setTool(r.mode);
+  else window.dispatchEvent(new CustomEvent("wp:enter-filter-brush", { detail: { id: r.filter, variant: r.variant } }));
+}
+/** EditMode → 回写动词记忆（快捷键 / 菜单 / 双击进来的也同步），钮面跟着换。 */
+function _syncVerbMemory(): void {
+  const fb = state.filterBrush;
+  const hit = subToolOfMode(editMode.current(), _currentFilterId(), fb?.variantId ?? null);
+  if (hit) desk.subTool[hit.verb] = hit.sub;
+  for (const sl of _slots) sl.refresh();
+}
+
 // #6 stage 4：UI 从 EditMode 派生（监听 wp:modechange）。setTool / enterTransient / exit 都会触发。
 // transient 期间（current()=transform/crop/adjust）**不高亮任何工具按钮** —— 这正是当初想实现、
 // 逼出"双轴不行"的那个 payoff（双轴的 tool() 仍指向底层工具会误亮）。
@@ -387,13 +410,16 @@ export function _syncEditModeUI() {
   // 工具按钮高亮：transient 时一个都不亮；持久工具高亮对应按钮
   // v0.6.31：四工具并列（fill 有自己的顶栏钮），高亮 = data-tool 直配
   // 2026-09-05 手指：filterBrush 模式 + smudge payload 时高亮工具栏「手指」钮（而不是 adjust 钮）
-  const smudgeActive = m === "filterBrush" && (state.filterBrush?.Filter as { id?: string } | null | undefined)?.id === "smudge";
+  // 2026-09-06 ADR-0012：动词位按动词亮（笔位 = brush|shapeBrush，套索位 = lasso|fill，手指位 = 任何 filterBrush payload）；
+  //   无动词的钮（吸色/抓手）仍按 data-tool 直配。
+  const verb = _currentVerb();
   for (const b of els.toolBtns) {
-    const on = !transient && (b.dataset.tool === m || (b.dataset.tool === "smudge" && smudgeActive));
+    const bv = b.dataset.verb;
+    const on = !transient && (bv ? bv === verb : b.dataset.tool === m);
     b.setAttribute("aria-pressed", on ? "true" : "false");
   }
-  // 液化 / 其它 filterBrush 没独立 data-tool 按钮，用 adjust 按钮高亮（transient 期间也不亮）
-  els.topAdjustBtn?.setAttribute("aria-pressed", (m === "filterBrush" && !smudgeActive) ? "true" : "false");
+  els.topAdjustBtn?.setAttribute("aria-pressed", "false");   // 滤镜笔全归手指位亮，adjust 钮不再代亮
+  _syncVerbMemory();
   // 注：body.dataset.tool 保持"持久工具"（在 setTool 里设），不在这改成 transient 名——避免扰乱
   // 依赖 body[data-tool] 的 CSS（且 data-mode 被图库占用）。transient 的 UI 抑制走面板 suppress + 按钮高亮。
   // slider 禁用：size/opacity 仅 canDraw 模式可调 → 反应式镜像，<LeftDial> 绑 :disabled。color 仅 allowsColor 可点。
@@ -1191,14 +1217,30 @@ export function initToolbar(ctx: AppContext) {
   // v0.6.55（user 2026-07-30）：恢复「二次点弹笔架」（v79 语义回归）——已激活的画笔/橡皮/形状笔
   //   再点 = toggle 该工具的笔架（openExclusive 自带 toggle）；无笔架的工具（lasso/fill）二次点仍无事。
   for (const b of els.toolBtns) {
+    // 2026-09-06 ADR-0012 动词位：单击 = 切动词（子工具走记忆）/ 已激活再点 = 开该动词的笔架（v0.6.55 语义）；
+    //   长按 / 右键 = 子工具菜单（ui/subtool-slot 接管 click，长按后吞掉那一击）。
+    const verb = b.dataset.verb;
+    if (verb && isVerb(verb)) {
+      _slots.push(attachSubToolSlot({
+        el: b as HTMLButtonElement,
+        tools: () => VERB_SUBTOOLS[verb].map((d) => ({ id: d.id, icon: d.icon, title: tLatin(d.titleKey as Parameters<typeof tLatin>[0]) })),
+        current: () => desk.subTool[verb] || DEFAULT_SUBTOOL[verb],
+        onPick: (id) => { setVerb(verb, id); closeExclusive(); },
+        onTap: () => {
+          if (_currentVerb() === verb) {
+            if (verb === "lasso") return;   // v0.7.28：选区/填色二次点不开笔架（选区笔笔架走 pen 子模式旁挂钮）
+            const rackId = verb === "smudge" ? PANELS.RACK_FILTER_BRUSH : RACK_PANEL_BY_TOOL[editMode.current()];
+            if (rackId) openExclusive(rackId);
+            return;
+          }
+          setVerb(verb);
+          closeExclusive();
+        },
+      }));
+      continue;
+    }
     b.addEventListener("click", () => {
       const tool = b.dataset.tool!;   // .tool[data-tool] 选择器保证存在
-      // 2026-09-05 手指：激活态 = filterBrush + smudge payload；二次点 = 开滤镜笔架（同画笔二次点语义）
-      if (tool === "smudge" && editMode.current() === "filterBrush"
-          && (state.filterBrush?.Filter as { id?: string } | null | undefined)?.id === "smudge") {
-        openExclusive(PANELS.RACK_FILTER_BRUSH);
-        return;
-      }
       if (editMode.current() === tool) {
         // v0.7.28：lasso/fill 二次点不开笔架（context-unaware 别扭，user 回滚）——选区笔笔架
         //   走 pen 子模式旁挂的 #selPenRackBtn；映射保留在 RACK_PANEL_BY_TOOL 只为 panel 注册。

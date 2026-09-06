@@ -174,6 +174,9 @@ function freshGroups() {
     //   老 doc 的 stale 键被 mergeInto 静默忽略、旧偏好回默认开，user 知情同意 2026-08-01）
     lassoTool:     { sub: "freehand" as string, setOp: "new" as string, constrainSquare: false, algo: "classic" as string, showAnts: true },
     fillTool:      { sub: "magic" as string, setOp: "union" as string, constrainSquare: false, algo: "lineart" as string, showAnts: true },
+    // 2026-09-06 ADR-0012 动词位的当前子工具（顶栏钮面图标随之换；user 批准 per-doc 持久化）：
+    //   brush: freehand|shape · eraser: pixel · smudge: smear|dull|blur|sharpen|liquify · lasso: select|fill（表 = common/verbs.ts）
+    subTool:       { brush: "freehand" as string, eraser: "pixel" as string, smudge: "smear" as string, lasso: "select" as string },
     // （v0.7.25 曾有 desk.selPen 变体/笔径组，v0.7.26 笔架化后退役——配置归 toolStates.selPen
     //   + 笔架 collection；老 doc 里的 stale 键被 mergeInto 静默忽略）
     // ADR-0005/0006 形状笔：子工具 + **per-图形约束**（user：每个图形的 lock 分别持久化，默认全不锁）
@@ -310,6 +313,12 @@ export const desk = {
     set opacity(v: number) { if (_bind) _bind.setOpacity(v); else S.g.brushTool.opacity = v; },
     get color(): string { return _bind ? _bind.getColor() : S.g.brushTool.color; },
     set color(v: string) { if (_bind) _bind.setColor(v); else S.g.brushTool.color = v; },
+  },
+  subTool: {
+    get brush(): string { return S.g.subTool.brush; }, set brush(v: string) { S.g.subTool.brush = v; },
+    get eraser(): string { return S.g.subTool.eraser; }, set eraser(v: string) { S.g.subTool.eraser = v; },
+    get smudge(): string { return S.g.subTool.smudge; }, set smudge(v: string) { S.g.subTool.smudge = v; },
+    get lasso(): string { return S.g.subTool.lasso; }, set lasso(v: string) { S.g.subTool.lasso = v; },
   },
   lassoTool: {
     get sub(): string { return S.g.lassoTool.sub; }, set sub(v: string) { S.g.lassoTool.sub = v; },

@@ -85,6 +85,12 @@ declare function freshGroups(): {
         algo: string;
         showAnts: boolean;
     };
+    subTool: {
+        brush: string;
+        eraser: string;
+        smudge: string;
+        lasso: string;
+    };
     shapeBrush: {
         sub: string;
         constrainLine: boolean;
@@ -244,6 +250,12 @@ export declare const desk: {
         size: number;
         opacity: number;
         color: string;
+    };
+    subTool: {
+        brush: string;
+        eraser: string;
+        smudge: string;
+        lasso: string;
     };
     lassoTool: {
         sub: string;

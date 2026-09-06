@@ -523,6 +523,8 @@ body[data-mode="gallery"] .left-sidebar { display: none; }
   cursor: pointer;
   transition: background 0.12s ease;
 }
+.tool { position: relative; }   /* 2026-09-06 动词位小三角定位锚 */
+.tool .tool-caret { position: absolute; right: 2px; bottom: 2px; width: 8px; height: 8px; opacity: .55; pointer-events: none; }
 .tool:hover { background: var(--bg-soft); }
 .tool:active { background: var(--line); }
 .tool[aria-pressed="true"] {

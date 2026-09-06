@@ -55,6 +55,11 @@ SPECS = [
     ("one-to-one",    "1:1", (2, 5, 20, 14, 'sans'), "参考窗菜单「1:1 像素」（stopgap 字形；待像素隐喻真图）"),
     # 2026-09-02 内置说明书入口（设置菜单「帮助」；登记见 ../20260708 SVG Icons/TODO.md 待画）
     ("help",          "?",   (5, 3, 14, 18, 'sans'), "设置菜单「帮助」= in-app 说明书入口（stopgap 字形；待 help/question 真图）"),
+    # 2026-09-06 ADR-0012 手指位子工具（登记见 ../20260708 SVG Icons/TODO.md 待画）：库里没有 → 中文字形顶位
+    ("blend",         "揉",  (3, 3, 18, 18), "手指位子工具「混色/揉」（dull；stopgap 字形）"),
+    ("blur",          "糊",  (3, 3, 18, 18), "手指位子工具「模糊」（stopgap 字形）"),
+    ("sharpen",       "锐",  (3, 3, 18, 18), "手指位子工具「锐化」（stopgap 字形）"),
+    ("liquify",       "化",  (3, 3, 18, 18), "手指位子工具「液化」（stopgap 字形）"),
 ]
 syms = []
 for sid, text, box, note in SPECS:

@@ -107,7 +107,7 @@
     <link rel="icon" href="./icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=3215b1089e65" />
+    <link rel="stylesheet" href="./styles.css?v=79dd8e234b3a" />
     <!-- zip.js UMD bundle：自挂 window.zip。必须在 module bundle 之前。
          defer（v417）：原来是 parser-blocking 的，硬刷新时 SW 被绕过 → 直奔网络 → 网络一卡整个
          文档解析就停住（浏览器标签页转圈）。defer 后它与下面的 type=module bundle 同属延迟脚本、
@@ -447,6 +447,10 @@
   <symbol id="chevron-right" data-cat="stopgap" data-src="baked:DroidSansFallbackFull(Apache-2.0)/DejaVuSans-Bold(Bitstream-Vera)" data-note="参考窗翻页 chip ›（stopgap 字形）" viewBox="0 0 24 24"><path d="M7.21 3 16.79 10.21V13.83L7.21 21V16.3L12.88 12L7.21 7.7Z" fill="currentColor" stroke="none"/></symbol>
   <symbol id="one-to-one" data-cat="stopgap" data-src="baked:DroidSansFallbackFull(Apache-2.0)/DejaVuSans-Bold(Bitstream-Vera)" data-note="参考窗菜单「1:1 像素」（stopgap 字形；待像素隐喻真图）" viewBox="0 0 24 24"><path d="M2.05 14.91H4.12V9.06L2 9.5V7.91L4.1 7.47H6.33V14.91H8.39V16.53H2.05Z M10.63 9.73H12.82V12.08H10.63ZM10.63 14.18H12.82V16.53H10.63Z M15.67 14.91H17.73V9.06L15.61 9.5V7.91L17.72 7.47H19.94V14.91H22V16.53H15.67Z" fill="currentColor" stroke="none"/></symbol>
   <symbol id="help" data-cat="stopgap" data-src="baked:DroidSansFallbackFull(Apache-2.0)/DejaVuSans-Bold(Bitstream-Vera)" data-note="设置菜单「帮助」= in-app 说明书入口（stopgap 字形；待 help/question 真图）" viewBox="0 0 24 24"><path d="M13.31 15.03H9.04V14.45Q9.04 13.48 9.43 12.73Q9.82 11.98 11.08 10.82L11.83 10.13Q12.51 9.51 12.82 8.97Q13.14 8.42 13.14 7.88Q13.14 7.05 12.57 6.58Q12 6.11 10.98 6.11Q10.02 6.11 8.91 6.51Q7.8 6.91 6.59 7.69V3.97Q8.02 3.47 9.21 3.24Q10.39 3 11.49 3Q14.38 3 15.9 4.18Q17.41 5.36 17.41 7.62Q17.41 8.78 16.95 9.7Q16.49 10.61 15.38 11.67L14.62 12.34Q13.81 13.08 13.56 13.52Q13.31 13.97 13.31 14.5ZM9.04 16.78H13.31V21H9.04Z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="blend" data-cat="stopgap" data-src="baked:DroidSansFallbackFull(Apache-2.0)/DejaVuSans-Bold(Bitstream-Vera)" data-note="手指位子工具「混色/揉」（dull；stopgap 字形）" viewBox="0 0 24 24"><path d="M9.41 7.13H13.97L12.12 6.21L12.89 5.2L14.82 6.21L17.37 4.89H10.42V3.66H19.69V4.82L15.82 6.98L15.98 7.06L15.9 7.13H20.46V8.29Q19.76 9.37 18.76 10.3L17.68 9.53L18.84 8.37H16.52V10.76Q16.44 12.08 14.74 12.08L13.82 12L13.58 10.69L14.74 10.84Q15.21 10.84 15.21 10.3V8.37Q12.97 10.61 9.95 11.77L9.03 10.53Q11.42 9.91 13.43 8.37H9.41ZM9.26 13.31H14.2V12.62H15.67V13.31H20.23V14.63H16.83Q18.22 16.87 21 18.8L19.84 20.19Q17.21 17.87 15.67 15.01V20.88H14.2V14.94Q12.5 18.33 9.64 20.27L8.64 18.95Q11.42 17.25 12.97 14.63H9.26ZM3.31 6.36H5.16V3.12H6.63V6.36H8.48V7.83H6.63V11.69L8.1 10.84L8.41 12.23L6.63 13.39V19.42Q6.55 20.88 5.16 20.88L3.7 20.73L3.31 19.26L4.93 19.42Q5.16 19.42 5.16 18.57V14.16L3.54 15.01L3 13.39L5.16 12.39V7.83H3.31Z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="blur" data-cat="stopgap" data-src="baked:DroidSansFallbackFull(Apache-2.0)/DejaVuSans-Bold(Bitstream-Vera)" data-note="手指位子工具「模糊」（stopgap 字形）" viewBox="0 0 24 24"><path d="M3.39 9.39H5.65V3H6.9V9.39H8.92V10.64H6.9V12.35L9.08 15.31L8.14 16.64L6.9 14.22V21H5.65V14.38L4.09 17.96L3.16 16.79Q4.71 14.14 5.57 10.64H3.39ZM4.48 4.32 5.1 8.14 4.01 8.61 3.47 4.79ZM8.14 4.32 9.23 4.71 8.45 8.69 7.36 8.06ZM20.84 3.31V18.97Q20.84 20.77 19.36 20.77L17.42 20.53L17.1 19.05L18.97 19.29Q19.36 19.29 19.36 18.82V14.06H16.87Q16.56 17.81 15.23 20.92L13.83 20.06Q15.47 15.62 15.55 11.88V3.31ZM16.95 7.99H19.36V4.71H16.95ZM16.95 12.66H19.36V9.39H16.95ZM9.31 6.27H11.42V3H12.9V6.27H15V7.68H12.9V10.95H14.45V17.42H11.03V18.58H9.7V10.95H11.42V7.68H9.31ZM11.03 16.01H13.13V12.35H11.03Z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="sharpen" data-cat="stopgap" data-src="baked:DroidSansFallbackFull(Apache-2.0)/DejaVuSans-Bold(Bitstream-Vera)" data-note="手指位子工具「锐化」（stopgap 字形）" viewBox="0 0 24 24"><path d="M5.69 3.15 7.15 3.62 6.46 5.54H10V6.92H5.85L4.08 9.46L3 8.38Q4.85 6 5.69 3.15ZM6.08 10.08H4.92V8.69H9.54V10.08H7.54V12.92H10V14.31H7.54V18.54L9.54 17.54L9.77 18.92L6.77 20.38L6.08 19.62V14.31H3.62V12.92H6.08ZM11.38 6.69H15.77L17.31 3.15L19 3.69L17.46 6.69H19.46V13.46H17.54V18.54Q17.54 19.15 18.23 19.15Q19.23 19.15 19.38 18.77Q19.54 18.38 19.54 16.92L21 17.38Q20.92 19.62 20.46 20.12Q20 20.62 18.23 20.62Q16.08 20.62 16 19.31V13.46H14.77Q14.46 19.08 10.69 20.85L9.69 19.54Q13 18.23 13.23 13.46H11.38ZM12.92 12.08H18V8.08H12.92ZM13.23 3.46Q14.23 4.54 14.85 5.85L13.38 6.54Q12.85 5.15 11.92 4.08Z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="liquify" data-cat="stopgap" data-src="baked:DroidSansFallbackFull(Apache-2.0)/DejaVuSans-Bold(Bitstream-Vera)" data-note="手指位子工具「液化」（stopgap 字形）" viewBox="0 0 24 24"><path d="M7.71 3.12 9.26 3.58 7.25 7.98V20.88H5.7V10.45L3.77 12.77L3 11.23Q6.32 7.36 7.71 3.12ZM12.12 3.5H13.74V10.07Q16.67 7.91 18.99 5.05L20.15 5.97Q17.37 9.61 13.74 12.08V18.1Q13.74 18.64 14.01 18.84Q14.28 19.03 15.67 19.03Q17.83 19.03 17.91 18.88Q18.76 18.88 19.03 18.26Q19.3 17.64 19.38 15.24L21 15.94Q20.69 19.26 20.07 19.92Q19.45 20.58 14.9 20.58Q13.12 20.58 12.62 20.15Q12.12 19.73 12.12 18.72V13.08L10.11 14.16L9.33 12.85L12.12 11.23Z" fill="currentColor" stroke="none"/></symbol>
 </svg>
 <!-- ICON-SPRITE:END -->
 
@@ -473,17 +477,15 @@
 
       <div class="tool-group" role="group" aria-label="tools">
         <!-- v0.6.31 回滚（user：长按真机难受）：组槽拆回并列四按钮；"再点开笔架"仍废除（笔架走左栏） -->
-        <button class="tool" id="toolPen" type="button" data-tool="brush" aria-pressed="true" data-i18n-title="tool.brush">
+        <!-- 2026-09-06 ADR-0012 动词位（data-verb）：笔位收形状笔、手指位收模糊/锐化/液化、套索位收填色；长按 / 右键出子工具菜单（ui/subtool-slot），钮面图标随之换 -->
+        <button class="tool" id="toolPen" type="button" data-tool="brush" data-verb="brush" aria-pressed="true" data-i18n-title="tool.brush">
           <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#pencil"/></svg>
         </button>
-        <button class="tool" id="toolShape" type="button" data-tool="shapeBrush" data-i18n-title="tool.shapeBrush">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#shapes"/></svg>
-        </button>
         <!-- 2026-09-05 手指（smudge）回归：payload 进 filterBrush 模式（toolbar setTool("smudge") → filters-adjust）；图标 = 图标库 finger -->
-        <button class="tool" id="toolSmudge" type="button" data-tool="smudge" data-i18n-title="tool.smudge">
+        <button class="tool" id="toolSmudge" type="button" data-tool="smudge" data-verb="smudge" data-i18n-title="tool.smudge">
           <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#finger"/></svg>
         </button>
-        <button class="tool" id="toolEraser" type="button" data-tool="eraser" data-i18n-title="tool.eraser">
+        <button class="tool" id="toolEraser" type="button" data-tool="eraser" data-verb="eraser" data-i18n-title="tool.eraser">
           <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#eraser"/></svg>
         </button>
         <!-- v120: shapes tool 撤了 (user：「shapes icon 不要，以后不要这个 tool 了，
@@ -495,11 +497,8 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#eyedropper"/></svg>
         </button>
         <!-- v0.6.31：套索/填色并列（fill 仍一等工具、不互通语义不变；lasso 二击 Esc v124 仍废除） -->
-        <button class="tool" id="toolLasso" type="button" data-tool="lasso" data-i18n-title="tool.lasso">
+        <button class="tool" id="toolLasso" type="button" data-tool="lasso" data-verb="lasso" data-i18n-title="tool.lasso">
           <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#lasso"/></svg>
-        </button>
-        <button class="tool" id="toolFill" type="button" data-tool="fill" data-i18n-title="tool.fill">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#paint-bucket"/></svg>
         </button>
         <button class="tool tool-hand-conditional" id="toolHand" type="button" data-tool="hand" data-i18n-title="tool.pan">
           <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#hand"/></svg>
@@ -1596,6 +1595,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-0425e256a5e3.mjs"></script>
+    <script type="module" src="./dist/weebpaint-574768f160fd.mjs"></script>
   </body>
 </html>
