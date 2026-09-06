@@ -356,6 +356,7 @@ export function setTool(tool: string) {
   // v132: 切到非 filterBrush 工具时自动退出 filter brush 模式（藏 toolbar / 清 state）
   if (state.filterBrush && tool !== "filterBrush") {
     state.filterBrush = null;
+    dialReactive.payload = null;   // 2026-09-05：payload 清空 → 手指 dial key 让位
     const tb = document.getElementById("filterBrushToolbar");
     if (tb) tb.classList.add("hidden");
   }

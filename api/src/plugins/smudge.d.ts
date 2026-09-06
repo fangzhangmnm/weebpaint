@@ -6,13 +6,7 @@ interface SmudgeBrushState {
 /** "#rrggbb" → straight sRGB 0..1（解析失败 → 黑）。 */
 export declare function parseHexColor(hex: unknown): [number, number, number];
 /** 纯函数：variant params + 当前笔（ResolvedBrush 形）+ 图层 → 引擎设置（可单测）。 */
-export declare function smudgeSettingsFrom(params: FilterParams, bs: BrushSettings & {
-    spacing?: number;
-    sizeCoeff?: number;
-    opaCoeff?: number;
-    pressureGamma?: number;
-    color?: string;
-}, layer: {
+export declare function smudgeSettingsFrom(params: FilterParams, bs: BrushSettings, layer: {
     lockAlpha?: boolean;
 }): SmudgeSettings;
 export declare class SmudgeFilter {

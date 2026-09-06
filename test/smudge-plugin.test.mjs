@@ -16,16 +16,16 @@ function mockLayer(docW, docH) {
 
 describe("smudge 插件 · 设置映射", () => {
   it("strength = flow × opacity；spacing 有地板；mix 非法回 srgb；paint 才有 colorRate；lockAlpha 跟图层", () => {
-    const s = smudgeSettingsFrom({ mode: "paint", colorRate: 0.3, mix: "bogus" }, { size: 40, flow: 0.5, opacity: 0.8, spacing: 0.01, hardness: 0.7, color: "#ff8000" }, { lockAlpha: true });
+    const s = smudgeSettingsFrom({ mode: "paint", colorRate: 0.3, mix: "bogus" }, { size: 40, flow: 0.5, opacity: 0.8, spacing: 0.005, hardness: 0.7, color: "#ff8000", flowCoeff: 1 }, { lockAlpha: true });
     eq(s.mode, "paint"); eq(s.colorRate, 0.3); eq(s.mix, "srgb"); eq(s.lockAlpha, true);
     assert(Math.abs(s.strength - 0.4) < 1e-9, "strength = 0.5 × 0.8");
-    eq(s.spacing, 0.05, "spacing 地板 0.05");
+    eq(s.spacing, 0.01, "spacing 地板 0.01（只防 0/负值）"); eq(s.flowCoeff, 1, "flowCoeff 透传");
     eq(s.hardness, 0.7);
     const [r, g, b] = s.color; assert(r === 1 && Math.abs(g - 128 / 255) < 1e-9 && b === 0, "颜色解析");
     const s2 = smudgeSettingsFrom({ mode: "smear", colorRate: 0.9, mix: "spectral" }, { size: 10 }, {});
     eq(s2.colorRate, 0, "非 paint 变体 colorRate 归零"); eq(s2.mix, "spectral"); eq(s2.lockAlpha, false);
     const s3 = smudgeSettingsFrom({}, { size: 10 }, {});
-    eq(s3.mode, "smear", "缺省 smear");
+    eq(s3.mode, "smear", "缺省 smear"); eq(s3.spacing, 0.02, "缺省间距 2%");
   });
   it("parseHexColor：带/不带 #、非法 → 黑", () => {
     eq(parseHexColor("00ff00")[1], 1); eq(parseHexColor("#0000FF")[2], 1); eq(parseHexColor("nope")[0], 0); eq(parseHexColor(null)[0], 0);

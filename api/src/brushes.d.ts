@@ -97,4 +97,8 @@ export declare function brushFromJSON(text: string): LegacyBrush;
 export declare function findBrush(rack: BrushRackData, id: string): Brush | null;
 export declare function brushesByTool(rack: BrushRackData, tool: string): Brush[];
 export declare function defaultBrushForTool(rack: BrushRackData, tool: string): Brush | null;
+export declare function staleBuiltinArgFixes(brushes: Brush[], specs: BrushSpec[]): {
+    brush: Brush;
+    patch: Partial<Brush>;
+}[];
 export {};

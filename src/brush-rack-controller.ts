@@ -22,10 +22,11 @@ import { reactive, shallowRef } from "../vendor/vue/vue.esm-browser.prod.js";
 import {
   defaultBrushForTool, brushesByTool, findBrush, newBrushId, brushFromJSON,
   makeBrush, loadBuiltinBrushes, getAllBrushes, getMeta, metaAppend, metaRemove, metaMove,
-  metaPrependBuiltins, RACK_META_ID, DEFAULT_FOLDER, staleBuiltinNameFixes, builtinSpecs,
+  metaPrependBuiltins, RACK_META_ID, DEFAULT_FOLDER, staleBuiltinNameFixes, staleBuiltinArgFixes, builtinSpecs,
   type RackMeta,
 } from "./brushes.ts";
 // resolveRef 内联（brush ref 解析：先 id 后 name 兜底；折 folder-merge 依赖）。
+const SMUDGE_DEFAULT_OPACITY = 0.5;   // 手指 dial 初值（首版手感数字，2026-09-05）
 function resolveRef<T extends { id?: unknown; name?: unknown }>(list: T[], ref: { id?: unknown; name?: unknown }): T | null {
   return list.find((x) => ref.id != null && x.id === ref.id) ?? list.find((x) => ref.name != null && x.name === ref.name) ?? null;
 }
@@ -142,10 +143,17 @@ export class BrushRackController {
   async _healBuiltinNames(): Promise<void> {
     const specs = await builtinSpecs();
     const fixes = staleBuiltinNameFixes(this._brushesRef.value, specs);
-    if (!fixes.length) return;
+    // 2026-09-05：出厂笔**参数**同款自愈（用户没动过的旧出厂值 → 新出厂值；首案 = 大/小滤镜笔 spacing 10%→2%）。
+    const argFixes = staleBuiltinArgFixes(this._brushesRef.value, specs);
+    if (!fixes.length && !argFixes.length) return;
     this._bulkWrite = true;   // 批量写压住 onChange，收尾统一刷一次（resetBuiltin 同款）
     try {
       for (const f of fixes) this.d.collection.setItem(f.brush.id, { ...f.brush, name: f.name });
+      const renamed = new Map(fixes.map((f) => [f.brush.id, f.name]));   // 同一支笔可能同轮被改名：两份修正叠一起写
+      for (const f of argFixes) {
+        const nm = renamed.get(f.brush.id);
+        this.d.collection.setItem(f.brush.id, { ...f.brush, ...(nm ? { name: nm } : {}), ...f.patch });
+      }
     } finally { this._bulkWrite = false; }
     this._syncFromCollection();
   }
@@ -225,12 +233,18 @@ export class BrushRackController {
   getRackToolKey(tool: string) {
     if (tool === "airbrush" || tool === "shapeBrush") return "brush";
     if (tool === "lasso" || tool === "fill") return "selPen";
+    // 2026-09-05 手指单独 dial（user 拍板）：filterBrush 模式下 payload = smudge → 自己的 toolStates.smudge
+    //   （size/opacity/选笔/variant 与模糊/液化分账）；笔架列表仍共用滤镜笔（brushesByTool 的 smudge 别名）。
+    //   反应式：currentBrush computed 另读 dialReactive.payload 订阅切换（本函数读的 state.filterBrush 不反应）。
+    if (tool === "filterBrush" && (this.d.state.filterBrush?.Filter as { id?: string } | null | undefined)?.id === "smudge") return "smudge";
     return tool;
   }
   defaultToolStateFor(tool: string) {
     const brush = defaultBrushForTool(this._view(), tool);
-    if (brush) return { size: brush.size.base, opacity: 1.0, activeBrushId: brush.id, activeBrushName: brush.name };
-    return { size: 12, opacity: 1.0, activeBrushId: null, activeBrushName: null };
+    // 手指默认强度 0.5（user 2026-09-05「默认进去 intensity too large」）；其它工具沿笔的 defaultOpa（缺省 1.0）。
+    const opacity = tool === "smudge" ? SMUDGE_DEFAULT_OPACITY : (brush?.defaultOpa ?? 1.0);
+    if (brush) return { size: brush.size.base, opacity, activeBrushId: brush.id, activeBrushName: brush.name };
+    return { size: tool === "smudge" ? 32 : 12, opacity, activeBrushId: null, activeBrushName: null };
   }
   // healing 回写版（显式路径用）
   findToolBrush(ts: ToolDial | null | undefined) {

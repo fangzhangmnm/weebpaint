@@ -32,6 +32,7 @@ export interface BrushSettings {
     opacity?: number;
     spacing?: number;
     sizeCoeff?: number;
+    flowCoeff?: number;
     opaCoeff?: number;
     pressureGamma?: number;
     color?: string;

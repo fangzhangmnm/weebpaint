@@ -416,6 +416,11 @@ export function brushesByTool(rack: BrushRackData, tool: string): Brush[] {
   if (tool === "brush") {
     return rack.brushes.filter((b) => BRUSH_GROUP.includes(b.tool));
   }
+  // 2026-09-05 手指（smudge）：自己的 dial key，但**共用滤镜笔的笔架**（Procreate 手指共用画笔库的最小版）——
+  //   列表 = tool==="smudge" 的笔（将来的纹理手指）在前 + 全部 filterBrush 笔。
+  if (tool === "smudge") {
+    return [...rack.brushes.filter((b) => b.tool === "smudge"), ...rack.brushes.filter((b) => b.tool === "filterBrush")];
+  }
   // v132 filterBrush 是新工具类别，自己的 rack（不串到 brush）
   return rack.brushes.filter((b) => b.tool === tool);
 }
@@ -424,5 +429,41 @@ export function brushesByTool(rack: BrushRackData, tool: string): Brush[] {
 // activeByTool 已废（v2：活动笔归 per-doc toolStates，见 ai-docs/20260606-folderflow-build-plan.md §6）；
 // 这里就取该工具第一支笔当默认。
 export function defaultBrushForTool(rack: BrushRackData, tool: string): Brush | null {
-  return brushesByTool(rack, tool)[0] || null;
+  const list = brushesByTool(rack, tool);
+  // 2026-09-05 手指默认笔 = 小滤镜笔（软、32px；user「默认用软笔同意」+「diameter too large」）——没有它才退首支。
+  if (tool === "smudge") return list.find((b) => b.id === "default-filter-small") ?? list[0] ?? null;
+  return list[0] || null;
+}
+
+// ── 出厂笔**参数**自愈护栏（2026-09-05；同 staleBuiltinNameFixes 的形状）──
+// 出厂数据改了默认值（如大/小滤镜笔 spacing 10%→2%，user 2026-09-05「大滤镜笔应该是2%，不是的话就是错了」）时，
+// 已存在账号里的副本仍是旧值。规则：default-* 的笔、该字段仍等于**某个历史出厂值**（= 用户从没动过它）、且不等于
+// 当前 spec 值 → 报一条修正。用户改成别的值的永不碰；幂等（稳态零改）。历史值表是本护栏的唯一输入，别在别处再猜。
+const STALE_BUILTIN_SPACING_HISTORY: Record<string, number[]> = {
+  "default-filter-big":   [0.1],   // v132（2026-05-30）数据抄自大喷枪
+  "default-filter-small": [0.1],
+};
+function _brushSpacingValue(b: Brush): number | undefined {
+  const sp = (b as { spacing?: unknown }).spacing;
+  if (typeof sp === "number") return sp;
+  if (sp && typeof sp === "object" && typeof (sp as { value?: unknown }).value === "number") return (sp as { value: number }).value;
+  return undefined;
+}
+export function staleBuiltinArgFixes(brushes: Brush[], specs: BrushSpec[]): { brush: Brush; patch: Partial<Brush> }[] {
+  const byId = new Map(specs.map((s) => [s.id, s]));
+  const fixes: { brush: Brush; patch: Partial<Brush> }[] = [];
+  for (const b of brushes) {
+    if (typeof b?.id !== "string" || !b.id.startsWith("default-")) continue;
+    const spec = byId.get(b.id);
+    const history = STALE_BUILTIN_SPACING_HISTORY[b.id];
+    if (!spec || !history) continue;
+    const want = spec.args?.spacingValue;
+    if (typeof want !== "number") continue;
+    const cur = _brushSpacingValue(b);
+    if (cur == null || cur === want || !history.some((h) => Math.abs(h - cur) < 1e-9)) continue;   // 用户改过 / 已是新值 → 豁免
+    const sp = (b as { spacing?: unknown }).spacing;
+    const patch = (sp && typeof sp === "object") ? { spacing: { ...(sp as object), value: want } } : { spacing: want };
+    fixes.push({ brush: b, patch: patch as Partial<Brush> });
+  }
+  return fixes;
 }

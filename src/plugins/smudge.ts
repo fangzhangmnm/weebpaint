@@ -32,10 +32,11 @@ export function parseHexColor(hex: unknown): [number, number, number] {
 }
 
 /** 纯函数：variant params + 当前笔（ResolvedBrush 形）+ 图层 → 引擎设置（可单测）。 */
-export function smudgeSettingsFrom(params: FilterParams, bs: BrushSettings & { spacing?: number; sizeCoeff?: number; opaCoeff?: number; pressureGamma?: number; color?: string }, layer: { lockAlpha?: boolean }): SmudgeSettings {
+export function smudgeSettingsFrom(params: FilterParams, bs: BrushSettings, layer: { lockAlpha?: boolean }): SmudgeSettings {
   const modeRaw = params.mode;
   const mode: SmudgeMode = modeRaw === "dull" || modeRaw === "paint" ? modeRaw : "smear";
-  const spacing = Math.max(0.05, num(bs.spacing, num(bs.spacingValue, 0.06)));
+  // 间距沿笔（滤镜笔出厂 2%，user 2026-09-05 拍板）；地板 1% 只防 0/负值，不再设 5% 地板。
+  const spacing = Math.max(0.01, num(bs.spacing, num(bs.spacingValue, 0.02)));
   return {
     mode,
     size: Math.max(1, num(bs.size, 32)),
@@ -43,6 +44,7 @@ export function smudgeSettingsFrom(params: FilterParams, bs: BrushSettings & { s
     spacing,
     strength: clamp01(num(bs.flow, 1) * num(bs.opacity, 1) * num(params.strengthScale, 1)),
     sizeCoeff: num(bs.sizeCoeff, 0),
+    flowCoeff: num(bs.flowCoeff, 0),
     opaCoeff: num(bs.opaCoeff, 0),
     pressureGamma: num(bs.pressureGamma, 1),
     colorRate: mode === "paint" ? clamp01(num(params.colorRate, 0.5)) : 0,

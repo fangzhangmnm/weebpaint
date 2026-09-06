@@ -14,7 +14,7 @@
 //      lockAlpha：只混颜色不动 alpha（cur.a = 0 的像素恒不动）。
 //   4) 写回 + dirty。
 //   首颗 dab：Accum ← cur（手指先「沾」上画布），不上色。
-// 强度 s = strength × signedLerp(opaCoeff, p^γ)；半径 r = size/2 × signedLerp(sizeCoeff, p^γ)（与 brush.ts 同式）。
+// 强度 s = strength × signedLerp(flowCoeff, p^γ) × signedLerp(opaCoeff, p^γ)；半径 r = size/2 × signedLerp(sizeCoeff, p^γ)（与 brush.ts 同式）。
 // footprint 夹 **doc 边界**，不夹 layer.bbox——颜料要能拖出内容框（同液化 tile era 的结论；tile 按需分配，写哪都行）。
 // 全程 premult：透明像素 RGB 永不参与（黑边病根的反面）。
 //
@@ -41,7 +41,8 @@ export interface SmudgeSettings {
   spacing: number;       // dab 间距 = 直径 × spacing
   strength: number;      // 0..1 基础强度（= flow × opacity × 每笔 pull；压感在引擎里叠）
   sizeCoeff: number;     // 压感→尺寸（signedLerp，同 brush.ts）
-  opaCoeff: number;      // 压感→强度
+  flowCoeff: number;     // 压感→强度（滤镜笔预设把压感写在 flowCoeff 上；2026-09-05 user「对强度需要有压感一定要有」）
+  opaCoeff: number;      // 压感→强度（第二乘子，同画笔 opa_mul）
   pressureGamma: number;
   colorRate: number;     // paint 模式：每 dab 掺入画笔色的比例（0..1）
   color: readonly [number, number, number];   // 画笔色 straight sRGB 0..1
@@ -143,7 +144,7 @@ export class SmudgeEngine {
     const s0 = st.s;
     const pc = Math.pow(clamp01(pressure), Math.max(0.01, s0.pressureGamma || 1));
     const r = Math.max(0.5, st.Rmax * signedLerp(s0.sizeCoeff || 0, pc));
-    const strength = clamp01(s0.strength * signedLerp(s0.opaCoeff || 0, pc));
+    const strength = clamp01(s0.strength * signedLerp(s0.flowCoeff || 0, pc) * signedLerp(s0.opaCoeff || 0, pc));
     const B = st.B;
     const ox = Math.round(cx) - st.half, oy = Math.round(cy) - st.half;   // 窗口原点（doc 坐标）
     const { docW, docH } = st.layer;

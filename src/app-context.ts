@@ -45,6 +45,7 @@ export interface DialReactive {
   tool: string;
   color: string;
   canDraw: boolean;
+  payload: string | null;   // 2026-09-05 filterBrush 模式的 payload id（filters-adjust 写；currentBrush 订阅它切手指 dial）
   // （pressureOff 已 sunset 2026-08-28：不要压感 = 选「固定xx」笔，总账 §3 #12）
 }
 

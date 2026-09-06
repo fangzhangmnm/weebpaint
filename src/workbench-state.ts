@@ -35,6 +35,9 @@ export function useDials(): { state: EditorRuntimeState; dialReactive: DialReact
     eraser:   { size: 32, opacity: 0.6, activeBrushId: null },
     // v132：size=radius，opacity=transparency，variantId=子算法选择（Filter.brushVariants[].id），空=默认
     filterBrush: { size: 32, opacity: 1.0, activeBrushId: null, variantId: null },
+    // 2026-09-05 手指单独 dial（user 拍板；持久化新 key，随 Object.keys 泛型序列化）：filterBrush 模式 + smudge payload 时
+    //   getRackToolKey → "smudge"。初值 = 小滤镜笔 32px / 强度 0.5（defaultToolStateFor 在首次进模式时覆盖）。
+    smudge:   { size: 32, opacity: 0.5, activeBrushId: null, variantId: null },
     // v0.7.26 选区笔（第四个 rack 工具类别，lasso/fill 经 getRackToolKey 映射到这）：
     //   序列化走 Object.keys(toolStates) 泛型遍历（session-state），加 key 即持久化
     selPen:   { size: 30, opacity: 1.0, activeBrushId: null },
@@ -62,6 +65,7 @@ export function useDials(): { state: EditorRuntimeState; dialReactive: DialReact
     tool: "brush",                 // 镜像 editMode.current()（含 transient）；_syncEditModeUI 同步
     color: state.color,
     canDraw: true,                 // 镜像 editMode.canDraw()；_syncEditModeUI 同步 → <LeftDial> 滑块 disabled
+    payload: null,                 // 2026-09-05 filterBrush 的 payload id（"smudge"/"liquify"/…）——手指单独 dial 的反应式开关
   });
   // color 读写代理回 dialReactive（app 里 state.color 零改动，背后反应式）。
   Object.defineProperty(state, "color", {

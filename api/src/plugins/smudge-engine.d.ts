@@ -16,6 +16,7 @@ export interface SmudgeSettings {
     spacing: number;
     strength: number;
     sizeCoeff: number;
+    flowCoeff: number;
     opaCoeff: number;
     pressureGamma: number;
     colorRate: number;

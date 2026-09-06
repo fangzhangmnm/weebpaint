@@ -30,7 +30,7 @@ const RED = [255, 0, 0, 255], BLUE = [0, 0, 255, 255], CLEAR = [0, 0, 0, 0];
 function settings(over = {}) {
   return {
     mode: "smear", size: 8, hardness: 1, spacing: 0.25, strength: 1,
-    sizeCoeff: 0, opaCoeff: 0, pressureGamma: 1, colorRate: 0, color: [0, 1, 0], mix: "srgb", lockAlpha: false,
+    sizeCoeff: 0, flowCoeff: 0, opaCoeff: 0, pressureGamma: 1, colorRate: 0, color: [0, 1, 0], mix: "srgb", lockAlpha: false,
     ...over,
   };
 }
@@ -139,6 +139,12 @@ describe("smudge-engine · dull / paint / 选区 / lockAlpha", () => {
     const [r, , b, a] = L.px(14, 10);
     eq(a, 255, "不透明区 alpha 不变");
     assert(r > 0 && b < 255, `蓝区被红色混到 (${r},${b})`);
+  });
+  it("压感 → 强度：flowCoeff=1 时半压比满压拖得少（user：强度必须吃压感）", () => {
+    const run = (p) => { const L = mockLayer(60, 20); L.fill(0, 0, 12, 20, RED); drag(new SmudgeEngine(), L, settings({ strength: 0.9, flowCoeff: 1 }), 8, 40, 10, p); return L.px(24, 10)[3]; };
+    const full = run(1), half = run(0.5);
+    assert(full > 0, "满压有拖出");
+    assert(half < full, `半压应更弱 (half=${half}, full=${full})`);
   });
   it("三种混色空间都能跑（冒烟）", () => {
     for (const mix of ["srgb", "oklab", "spectral"]) {

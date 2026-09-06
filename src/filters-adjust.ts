@@ -55,6 +55,7 @@ interface AdjustState {
 }
 
 let state: AppContext["state"], editMode: AppContext["editMode"], doc: AppContext["doc"], board: AppContext["board"], history: AppContext["history"];
+let dialReactive: AppContext["dialReactive"];   // 2026-09-05：filterBrush payload 反应式开关（手指单独 dial）
 let wp2: AppContext["wp2"];
 let setStatus: AppContext["setStatus"], updateSaveStatus: AppContext["updateSaveStatus"];
 let _adjustWin: FloatingWindowHandle | null = null;   // 调整面板浮窗句柄（initFiltersAdjust 注册）
@@ -276,7 +277,8 @@ function _enterFilterBrushMode(Filter: FilterLike) {
   _filterBrushPreviousTool = editMode.current() === "filterBrush" ? "brush" : editMode.current();
   // 取持久化的 variantId（user 上次选过的；新 doc 默认第一个）
   const variants = Filter.brushVariants || [{ id: "default", title: Filter.title, params: Filter.defaults() }];
-  const savedVid = state.toolStates.filterBrush?.variantId;
+  const tsKey = _toolStateKeyFor(Filter);   // 2026-09-05：手指的 variant/dial 记在 toolStates.smudge
+  const savedVid = state.toolStates[tsKey]?.variantId;
   let variant = variants.find((v) => v.id === savedVid) || variants[0];
   // v147 声明了 boundaryModes 的 filter（液化）→ params 带上持久化的 bleed；其他 filter 不掺这个 key
   let params = Filter.boundaryModes
@@ -285,7 +287,8 @@ function _enterFilterBrushMode(Filter: FilterLike) {
   if (Filter.sampleModes) params = { ...params, sample: desk.liquify.sample };
   if (Filter.mixModes) params = { ...params, mix: _currentMixSpace() };   // 2026-09-05 手指：混色空间跟偏好
   state.filterBrush = { Filter, params, variantId: variant.id, variantLabel: variant.title };
-  if (state.toolStates.filterBrush) state.toolStates.filterBrush.variantId = variant.id;
+  if (state.toolStates[tsKey]) state.toolStates[tsKey].variantId = variant.id;
+  dialReactive.payload = Filter.id;   // 先于 setTool：currentBrush/rack 按 payload 选 dial key
   setTool("filterBrush");
   _renderFilterBrushToolbar();
   // v132 (user：「点 filter brush 不要自动弹笔架」) 进入时不开 rack
@@ -296,8 +299,11 @@ function _currentMixSpace(): string {
   const v = preferences.get("smudge-mix");
   return isMixSpace(v) ? v : "srgb";
 }
+// 手指（smudge）单独 dial（2026-09-05 user 拍板）；其它滤镜笔共用 filterBrush 那份。与 rack.getRackToolKey 同判据。
+function _toolStateKeyFor(Filter: FilterLike): string { return Filter.id === "smudge" ? "smudge" : "filterBrush"; }
 function _exitFilterBrushMode() {
   state.filterBrush = null;
+  dialReactive.payload = null;
   const tb = document.getElementById("filterBrushToolbar");
   if (tb) tb.classList.add("hidden");
   closeExclusive();   // 收 rack
@@ -341,7 +347,7 @@ function _renderFilterBrushToolbar() {
       fb.params = np;
       fb.variantId = v.id;
       fb.variantLabel = v.title;
-      if (state.toolStates.filterBrush) state.toolStates.filterBrush.variantId = v.id;
+      { const k = _toolStateKeyFor(Filter); if (state.toolStates[k]) state.toolStates[k].variantId = v.id; }
       // UI 态不 mark dirty（user 2026-06-10）：variant 选择是工具态，保存时顺手捞；真应用滤镜走 histchange 门。
       setStatus(t("mi.switchedTo", { title: v.title }));
     } });
@@ -388,7 +394,7 @@ function _renderFilterBrushToolbar() {
 
 export function initFiltersAdjust(ctx: AppContext) {
   ({ state, editMode, doc, board, history, setStatus, updateSaveStatus, wp2,
-     _suppressTransientPanels, _restoreTransientPanels } = ctx);
+     _suppressTransientPanels, _restoreTransientPanels, dialReactive } = ctx);
   // 调整面板 = 浮窗（2026-09-02 C2）：z/拖/钳制归 ui/floating-window；初始摆位仍走 positionPopup（钉右、让顶栏）。
   //   不进 transient 抑制（它本身就是 adjust-color transient 的 UI）。拖动那份原在 topbar-menu.ts，已删。
   registerContextToolbar(document.getElementById("filterBrushToolbar"));   // C4：滤镜笔条登记

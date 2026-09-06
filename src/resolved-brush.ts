@@ -27,6 +27,7 @@ interface CurrentBrushDeps { state: EditorRuntimeState; dialReactive: DialReacti
 export function makeCurrentBrush({ state, dialReactive, rack }: CurrentBrushDeps) {
   // **必须纯**：computed 内不写 toolStates（GUID healing 回写用 findToolBrushPure 的纯版；写回留显式路径）。
   const currentBrush = computed(() => {
+    void dialReactive.payload;   // 2026-09-05：订阅 filterBrush payload（手指单独 dial 的 key 由它决定；见 getRackToolKey）
     const ts = state.toolStates[rack.getRackToolKey(dialReactive.tool)] || state.toolStates.brush;
     // v0.6.14 缺笔自愈：id/name 解析不到 → 退该工具默认笔（纯派生不回写；无笔架 → null → DEFAULT 兜底）
     const preset = rack.resolveActiveBrushPure(ts, dialReactive.tool);

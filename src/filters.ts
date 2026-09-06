@@ -106,6 +106,7 @@ export interface BrushSettings {
   //   声明成可选让插件不必 cast 整个对象。spacing = 直径比例（ResolvedBrush 字段名；spacingValue 是旧名）。
   spacing?: number;
   sizeCoeff?: number;
+  flowCoeff?: number;
   opaCoeff?: number;
   pressureGamma?: number;
   color?: string;
