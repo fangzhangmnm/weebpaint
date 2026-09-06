@@ -1,6 +1,6 @@
 # 本 app 的图标
 
-149 icons · 提取自家族图标库 `../20260708 SVG Icons/icons.svg` · 由 `extract-icons.py` 生成，别手改。
+150 icons · 提取自家族图标库 `../20260708 SVG Icons/icons.svg` · 由 `extract-icons.py` 生成，别手改。
 
 用法：把 sprite 整段内联到 `<body>` 顶部，然后按 id 引用；
 ⚠ sprite 根自带的隐藏样式（1×1 + `opacity:0`）别换成 `display:none`——
@@ -12,7 +12,7 @@
 <svg width="24" height="24"><use href="#brush-rack"/></svg>
 ```
 
-> 👁 **待过目**（AI 自画、未经人类审阅，`data-review="pending"`）：`blend`、`blur`、`sharpen`、`liquify`、`chevron-left`、`chevron-right`、`one-to-one`、`help`
+> 👁 **待过目**（AI 自画、未经人类审阅，`data-review="pending"`）：`blend`、`blur`、`sharpen`、`liquify`、`finger-paint`、`chevron-left`、`chevron-right`、`one-to-one`、`help`
 > 见库 `index.html` 的「待过目」栏；过目后进库/打回归库 session。
 
 
@@ -36,6 +36,7 @@
 | `blur` 👁待过目 | 模糊:实心点 + 两圈虚化环(外圈更淡)=低通扩散；与 sharpen(硬边菱形)成对【WeebPaint 手指位长按菜单「模糊（笔刷）」+ 钮面；fable 自画未过目】 |
 | `sharpen` 👁待过目 | 锐化:硬边菱形 + 十字棱线(淡)=切面/刃口；与 blur 成对(一软一硬)【WeebPaint 手指位长按菜单「锐化（笔刷）」+ 钮面；fable 自画未过目】 |
 | `liquify` 👁待过目 | 液化:三道水平线被向下推弯(上轻中重下不动)=像素被推着流；与 hand(平移)不撞【WeebPaint 手指位长按菜单「液化」+ 钮面；fable 自画未过目】 |
+| `finger-paint` 👁待过目 | 带颜料的手指(湿画笔):finger 原贝塞尔 + 右下一颗实心颜料滴(从指侧滴下)【WeebPaint 手指位上下文条左段「带颜料的手指」子工具钮 + 选中后顶栏钮面；2026-09-06 fable 自画未过目】 |
 
 ## tool
 

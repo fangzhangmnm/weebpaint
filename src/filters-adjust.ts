@@ -16,7 +16,9 @@ import { positionPopup } from "./anchored-popup.ts";
 import { openAdoptedPopup, closePopupMenuOf, isPopupOpen } from "./ui/popup-menu.ts";   // 2026-09-02 C1：调整 popup 收养
 import { mountContextToolbar, type ContextToolbarHandle, type ToolbarItem } from "./ui/context-toolbar.ts";   // 2026-09-02 C4 登记 → 2026-09-06 U1 工厂
 
-import { setTool } from "./toolbar.ts";   // 命令 = toolbar 的接口（显式 import）
+import { setTool, setVerb } from "./toolbar.ts";   // 命令 = toolbar 的接口（显式 import）
+import { mountVerbSegment } from "./ui/verb-segment.ts";   // 2026-09-06 晚 ADR-0012 修订 ③：条左段 = 手指位子工具
+import { VERB_SUBTOOLS, DEFAULT_SUBTOOL } from "./common/verbs.ts";
 import { requireEditableLeaf } from "./editable-leaf.ts";
 import { resampleItems } from "./frontend/resample-modes.ts";
 import { createSelectField, type SelectFieldOpts } from "./ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
@@ -222,14 +224,12 @@ function _closeFilterPanel(applied: boolean) {
 //   - 艺术滤镜 = category="artist"，1 个 picker item（点开 panel 里有 dropdown 切）
 //   - 组之间 hr 分隔，不写类别 label
 const ADJUST_PREFIX_SVG = iconHtml("sliders", { cls: "menu-item-icon" });
-const BRUSH_PREFIX_SVG = iconHtml("pencil", { cls: "menu-item-icon" });
 function _renderFilterMenu() {
   const container = document.getElementById("adjustFilterList");
   if (!container) return;
   container.innerHTML = "";
   const all = (listFilters() as FilterLike[]).filter((F) => !F.hiddenInMenu);
   const adjustmentRegion = all.filter((F) => (F.category || "adjustment") === "adjustment" && F.modes.includes("region"));
-  const brushFilters     = all.filter((F) => F.modes.includes("brush"));
   const artistFilters    = all.filter((F) => F.category === "artist");
   const addHr = () => {
     const hr = document.createElement("hr"); hr.className = "menu-sep"; container.appendChild(hr);
@@ -253,15 +253,7 @@ function _renderFilterMenu() {
     });
     groupOpened = true;
   }
-  // 2) 笔刷类 filter（液化 / 锐化模糊 都是 plugin，自动列出来）
-  if (groupOpened && brushFilters.length > 0) addHr();
-  groupOpened = brushFilters.length > 0;
-  for (const F of brushFilters) {
-    addItem(F.title, BRUSH_PREFIX_SVG, () => {
-      setAdjustOpen(false);
-      _enterFilterBrushMode(F);
-    });
-  }
+  // 2) 笔刷类 filter：2026-09-06 晚起**不再列在 fx**（user：滤镜笔都算手指的子工具，fx 语义变回 filter）——入口 = 顶栏手指位上下文条左段
   // 3) 艺术滤镜（1 picker item）
   if (artistFilters.length > 0) {
     if (groupOpened) addHr();
@@ -340,9 +332,16 @@ function _fbRows(): ToolbarItem[][] {
   if (!fb) return [];
   const Filter = fb.Filter as FilterLike;
   const items: ToolbarItem[] = [{ kind: "title", text: Filter.title }];
-  // ① 子算法（多 variant 才显）
+  // ⓪ 左段 = 手指位子工具（ADR-0012 修订 ③：子工具栈并入上下文条；顶栏手指位只会冒出这一条）
+  items.push({ kind: "custom", id: "filterBrushVerbSeg", mount: (host) => mountVerbSegment(host, {
+    tools: () => VERB_SUBTOOLS.smudge.map((d) => ({ id: d.id, icon: d.icon, title: tLatin(d.titleKey as Parameters<typeof tLatin>[0]) })),
+    current: () => desk.subTool.smudge || DEFAULT_SUBTOOL.smudge,
+    onPick: (id) => setVerb("smudge", id),
+  }).dispose });
+  // ① 子算法下拉：只在本滤镜还有**左段没盖住**的 variant 时显（液化 pinch/bloat…）；手指 smear/dull/paint、锐化模糊 blur/sharp 全在左段 → 下拉退役
   const variants = Filter.brushVariants || [];
-  if (variants.length > 1) {
+  const covered = new Set(VERB_SUBTOOLS.smudge.filter((d) => "filter" in d.route && d.route.filter === Filter.id).map((d) => ("filter" in d.route ? d.route.variant : undefined)));
+  if (variants.length > 1 && variants.some((v) => !covered.has(v.id))) {
     items.push({ kind: "select", id: "filterBrushVariantSel", title: tLatin("fb.variant"), items: () => variants.map((v) => ({ value: v.id, label: v.title })), value: () => fb.variantId || "", onChange: (id) => {
       const v = variants.find((x) => x.id === id);
       if (!v) return;

@@ -29,6 +29,7 @@ export const VERB_SUBTOOLS: Record<Verb, readonly SubToolDef[]> = {
   smudge: [
     { id: "smear", icon: "finger", titleKey: "flt.smudge.smear", route: { filter: "smudge", variant: "smear" } },
     { id: "dull", icon: "blend", titleKey: "flt.smudge.dull", route: { filter: "smudge", variant: "dull" } },
+    { id: "paint", icon: "finger-paint", titleKey: "flt.smudge.paint", route: { filter: "smudge", variant: "paint" } },   // 2026-09-06 晚：湿画笔进左段（图标 PENDING 待过目）
     { id: "blur", icon: "blur", titleKey: "flt.sb.blurBrush", route: { filter: "sharpenBlur", variant: "blur" } },
     { id: "sharpen", icon: "sharpen", titleKey: "flt.sb.sharpBrush", route: { filter: "sharpenBlur", variant: "sharp" } },
     { id: "liquify", icon: "liquify", titleKey: "flt.liq.title", route: { filter: "liquify" } },
@@ -69,7 +70,7 @@ export function subToolOfMode(mode: string, filterId?: string | null, variantId?
     if ("mode" in r) { if (r.mode === mode) return { verb, sub: s.id }; }
     else if (mode === "filterBrush" && r.filter === filterId && (r.variant == null || r.variant === variantId)) return { verb, sub: s.id };
   }
-  // filterBrush 的 variant 不在表里（如液化 pinch/bloat、带颜料的手指 paint）→ 归该 filter 的第一条
+  // filterBrush 的 variant 不在表里（如液化 pinch/bloat）→ 归该 filter 的第一条
   if (mode === "filterBrush" && filterId) {
     const s = VERB_SUBTOOLS[verb].find((x) => "filter" in x.route && x.route.filter === filterId);
     if (s) return { verb, sub: s.id };

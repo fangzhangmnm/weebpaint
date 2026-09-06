@@ -294,6 +294,13 @@ body[data-tool="fill"] .board { cursor: crosshair; }
 /* ui/context-toolbar 工厂件（2026-09-06 U1）：chrome 复用 .lasso-toolbar-stack/.lasso-toolbar，这里只补工厂特有小件 */
 .ct-title { color: var(--ink-soft); font-size: 13px; padding: 0 6px 0 8px; white-space: nowrap; }
 .ct-sep { color: var(--line); padding: 0 2px; user-select: none; }
+/* 2026-09-06 晚 ADR-0012 修订 ③：上下文条左段（子工具栏）宿主不占 flex 位；工厂 custom 宿主同 */
+.verb-segment-host, .ct-custom { display: contents; }
+.verb-segment { flex: 0 1 auto; min-width: max(84px, 26vw); overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.verb-segment::-webkit-scrollbar { display: none; }
+.verb-segment > .lasso-tool-btn { flex: none; }
+/* 窄屏（SE2 375）：上下文条标题让位——左段已经点明是哪个工具，顶栏钮面也亮着 */
+@media (max-width: 480px) { .ct-toolbar .ct-title { display: none; } }
 .ct-select.select-field { border-radius: 999px; }
 .ct-toolbar .fb-inline-slider { padding: 0 4px; }
 .ct-more svg { width: 18px; height: 18px; }

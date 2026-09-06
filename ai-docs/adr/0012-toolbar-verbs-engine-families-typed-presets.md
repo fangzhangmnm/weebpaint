@@ -47,6 +47,12 @@ Krita 的 paintop preset × tool 两轴只作参考，不照搬。
 - ADR-0004（填色 = 选区消费视图）、ADR-0005（形状笔）
 - user 原话出处：`journal/20260905 v0.13 feedbacks.md`（2026-09-05 晚至 09-06）
 
+## 修订 2026-09-06 晚 ③：子工具栈并入上下文条左段（v0.14.1）
+
+user 原话：「『再点一次 = 展开子工具』不同意，这个我们之前探索过。是最 confusing 的选项。其实我觉得根因在于同一个图标会有 context subtoolbar vs subtool stack 两个不同的弹出，真正的问题是这个，需要治的是这个」→ 提案「子工具栈并入上下文条，成为它的左段；长按不再弹菜单，只是把这条上下文条叫出来」→ user「先试试这个吧，次优解。先活下来再说」。
+
+落地：① `ui/verb-segment` = 上下文条左段（图标钮并排，当前项 pressed），插进套索条 / 形状条行首、滤镜笔条（工厂 custom 项）、笔·自由手的新工厂条 `#brushToolbar`（默认藏，长按笔位叫出，✓ 收起，切离 brush 自收）；② `ui/subtool-slot` 长按/右键 = onReveal（叫出条），**不再弹 popup 菜单**，小三角只剩「有子工具」的静态提示；③ 滤镜笔条上的 variant 下拉只在左段没盖住的 variant 时显（液化 pinch/bloat…），手指/锐化模糊的下拉退役；④ 带颜料的手指进手指位子工具（图标 `finger-paint` PENDING 待过目）；⑤ **fx 语义回 filter**：fx 菜单不再列滤镜笔（入口 = 手指位条左段）；⑥ 窄屏（≤480）：左段自身可横滑、条标题让位。「再点一次 = 展开」这条路**已探过且否决，别再提**。
+
 ## 修订 2026-09-06 晚 ②：手指自己的笔架（v0.13.14）
 
 手指（smudge）不再借滤镜笔架：`brushesByTool("smudge")` 只列 tool=smudge 的笔；出厂笔 = 软手指/硬手指（`builtin-brushes.json`，defaultOpa 0.5 写进笔数据，controller 常量与「选笔不盖 0.5」过渡守卫一并撤）；老笔架缺该类别时 `_healBuiltinNames` 补种（只在该 tool 一支都没有时补，按 id 幂等）。模糊/锐化/液化仍走 filterBrush 笔架。这是 §2 「preset 按 engine 族 typed」的第一刀。

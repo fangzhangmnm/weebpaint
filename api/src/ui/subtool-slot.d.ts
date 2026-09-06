@@ -8,12 +8,12 @@ export interface SubToolSlotOpts {
     tools: () => SubTool[];
     current: () => string;
     onTap(): void;
-    onPick(id: string): void;
+    onReveal(): void;
     longPressMs?: number;
 }
 export interface SubToolSlotHandle {
     refresh(): void;
-    openMenu(): void;
+    reveal(): void;
     dispose(): void;
 }
 export declare function attachSubToolSlot(o: SubToolSlotOpts): SubToolSlotHandle;

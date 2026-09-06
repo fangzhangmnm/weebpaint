@@ -38,7 +38,7 @@ describe("verbs · mode ↔ 动词/子工具", () => {
     eq(subToolOfMode("fill").sub, "fill");
     eq(subToolOfMode("lasso").sub, "select");
     eq(subToolOfMode("filterBrush", "smudge", "dull").sub, "dull");
-    eq(subToolOfMode("filterBrush", "smudge", "paint").sub, "smear", "带颜料的手指 → 手指位首条");
+    eq(subToolOfMode("filterBrush", "smudge", "paint").sub, "paint", "带颜料的手指 2026-09-06 晚进表");
     eq(subToolOfMode("filterBrush", "sharpenBlur", "sharp").sub, "sharpen");
     eq(subToolOfMode("filterBrush", "sharpenBlur", "blur").sub, "blur");
     eq(subToolOfMode("filterBrush", "liquify", "pinch").sub, "liquify");

@@ -22,7 +22,8 @@ import { t, tLatin } from "./i18n/index.ts";
 import { fillPreviewActive, commitFillNow, sendSelectionToFill } from "./fill-mode.ts";
 import { isPopupOpen, openAdoptedPopup, toggleAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";
 import { registerContextToolbar, mountContextToolbar, type ContextToolbarHandle } from "./ui/context-toolbar.ts";
-import { attachSubToolSlot, type SubToolSlotHandle } from "./ui/subtool-slot.ts";   // 2026-09-06 U3 动词位长按子工具
+import { attachSubToolSlot, type SubToolSlotHandle } from "./ui/subtool-slot.ts";   // 2026-09-06 U3 动词位长按（修订 ③：长按 = 叫出上下文条）
+import { mountVerbSegment, type VerbSegmentHandle } from "./ui/verb-segment.ts";   // 2026-09-06 晚 ADR-0012 修订 ③：子工具栈并入上下文条左段
 import { VERB_SUBTOOLS, DEFAULT_SUBTOOL, isVerb, subToolDef, verbOfMode, subToolOfMode, type Verb } from "./common/verbs.ts";   // ADR-0012 动词表   // 2026-09-02 C4：顶栏条登记（让位高度由登记表算）   // 2026-09-02 C1：组槽/配置菜单收养（外点关/Escape/栈/定位归 module）
 import { configFromModeState, planesForMode, defaultVpsForMode } from "./perspective-frame.ts";
 import type { PerspMode } from "./perspective-frame.ts";
@@ -411,6 +412,17 @@ export function setTool(tool: string) {
 
 // ---- 动词位（ADR-0012，2026-09-06 U3）：动词 → 记忆的子工具 → 老 EditMode / 滤镜笔 payload ----
 const _slots: SubToolSlotHandle[] = [];
+const _segments: VerbSegmentHandle[] = [];       // 各上下文条左段（套索条 / 形状条 / 笔条；滤镜笔条的左段归 filters-adjust 自管）
+let _brushToolbar: ContextToolbarHandle | null = null;   // 笔·自由手的上下文条：默认藏，长按笔位叫出，✓ 收起
+function _verbTools(verb: Verb) { return VERB_SUBTOOLS[verb].map((d) => ({ id: d.id, icon: d.icon, title: tLatin(d.titleKey as Parameters<typeof tLatin>[0]) })); }
+/** 把某动词的子工具左段插到一条静态上下文条的行首（display:contents 宿主，不扰 flex 行）。 */
+function _mountVerbSegmentInto(row: HTMLElement | null, verb: Verb): void {
+  if (!row) return;
+  const host = document.createElement("span");
+  host.className = "verb-segment-host";
+  row.insertBefore(host, row.firstChild);
+  _segments.push(mountVerbSegment(host, { tools: () => _verbTools(verb), current: () => desk.subTool[verb] || DEFAULT_SUBTOOL[verb], onPick: (id) => { setVerb(verb, id); closeExclusive(); } }));
+}
 function _currentFilterId(): string | null { return (state.filterBrush?.Filter as { id?: string } | null | undefined)?.id ?? null; }
 function _currentVerb(): Verb | null { return verbOfMode(editMode.current(), _currentFilterId()); }
 /** 切到动词（可指定子工具）：写 desk.subTool 记忆，再按表路由到老入口——行为语义零变更。 */
@@ -421,6 +433,9 @@ export function setVerb(verb: Verb, sub?: string): void {
   const r = def.route;
   if ("mode" in r) setTool(r.mode);
   else window.dispatchEvent(new CustomEvent("wp:enter-filter-brush", { detail: { id: r.filter, variant: r.variant } }));
+  // 同一模式内换子工具（filterBrush 换 variant / 同 mode 早退）不发 modechange → 这里直接刷钮面与各左段
+  for (const sl of _slots) sl.refresh();
+  for (const sg of _segments) sg.refresh();
 }
 /** EditMode → 回写动词记忆（快捷键 / 菜单 / 双击进来的也同步），钮面跟着换。 */
 function _syncVerbMemory(): void {
@@ -428,6 +443,7 @@ function _syncVerbMemory(): void {
   const hit = subToolOfMode(editMode.current(), _currentFilterId(), fb?.variantId ?? null);
   if (hit) desk.subTool[hit.verb] = hit.sub;
   for (const sl of _slots) sl.refresh();
+  for (const sg of _segments) sg.refresh();
 }
 
 // #6 stage 4：UI 从 EditMode 派生（监听 wp:modechange）。setTool / enterTransient / exit 都会触发。
@@ -457,6 +473,7 @@ export function _syncEditModeUI() {
   if (els.activeSwatch) (els.activeSwatch as HTMLButtonElement).disabled = !editMode.allowsColor();
   updateLassoToolbar();             // 选区/变换工具栏跟着重新派生
   updateShapeToolbar();             // 形状笔工具栏跟着重新派生（与 lasso stack 互斥）
+  if (m !== "brush") _brushToolbar?.hide();   // 笔·自由手的条只在 brush 模式下活（长按叫出）；切走即收
   board.requestRender();            // overlay chrome（透视 gizmo/蚂蚁线）随工具显隐——不补这刀
                                     //   切工具后 gizmo 残留/不出现，直到下次 pan/落笔（"闪"，2026-07-28 修）
 }
@@ -718,6 +735,7 @@ export function initToolbar(ctx: AppContext) {
   // 两行 toolbar stack（v93）：row1 = 选区方式，row2 = 操作 / 变换
   lassoToolbarStack = byId("lassoToolbarStack");
   registerContextToolbar(lassoToolbarStack);
+  _mountVerbSegmentInto(byId("lassoToolbarRow1"), "lasso");   // 修订 ③：套索条左段 = [选区 | 油漆桶]
   lassoToolbarRow1 = byId("lassoToolbarRow1");
   lassoToolbarRow2 = byId("lassoToolbarRow2");
   lassoSubToolBar = byId("lassoSubToolBar");
@@ -823,6 +841,7 @@ export function initToolbar(ctx: AppContext) {
   //   画一半切子工具/约束 = cancel 不进 undo（user 拍板，同两指手势接管语义）。
   shapeToolbarStack = byId("shapeToolbarStack");
   registerContextToolbar(shapeToolbarStack);
+  _mountVerbSegmentInto(byId("shapeToolbarRow1"), "brush");   // 修订 ③：形状条左段 = [自由手 | 形状]（从形状回自由手就在这）
   shapeSubBtns = [...byId("shapeSubCtl").querySelectorAll<HTMLElement>("[data-shape-sub]")];
   shapeSubLineUse = byId("shapeSubLineUse") as unknown as SVGUseElement;
   shapeSubRectUse = byId("shapeSubRectUse") as unknown as SVGUseElement;
@@ -1239,16 +1258,31 @@ export function initToolbar(ctx: AppContext) {
   // v0.6.31 回滚：四工具并列，单击=切换。长按/Alt/右键/组菜单全撤（真机难受）。
   // v0.6.55（user 2026-07-30）：恢复「二次点弹笔架」（v79 语义回归）——已激活的画笔/橡皮/形状笔
   //   再点 = toggle 该工具的笔架（openExclusive 自带 toggle）；无笔架的工具（lasso/fill）二次点仍无事。
+  // 修订 ③：笔·自由手的上下文条（工厂）——默认藏，长按笔位叫出；左段 [自由手 | 形状] + ✓ 收起。切离 brush 自动收（_syncEditModeUI）。
+  _brushToolbar = mountContextToolbar({ id: "brushToolbar", ariaLabel: tLatin("tool.brush"), rows: [[
+    { kind: "custom", id: "brushVerbSeg", mount: (host) => {
+      const h = mountVerbSegment(host, { tools: () => _verbTools("brush"), current: () => desk.subTool.brush || DEFAULT_SUBTOOL.brush, onPick: (id) => { setVerb("brush", id); closeExclusive(); } });
+      _segments.push(h);
+      return () => { h.dispose(); const i = _segments.indexOf(h); if (i >= 0) _segments.splice(i, 1); };
+    } },
+    { kind: "button", id: "brushToolbarHide", icon: "check", title: tLatin("common.exit"), onClick: () => _brushToolbar?.hide(), foldPriority: -2 },
+  ]] });
   for (const b of els.toolBtns) {
     // 2026-09-06 ADR-0012 动词位：单击 = 切动词（子工具走记忆）/ 已激活再点 = 开该动词的笔架（v0.6.55 语义）；
-    //   长按 / 右键 = 子工具菜单（ui/subtool-slot 接管 click，长按后吞掉那一击）。
+    //   长按 / 右键 = 叫出该动词的上下文条（ui/subtool-slot 接管 click，长按后吞掉那一击；2026-09-06 晚修订 ③，原弹子工具菜单）。
     const verb = b.dataset.verb;
     if (verb && isVerb(verb)) {
       _slots.push(attachSubToolSlot({
         el: b as HTMLButtonElement,
         tools: () => VERB_SUBTOOLS[verb].map((d) => ({ id: d.id, icon: d.icon, title: tLatin(d.titleKey as Parameters<typeof tLatin>[0]) })),
         current: () => desk.subTool[verb] || DEFAULT_SUBTOOL[verb],
-        onPick: (id) => { setVerb(verb, id); closeExclusive(); },
+        // 修订 ③：长按 = 叫出该动词的上下文条（子工具在条左段）。套索/形状/滤镜笔的条随动词激活已显；
+        //   笔·自由手默认没有条 → 这里显 _brushToolbar；橡皮单子工具无条（tools<2 长按不触发）。
+        onReveal: () => {
+          closeExclusive();
+          if (_currentVerb() !== verb) setVerb(verb);
+          if (verb === "brush" && editMode.current() === "brush") _brushToolbar?.show();
+        },
         onTap: () => {
           if (_currentVerb() === verb) {
             if (verb === "lasso") return;   // v0.7.28：选区/填色二次点不开笔架（选区笔笔架走 pen 子模式旁挂钮）
