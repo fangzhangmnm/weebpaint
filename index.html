@@ -107,7 +107,7 @@
     <link rel="icon" href="./icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=1725f5b488e4" />
+    <link rel="stylesheet" href="./styles.css?v=26c4e6bb1b10" />
     <!-- zip.js UMD bundle：自挂 window.zip。必须在 module bundle 之前。
          defer（v417）：原来是 parser-blocking 的，硬刷新时 SW 被绕过 → 直奔网络 → 网络一卡整个
          文档解析就停住（浏览器标签页转圈）。defer 后它与下面的 type=module bundle 同属延迟脚本、
@@ -931,6 +931,8 @@
       <p class="sheet-hint" id="diagLogHint"></p>
       <pre class="diag-log-pre" id="diagLogText"></pre>
       <button class="sheet-action" id="diagLogCopy" type="button" data-i18n="diag.copy">复制</button>
+      <!-- 2026-09-06 Web Share（iPad 把日志直接发给任何 app）；navigator.share 不在时 diag-log-sheet 隐掉 -->
+      <button class="sheet-action" id="diagLogShare" type="button" data-i18n="diag.share">分享…</button>
       <button class="sheet-action ghost" id="diagLogClear" type="button" data-i18n="diag.clear">清空</button>
       <button class="sheet-action ghost" id="diagLogClose" type="button" data-i18n="diag.close">关闭</button>
     </div>
@@ -1454,6 +1456,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-e67cd01dc232.mjs"></script>
+    <script type="module" src="./dist/weebpaint-601326f408fd.mjs"></script>
   </body>
 </html>
