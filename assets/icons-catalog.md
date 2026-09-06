@@ -1,6 +1,6 @@
 # 本 app 的图标
 
-141 icons · 提取自家族图标库 `../20260708 SVG Icons/icons.svg` · 由 `extract-icons.py` 生成，别手改。
+149 icons · 提取自家族图标库 `../20260708 SVG Icons/icons.svg` · 由 `extract-icons.py` 生成，别手改。
 
 用法：把 sprite 整段内联到 `<body>` 顶部，然后按 id 引用；
 ⚠ sprite 根自带的隐藏样式（1×1 + `opacity:0`）别换成 `display:none`——
@@ -11,6 +11,9 @@
 <!-- 内联 icons.svg -->
 <svg width="24" height="24"><use href="#brush-rack"/></svg>
 ```
+
+> 👁 **待过目**（AI 自画、未经人类审阅，`data-review="pending"`）：`blend`、`blur`、`sharpen`、`liquify`、`chevron-left`、`chevron-right`、`one-to-one`、`help`
+> 见库 `index.html` 的「待过目」栏；过目后进库/打回归库 session。
 
 
 ## drawing-tool
@@ -29,6 +32,10 @@
 | `pencil` | 铅笔 Bootstrap Icons MIT |
 | `stamp` | 橡皮图章 |
 | `pen-pressure` | 笔压启用·案D:库内 pencil(Bootstrap 实心, 尖本就朝左下)缩到 0.60 置右上 + 笔尖 (9.4,14.6) 处两道同心波纹环(r4.8/7.6, 缺口 100° 让给笔身); 20260728 候选 4 号入库(甲方参考图思路) |
+| `blend` 👁待过目 | 混色/揉(dull):两圆相接、重叠区半透明填充=两色揉成一色【WeebPaint 顶栏手指位长按菜单「混色（揉）」+ 选中后钮面；2026-09-06 fable 自画未过目】 |
+| `blur` 👁待过目 | 模糊:实心点 + 两圈虚化环(外圈更淡)=低通扩散；与 sharpen(硬边菱形)成对【WeebPaint 手指位长按菜单「模糊（笔刷）」+ 钮面；fable 自画未过目】 |
+| `sharpen` 👁待过目 | 锐化:硬边菱形 + 十字棱线(淡)=切面/刃口；与 blur 成对(一软一硬)【WeebPaint 手指位长按菜单「锐化（笔刷）」+ 钮面；fable 自画未过目】 |
+| `liquify` 👁待过目 | 液化:三道水平线被向下推弯(上轻中重下不动)=像素被推着流；与 hand(平移)不撞【WeebPaint 手指位长按菜单「液化」+ 钮面；fable 自画未过目】 |
 
 ## tool
 
@@ -183,6 +190,8 @@
 | `chevron-down` | 下移:竖线 + 底端 ∨ 箭头 |
 | `chevron-up` | 上移:竖线 + 顶端 ∧ 箭头 |
 | `x` | 叉 |
+| `chevron-left` 👁待过目 | ‹ 小尺寸优化裸 chevron:描边 2.4、臂短(14px chip 用)；库里带杆的 back 是另一语义【WeebPaint 参考窗多图时窗底翻页 chip；fable 自画未过目】 |
+| `chevron-right` 👁待过目 | › chevron-left 的精确镜像【WeebPaint 参考窗翻页 chip；fable 自画未过目】 |
 
 ## cloud
 
@@ -218,6 +227,7 @@
 | `picture-in-picture` | 画中画:大框(主画布) + 右下角内嵌小窗(参考小窗自己) |
 | `pixel-grid` | 像素栅格(WeebPaint ☰「像素栅格(放大时)」): 淡细网格(4x4, sw0.55/opacity0.35, butt 端帽)+两枚内缩 0.35 的像素画——方块(2,1) + 右下角 L(1,3)-(3,3)-(3,2), 甲方读作生命游戏的 glider。⚠ L 是**合成单路径**画的(共享边相消), 不逐格 rect —— 逐格必出白缝(resample 8x8 版即因此 sunset)。20260821 甲方拍板 C 案入库; 落选: 5x5 像素空心圆 / 5x5 像素空心矩形(接近粗边框, 与 grid-border 抢语义) / 5x5 里 3x3 空心方 / 同案满格不内缩版 / 更早的 resample AA 圆盘叠网格两案(太糊)。与同族区分: grid=实线密 4x4 · grid-border=虚框+实十字 · snap-grid=实框+虚十字 · pixel-grid=淡网格+像素画 |
 | `snap-grid` | 主栅格/对齐网格(WeebPaint ☰「主栅格(对齐网格)」): **实线**外框(1.7, 与 grid-border 同重)+**虚线**十字(1.2, dash 2.25/2.0)。三件并置可辨: grid=实线密 4x4 / grid-border=虚框+实十字 / snap-grid=实框+虚十字。20260821 甲方拍板候选1号入库(全虚线版、3x3 虚线版、细框 1.2 版落选); 原与像素栅格/主栅格尺寸三条菜单同挂 #grid, 本轮分家 |
+| `one-to-one` 👁待过目 | 1:1 像素:四角括号 + 中心一颗实心像素=「一图像素对一屏像素」(不写 1:1 文字)【WeebPaint 参考窗 ＋ 菜单「1:1 像素」项；fable 自画未过目】 |
 
 ## ui
 
@@ -231,6 +241,7 @@
 | `shortcut` | 快捷键:键帽圆角方块内放 V |
 | `theme` | 主题日月同辉:细月牙(大圆挖近等大圆) + 八芒太阳嵌在缺口里, 光芒是与太阳脱开的短线。日月直径比 1.00, 分离角 -30°, 分离距离 1.05 倍月半径;太阳用遮罩描边留白从月牙上抠出白边 |
 | `wrench` | 扳手:斜置组合扳手轮廓(feather:wrench 衍生), 20260724 候选 1 号入库 |
+| `help` 👁待过目 | 帮助:圆 + 路径画的问号(不用 text)【WeebPaint ☰ 设置菜单「帮助」= in-app 说明书入口；fable 自画未过目】 |
 
 ## ai
 

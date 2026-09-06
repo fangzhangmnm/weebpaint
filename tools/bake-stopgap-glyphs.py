@@ -49,17 +49,8 @@ def text_path(text, box, font='cjk'):
 SPECS = [
     # 2026-08-21 图标收货：cut/copy-picture 真图入库后 stopgap 曾清零（历史见 git）。
     # （device 已 2026-08-28 收货真图标——甲方 0827 拍板候选 1 号「显示器·T 座」，stopgap 条目退役。）
-    # 2026-08-30 参考窗整改批（登记见 ../20260708 SVG Icons/TODO.md 待画）：库里没有 → 字形顶位。
-    ("chevron-left",  "‹",   (3, 3, 18, 18, 'sans'), "参考窗翻页 chip ‹（stopgap 字形；库裸 chevron 曾 sunset，待美工裁小尺寸版）"),
-    ("chevron-right", "›",   (3, 3, 18, 18, 'sans'), "参考窗翻页 chip ›（stopgap 字形）"),
-    ("one-to-one",    "1:1", (2, 5, 20, 14, 'sans'), "参考窗菜单「1:1 像素」（stopgap 字形；待像素隐喻真图）"),
-    # 2026-09-02 内置说明书入口（设置菜单「帮助」；登记见 ../20260708 SVG Icons/TODO.md 待画）
-    ("help",          "?",   (5, 3, 14, 18, 'sans'), "设置菜单「帮助」= in-app 说明书入口（stopgap 字形；待 help/question 真图）"),
-    # 2026-09-06 ADR-0012 手指位子工具（登记见 ../20260708 SVG Icons/TODO.md 待画）：库里没有 → 中文字形顶位
-    ("blend",         "揉",  (3, 3, 18, 18), "手指位子工具「混色/揉」（dull；stopgap 字形）"),
-    ("blur",          "糊",  (3, 3, 18, 18), "手指位子工具「模糊」（stopgap 字形）"),
-    ("sharpen",       "锐",  (3, 3, 18, 18), "手指位子工具「锐化」（stopgap 字形）"),
-    ("liquify",       "化",  (3, 3, 18, 18), "手指位子工具「液化」（stopgap 字形）"),
+    # 2026-09-06 收货：chevron-left/right、one-to-one、help、blend/blur/sharpen/liquify 八枚已由图标库「待过目层」（fable 自画，
+    #   data-review="pending"）提供 → 全部 stopgap 退役，SPECS 清零。新缺图标照旧在这里烤字顶位 + 登记 ../20260708 SVG Icons/TODO.md。
 ]
 syms = []
 for sid, text, box, note in SPECS:
