@@ -6918,6 +6918,61 @@ export declare const S: {
         readonly en: "All";
         readonly ja: "すべて";
     };
+    readonly "curve.tangent": {
+        readonly zh: "切线";
+        readonly en: "Tangent";
+        readonly ja: "接線";
+    };
+    readonly "curve.mode.clampedAuto": {
+        readonly zh: "自动（不过冲）";
+        readonly en: "Clamped auto";
+        readonly ja: "自動（クランプ）";
+    };
+    readonly "curve.mode.auto": {
+        readonly zh: "自动";
+        readonly en: "Auto";
+        readonly ja: "自動";
+    };
+    readonly "curve.mode.free": {
+        readonly zh: "自由";
+        readonly en: "Free";
+        readonly ja: "自由";
+    };
+    readonly "curve.mode.flat": {
+        readonly zh: "水平";
+        readonly en: "Flat";
+        readonly ja: "水平";
+    };
+    readonly "curve.mode.linear": {
+        readonly zh: "直线";
+        readonly en: "Linear";
+        readonly ja: "直線";
+    };
+    readonly "curve.mode.constant": {
+        readonly zh: "阶跃";
+        readonly en: "Constant";
+        readonly ja: "階段";
+    };
+    readonly "curve.broken": {
+        readonly zh: "断开";
+        readonly en: "Broken";
+        readonly ja: "分離";
+    };
+    readonly "curve.reset": {
+        readonly zh: "复位";
+        readonly en: "Reset curve";
+        readonly ja: "リセット";
+    };
+    readonly "curve.addKey": {
+        readonly zh: "加点";
+        readonly en: "Add key";
+        readonly ja: "キーを追加";
+    };
+    readonly "curve.removeKey": {
+        readonly zh: "删点";
+        readonly en: "Delete key";
+        readonly ja: "キーを削除";
+    };
     readonly "flt.liq.title": {
         readonly zh: "液化";
         readonly en: "Liquify";

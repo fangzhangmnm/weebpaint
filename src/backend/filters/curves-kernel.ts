@@ -3,82 +3,52 @@
 //
 // v132 (user：「曲线不是折线！」)：分段插值 = Monotonic Cubic Hermite 系
 // v135 (user：「曲线还是有点怪，不是 PS / Unity 手感」)：换 Catmull-Rom
-//   切线 = (邻居 y 差) / (邻居 x 差) — 中心差分；端点 = 单边斜率
-//   越界值 clamp 到 0..255，偶尔出现 plateau 是 trade-off（PS 也这样）
+// 2026-09-05（user 0820「曲线完全不能用……重做，对标Unity的animation curve」；0830 拍板对齐 Unity 带把手）：
+//   参数从 [x,y][] 换成 common/anim-curve.ts 的 AnimCurve（key + 切线模式 + 把手；默认 clampedAuto 不过冲），
+//   LUT = bakeLut8(curve)。旧 CurvePoint 数组（MCP 回放 / 旧脚本）经 curveOf 兼容转成 AnimCurve。
+//   edited by Claude Fable 5.1
 
-import { clamp8, type FilterKernel, type FilterParams } from "./kernel.ts";
+import { type FilterKernel, type FilterParams } from "./kernel.ts";
+import { type AnimCurve, identityCurve, makeCurve, bakeLut8, sanitizeCurve } from "../../common/anim-curve.ts";
 
-export type CurvePoint = [number, number];
+export type CurveChannel = "comp" | "r" | "g" | "b" | "a";
+export const CURVE_CHANNELS: readonly CurveChannel[] = ["comp", "r", "g", "b", "a"];
 
 export interface CurvesParams extends FilterParams {
-  active: string;
-  comp: CurvePoint[];
-  r: CurvePoint[];
-  g: CurvePoint[];
-  b: CurvePoint[];
-  a: CurvePoint[];
+  active: CurveChannel;
+  comp: AnimCurve;
+  r: AnimCurve;
+  g: AnimCurve;
+  b: AnimCurve;
+  a: AnimCurve;
 }
 
-// Catmull-Rom → Hermite basis 采样 LUT。UI 画曲线（plugins/curves.ts buildBody）与 bake 同源。
-export function buildCurveLut(points: CurvePoint[]): Uint8Array {
-  const pts = points.slice().sort((a, b) => a[0] - b[0]);
-  const n = pts.length;
-  const lut = new Uint8Array(256);
-  if (n < 2) {
-    for (let x = 0; x < 256; x++) lut[x] = x;
-    return lut;
+/** 参数 → AnimCurve：AnimCurve 原样（校验后）；旧 [x0..255, y0..255][] 点表 → 转 0..1 曲线；其他 → 恒等。 */
+export function curveOf(p: unknown): AnimCurve {
+  if (Array.isArray(p)) {
+    const pts = (p as unknown[]).filter((q): q is [number, number] => Array.isArray(q) && q.length >= 2 && Number.isFinite(q[0]) && Number.isFinite(q[1]))
+      .map(([x, y]) => ({ t: x / 255, v: y / 255 }));
+    return pts.length >= 2 ? makeCurve(pts) : identityCurve();
   }
-  // 1) Catmull-Rom 切线（中心差分；端点单边）
-  const tans = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    if (i === 0) {
-      const dx = pts[1][0] - pts[0][0];
-      tans[i] = dx === 0 ? 0 : (pts[1][1] - pts[0][1]) / dx;
-    } else if (i === n - 1) {
-      const dx = pts[n - 1][0] - pts[n - 2][0];
-      tans[i] = dx === 0 ? 0 : (pts[n - 1][1] - pts[n - 2][1]) / dx;
-    } else {
-      const dx = pts[i + 1][0] - pts[i - 1][0];
-      tans[i] = dx === 0 ? 0 : (pts[i + 1][1] - pts[i - 1][1]) / dx;
-    }
-  }
-  // 2) 采样到 LUT（Hermite basis：y(t) = h00·y0 + h10·dx·m0 + h01·y1 + h11·dx·m1）
-  let seg = 0;
-  for (let x = 0; x < 256; x++) {
-    while (seg < n - 2 && x > pts[seg + 1][0]) seg++;
-    const x0 = pts[seg][0], y0 = pts[seg][1];
-    const x1 = pts[seg + 1][0], y1 = pts[seg + 1][1];
-    const dx = x1 - x0;
-    if (dx === 0) { lut[x] = clamp8(y0); continue; }
-    const t = (x - x0) / dx;
-    const t2 = t * t, t3 = t2 * t;
-    const h00 =  2 * t3 - 3 * t2 + 1;
-    const h10 =      t3 - 2 * t2 + t;
-    const h01 = -2 * t3 + 3 * t2;
-    const h11 =      t3 -     t2;
-    const y = h00 * y0 + h10 * dx * tans[seg] + h01 * y1 + h11 * dx * tans[seg + 1];
-    lut[x] = clamp8(y);
-  }
-  return lut;
+  return sanitizeCurve(p) ?? identityCurve();
 }
 
 export const CurvesKernel: FilterKernel = {
   id: "curves",
 
   defaults(): CurvesParams {
-    const id = (): CurvePoint[] => [[0, 0], [255, 255]];
-    return { active: "comp", comp: id(), r: id(), g: id(), b: id(), a: id() };
+    return { active: "comp", comp: identityCurve(), r: identityCurve(), g: identityCurve(), b: identityCurve(), a: identityCurve() };
   },
 
   bleedRadius() { return 0; },
 
   bake(srcData, dstData, params, mask) {
-    const p = params as CurvesParams;
-    const lutComp = buildCurveLut(p.comp);
-    const lutR    = buildCurveLut(p.r);
-    const lutG    = buildCurveLut(p.g);
-    const lutB    = buildCurveLut(p.b);
-    const lutA    = buildCurveLut(p.a);
+    const p = params as Partial<CurvesParams>;
+    const lutComp = bakeLut8(curveOf(p.comp));
+    const lutR    = bakeLut8(curveOf(p.r));
+    const lutG    = bakeLut8(curveOf(p.g));
+    const lutB    = bakeLut8(curveOf(p.b));
+    const lutA    = bakeLut8(curveOf(p.a));
     const N = srcData.length / 4;
     for (let i = 0; i < N; i++) {
       const o = i * 4;

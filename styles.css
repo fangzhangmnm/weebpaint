@@ -1786,14 +1786,62 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
 .curves-tab[aria-pressed="true"] {
   background: var(--accent); color: #fff;
 }
-.curves-canvas {
-  width: 100%;
-  aspect-ratio: 1;
-  display: block;
-  border-radius: 4px;
-  background: #1c1c1c;
-  margin-bottom: 6px;
+/* 曲线编辑器（ui/curve-editor.ts，2026-09-05）：SVG 曲线 + HTML 键/把手 + 右上角 gizmo 钮（参考窗语言）。
+   颜色全走主题变量；--curve-accent 由宿主按通道注入。edited by Claude Fable 5.1 */
+.curve-editor { display: flex; flex-direction: column; gap: 6px; outline: none; user-select: none; -webkit-user-select: none; }
+.curve-editor:focus-visible .ce-plot { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
+.ce-plot {
+  position: relative; width: 100%; aspect-ratio: 1;
+  margin: 8px 0 8px;                       /* 端点键半径露出 plot 边界，留白别裁 */
+  border: 1px solid var(--line); border-radius: 4px;
+  background: var(--bg-soft);
+  touch-action: none;
 }
+.ce-plot > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; display: block; }   /* 只钉直接子 svg：gizmo 钮里的图标 svg 不许中招（曾把两图标叠到一个钮上） */
+.ce-grid line { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.ce-identity { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+.ce-curve { fill: none; stroke: var(--curve-accent, var(--accent)); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.ce-hline { stroke: var(--ink-soft); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.ce-keys { position: absolute; inset: 0; pointer-events: none; }
+.ce-key {
+  position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
+  background: var(--curve-accent, var(--accent)); border: 2px solid var(--bg);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  pointer-events: auto; cursor: grab; touch-action: none;
+}
+.ce-key::before { content: ""; position: absolute; inset: -11px; border-radius: 50%; }   /* 触屏命中面 ≥ 30px */
+.ce-key.selected { width: 16px; height: 16px; margin: -8px 0 0 -8px; box-shadow: 0 0 0 2px var(--ink); }
+.ce-key.locked { border-radius: 2px; }
+.ce-knob {
+  position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
+  background: var(--bg); border: 2px solid var(--ink-soft);
+  cursor: grab; touch-action: none; z-index: 2;
+}
+.ce-knob::before { content: ""; position: absolute; inset: -11px; border-radius: 50%; }
+/* gizmo 落左上角：右上角 (1,1) 是恒等曲线的末端键，放那儿会盖住键（截图实测）。 */
+.ce-gizmos { position: absolute; top: 4px; left: 4px; z-index: 3; display: flex; gap: 4px; transition: opacity 0.35s; }
+.ce-gizmo {
+  width: 28px; height: 28px; padding: 0; border: none; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--bg) 72%, transparent); color: var(--ink); cursor: pointer;
+}
+.ce-gizmo svg { width: 16px; height: 16px; pointer-events: none; }
+.ce-gizmo:hover { background: color-mix(in srgb, var(--bg) 90%, transparent); }
+.ce-gizmo:disabled { opacity: 0.3; cursor: default; }
+.curve-editor.idle .ce-gizmos { opacity: 0.35; }
+.curve-editor.away .ce-gizmos { opacity: 0; }
+.ce-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink); min-height: 22px; }
+.ce-row-readout { justify-content: flex-end; color: var(--ink-soft); font-variant-numeric: tabular-nums; min-height: 16px; }
+.ce-label { color: var(--ink-soft); }
+.ce-select-slot { flex: 1; display: flex; }
+.ce-select-slot .select-field { flex: 1; }
+.ce-btn {
+  font: inherit; font-size: 12px; padding: 3px 8px;
+  background: var(--bg-soft); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px; cursor: pointer;
+}
+.ce-btn[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+.ce-btn:disabled { opacity: 0.4; cursor: default; }
 
 /* v110 自由裁切 overlay：全屏覆盖，rect+handles 在屏幕坐标 */
 .crop-overlay {

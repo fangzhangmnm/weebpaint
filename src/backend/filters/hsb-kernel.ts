@@ -3,6 +3,8 @@
 // v132 (user：「饱和度用自然饱和度算法，默认自然，下拉框选」)
 // - 自然饱和度（vibrance）：对低饱和像素加幅度大，高饱和像素少加，防过饱
 // - 线性饱和度：朝 luma lerp，PS 老式饱和度
+// 2026-08-30 user 拍板默认回滚 linear（「hsv里面自然饱和度一直很煤气灯，我后来用的都是普通的，把那个当默认吧」）：
+//   自然饱和度对满饱和平涂几乎无效，拉满没反应像坏了；vibrance 仍在下拉里可选。edited by Claude Fable 5.1 2026-09-05
 
 import { clamp8, type FilterKernel, type FilterParams } from "./kernel.ts";
 
@@ -18,7 +20,7 @@ export const HsbKernel: FilterKernel = {
   id: "hsb",
 
   defaults(): HsbParams {
-    return { brightness: 0, contrast: 0, saturation: 0, hue: 0, satMode: "vibrance" };
+    return { brightness: 0, contrast: 0, saturation: 0, hue: 0, satMode: "linear" };
   },
 
   bleedRadius() { return 0; },
