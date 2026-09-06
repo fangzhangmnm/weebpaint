@@ -26,6 +26,8 @@ export class CurvesFilter {
   static defaults = CurvesKernel.defaults;
   static bake = CurvesKernel.bake;
 
+  static disposeBody(state: CurvesBuildState): void { state._curveEditor?.dispose(); state._curveEditor = undefined; }
+
   static buildBody(container: HTMLElement, state: CurvesBuildState, onChange: () => void): void {
     container.innerHTML = "";
     state._curveEditor?.dispose();

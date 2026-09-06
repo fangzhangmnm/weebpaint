@@ -291,7 +291,9 @@ export class BrushRackController {
     ts.activeBrushId = brushId;
     ts.activeBrushName = brush.name;
     ts.size = brush.size.base;
-    ts.opacity = brush.defaultOpa ?? 1.0;
+    // 手指（smudge）的强度 dial 不随选笔重置（user 2026-09-05「smudge 的默认 0.5 不靠谱，因为换笔切回来就变回笔刷默认的 1 了」）：
+    //   滤镜笔的 defaultOpa 是给模糊/液化的；手指有自己的口味（SMUDGE_DEFAULT_OPACITY 起步，之后跟 dial）。过渡修法——终局 = 手指自己的笔架/出厂笔。
+    if (key !== "smudge") ts.opacity = brush.defaultOpa ?? 1.0;
     if (key === this.getRackToolKey(this.d.editMode().current())) this.applyToolState(this.d.editMode().current());
   }
 

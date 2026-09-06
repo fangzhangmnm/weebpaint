@@ -112,6 +112,29 @@ describe("smudge-engine · dull / paint / 选区 / lockAlpha", () => {
     assert(r > 20 && b > 20 && r < 240 && b < 240, `交界应是紫 (${r},${g},${b})`);
     assert(r + b >= 200, `不发黑：r+b=${r + b}`);
   });
+  it("smear↔dull 连续量（s=0.9）：拖红进透明区，终点 alpha 随 dull 单调下降（0=纯搬块 > 0.5 > 1=揉平均色），颜色仍是红", () => {
+    // s=1 时记忆永不衰减，三档都 255（无法区分）；s=0.9 实测 246 > 230 > 215（tmp 实验 2026-09-05）
+    const alphaAt = (dull) => {
+      const L = mockLayer(40, 20);
+      L.fill(0, 0, 20, 20, RED);
+      drag(new SmudgeEngine(), L, settings({ mode: "smear", dull, strength: 0.9, hardness: 1 }), 10, 30, 10);
+      const [r, g, b, a] = L.px(28, 10);
+      if (a > 0) assert(r >= 250 && g <= 3 && b <= 3, `dull=${dull} 终点应仍是纯红 (${r},${g},${b},${a})`);
+      return a;
+    };
+    const a0 = alphaAt(0), a5 = alphaAt(0.5), a1 = alphaAt(1);
+    assert(a0 >= a5 && a5 >= a1, `单调：${a0} ≥ ${a5} ≥ ${a1}`);
+    assert(a0 > a1, `两端确实不同：${a0} vs ${a1}`);
+    assert(a5 > a1 && a5 < a0, `0.5 严格在中间：${a0} > ${a5} > ${a1}`);
+  });
+  it("旧 settings 无 dull 字段 → 按 mode 二值（mode dull 等价 dull=1）", () => {
+    const L1 = mockLayer(40, 20), L2 = mockLayer(40, 20);
+    L1.fill(0, 0, 20, 20, RED); L2.fill(0, 0, 20, 20, RED);
+    const s1 = settings({ mode: "dull", strength: 0.7, hardness: 0.5 }); delete s1.dull;
+    drag(new SmudgeEngine(), L1, s1, 10, 30, 10);
+    drag(new SmudgeEngine(), L2, settings({ mode: "smear", dull: 1, strength: 0.7, hardness: 0.5 }), 10, 30, 10);
+    assert(same(snapshot(L1), snapshot(L2)), "二值 mode=dull 与 dull=1 逐字节相同");
+  });
   it("paint：带颜料的手指把画笔色（绿）掺进去", () => {
     const L = mockLayer(40, 20);
     L.fill(0, 0, 40, 20, RED);

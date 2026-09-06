@@ -357,6 +357,9 @@ body[data-tool="fill"] .board { cursor: crosshair; }
 .lasso-tol-inline .brush-slider-label { display: none; }
 .lasso-tol-inline .ramp-slider { width: 120px; }
 .lasso-tol-inline .brush-slider-value { min-width: 24px; }
+/* 滤镜笔条内联旋钮（2026-09-05 手指「揉匀」）：复用 lasso 容差滑条样式，但标签要露出来 */
+.fb-inline-slider .brush-slider-label { display: inline; color: var(--ink-soft); font-size: 12px; }
+.fb-inline-slider .ramp-slider { width: 90px; }
 .lasso-popup-val { text-align: right; font-variant-numeric: tabular-nums; }
 .lasso-popup-row input[type="range"] { width: 100%; }
 
@@ -1791,8 +1794,8 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
 .curve-editor { display: flex; flex-direction: column; gap: 6px; outline: none; user-select: none; -webkit-user-select: none; }
 .curve-editor:focus-visible .ce-plot { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
 .ce-plot {
-  position: relative; width: 100%; aspect-ratio: 1;
-  margin: 8px 0 8px;                       /* 端点键半径露出 plot 边界，留白别裁 */
+  position: relative; width: 200px; height: 200px;   /* 边长由 curve-editor inline 写（默认 200，grip 可拖）；这里只是兜底 */
+  margin: 8px auto;                        /* 居中；端点键半径露出 plot 边界，留白别裁 */
   border: 1px solid var(--line); border-radius: 4px;
   background: var(--bg-soft);
   touch-action: none;
@@ -1801,7 +1804,7 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
 .ce-grid line { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .ce-identity { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
 .ce-curve { fill: none; stroke: var(--curve-accent, var(--accent)); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-.ce-hline { stroke: var(--ink-soft); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.ce-hline { stroke: var(--ink); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .ce-keys { position: absolute; inset: 0; pointer-events: none; }
 .ce-key {
   position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
@@ -1813,11 +1816,24 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
 .ce-key.selected { width: 16px; height: 16px; margin: -8px 0 0 -8px; box-shadow: 0 0 0 2px var(--ink); }
 .ce-key.locked { border-radius: 2px; }
 .ce-knob {
-  position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
-  background: var(--bg); border: 2px solid var(--ink-soft);
+  position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%;   /* user 0905「手柄太小」：12→16 */
+  background: var(--bg); border: 2px solid var(--ink);
   cursor: grab; touch-action: none; z-index: 2;
 }
-.ce-knob::before { content: ""; position: absolute; inset: -11px; border-radius: 50%; }
+.ce-knob::before { content: ""; position: absolute; inset: -8px; border-radius: 50%; }   /* 命中面 32px */
+/* 右下角 grip（沿 .float-panel-resize 家族斜纹，裁成三角）：拖拽改绘图区边长 */
+.ce-grip {
+  position: absolute; right: 0; bottom: 0; width: 19px; height: 19px; z-index: 2;
+  cursor: nwse-resize; touch-action: none;
+  color: var(--ink); opacity: 0.85;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  transition: opacity 0.35s;
+}
+.ce-grip::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(135deg, transparent 0 58%, currentColor 58% 65%, transparent 65% 79%, currentColor 79% 86%, transparent 86%);
+}
 /* gizmo 落左上角：右上角 (1,1) 是恒等曲线的末端键，放那儿会盖住键（截图实测）。 */
 .ce-gizmos { position: absolute; top: 4px; left: 4px; z-index: 3; display: flex; gap: 4px; transition: opacity 0.35s; }
 .ce-gizmo {
@@ -1828,8 +1844,8 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
 .ce-gizmo svg { width: 16px; height: 16px; pointer-events: none; }
 .ce-gizmo:hover { background: color-mix(in srgb, var(--bg) 90%, transparent); }
 .ce-gizmo:disabled { opacity: 0.3; cursor: default; }
-.curve-editor.idle .ce-gizmos { opacity: 0.35; }
-.curve-editor.away .ce-gizmos { opacity: 0; }
+.curve-editor.idle .ce-gizmos, .curve-editor.idle .ce-grip { opacity: 0.35; }
+.curve-editor.away .ce-gizmos, .curve-editor.away .ce-grip { opacity: 0; }
 .ce-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink); min-height: 22px; }
 .ce-row-readout { justify-content: flex-end; color: var(--ink-soft); font-variant-numeric: tabular-nums; min-height: 16px; }
 .ce-label { color: var(--ink-soft); }

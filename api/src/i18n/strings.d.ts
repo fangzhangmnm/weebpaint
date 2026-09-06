@@ -3859,6 +3859,11 @@ export declare const S: {
         readonly en: "Wet finger (paint)";
         readonly ja: "絵の具つき指先";
     };
+    readonly "flt.smudge.dullKnob": {
+        readonly zh: "揉匀";
+        readonly en: "Dull";
+        readonly ja: "なじませ";
+    };
     readonly "flt.smudge.mix.srgb": {
         readonly zh: "直接混合";
         readonly en: "Plain mix";
@@ -7022,11 +7027,6 @@ export declare const S: {
         readonly zh: "翻转";
         readonly en: "Flip";
         readonly ja: "反転";
-    };
-    readonly "ramp.pickForeground": {
-        readonly zh: "取前景色";
-        readonly en: "Use foreground color";
-        readonly ja: "描画色を使う";
     };
     readonly "ramp.addStop": {
         readonly zh: "加色标";

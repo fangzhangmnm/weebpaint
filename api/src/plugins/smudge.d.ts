@@ -18,6 +18,7 @@ export declare class SmudgeFilter {
     static defaults(): {
         mode: string;
         colorRate: number;
+        dull: number;
     };
     static supportsLayerGroup: boolean;
     static brushVariants: {
@@ -26,7 +27,16 @@ export declare class SmudgeFilter {
         params: {
             mode: string;
             colorRate: number;
+            dull: number;
         };
+    }[];
+    static brushSliders: {
+        key: string;
+        title: string;
+        min: number;
+        max: number;
+        step: number;
+        fmt: (v: number) => string;
     }[];
     static mixModes: {
         id: string;

@@ -40,6 +40,7 @@ export function smudgeSettingsFrom(params: FilterParams, bs: BrushSettings, laye
   const spacing = Math.max(0.01, num(bs.spacing, num(bs.spacingValue, 0.02)));
   return {
     mode,
+    dull: clamp01(num(params.dull, mode === "dull" ? 1 : 0)),   // 旋钮缺省按 variant：手指 0 / 混色 1
     size: Math.max(1, num(bs.size, 32)),
     hardness: clamp01(num(bs.hardness, 0.6)),
     spacing,
@@ -62,14 +63,18 @@ export class SmudgeFilter {
   static category = "adjustment";   // 与 liquify / sharpenBlur 同组（fx 菜单「笔刷类」自动列出）
   static modes = ["brush"];
   static bleedRadius(_p: FilterParams): number { return 0; }
-  static defaults() { return { mode: "smear", colorRate: 0 }; }
+  static defaults() { return { mode: "smear", colorRate: 0, dull: 0 }; }
   // 单叶语义（色彩类同）：组进来 = 上游路由错，响亮拒绝
   static supportsLayerGroup = false;
 
   static brushVariants = [
-    { id: "smear", title: tLatin("flt.smudge.smear"), params: { mode: "smear", colorRate: 0 } },
-    { id: "dull",  title: tLatin("flt.smudge.dull"),  params: { mode: "dull",  colorRate: 0 } },
-    { id: "paint", title: tLatin("flt.smudge.paint"), params: { mode: "paint", colorRate: 0.5 } },
+    { id: "smear", title: tLatin("flt.smudge.smear"), params: { mode: "smear", colorRate: 0, dull: 0 } },
+    { id: "dull",  title: tLatin("flt.smudge.dull"),  params: { mode: "dull",  colorRate: 0, dull: 1 } },
+    { id: "paint", title: tLatin("flt.smudge.paint"), params: { mode: "paint", colorRate: 0.5, dull: 0 } },
+  ];
+  // 2026-09-05 user「嗯 smear dull 连续量」：滤镜笔条上的「揉匀」旋钮，0 = 纯搬块 … 1 = 纯揉平均色（值经 params.dull）。
+  static brushSliders = [
+    { key: "dull", title: tLatin("flt.smudge.dullKnob"), min: 0, max: 1, step: 0.05, fmt: (v: number) => `${Math.round(v * 100)}%` },
   ];
   // 混色空间（filters-adjust 通用渲染第 2 个下拉；值经 params.mix 透传，持久化 preferences "smudge-mix"）
   static mixModes = [

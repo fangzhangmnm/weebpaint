@@ -12,6 +12,7 @@ export interface SmudgeSelection {
 export type SmudgeMode = "smear" | "dull" | "paint";
 export interface SmudgeSettings {
     mode: SmudgeMode;
+    dull: number;
     size: number;
     hardness: number;
     spacing: number;

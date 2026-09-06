@@ -27,6 +27,14 @@ describe("smudge 插件 · 设置映射", () => {
     const s3 = smudgeSettingsFrom({}, { size: 10 }, {});
     eq(s3.mode, "smear", "缺省 smear"); eq(s3.spacing, 0.02, "缺省间距 2%");
   });
+  it("dull 连续量：缺省按 variant（smear 0 / dull 1），params.dull 覆盖并钳 0..1；brushSliders 声明「揉匀」", () => {
+    eq(smudgeSettingsFrom({ mode: "dull" }, { size: 10 }, {}).dull, 1);
+    eq(smudgeSettingsFrom({ mode: "smear" }, { size: 10 }, {}).dull, 0);
+    eq(smudgeSettingsFrom({ mode: "smear", dull: 0.3 }, { size: 10 }, {}).dull, 0.3);
+    eq(smudgeSettingsFrom({ mode: "dull", dull: 7 }, { size: 10 }, {}).dull, 1);
+    eq(SmudgeFilter.brushSliders.length, 1); eq(SmudgeFilter.brushSliders[0].key, "dull");
+    eq(SmudgeFilter.brushVariants.find((v) => v.id === "dull").params.dull, 1);
+  });
   it("parseHexColor：带/不带 #、非法 → 黑", () => {
     eq(parseHexColor("00ff00")[1], 1); eq(parseHexColor("#0000FF")[2], 1); eq(parseHexColor("nope")[0], 0); eq(parseHexColor(null)[0], 0);
   });

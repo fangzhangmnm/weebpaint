@@ -13,11 +13,21 @@ let state: AppContext["state"], colorWheel: ReturnType<typeof mountColorWheel>;
 // ---- 色板 target 切换（T4c；v0.8.24 扩到 fill 工具全程）：fill 里色板编辑「将要填的颜色」
 // （PendingFill），不碰笔刷色。注册制防环：fill-mode init 时注册 provider（返回 null = 无 target，
 // 照旧写笔刷色）。
+// 2026-09-05 单槽 → 栈（edited by Claude Fable 5.1）：第二个消费者 = 渐变映射的选中色标（user「把 color window 抽象复用一下，
+//   让它不是只绑定画笔颜色」；journal 20260802「color 窗口可以指向不同的 color 值进行编辑」）。后注册者优先；provider 返 null =
+//   让位。registerColorTarget 返回注销函数（fill 那份终身注册，忽略返回值即可）。
 export interface ColorTarget { get(): string; set(hex: string): void }
-let _targetProvider: (() => ColorTarget | null) | null = null;
-export function registerColorTarget(p: () => ColorTarget | null): void { _targetProvider = p; }
+const _targetProviders: Array<() => ColorTarget | null> = [];
+export function registerColorTarget(p: () => ColorTarget | null): () => void {
+  _targetProviders.push(p);
+  return () => { const i = _targetProviders.indexOf(p); if (i >= 0) _targetProviders.splice(i, 1); };
+}
+function _activeTarget(): ColorTarget | null {
+  for (let i = _targetProviders.length - 1; i >= 0; i--) { const t = _targetProviders[i](); if (t) return t; }
+  return null;
+}
 /** 色板当前显示/编辑的颜色（target 优先，否则笔刷色）。 */
-export function currentPanelColor(): string { return _targetProvider?.()?.get() ?? state.color; }
+export function currentPanelColor(): string { return _activeTarget()?.get() ?? state.color; }
 /** 显示面重同步（target 生灭/undo 换色后调；只写 DOM/色轮，不写任何状态）。 */
 export function refreshColorDisplay(): void {
   if (!colorWheel) return;   // initColorPanel 之前（node 测试/boot 早期）无显示面可刷
@@ -27,7 +37,7 @@ export function refreshColorDisplay(): void {
 }
 
 export function setColor(hex: string) {
-  const t = _targetProvider?.();
+  const t = _activeTarget();
   if (t) t.set(hex);   // fill 工具期：改的是 PendingFill（预览挂着时可撤销）；笔刷色不动
   else desk.brushTool.color = hex;   // 绑定反应式引擎（→state.color/dialReactive.color 重派生）+ 标脏持久化
   els.activeSwatch.style.background = hex;

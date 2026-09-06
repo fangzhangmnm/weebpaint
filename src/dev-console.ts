@@ -4,6 +4,7 @@
 import { fetchOraThumbnail } from "./gallery/cloud-thumbs.ts";
 import { requireStore } from "./app-store.ts";
 import { registerFilter, listFilters } from "./filters.ts";
+import { setColor } from "./color-panel.ts";
 import { registerExporter, listExporters } from "./exporters.ts";
 import {
   clearCloudThumbCache,
@@ -82,6 +83,7 @@ export function initDevConsole() {
   // 暴露给 plugin（v131）：window.WeebPaint.registerFilter(FilterClass)
   // 插件自己写 buildBody，可以放色环 / 自定义 canvas / 任何 DOM（user：「插件自己提供 UI」）
   WP.registerFilter = registerFilter;
+  WP.setColor = setColor;   // 2026-09-05：色板真入口（走 color target：fill 期改 PendingFill、渐变映射选中色标期改色标）——探针/console 用
   WP.listFilters = listFilters;
   // candidate 2：导出格式同样可插件注册（下载插件 → registerExporter）
   WP.registerExporter = registerExporter;

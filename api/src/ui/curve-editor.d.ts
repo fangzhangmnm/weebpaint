@@ -13,7 +13,7 @@ export declare function pxToData(x: number, y: number, size: PlotSize): {
     t: number;
     v: number;
 };
-export declare const HANDLE_LEN_PX = 40;
+export declare const HANDLE_LEN_PX = 56;
 /** 把手钮相对 key 的 px 偏移：斜率 m = dv/dt 的屏幕方向（in 侧反向），定长 HANDLE_LEN_PX。 */
 export declare function handleOffsetPx(slope: number, side: "in" | "out", size: PlotSize, len?: number): {
     dx: number;
@@ -32,6 +32,7 @@ export declare function keyboardNudge(key: string, shift: boolean, step: number)
 } | null;
 export interface CurveEditorOpts {
     curve: AnimCurve;
+    plotSize?: number;
     lockEndpointsT?: boolean;
     showIdentity?: boolean;
     accent?: string;
@@ -48,4 +49,5 @@ export interface CurveEditorHandle {
     select(i: number): void;
     dispose(): void;
 }
+export declare const DEFAULT_PLOT_SIZE = 200;
 export declare function makeCurveEditor(o: CurveEditorOpts): CurveEditorHandle;

@@ -56,6 +56,8 @@ export interface Filter {
   bleedRadius?(params: FilterParams): number;
   defaults?(): FilterParams;
   buildBody?(container: HTMLElement, state: unknown, onChange: () => void): void;
+  // 2026-09-05：面板关闭 / 重置重建前的收口钩（注销 color target、dispose 编辑器等）。没副作用的插件不用实现。
+  disposeBody?(state: unknown): void;
   // 能力声明（2026-08-28）：active 是图层组时，本 filter 能不能一次吃下整组的叶？
   //   true  = beginBrushStroke 会收到组内全部叶（含隐藏），自负「所有叶同待遇」的语义（液化=共享位移场）。
   //   缺省/false = 只吃单叶；input 侧照旧硬拒组（st.groupNoDraw）。
@@ -156,13 +158,6 @@ export function onFilterRegistered(fn: (item: Filter) => void): () => void {
   return _reg.onRegistered(fn);
 }
 
-// ============= 前景色读口（2026-09-05）=============
-// 插件（渐变映射「取前景色」）要读当前前景色，但 plugins/ 不该 import app 层（color-panel / app-context）——
-// 由 filters-adjust.initFiltersAdjust 注入 provider，这里只做转发。缺省黑。
-let _fgProvider: (() => string) | null = null;
-export function setFilterForegroundColorProvider(fn: () => string): void { _fgProvider = fn; }
-export function filterForegroundColor(): string { return _fgProvider ? _fgProvider() : "#000000"; }
-
 // ============= 共享 helper =============
 
 // 一行 slider row：label + 滑块 + 数字
@@ -214,6 +209,9 @@ export function makeSectionTitle(text: string): HTMLDivElement {
 //   // 之后 BlurFilter.beginBrushStroke/extendBrushStamp/endBrushStroke/flushDirty 都有了
 //
 // 跟 liquify（位移场）那种 filter 不同；位移场 filter 自己写完整 brush 方法。
+/** 色彩类滤镜笔（模糊/锐化）的间距地板：每颗 dab 都是一次卷积，间距再小 = 强度×N 且成本×N；10% 是 v132–v0.13.3 的历史值。 */
+export const COLOR_BRUSH_MIN_SPACING = 0.1;
+
 export function attachColorBrushBehavior(FilterClass: Filter): void {
   FilterClass.beginBrushStroke = function(layers: readonly BrushLayer[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, p: number): ColorBrushState {
     // 色彩类 filter 是单叶语义（见 Filter.supportsLayerGroup 注释）——多叶传进来 = 上游路由错了，
@@ -239,7 +237,11 @@ export function attachColorBrushBehavior(FilterClass: Filter): void {
     //   ResolvedBrush（字段名 spacing = 归一后的直径比例）→ 一直落到 0.06 写死，预设的 spacing 从未生效。改读 spacing
     //   （spacingValue 兜底，最后 0.06）。代价（node 实测 amount −50/5 轮 box）：32px 0.6ms/dab、100px 3.9ms、300px 28ms；
     //   滤镜笔出厂 2%（v0.13.3）后 1000px 一笔 ≈ 0.6s / 2.0s / 4.7s（6% 时 0.3 / 0.7 / 1.6s）。大笔模糊要快得另做可分离核/GPU。
-    const spacingFrac = (typeof bs.spacing === "number" && bs.spacing > 0) ? bs.spacing : (bs.spacingValue || 0.06);
+    //   2026-09-05 晚 user 反悔（「大滤镜笔性能确实不可接受，有模糊的话改回10%」「模糊锐化自己的地板同意」）：模糊/锐化不跟笔的
+    //   间距走到底——自己的地板 COLOR_BRUSH_MIN_SPACING（10%）。真正的语义整改（滤镜一次算、wash 式 mask 合成，间距与强度解耦）
+    //   见 ai-docs/20260905-grill-agenda-toolbar-smudge-routing.md §E。
+    const presetSpacing = (typeof bs.spacing === "number" && bs.spacing > 0) ? bs.spacing : (bs.spacingValue || 0.06);
+    const spacingFrac = Math.max(COLOR_BRUSH_MIN_SPACING, presetSpacing);
     const spacingPx = Math.max(1, R * 2 * spacingFrac);
     state.pendingDist += dist;
     if (state.pendingDist < spacingPx) {

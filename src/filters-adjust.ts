@@ -11,7 +11,8 @@ import { registerFloatingWindow, type FloatingWindowHandle } from "./ui/floating
 import { t, tLatin } from "./i18n/index.ts";
 import { desk } from "./workbench-state.ts";
 import { PANELS, openExclusive, closeExclusive } from "./panel-state.ts";
-import { getFilter, listFilters, onFilterRegistered, setFilterForegroundColorProvider } from "./filters.ts";
+import { getFilter, listFilters, onFilterRegistered } from "./filters.ts";
+import { makeRampSlider } from "./ui/ramp-slider.ts";   // 2026-09-05 滤镜笔条连续旋钮（brushSliders）
 import { positionPopup } from "./anchored-popup.ts";
 import { openAdoptedPopup, closePopupMenuOf, isPopupOpen } from "./ui/popup-menu.ts";   // 2026-09-02 C1：调整 popup 收养
 import { registerContextToolbar } from "./ui/context-toolbar.ts";   // 2026-09-02 C4
@@ -33,11 +34,13 @@ interface FilterLike {
   hiddenInMenu?: boolean;   // true = 注册但不进菜单（曲线 UI 暂禁，2026-08-25）
   defaults(): Record<string, unknown>;
   buildBody(body: HTMLElement, state: unknown, onChange: () => void): void;
+  disposeBody?(state: unknown): void;   // 2026-09-05：关面板 / 重置重建前收口（渐变映射注销 color target）
   bake(src: Uint8ClampedArray, out: Uint8ClampedArray, params: unknown, mask: Uint8Array | null, w: number, h: number): void;
   brushVariants?: { id: string; title: string; params: Record<string, unknown> }[];
   boundaryModes?: { id: string; title: string }[];
   sampleModes?: boolean;   // v0.6.36：声明即渲染采样核下拉（液化；选项 = RESAMPLE_MODES 的 liquify context）
   mixModes?: { id: string; title: string }[];   // 2026-09-05：混色空间下拉（手指 smudge 声明；值经 params.mix，持久化 preferences "smudge-mix"）
+  brushSliders?: { key: string; title: string; min: number; max: number; step: number; fmt?: (v: number) => string }[];   // 2026-09-05：连续旋钮（手指 smear↔dull「揉匀」；值经 params[key]，session 态）
 }
 // adjust panel 操作的 doc 活层（doc.js 未类型化 → 只描述用到的）。
 interface AdjustLayer { id: number; name: string; bboxX: number; bboxY: number; bboxW: number; bboxH: number; snapshot(): LayerSnap; }
@@ -179,6 +182,7 @@ function _closeFilterPanel(applied: boolean) {
   const L = _adjustState.active;
   if (_adjustState._rafId) { cancelAnimationFrame(_adjustState._rafId); _adjustState._rafId = 0; }
   board.setActiveLayerSurrogate?.(null, null);
+  _adjustState.Filter.disposeBody?.(_adjustState);   // 插件收口（color target 注销等），在 DOM 清空前
   if (applied) {
     // 烤进 layer（surrogate 字节已是最终结果 → 直落 tile，零 canvas）。
     // C6 顺手账（census §6.4）：replaceFromBytes（整层 clear+重写 → collector 扣押整层）换
@@ -350,7 +354,21 @@ function _renderFilterBrushToolbar() {
       { const k = _toolStateKeyFor(Filter); if (state.toolStates[k]) state.toolStates[k].variantId = v.id; }
       // UI 态不 mark dirty（user 2026-06-10）：variant 选择是工具态，保存时顺手捞；真应用滤镜走 histchange 门。
       setStatus(t("mi.switchedTo", { title: v.title }));
+      if (Filter.brushSliders) _renderFilterBrushToolbar();   // 旋钮值随 variant 预设变 → 重画条
     } });
+  }
+  // ①b 2026-09-05 连续旋钮：声明了 brushSliders 的 filter（手指 smear↔dull「揉匀」）常驻渲染；值 → params[key]。
+  //   session 态、不持久化（持久化键要 user 点头）；variant 切换会按预设重置。窄条内联样式复用 lasso 容差滑条那套。
+  for (const sl of Filter.brushSliders || []) {
+    const wrap = document.createElement("span");
+    wrap.className = "lasso-tol-inline fb-inline-slider";
+    wrap.title = sl.title;
+    const cur = typeof fb.params[sl.key] === "number" ? (fb.params[sl.key] as number) : sl.min;
+    wrap.appendChild(makeRampSlider({
+      label: sl.title, min: sl.min, max: sl.max, step: sl.step, value: cur, fmt: sl.fmt,
+      onInput: (v) => { fb.params = { ...fb.params, [sl.key]: v }; },
+    }).el);
+    slot.appendChild(wrap);
   }
   // ② v0.6.36 采样核下拉：声明了 sampleModes 的 filter（液化）常驻渲染。选项 = RESAMPLE_MODES
   //   的 liquify context（SSoT 复用，与 transform 下拉同源）；持久化 desk.liquify.sample。
@@ -395,7 +413,6 @@ function _renderFilterBrushToolbar() {
 export function initFiltersAdjust(ctx: AppContext) {
   ({ state, editMode, doc, board, history, setStatus, updateSaveStatus, wp2,
      _suppressTransientPanels, _restoreTransientPanels, dialReactive } = ctx);
-  setFilterForegroundColorProvider(() => state.color);   // 2026-09-05 渐变映射「取前景色」读口（插件不 import app 层）
   // 调整面板 = 浮窗（2026-09-02 C2）：z/拖/钳制归 ui/floating-window；初始摆位仍走 positionPopup（钉右、让顶栏）。
   //   不进 transient 抑制（它本身就是 adjust-color transient 的 UI）。拖动那份原在 topbar-menu.ts，已删。
   registerContextToolbar(document.getElementById("filterBrushToolbar"));   // C4：滤镜笔条登记
@@ -427,6 +444,7 @@ export function initFiltersAdjust(ctx: AppContext) {
   });
   document.getElementById("adjustReset")?.addEventListener("click", () => {
     if (!_adjustState) return;
+    _adjustState.Filter.disposeBody?.(_adjustState);
     _adjustState.params = _adjustState.Filter.defaults();
     els.adjustParamsBody.innerHTML = "";
     _adjustState.Filter.buildBody(els.adjustParamsBody, _adjustState, _onFilterChange);

@@ -24,12 +24,14 @@ describe("ramp-editor · 渐变串", () => {
 });
 
 describe("ramp-editor · dom-shim 构造", () => {
-  it("makeRampEditor 建/select/setRamp/dispose 不抛；data-* 反映色标数与选中", () => {
-    let inputs = 0;
-    const h = makeRampEditor({ ramp: grayRamp(), getForeground: () => [1, 2, 3, 255], onInput: () => inputs++, onCommit: () => {} });
+  it("makeRampEditor 建/select/setRamp/dispose 不抛；data-* 反映色标数与选中；onSelect 只在选中变化时发", () => {
+    let inputs = 0; const sels = [];
+    const h = makeRampEditor({ ramp: grayRamp(), onInput: () => inputs++, onCommit: () => {}, onSelect: (i) => sels.push(i) });
     eq(h.el.dataset.stopCount, "2"); eq(h.selected(), -1);
     h.select(1); eq(h.el.dataset.selected, "1");
+    h.redraw();   // 未变 → 不重发
     h.setRamp(makeRamp([{ t: 0.3, rgba: [0, 0, 0, 255] }])); eq(h.el.dataset.stopCount, "1"); eq(h.selected(), -1);
+    eq(sels.join(","), "-1,1,-1");
     h.dispose();
     eq(inputs, 0);
   });

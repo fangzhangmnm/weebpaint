@@ -9,6 +9,7 @@ export interface Filter {
     bleedRadius?(params: FilterParams): number;
     defaults?(): FilterParams;
     buildBody?(container: HTMLElement, state: unknown, onChange: () => void): void;
+    disposeBody?(state: unknown): void;
     supportsLayerGroup?: boolean;
     bake(srcData: Uint8ClampedArray, dstData: Uint8ClampedArray, params: FilterParams, mask: Uint8Array | null, w: number, h: number): void;
     beginBrushStroke?(layers: readonly BrushLayer[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, p: number): ColorBrushState;
@@ -59,14 +60,14 @@ export declare function registerFilter(FilterClass: Filter): void;
 export declare function getFilter(id: string): Filter | null;
 export declare function listFilters(): Filter[];
 export declare function onFilterRegistered(fn: (item: Filter) => void): () => void;
-export declare function setFilterForegroundColorProvider(fn: () => string): void;
-export declare function filterForegroundColor(): string;
 export interface SliderRowOpts {
     fmt?: (value: number) => string;
     gradient?: string;
 }
 export declare function makeSliderRow(label: string, key: string, min: number, max: number, step: number, init: number, onChange: (key: string, value: number) => void, opts?: SliderRowOpts): HTMLLabelElement;
 export declare function makeSectionTitle(text: string): HTMLDivElement;
+/** 色彩类滤镜笔（模糊/锐化）的间距地板：每颗 dab 都是一次卷积，间距再小 = 强度×N 且成本×N；10% 是 v132–v0.13.3 的历史值。 */
+export declare const COLOR_BRUSH_MIN_SPACING = 0.1;
 export declare function attachColorBrushBehavior(FilterClass: Filter): void;
 export interface SelectOption {
     value: string;

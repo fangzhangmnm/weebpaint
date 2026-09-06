@@ -737,6 +737,7 @@ export const S = {
   "flt.smudge.smear":        { zh: "手指（拖）", en: "Finger (smear)", ja: "指先（引きずり）" },
   "flt.smudge.dull":         { zh: "混色（揉）", en: "Blend (dull)", ja: "色混ぜ（なじませ）" },
   "flt.smudge.paint":        { zh: "带颜料的手指", en: "Wet finger (paint)", ja: "絵の具つき指先" },
+  "flt.smudge.dullKnob":     { zh: "揉匀", en: "Dull", ja: "なじませ" },   // 2026-09-05 smear↔dull 连续旋钮
   "flt.smudge.mix.srgb":     { zh: "直接混合", en: "Plain mix", ja: "そのまま混色" },
   "flt.smudge.mix.oklab":    { zh: "保饱和度", en: "Vivid mix", ja: "鮮やか混色" },
   "flt.smudge.mix.spectral": { zh: "颜料谱", en: "Pigment mix", ja: "顔料混色" },
@@ -1300,7 +1301,6 @@ export const S = {
   "ramp.interp.ease":       { zh: "缓和", en: "Ease", ja: "イーズ" },
   "ramp.space":             { zh: "色彩空间", en: "Color space", ja: "色空間" },
   "ramp.flip":              { zh: "翻转", en: "Flip", ja: "反転" },
-  "ramp.pickForeground":    { zh: "取前景色", en: "Use foreground color", ja: "描画色を使う" },
   "ramp.addStop":           { zh: "加色标", en: "Add stop", ja: "ストップを追加" },
   "ramp.removeStop":        { zh: "删色标", en: "Delete stop", ja: "ストップを削除" },
   "ramp.pos":               { zh: "位置", en: "Position", ja: "位置" },

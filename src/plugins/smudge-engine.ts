@@ -38,6 +38,7 @@ export type SmudgeMode = "smear" | "dull" | "paint";
 
 export interface SmudgeSettings {
   mode: SmudgeMode;
+  dull: number;          // 0..1 smear↔dull 连续量：0 = 搬块（smear），1 = 揉平均色（dull），中间 = 两者 lerp（user 2026-09-05「smear dull 连续量」；Krita 是二选一 + smudge radius）
   size: number;          // dab 直径（p=1 时，doc px）
   hardness: number;      // 0..1（硬芯比例）
   spacing: number;       // dab 间距 = 直径 × spacing
@@ -92,7 +93,7 @@ export class SmudgeEngine {
     const n = B * B;
     const st: StrokeState = {
       layer, s: settings, pShape: makePressureShaper(settings), selection, Rmax, B, half: Math.floor(B / 2),
-      accum: new Float32Array(settings.mode === "dull" ? 0 : n * 4),
+      accum: new Float32Array(n * 4),   // 2026-09-05 连续 dull：块记忆恒分配（旋钮中途拧到 <1 也有料）
       accumColor: new Float32Array(4),
       paint: new Float32Array([settings.color[0], settings.color[1], settings.color[2], 1]),
       cur: new Float32Array(n * 4),
@@ -188,20 +189,23 @@ export class SmudgeEngine {
     const mode = s0.mode;
     const space = s0.mix;
     const n = B * B;
+    // smear↔dull 连续量（旧 settings 无 dull 字段 → 按 mode 二值；NaN 防御）
+    const dullK = clamp01(Number.isFinite(s0.dull) ? s0.dull : (mode === "dull" ? 1 : 0));
     if (!st.primed) {
-      // 首颗：沾色，不上色
-      if (mode === "smear" || mode === "paint") st.accum.set(cur);
-      if (mode === "dull") this._weightedAverage(cur, mask, n, st.accumColor);
+      // 首颗：沾色，不上色（两份记忆都沾：块 + 平均色，旋钮中途拧也有料）
+      st.accum.set(cur);
+      this._weightedAverage(cur, mask, n, st.accumColor);
       st.primed = true;
       return;
     }
     // 1) 记忆更新：ρ = s^(step/D)
     const D = 2 * r;
     const rho = strength >= 1 ? 1 : strength <= 0 ? 0 : Math.pow(strength, MEMORY_EXP * Math.max(0, step) / D);
-    if (mode === "dull") {
+    if (dullK > 0) {
       this._weightedAverage(cur, mask, n, st.tmp);
       mixPremultInto(st.accumColor, 0, st.tmp, 0, st.accumColor, 0, rho, space);
-    } else if (rho < 1) {
+    }
+    if (dullK < 1 && rho < 1) {
       const acc = st.accum;
       for (let q = 0; q < n; q++) {
         const o = q * 4;
@@ -231,9 +235,10 @@ export class SmudgeEngine {
         if (lock && ca <= 0) continue;
         // 出料 P
         let P: Float32Array, pi: number;
-        if (mode === "dull") { P = st.accumColor; pi = 0; }
-        else if (mode === "paint" && colorRate > 0) { mixPremultInto(tmp, 0, st.accum, o, st.paint, 0, colorRate, space); P = tmp; pi = 0; }
-        else { P = st.accum; pi = o; }
+        if (dullK >= 1) { P = st.accumColor; pi = 0; }
+        else if (dullK <= 0) { P = st.accum; pi = o; }
+        else { mixPremultInto(tmp, 0, st.accum, o, st.accumColor, 0, dullK, space); P = tmp; pi = 0; }   // 连续量：块与平均色 lerp
+        if (mode === "paint" && colorRate > 0) { mixPremultInto(tmp, 0, P, pi, st.paint, 0, colorRate, space); P = tmp; pi = 0; }
         // 上色（写进 cur 就地）
         mixPremultInto(cur, o, cur, o, P, pi, a, space);
         const k = (j * w + i) * 4;

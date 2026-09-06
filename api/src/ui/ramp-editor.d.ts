@@ -8,9 +8,9 @@ export declare function pickInsertStopT(stops: readonly {
 export declare function rgba8ToHex(c: Rgba8): string;
 export interface RampEditorOpts {
     ramp: ColorRamp;
-    getForeground(): Rgba8;
     onInput(): void;
     onCommit(): void;
+    onSelect?(i: number): void;
 }
 export interface RampEditorHandle {
     el: HTMLElement;

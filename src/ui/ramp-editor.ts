@@ -5,13 +5,14 @@
 // · 色标 = 条下小旗，tap 选中，1D 拖动（drag-value rel 状态机：抓取不跳变 + shift 细调），可越过邻居重排。
 // · ＋/🗑 实体钮同曲线编辑器形制（28px 圆钮），但**不 overlay 在条上**——条只有 36px 高、渐变本身就是内容，盖住起点色
 //   等于遮内容（截图实测）；放读数行右侧。＋ = 选中与右邻中点插入，颜色 = evaluateRamp。
-// · 行：插值 select（Linear/Constant/Ease）· 色彩空间 select（sRGB/OKLab）· 翻转 · 取前景色（把选中色标设为当前前景色——
-//   二分实战：先在色轮取皮肤色，再点色标、点取色）。色轮内嵌 v1 之后再议（提案 §2.5）。
+// · 行：插值 select（Linear/Constant/Ease）· 色彩空间 select（sRGB/OKLab）· 翻转。
+// · 色标颜色**不在这里编辑**：选中色标 → 宿主经 onSelect 把它挂成 color-panel 的 ColorTarget，色轮/吸管直接改它
+//   （user 2026-09-05「use foreground color 不对……把 color window 抽象复用」；原「取前景色」钮撤）。
 // · 数学全在 common/color-ramp.ts；本模块只调 verb。宿主持 ColorRamp 引用，原地改。
 
 import {
   type ColorRamp, type Rgba8, type RampInterp, type RampSpace, RAMP_INTERPS, RAMP_SPACES,
-  bakeRampLut, evaluateRamp, insertStop, removeStop, moveStop, setStopColor, flipRamp, rgba8ToCss,
+  bakeRampLut, evaluateRamp, insertStop, removeStop, moveStop, flipRamp, rgba8ToCss,
 } from "../common/color-ramp.ts";
 import { dragMove, type DragState } from "./drag-value.ts";
 import { createSelectField, type SelectField } from "./select-field.ts";
@@ -52,9 +53,9 @@ export function rgba8ToHex(c: Rgba8): string {
 
 export interface RampEditorOpts {
   ramp: ColorRamp;
-  getForeground(): Rgba8;
   onInput(): void;
   onCommit(): void;
+  onSelect?(i: number): void;   // 选中色标变了（-1 = 无）；宿主接 color target / 刷色板显示
 }
 export interface RampEditorHandle {
   el: HTMLElement;
@@ -85,7 +86,6 @@ export function makeRampEditor(o: RampEditorOpts): RampEditorHandle {
       `<span class="ce-label" data-k="space"></span><span class="ce-select-slot" data-k="space"></span></div>` +
     `<div class="ce-row ce-row-end">` +
       `<button type="button" class="ce-btn" data-act="flip"></button>` +
-      `<button type="button" class="ce-btn" data-act="fg"></button>` +
     `</div>`;
 
   const q = <T extends Element = HTMLElement>(s: string) => el.querySelector(s) as T;
@@ -95,12 +95,10 @@ export function makeRampEditor(o: RampEditorOpts): RampEditorHandle {
   const delBtn = q<HTMLButtonElement>('.ce-gizmo[data-act="del"]');
   const readout = q(".ce-readout");
   const flipBtn = q<HTMLButtonElement>('.ce-btn[data-act="flip"]');
-  const fgBtn = q<HTMLButtonElement>('.ce-btn[data-act="fg"]');
 
   q('.ce-label[data-k="interp"]').textContent = tr("ramp.interp");
   q('.ce-label[data-k="space"]').textContent = tr("ramp.space");
   flipBtn.textContent = tr("ramp.flip");
-  fgBtn.textContent = tr("ramp.pickForeground");
   addBtn.title = tr("ramp.addStop"); addBtn.setAttribute("aria-label", tr("ramp.addStop"));
   delBtn.title = tr("ramp.removeStop"); delBtn.setAttribute("aria-label", tr("ramp.removeStop"));
 
@@ -144,11 +142,12 @@ export function makeRampEditor(o: RampEditorOpts): RampEditorHandle {
     const k = sel >= 0 ? stops[sel] : null;
     readout.textContent = k ? `${tr("ramp.pos")} ${Math.round(k.t * 100)}% · ${rgba8ToHex(k.rgba)}` : "";
     delBtn.disabled = !k || stops.length <= 1;
-    fgBtn.disabled = !k;
     interpField.refresh(); spaceField.refresh();
     el.dataset.stopCount = String(stops.length);
     el.dataset.selected = String(sel);
+    if (sel !== lastSel) { lastSel = sel; o.onSelect?.(sel); }
   }
+  let lastSel = -2;
 
   function select(i: number): void { sel = i >= 0 && i < ramp.stops.length ? i : -1; redraw(); }
 
@@ -196,11 +195,9 @@ export function makeRampEditor(o: RampEditorOpts): RampEditorHandle {
   const onAdd = () => { sel = insertStop(ramp, clamp01(pickInsertStopT(ramp.stops, sel))); commitChange(); };
   const onDel = () => { if (sel < 0 || !removeStop(ramp, sel)) return; sel = -1; commitChange(); };
   const onFlip = () => { flipRamp(ramp); if (sel >= 0) sel = ramp.stops.length - 1 - sel; commitChange(); };
-  const onFg = () => { if (sel < 0) return; setStopColor(ramp, sel, o.getForeground()); commitChange(); };
   addBtn.addEventListener("click", onAdd);
   delBtn.addEventListener("click", onDel);
   flipBtn.addEventListener("click", onFlip);
-  fgBtn.addEventListener("click", onFg);
 
   const onKey = (e: KeyboardEvent) => {
     if (sel < 0 || !ramp.stops[sel]) return;
@@ -229,7 +226,6 @@ export function makeRampEditor(o: RampEditorOpts): RampEditorHandle {
       addBtn.removeEventListener("click", onAdd);
       delBtn.removeEventListener("click", onDel);
       flipBtn.removeEventListener("click", onFlip);
-      fgBtn.removeEventListener("click", onFg);
       el.removeEventListener("keydown", onKey);
       interpField.dispose(); spaceField.dispose();
     },
