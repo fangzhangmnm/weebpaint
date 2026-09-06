@@ -26,13 +26,14 @@ import {
   type RackMeta,
 } from "./brushes.ts";
 // resolveRef 内联（brush ref 解析：先 id 后 name 兜底；折 folder-merge 依赖）。
-const SMUDGE_DEFAULT_OPACITY = 0.5;   // 手指 dial 初值（首版手感数字，2026-09-05）
 function resolveRef<T extends { id?: unknown; name?: unknown }>(list: T[], ref: { id?: unknown; name?: unknown }): T | null {
   return list.find((x) => ref.id != null && x.id === ref.id) ?? list.find((x) => ref.name != null && x.name === ref.name) ?? null;
 }
 import { collectFolders } from "./brush-rack-view.ts";
 import { mountRackSheet } from "./ui/rack-sheet.ts";
 import { mountBrushSettings } from "./ui/brush-config-view.ts";
+import { plotSizePref } from "./plugins/curves.ts";
+import { preferences } from "./app-prefs.ts";
 import { exportBrush, exportRackFolder, buildRackCode, shareOrDownloadJSON } from "./brush-io.ts";
 import type { Brush, BrushRackData } from "./brush-types.ts";
 import type { EditorRuntimeState, DialReactive, ToolDial } from "./app-context.ts";
@@ -145,6 +146,26 @@ export class BrushRackController {
     const fixes = staleBuiltinNameFixes(this._brushesRef.value, specs);
     // 2026-09-05：出厂笔**参数**同款自愈（用户没动过的旧出厂值 → 新出厂值；首案 = 大/小滤镜笔 spacing 10%→2%）。
     const argFixes = staleBuiltinArgFixes(this._brushesRef.value, specs);
+    // 2026-09-06：新工具类别补种——出厂 spec 里有、而笔架里**一支都没有**的 tool（首案 = smudge 自己的笔架）→ 补该类别全部出厂笔。
+    //   只在该类别为空时补（用户删过的类别不会被反复塞回：有一支就算有），按 id 幂等。
+    const haveTool = new Set(this._brushesRef.value.map((b) => b.tool));
+    const missingTools = [...new Set(specs.map((s) => s.tool))].filter((tl) => !haveTool.has(tl));
+    if (missingTools.length && this._brushesRef.value.length > 0) {
+      const all = await loadBuiltinBrushes();
+      if (all) {
+        const adds = all.filter((b) => missingTools.includes(b.tool));
+        if (adds.length) {
+          this._bulkWrite = true;
+          try {
+            for (const b of adds) this.d.collection.setItem(b.id, b);
+            const byFolder: Record<string, string[]> = {};
+            for (const b of adds) (byFolder[b.folder || DEFAULT_FOLDER] ||= []).push(b.id);
+            this.d.collection.setItem(RACK_META_ID, metaPrependBuiltins(this._meta(), byFolder));
+          } finally { this._bulkWrite = false; }
+          this._syncFromCollection();
+        }
+      }
+    }
     if (!fixes.length && !argFixes.length) return;
     this._bulkWrite = true;   // 批量写压住 onChange，收尾统一刷一次（resetBuiltin 同款）
     try {
@@ -241,8 +262,8 @@ export class BrushRackController {
   }
   defaultToolStateFor(tool: string) {
     const brush = defaultBrushForTool(this._view(), tool);
-    // 手指默认强度 0.5（user 2026-09-05「默认进去 intensity too large」）；其它工具沿笔的 defaultOpa（缺省 1.0）。
-    const opacity = tool === "smudge" ? SMUDGE_DEFAULT_OPACITY : (brush?.defaultOpa ?? 1.0);
+    // 强度初值沿笔的 defaultOpa（手指出厂笔 0.5 写在 builtin-brushes.json，user 2026-09-05「默认进去 intensity too large」）；无笔时手指 0.5 兜底。
+    const opacity = brush?.defaultOpa ?? (tool === "smudge" ? 0.5 : 1.0);
     if (brush) return { size: brush.size.base, opacity, activeBrushId: brush.id, activeBrushName: brush.name };
     return { size: tool === "smudge" ? 32 : 12, opacity, activeBrushId: null, activeBrushName: null };
   }
@@ -291,9 +312,7 @@ export class BrushRackController {
     ts.activeBrushId = brushId;
     ts.activeBrushName = brush.name;
     ts.size = brush.size.base;
-    // 手指（smudge）的强度 dial 不随选笔重置（user 2026-09-05「smudge 的默认 0.5 不靠谱，因为换笔切回来就变回笔刷默认的 1 了」）：
-    //   滤镜笔的 defaultOpa 是给模糊/液化的；手指有自己的口味（SMUDGE_DEFAULT_OPACITY 起步，之后跟 dial）。过渡修法——终局 = 手指自己的笔架/出厂笔。
-    if (key !== "smudge") ts.opacity = brush.defaultOpa ?? 1.0;
+    ts.opacity = brush.defaultOpa ?? 1.0;   // 2026-09-06：手指有自己的笔架（出厂 defaultOpa 0.5），过渡守卫撤
     if (key === this.getRackToolKey(this.d.editMode().current())) this.applyToolState(this.d.editMode().current());
   }
 
@@ -448,6 +467,7 @@ export class BrushRackController {
     // brush-settings 编辑器 Vue 组件
     this._settingsUI = mountBrushSettings(sEls.body, {
       blendModes: this.d.blendModes,
+      curvePlotSize: { get: () => plotSizePref(), set: (px) => preferences.set("curve-plot-size", px) },   // 2026-09-06 压感曲线编辑器尺寸跟机器
       onDelete: () => this.deleteEditingBrush(),
       onExport: () => { if (this._editingDraft) exportBrush(this._editingDraft); },
     });

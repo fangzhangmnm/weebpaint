@@ -9,12 +9,18 @@ import { t } from "../i18n/index.ts";
 import { CurvesKernel, curveOf, CURVE_CHANNELS, type CurvesParams, type CurveChannel } from "../backend/filters/curves-kernel.ts";
 import { makeCurveEditor, type CurveEditorHandle } from "../ui/curve-editor.ts";
 import type { AnimCurve } from "../common/anim-curve.ts";
+import { preferences } from "../app-prefs.ts";   // 2026-09-06 绘图区边长 device 偏好 curve-plot-size
 
 interface CurvesBuildState {
   params: CurvesParams;
   _curveEditor?: CurveEditorHandle;   // 重建 body 时 dispose 上一只
 }
 
+/** 曲线编辑器绘图区边长（device 偏好；坏值回 200）。 */
+export function plotSizePref(): number {
+  const v = preferences.get("curve-plot-size");
+  return typeof v === "number" && Number.isFinite(v) && v >= 120 ? v : 200;
+}
 const CH_COLOR: Record<CurveChannel, string> = { comp: "var(--ink)", r: "#e44", g: "#3a3", b: "#46e", a: "#999" };
 
 export class CurvesFilter {
@@ -56,6 +62,8 @@ export class CurvesFilter {
 
     const editor = makeCurveEditor({
       curve: p[p.active] as AnimCurve,
+      plotSize: plotSizePref(),
+      onPlotResize: (px) => preferences.set("curve-plot-size", px),
       lockEndpointsT: true,
       accent: CH_COLOR[p.active],
       fmt: (tt, v) => `${Math.round(tt * 255)} → ${Math.round(v * 255)}`,

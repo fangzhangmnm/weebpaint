@@ -45,6 +45,15 @@ export interface BrushSelection {
     materializeMaskRegion(x0: number, y0: number, w: number, h: number): Uint8Array;
 }
 export type DirtyRect = [number, number, number, number];
+export interface ColorBrushTile {
+    x0: number;
+    y0: number;
+    w: number;
+    h: number;
+    orig: Uint8ClampedArray;
+    cov: Float32Array;
+    sel: Uint8Array | null;
+}
 export interface ColorBrushState {
     layer: BrushLayer;
     params: FilterParams;
@@ -55,6 +64,14 @@ export interface ColorBrushState {
     lastY: number;
     pendingDist: number;
     dirty: DirtyRect | null;
+    pending: Array<{
+        cx: number;
+        cy: number;
+        R: number;
+        a: number;
+    }>;
+    tiles: Map<string, ColorBrushTile>;
+    dabs: number;
 }
 export declare function registerFilter(FilterClass: Filter): void;
 export declare function getFilter(id: string): Filter | null;
@@ -66,7 +83,7 @@ export interface SliderRowOpts {
 }
 export declare function makeSliderRow(label: string, key: string, min: number, max: number, step: number, init: number, onChange: (key: string, value: number) => void, opts?: SliderRowOpts): HTMLLabelElement;
 export declare function makeSectionTitle(text: string): HTMLDivElement;
-/** 色彩类滤镜笔（模糊/锐化）的间距地板：每颗 dab 都是一次卷积，间距再小 = 强度×N 且成本×N；10% 是 v132–v0.13.3 的历史值。 */
+/** 色彩类滤镜笔（模糊/锐化）的间距地板：wash 合成后间距只影响 mask 边缘平滑度，10% 足够；再小 = 白烧 dab。 */
 export declare const COLOR_BRUSH_MIN_SPACING = 0.1;
 export declare function attachColorBrushBehavior(FilterClass: Filter): void;
 export interface SelectOption {

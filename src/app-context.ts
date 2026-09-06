@@ -31,6 +31,7 @@ export interface ToolDial {
   activeBrushId?: string | null;
   activeBrushName?: string | null;
   variantId?: string | null;
+  dull?: number;   // 2026-09-06 手指「揉匀」旋钮值（user「尾巴你都帮我做了」= 持久化点头）；per-doc 随 toolStates 序列化
 }
 export interface EditorRuntimeState {
   filterBrush: { Filter: unknown; params: Record<string, unknown>; variantId?: string; variantLabel?: string } | null;

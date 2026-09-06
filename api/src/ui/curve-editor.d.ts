@@ -47,6 +47,7 @@ export interface CurveEditorOpts {
     keyStep?: number;
     onInput(): void;
     onCommit(): void;
+    onPlotResize?(px: number): void;
 }
 export interface CurveEditorHandle {
     el: HTMLElement;

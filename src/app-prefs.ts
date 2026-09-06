@@ -21,7 +21,8 @@ export const PREF_REGISTRY = {
   "color-theme":          { scope: "device", def: "auto" as string },            // 环境耦合（OLED/暗房），一键可切
   "single-finger-draw":   { scope: "device", def: false as boolean },            // 硬件耦合：同人 iPad 开/台式关（VS Code machine-scope 先例）
   "stylus-smooth-params": { scope: "device", def: {} as Record<string, number> },// 数位板/笔硬件调参
-  "pressure-level":       { scope: "device", def: "mid" as string },            // 2026-09-05 压感四档 none/weak/mid/strong：跟板子/跟人，不跟画（common/pressure-level.ts）
+  "pressure-level":       { scope: "device", def: "mid" as string },
+  "curve-plot-size":      { scope: "device", def: 200 as number },              // 2026-09-06 曲线编辑器绘图区边长 px（屏幕/手指尺寸耦合 → 跟机器）；user「尾巴你都帮我做了」= 持久化点头            // 2026-09-05 压感四档 none/weak/mid/strong：跟板子/跟人，不跟画（common/pressure-level.ts）
   // gallery（跟身份/库走；P3 per-gallery，现 = synced collection）
   "lang":                 { scope: "gallery", def: null as string | null },
   "gen-ai":               { scope: "gallery", def: false as boolean },

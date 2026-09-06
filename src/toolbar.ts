@@ -21,7 +21,7 @@ import { mountSelectField, type SelectField } from "./ui/select-field.ts";   // 
 import { t, tLatin } from "./i18n/index.ts";
 import { fillPreviewActive, commitFillNow, sendSelectionToFill } from "./fill-mode.ts";
 import { openAdoptedPopup, toggleAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";
-import { registerContextToolbar } from "./ui/context-toolbar.ts";
+import { registerContextToolbar, mountContextToolbar, type ContextToolbarHandle } from "./ui/context-toolbar.ts";
 import { attachSubToolSlot, type SubToolSlotHandle } from "./ui/subtool-slot.ts";   // 2026-09-06 U3 动词位长按子工具
 import { VERB_SUBTOOLS, DEFAULT_SUBTOOL, isVerb, subToolDef, verbOfMode, subToolOfMode, type Verb } from "./common/verbs.ts";   // ADR-0012 动词表   // 2026-09-02 C4：顶栏条登记（让位高度由登记表算）   // 2026-09-02 C1：组槽/配置菜单收养（外点关/Escape/栈/定位归 module）
 import { configFromModeState, planesForMode, defaultVpsForMode } from "./perspective-frame.ts";
@@ -65,7 +65,7 @@ let lassoSetOpSlot: HTMLElement, lassoSetOpSlotUse: SVGUseElement, lassoSetOpMen
 let lassoSubSlot: HTMLElement, lassoSubSlotUse: SVGUseElement, lassoSubMenu: HTMLElement, lassoSubMenuBtns: HTMLElement[];   // 子工具组槽（v0.5.14）
 let lassoExpandToggle: HTMLElement, lassoMagicExpandVal: HTMLElement, lassoMagicExpandMenu: HTMLElement;   // 扩张钮（v0.6.26 图标+小三角，stepper 收弹出）
 let lassoTransformBtn: HTMLElement, lassoFillCommitBtn: HTMLElement, lassoDeselectBtn: HTMLElement;
-let pickerToolbar: HTMLElement | null, pickModeField: SelectField | null = null;   // 吸色 context toolbar（取样模式：合并 / 当前图层）
+let pickerToolbar: ContextToolbarHandle | null = null;   // 吸色 context toolbar（取样模式：合并 / 当前图层）——2026-09-06 U5 迁 ui/context-toolbar 工厂
 
 // v0.6.24 fill/lasso 分家（v0.5.16 的共享 RAM 记忆 _selMem 作废）：子工具/布尔/1:1 per-tool
 //   持久化在 desk.lassoTool / fillTool（跟 ora 走）。当前选区工具的记录：
@@ -169,8 +169,7 @@ export function updateLassoToolbar() {
   //   即便有选区也不露 deselect-only；Ctrl+D 仍可去选）。本函数 = 上下文工具栏统一同步点。
   const pickerActive = editMode.current() === "picker";
   if (pickerToolbar) {
-    pickerToolbar.classList.toggle("hidden", !pickerActive);
-    if (pickerActive) pickModeField?.refresh();   // desk.colorPicker.layerMode 是值的 SSoT，label 从它派生
+    if (pickerActive) pickerToolbar.show(); else pickerToolbar.hide();   // show 自带 refresh：desk.colorPicker.layerMode 是值的 SSoT，label 从它派生
   }
   const floating = input.lasso.hasFloating();
   const hasSelection = !!doc.selection;
@@ -1202,18 +1201,16 @@ export function initToolbar(ctx: AppContext) {
   // 吸色取样模式 dropdown（composite 合并 / layer 当前图层 raw）。
   //   持久化 = desk.colorPicker.layerMode（per-doc desk，进 .weebpaint/editor-state.json）——**不是 LS**，
   //   v406 起设备级 webpaint.pickMode 已删。input._doPick 经 getPickMode 读（走 bindEditorReactive 的桥）。
-  pickerToolbar = document.getElementById("pickerToolbar");
-  registerContextToolbar(pickerToolbar);
-  const pickModeEl = document.getElementById("pickModeSel");
-  if (pickModeEl) {
-    pickModeField = mountSelectField(pickModeEl, {
+  // 2026-09-06 U5：吸色条走工厂（静态 #pickerToolbar 退役）；id 保留供登记/探针
+  pickerToolbar = mountContextToolbar({ id: "pickerToolbar", ariaLabel: tLatin("pick.toolbar"), rows: [[
+    { kind: "title", text: tLatin("pick.sampleLabel") },
+    { kind: "select", id: "pickModeSel", title: tLatin("pick.sampleTip"),
       items: () => [{ value: "composite", label: tLatin("pick.composite") }, { value: "layer", label: tLatin("pick.active") }],
       value: () => desk.colorPicker.layerMode,
-      onChange: (v) => { desk.colorPicker.layerMode = v; },   // binding → state.pickMode（引擎 input._doPick 经 getPickMode 读）
-    });
-    // desk 载入：文档的 pickMode 回灌 → 刷新下拉显示（desk 已由 Unserialize 更新，只同步 UI，不回写）
-    window.addEventListener("wp:applyEditorState", () => pickModeField?.refresh());
-  }
+      onChange: (v) => { desk.colorPicker.layerMode = v; } },   // binding → state.pickMode（引擎 input._doPick 经 getPickMode 读）
+  ]] });
+  // desk 载入：文档的 pickMode 回灌 → 刷新下拉显示（desk 已由 Unserialize 更新，只同步 UI，不回写）
+  window.addEventListener("wp:applyEditorState", () => pickerToolbar?.refresh());
   // 选区 → 新层 / 复制层
 
   window.addEventListener("wp:lassochange", updateLassoToolbar);

@@ -420,11 +420,9 @@ export function brushesByTool(rack: BrushRackData, tool: string): Brush[] {
   if (tool === "brush") {
     return rack.brushes.filter((b) => BRUSH_GROUP.includes(b.tool));
   }
-  // 2026-09-05 手指（smudge）：自己的 dial key，但**共用滤镜笔的笔架**（Procreate 手指共用画笔库的最小版）——
-  //   列表 = tool==="smudge" 的笔（将来的纹理手指）在前 + 全部 filterBrush 笔。
-  if (tool === "smudge") {
-    return [...rack.brushes.filter((b) => b.tool === "smudge"), ...rack.brushes.filter((b) => b.tool === "filterBrush")];
-  }
+  // 2026-09-05 手指曾借滤镜笔架（smudge 笔在前 + 全部 filterBrush 笔）；2026-09-06 ADR-0012 终局：手指**自己的笔架**
+  //   （tool==="smudge" 的笔；出厂 = 软手指/硬手指，defaultOpa 0.5 写进笔数据，不再是 controller 常量）。
+  //   模糊/锐化/液化仍走 filterBrush 笔架。缺出厂笔的老笔架由 brush-rack-controller._healBuiltinNames 补种。
   // v132 filterBrush 是新工具类别，自己的 rack（不串到 brush）
   return rack.brushes.filter((b) => b.tool === tool);
 }
@@ -434,8 +432,8 @@ export function brushesByTool(rack: BrushRackData, tool: string): Brush[] {
 // 这里就取该工具第一支笔当默认。
 export function defaultBrushForTool(rack: BrushRackData, tool: string): Brush | null {
   const list = brushesByTool(rack, tool);
-  // 2026-09-05 手指默认笔 = 小滤镜笔（软、32px；user「默认用软笔同意」+「diameter too large」）——没有它才退首支。
-  if (tool === "smudge") return list.find((b) => b.id === "default-filter-small") ?? list[0] ?? null;
+  // 手指默认笔 = 软手指（user 2026-09-05「默认用软笔同意」）——没有它才退首支。
+  if (tool === "smudge") return list.find((b) => b.id === "default-smudge-soft") ?? list[0] ?? null;
   return list[0] || null;
 }
 

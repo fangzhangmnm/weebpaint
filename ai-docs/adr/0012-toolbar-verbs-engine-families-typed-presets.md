@@ -47,6 +47,10 @@ Krita 的 paintop preset × tool 两轴只作参考，不照搬。
 - ADR-0004（填色 = 选区消费视图）、ADR-0005（形状笔）
 - user 原话出处：`journal/20260905 v0.13 feedbacks.md`（2026-09-05 晚至 09-06）
 
+## 修订 2026-09-06 晚 ②：手指自己的笔架（v0.13.14）
+
+手指（smudge）不再借滤镜笔架：`brushesByTool("smudge")` 只列 tool=smudge 的笔；出厂笔 = 软手指/硬手指（`builtin-brushes.json`，defaultOpa 0.5 写进笔数据，controller 常量与「选笔不盖 0.5」过渡守卫一并撤）；老笔架缺该类别时 `_healBuiltinNames` 补种（只在该 tool 一支都没有时补，按 id 幂等）。模糊/锐化/液化仍走 filterBrush 笔架。这是 §2 「preset 按 engine 族 typed」的第一刀。
+
 ## 修订 2026-09-06 晚：吸色钮拍板（user 原话）
 
 - 「好那么先加吸色按钮吧，不要像procreate一样谜语人就一个方框，而是用我们的吸管。你的提案先试一下。先很没有创意的放两个滑条中间吧我建议是一次性。按住形式容易误触碰，也是为什么我不太喜欢procreate这个设计的原因。然后根据context不同也许可以变成别的icon」

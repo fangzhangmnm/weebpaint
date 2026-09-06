@@ -9,12 +9,12 @@ describe("context-toolbar · 登记表 = index.html 顶栏条全集", () => {
     const { contextToolbarIds, contextToolbarBottom } = await import("../src/ui/context-toolbar.ts");
     const html = readFileSync(new URL("../index.html", import.meta.url), "utf-8");
     const inHtml = [...html.matchAll(/<div class="(?:lasso-toolbar-stack|crop-toolbar)[^"]*" id="([A-Za-z]+)"/g)].map((m) => m[1]);
-    assert(inHtml.length >= 5, "index.html 应有 ≥5 条静态顶栏条（滤镜笔条 2026-09-06 起由工厂生成），实得 " + inHtml.length);
+    assert(inHtml.length >= 4, "index.html 应有 ≥4 条静态顶栏条（滤镜笔条/吸色条 2026-09-06 起由工厂生成），实得 " + inHtml.length);
     const registered = new Set(contextToolbarIds());
     const missing = inHtml.filter((id) => !registered.has(id));
     eq(missing.length, 0, "未登记的顶栏条：" + missing.join(",") + "（已登记：" + [...registered].join(",") + "）");
     eq(typeof contextToolbarBottom(), "number");
-    assert(registered.has("filterBrushToolbar"), "工厂 mount 的滤镜笔条也在登记表（init 即 mount）：" + [...registered].join(","));
+    assert(registered.has("filterBrushToolbar") && registered.has("pickerToolbar"), "工厂 mount 的滤镜笔条/吸色条也在登记表（init 即 mount）：" + [...registered].join(","));
   });
   it("anchored-popup 源码不再持顶栏 id 数组", () => {
     const src = readFileSync(new URL("../src/anchored-popup.ts", import.meta.url), "utf-8");

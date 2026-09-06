@@ -289,6 +289,8 @@ function _enterFilterBrushMode(Filter: FilterLike, variantId?: string) {
     : variant.params;
   if (Filter.sampleModes) params = { ...params, sample: desk.liquify.sample };
   if (Filter.mixModes) params = { ...params, mix: _currentMixSpace() };   // 2026-09-05 手指：混色空间跟偏好
+  // 2026-09-06 「揉匀」旋钮值跟画走（toolStates.<key>.dull）：有记录 → 覆盖 variant 预设
+  { const savedDull = state.toolStates[tsKey]?.dull; if (Filter.brushSliders?.some((sl) => sl.key === "dull") && typeof savedDull === "number") params = { ...params, dull: savedDull }; }
   state.filterBrush = { Filter, params, variantId: variant.id, variantLabel: variant.title };
   if (state.toolStates[tsKey]) state.toolStates[tsKey].variantId = variant.id;
   dialReactive.payload = Filter.id;   // 先于 setTool：currentBrush/rack 按 payload 选 dial key
@@ -335,7 +337,7 @@ function _fbRows(): ToolbarItem[][] {
       fb.params = np;
       fb.variantId = v.id;
       fb.variantLabel = v.title;
-      { const k = _toolStateKeyFor(Filter); if (state.toolStates[k]) state.toolStates[k].variantId = v.id; }
+      { const k = _toolStateKeyFor(Filter); const ts = state.toolStates[k]; if (ts) { ts.variantId = v.id; ts.dull = typeof np.dull === "number" ? np.dull : undefined; } }   // 切 variant：旋钮记忆回预设
       // UI 态不 mark dirty（user 2026-06-10）：variant 选择是工具态，保存时顺手捞；真应用滤镜走 histchange 门。
       setStatus(t("mi.switchedTo", { title: v.title }));
       _renderFilterBrushToolbar();   // 旋钮值随 variant 预设变 → 重画条
@@ -360,7 +362,10 @@ function _fbRows(): ToolbarItem[][] {
   for (const sl of Filter.brushSliders || []) {
     items.push({ kind: "slider", id: `filterBrushSlider-${sl.key}`, label: sl.title, min: sl.min, max: sl.max, step: sl.step, fmt: sl.fmt,
       value: () => (typeof fb.params[sl.key] === "number" ? (fb.params[sl.key] as number) : sl.min),
-      onInput: (v) => { fb.params = { ...fb.params, [sl.key]: v }; } });
+      onInput: (v) => {
+        fb.params = { ...fb.params, [sl.key]: v };
+        if (sl.key === "dull") { const ts = state.toolStates[_toolStateKeyFor(Filter)]; if (ts) ts.dull = v; }   // 持久化（per-doc）
+      } });
   }
   // ③ 边界取样（液化且有选区）
   if (Filter.boundaryModes && doc.selection) {

@@ -3,6 +3,8 @@ export declare const MIX_SPACES: readonly MixSpace[];
 export declare function isMixSpace(v: unknown): v is MixSpace;
 export declare function srgbToLinear(c: number): number;
 export declare function linearToSrgb(c: number): number;
+export declare function srgbToLinearFast(c: number): number;
+export declare function linearToSrgbFast(c: number): number;
 export declare function linearRgbToOklab(r: number, g: number, b: number, out: Float32Array | number[], oi?: number): void;
 export declare function oklabToLinearRgb(L: number, a: number, b: number, out: Float32Array | number[], oi?: number): void;
 /** 线性 RGB（0..1）→ 10 段反射谱（含 WGM_EPSILON 地板，保证可取对数）。 */

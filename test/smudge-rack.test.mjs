@@ -1,4 +1,4 @@
-// 手指笔架/dial（created 2026-09-05 by Claude Fable 5.1）：smudge 别名列表、默认笔 = 小滤镜笔、出厂笔参数自愈（spacing 10%→2%）。
+// 手指笔架/dial（created 2026-09-05 by Claude Fable 5.1；2026-09-06 手指自己的笔架）：smudge 只列 smudge 笔、默认笔 = 软手指、出厂笔参数自愈（spacing 10%→2%）。
 import { describe, it, eq, assert } from "./runner.mjs";
 import { brushesByTool, defaultBrushForTool, staleBuiltinArgFixes, makeBrush } from "../src/brushes.ts";
 
@@ -7,6 +7,7 @@ const rack = { brushes: [
   makeBrush({ id: "default-filter-big", name: "大滤镜笔", tool: "filterBrush", size: 300, spacingValue: 0.1 }),
   makeBrush({ id: "default-filter-small", name: "小滤镜笔", tool: "filterBrush", size: 32, spacingValue: 0.1 }),
   makeBrush({ id: "u-texture-finger", name: "纹理手指", tool: "smudge", spacingValue: 0.02 }),
+  makeBrush({ id: "default-smudge-soft", name: "软手指", tool: "smudge", size: 32, spacingValue: 0.02, defaultOpa: 0.5 }),
 ] };
 const specs = [
   { id: "default-filter-big", name: "大滤镜笔", tool: "filterBrush", args: { spacingValue: 0.02 } },
@@ -14,14 +15,15 @@ const specs = [
 ];
 
 describe("smudge 笔架", () => {
-  it("brushesByTool(smudge) = smudge 笔在前 + 全部滤镜笔；不串画笔", () => {
+  it("brushesByTool(smudge) = 只有 smudge 笔（2026-09-06 自己的笔架，不再借滤镜笔）；不串画笔/滤镜笔", () => {
     const ids = brushesByTool(rack, "smudge").map((b) => b.id);
-    eq(ids.join(","), "u-texture-finger,default-filter-big,default-filter-small");
+    eq(ids.join(","), "u-texture-finger,default-smudge-soft");
     eq(brushesByTool(rack, "filterBrush").length, 2, "滤镜笔架不含 smudge 笔");
   });
-  it("默认笔：smudge → 小滤镜笔；没有小滤镜笔时退首支", () => {
-    eq(defaultBrushForTool(rack, "smudge").id, "default-filter-small");
-    const r2 = { brushes: rack.brushes.filter((b) => b.id !== "default-filter-small") };
+  it("默认笔：smudge → 软手指（defaultOpa 0.5 在笔数据里）；没有软手指时退首支", () => {
+    eq(defaultBrushForTool(rack, "smudge").id, "default-smudge-soft");
+    eq(defaultBrushForTool(rack, "smudge").defaultOpa, 0.5);
+    const r2 = { brushes: rack.brushes.filter((b) => b.id !== "default-smudge-soft") };
     eq(defaultBrushForTool(r2, "smudge").id, "u-texture-finger");
     eq(defaultBrushForTool(rack, "filterBrush").id, "default-filter-big", "滤镜笔默认不变");
   });

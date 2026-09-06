@@ -14,6 +14,7 @@ export interface ToolDial {
     activeBrushId?: string | null;
     activeBrushName?: string | null;
     variantId?: string | null;
+    dull?: number;
 }
 export interface EditorRuntimeState {
     filterBrush: {

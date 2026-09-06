@@ -270,6 +270,62 @@
     }
   },
   {
+    "id": "default-smudge-soft",
+    "name": "软手指",
+    "names": {
+      "zh": "软手指",
+      "en": "Soft finger",
+      "ja": "柔らかい指先"
+    },
+    "tool": "smudge",
+    "args": {
+      "size": 32,
+      "hardness": 0.15,
+      "sizeBaseMax": 300,
+      "folder": "我的常用",
+      "sizeCoeff": 0.4,
+      "opaCoeff": 0,
+      "flowCoeff": 1,
+      "pressureGamma": 1,
+      "pressureLPF": 50,
+      "compositeMode": "buildup",
+      "spacingValue": 0.02,
+      "taperIn": 0,
+      "taperOut": 0,
+      "streamline": 0,
+      "stabilization": 0.1,
+      "defaultOpa": 0.5
+    }
+  },
+  {
+    "id": "default-smudge-hard",
+    "name": "硬手指",
+    "names": {
+      "zh": "硬手指",
+      "en": "Hard finger",
+      "ja": "硬い指先"
+    },
+    "tool": "smudge",
+    "args": {
+      "size": 48,
+      "hardness": 0.7,
+      "sizeBaseMax": 300,
+      "folder": "我的常用",
+      "sizeCoeff": 0.4,
+      "opaCoeff": 0,
+      "flowCoeff": 1,
+      "pressureGamma": 1,
+      "pressureLPF": 50,
+      "compositeMode": "buildup",
+      "spacingValue": 0.02,
+      "taperIn": 0,
+      "taperOut": 0,
+      "streamline": 0,
+      "stabilization": 0.1,
+      "defaultOpa": 0.5
+    }
+  },
+  {
     "id": "default-brush-pixel",
     "name": "像素笔",
     "names": {

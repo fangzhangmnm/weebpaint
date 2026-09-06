@@ -669,12 +669,7 @@
 
     <!-- 吸色工具 context toolbar（复用 lasso stack 的 context-toolbar 视觉类）：吸色取样模式。
          与 lassoToolbarStack 互斥（吸色 ⊻ 套索），同位显示。 -->
-    <div class="lasso-toolbar-stack hidden" id="pickerToolbar" role="toolbar" data-i18n-aria="pick.toolbar">
-      <div class="lasso-toolbar">
-        <div class="lasso-section">
-          <span class="lasso-tool-text" aria-hidden="true" data-i18n="pick.sampleLabel">取样</span>
-          <button type="button" class="lasso-tool-select select-field" id="pickModeSel" data-i18n-title="pick.sampleTip"></button>
-        </div>
+    <!-- 吸色上下文条：2026-09-06 U5 起由 ui/context-toolbar 工厂在 toolbar init 生成（id=pickerToolbar）。 -->
       </div>
     </div>
 
@@ -1453,6 +1448,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-a8ae87ec476e.mjs"></script>
+    <script type="module" src="./dist/weebpaint-cb779aa7dd08.mjs"></script>
   </body>
 </html>

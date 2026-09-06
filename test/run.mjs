@@ -166,6 +166,8 @@ import "./smudge-engine.test.mjs";          // 2026-09-05 手指/涂抹引擎（
 import "./smudge-plugin.test.mjs";          // 2026-09-05 手指插件：ResolvedBrush→设置映射 + Filter brush 契约跑一笔
 import "./color-brush-premul.test.mjs";     // 2026-09-05 滤镜笔混回图层末步预乘（模糊黑边残留回归）
 import "./color-brush-spacing.test.mjs";    // 2026-09-05 晚 模糊/锐化间距地板 10%（user「有模糊的话改回10%」；大滤镜笔性能）
+import "./color-brush-wash.test.mjs";       // 2026-09-06 模糊/锐化 wash 幂等：来回描 = 描一遍 / 满覆盖处 = 一次滤波 / 密疏间距同值（议程 §E）
+import "./color-mix-lut.test.mjs";          // 2026-09-06 sRGB 传递函数 LUT 层 1：fast 版误差 < 1/255（议程 §H）
 import "./smudge-rack.test.mjs";            // 2026-09-05 手指笔架别名/默认小滤镜笔/出厂 spacing 自愈
 
 console.log("\n  WeebPaint —— vendored OneDriveProvider 适配验收（lib 契约在 sync-store/test/）\n");

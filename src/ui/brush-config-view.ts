@@ -37,6 +37,8 @@ const CurveEditorVue = defineComponent({
     onMounted(() => {
       if (!host.value) return;
       h = makeCurveEditor({
+        plotSize: _plotSizeStore?.get(),
+        onPlotResize: (px) => _plotSizeStore?.set(px),
         curve: toRaw(props.curve) as AnimCurve,
         lockEndpointsT: true,
         fmt: (t, v) => `${Math.round(t * 100)}% → ${Math.round(v * 100)}%`,
@@ -190,10 +192,14 @@ export interface BrushSettingsHandle {
   close(): void;
 }
 
+// 曲线编辑器绘图区边长的持久化钩（宿主注入；ui/ 不 import app-prefs）
+let _plotSizeStore: { get(): number; set(px: number): void } | null = null;
+
 export function mountBrushSettings(
   el: HTMLElement,
-  opts: { blendModes: Record<string, string>; onDelete: () => void; onExport: () => void },
+  opts: { blendModes: Record<string, string>; onDelete: () => void; onExport: () => void; curvePlotSize?: { get(): number; set(px: number): void } },
 ): BrushSettingsHandle {
+  if (opts.curvePlotSize) _plotSizeStore = opts.curvePlotSize;
   const draft = ref<object | null>(null);
   const app = createApp(defineComponent({
     components: { BrushSettings },

@@ -124,6 +124,15 @@ export interface BrushSelection {
 export type DirtyRect = [number, number, number, number];
 
 // 单 stroke 的可变状态（beginBrushStroke 返回，后续方法读写）。
+// 2026-09-06 wash 幂等改造（user「模糊笔 wash idempotent 同意」；议程 §E）：不再逐 dab 烤+混回（重叠 dab = 叠加滤波，
+//   间距同时决定强度与成本），改成「dab 只累积覆盖 mask，flush 时对扫过区域**从起笔原像素**算一次滤波，按 max 覆盖合成」——
+//   一笔之内来回描不再越描越糊，强度与间距解耦，成本从 O(dab 数) 降到 O(面积/帧)。
+export interface ColorBrushTile {
+  x0: number; y0: number; w: number; h: number;
+  orig: Uint8ClampedArray;      // 起笔时该 tile 的原像素（首次触及时从写靶读一次；写靶是 shadow 替身，起笔即快照）
+  cov: Float32Array;            // 覆盖 0..1（wash：max）
+  sel: Uint8Array | null;       // 选区 gray8（懒物化）
+}
 export interface ColorBrushState {
   layer: BrushLayer;
   params: FilterParams;
@@ -134,6 +143,9 @@ export interface ColorBrushState {
   lastY: number;
   pendingDist: number;
   dirty: DirtyRect | null;
+  pending: Array<{ cx: number; cy: number; R: number; a: number }>;   // 自上次 flush 以来的 dab
+  tiles: Map<string, ColorBrushTile>;
+  dabs: number;                 // 撒过的 dab 总数（测试观测间距地板用）
 }
 
 const _reg = makeRegistry<Filter>({ name: "filter" });
@@ -209,8 +221,9 @@ export function makeSectionTitle(text: string): HTMLDivElement {
 //   // 之后 BlurFilter.beginBrushStroke/extendBrushStamp/endBrushStroke/flushDirty 都有了
 //
 // 跟 liquify（位移场）那种 filter 不同；位移场 filter 自己写完整 brush 方法。
-/** 色彩类滤镜笔（模糊/锐化）的间距地板：每颗 dab 都是一次卷积，间距再小 = 强度×N 且成本×N；10% 是 v132–v0.13.3 的历史值。 */
+/** 色彩类滤镜笔（模糊/锐化）的间距地板：wash 合成后间距只影响 mask 边缘平滑度，10% 足够；再小 = 白烧 dab。 */
 export const COLOR_BRUSH_MIN_SPACING = 0.1;
+const CB_TILE = 256;
 
 export function attachColorBrushBehavior(FilterClass: Filter): void {
   FilterClass.beginBrushStroke = function(layers: readonly BrushLayer[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, p: number): ColorBrushState {
@@ -223,8 +236,9 @@ export function attachColorBrushBehavior(FilterClass: Filter): void {
     const state: ColorBrushState = {
       layer, params, brushSettings, selection, FilterClass,
       lastX: x, lastY: y, pendingDist: 0, dirty: null,
+      pending: [], tiles: new Map(), dabs: 0,
     };
-    _colorBrushStamp(state, x, y, p);
+    _cbPushDab(state, x, y, p);
     return state;
   };
   FilterClass.extendBrushStamp = function(state: ColorBrushState, x: number, y: number, p: number): void {
@@ -233,13 +247,9 @@ export function attachColorBrushBehavior(FilterClass: Filter): void {
     if (dist <= 0) return;
     const bs = state.brushSettings;
     const R = Math.max(2, bs.size / 2);
-    // 2026-09-05（user「模糊也改，都统一。之前不读可能是错误的」）：v132 起这里读 bs.spacingValue，而传进来的是
-    //   ResolvedBrush（字段名 spacing = 归一后的直径比例）→ 一直落到 0.06 写死，预设的 spacing 从未生效。改读 spacing
-    //   （spacingValue 兜底，最后 0.06）。代价（node 实测 amount −50/5 轮 box）：32px 0.6ms/dab、100px 3.9ms、300px 28ms；
-    //   滤镜笔出厂 2%（v0.13.3）后 1000px 一笔 ≈ 0.6s / 2.0s / 4.7s（6% 时 0.3 / 0.7 / 1.6s）。大笔模糊要快得另做可分离核/GPU。
-    //   2026-09-05 晚 user 反悔（「大滤镜笔性能确实不可接受，有模糊的话改回10%」「模糊锐化自己的地板同意」）：模糊/锐化不跟笔的
-    //   间距走到底——自己的地板 COLOR_BRUSH_MIN_SPACING（10%）。真正的语义整改（滤镜一次算、wash 式 mask 合成，间距与强度解耦）
-    //   见 ai-docs/20260905-grill-agenda-toolbar-smudge-routing.md §E。
+    // 2026-09-05（user「模糊也改，都统一」）：读 ResolvedBrush.spacing（旧 spacingValue 兜底）；
+    //   同日晚 user 反悔「有模糊的话改回10%」「模糊锐化自己的地板同意」→ 地板 COLOR_BRUSH_MIN_SPACING。
+    //   2026-09-06 wash 幂等后间距只管 mask 边缘，与强度解耦（议程 §E）。
     const presetSpacing = (typeof bs.spacing === "number" && bs.spacing > 0) ? bs.spacing : (bs.spacingValue || 0.06);
     const spacingFrac = Math.max(COLOR_BRUSH_MIN_SPACING, presetSpacing);
     const spacingPx = Math.max(1, R * 2 * spacingFrac);
@@ -251,91 +261,130 @@ export function attachColorBrushBehavior(FilterClass: Filter): void {
     const ux = dx / dist, uy = dy / dist;
     let placedDist = spacingPx - (state.pendingDist - dist);
     while (placedDist <= dist) {
-      _colorBrushStamp(state, state.lastX + ux * placedDist, state.lastY + uy * placedDist, p);
+      _cbPushDab(state, state.lastX + ux * placedDist, state.lastY + uy * placedDist, p);
       placedDist += spacingPx;
     }
     state.pendingDist = dist - (placedDist - spacingPx);
     state.lastX = x; state.lastY = y;
   };
-  FilterClass.endBrushStroke = function(_state: ColorBrushState): void { /* nothing */ };
+  // 抬笔：把还没 flush 的 dab 合成掉（StrokeSession.end 在 endStroke 之后不再 flush，直接 commit 替身叶）
+  FilterClass.endBrushStroke = function(state: ColorBrushState): void { _cbComposite(state); };
   FilterClass.flushDirty = function(state: ColorBrushState): DirtyRect | null {
+    _cbComposite(state);
     const d = state.dirty;
     state.dirty = null;
     return d;
   };
 }
 
-// 单 stamp 内的工作：读 layer 像素 → filter.bake → 圆形 alpha + 选区 → 合回 layer
-function _colorBrushStamp(state: ColorBrushState, cx: number, cy: number, pressure: number): void {
-  const { layer, FilterClass, params, brushSettings, selection } = state;
-  const R = Math.max(2, brushSettings.size / 2 * (pressure ?? 1));
+function _cbPushDab(state: ColorBrushState, cx: number, cy: number, pressure: number): void {
+  const bs = state.brushSettings;
+  const R = Math.max(2, bs.size / 2 * (pressure ?? 1));
+  const flow = Math.max(0, Math.min(1, bs.flow ?? bs.opacity ?? 1));
+  if (flow <= 0) return;
+  state.pending.push({ cx, cy, R, a: flow });
+  state.dabs++;
+}
+
+function _cbTile(state: ColorBrushState, tx: number, ty: number): ColorBrushTile | null {
+  const key = tx + "," + ty;
+  let t = state.tiles.get(key);
+  if (t) return t;
+  const L = state.layer;
+  const x0 = Math.max(tx * CB_TILE, L.bboxX), y0 = Math.max(ty * CB_TILE, L.bboxY);
+  const x1 = Math.min((tx + 1) * CB_TILE, L.bboxX + L.bboxW), y1 = Math.min((ty + 1) * CB_TILE, L.bboxY + L.bboxH);
+  if (x1 <= x0 || y1 <= y0) return null;
+  const w = x1 - x0, h = y1 - y0;
+  t = { x0, y0, w, h, orig: new Uint8ClampedArray(L.getImageData(x0, y0, w, h).data), cov: new Float32Array(w * h), sel: null };
+  if (state.selection) t.sel = state.selection.materializeMaskRegion(x0, y0, w, h);
+  state.tiles.set(key, t);
+  return t;
+}
+
+/** 把 pending dab 合成掉：① 覆盖 mask 取 max；② 扫过区域从原像素算一次滤波；③ out = lerp(orig, filtered, cov)（premult）。 */
+function _cbComposite(state: ColorBrushState): void {
+  const dabs = state.pending;
+  if (!dabs.length) return;
+  state.pending = [];
+  const { layer, FilterClass, params, brushSettings } = state;
   const hardness = brushSettings.hardness ?? 0.6;
-  const bx0 = Math.floor(cx - R), by0 = Math.floor(cy - R);
-  const bx1 = Math.ceil(cx + R),  by1 = Math.ceil(cy + R);
-  // clamp 到 layer.bbox（filter brush 不扩层 —— 没像素就不处理）
-  const lx0 = layer.bboxX, ly0 = layer.bboxY;
-  const lx1 = lx0 + layer.bboxW, ly1 = ly0 + layer.bboxH;
-  const sx0 = Math.max(bx0, lx0), sy0 = Math.max(by0, ly0);
-  const sx1 = Math.min(bx1, lx1), sy1 = Math.min(by1, ly1);
-  if (sx1 <= sx0 || sy1 <= sy0) return;
-  const bleed = FilterClass.bleedRadius ? FilterClass.bleedRadius(params) : 0;
-  const ex0 = Math.max(lx0, sx0 - bleed), ey0 = Math.max(ly0, sy0 - bleed);
-  const ex1 = Math.min(lx1, sx1 + bleed), ey1 = Math.min(ly1, sy1 + bleed);
-  const ew = ex1 - ex0, eh = ey1 - ey0;
-  if (ew <= 0 || eh <= 0) return;
-  const srcImg = layer.getImageData(ex0, ey0, ew, eh);   // doc 坐标读（绕物化 canvas）
-  const dstImg = new ImageData(ew, eh);
-  FilterClass.bake(srcImg.data, dstImg.data, params, null, ew, eh);
-  const ox = sx0 - ex0, oy = sy0 - ey0;
-  const sw = sx1 - sx0, sh = sy1 - sy0;
-  let selData: Uint8Array | null = null;
-  if (selection) selData = selection.materializeMaskRegion(sx0, sy0, sw, sh);   // v0.4.6：gray8 窄读，canvas 中转死
-  const layerImg = layer.getImageData(sx0, sy0, sw, sh);
-  const layerData = layerImg.data;
-  const flow = Math.max(0, Math.min(1, brushSettings.flow ?? brushSettings.opacity ?? 1));
-  let blended = false;   // v0.6.17：一个像素都没混过（选区全裁/flow=0）→ 跳过写回，免得同字节换新 tile 句柄骗过 no-op 守卫
-  for (let j = 0; j < sh; j++) {
-    for (let i = 0; i < sw; i++) {
-      const px = sx0 + i, py = sy0 + j;
-      const dx = px + 0.5 - cx, dy = py + 0.5 - cy;
-      const dist = Math.hypot(dx, dy);
-      if (dist > R) continue;
-      const innerR = R * hardness;
-      let stampA;
-      if (dist <= innerR) stampA = 1;
-      else {
-        const t = (dist - innerR) / (R - innerR);
-        stampA = 1 - (t * t * (3 - 2 * t));
+  const lx0 = layer.bboxX, ly0 = layer.bboxY, lx1 = lx0 + layer.bboxW, ly1 = ly0 + layer.bboxH;
+  // ① 覆盖：逐 dab 在其覆盖的 tile 上 cov = max(cov, stampA·flow·sel)
+  let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+  for (const d of dabs) {
+    const sx0 = Math.max(Math.floor(d.cx - d.R), lx0), sy0 = Math.max(Math.floor(d.cy - d.R), ly0);
+    const sx1 = Math.min(Math.ceil(d.cx + d.R), lx1), sy1 = Math.min(Math.ceil(d.cy + d.R), ly1);
+    if (sx1 <= sx0 || sy1 <= sy0) continue;
+    bx0 = Math.min(bx0, sx0); by0 = Math.min(by0, sy0); bx1 = Math.max(bx1, sx1); by1 = Math.max(by1, sy1);
+    const innerR = d.R * hardness;
+    for (let ty = Math.floor(sy0 / CB_TILE); ty * CB_TILE < sy1; ty++) {
+      for (let tx = Math.floor(sx0 / CB_TILE); tx * CB_TILE < sx1; tx++) {
+        const t = _cbTile(state, tx, ty);
+        if (!t) continue;
+        const px0 = Math.max(sx0, t.x0), py0 = Math.max(sy0, t.y0), px1 = Math.min(sx1, t.x0 + t.w), py1 = Math.min(sy1, t.y0 + t.h);
+        for (let py = py0; py < py1; py++) {
+          for (let px = px0; px < px1; px++) {
+            const dist = Math.hypot(px + 0.5 - d.cx, py + 0.5 - d.cy);
+            if (dist > d.R) continue;
+            let stampA = 1;
+            if (dist > innerR) { const u = (dist - innerR) / (d.R - innerR); stampA = 1 - u * u * (3 - 2 * u); }
+            let a = stampA * d.a;
+            const q = (py - t.y0) * t.w + (px - t.x0);
+            if (t.sel) a *= t.sel[q] / 255;
+            if (a > t.cov[q]) t.cov[q] = a;
+          }
+        }
       }
-      let a = stampA * flow;
-      if (selData) a *= selData[j * sw + i] / 255;
-      if (a <= 0) continue;
-      blended = true;
-      const lo = (j * sw + i) * 4;
-      const fo = ((j + oy) * ew + (i + ox)) * 4;
-      // 2026-09-05 预乘（模糊黑边残留，v0.12.3 只修了卷积内部）：straight 逐通道 lerp 会把透明像素的 RGB(0,0,0)
-      //   按 (1−a) 掺进来——模糊扩进原本透明像素的软边被拉黑。改成「premult lerp 再去预乘」的等价式：
-      //   颜色权 = 各自 alpha × 混合权 / 新 alpha；透明像素颜色权为 0，永不参与。回归测 test/color-brush-premul.test.mjs。
-      const la = layerData[lo + 3] / 255, fa = dstImg.data[fo + 3] / 255;
-      const na = la * (1 - a) + fa * a;
-      if (na <= 0) { layerData[lo] = 0; layerData[lo + 1] = 0; layerData[lo + 2] = 0; layerData[lo + 3] = 0; continue; }
-      const wl = (la * (1 - a)) / na, wf = (fa * a) / na;
-      layerData[lo]     = layerData[lo]     * wl + dstImg.data[fo]     * wf;
-      layerData[lo + 1] = layerData[lo + 1] * wl + dstImg.data[fo + 1] * wf;
-      layerData[lo + 2] = layerData[lo + 2] * wl + dstImg.data[fo + 2] * wf;
-      layerData[lo + 3] = na * 255;
     }
   }
-  if (!blended) return;   // 零像素混合 → 不写回、不标 dirty（见上）
-  layer.putImageData(sx0, sy0, layerImg);   // doc 坐标写回 tile
-  const d = state.dirty;
-  if (!d) state.dirty = [sx0, sy0, sx1, sy1];
-  else {
-    d[0] = Math.min(d[0], sx0);
-    d[1] = Math.min(d[1], sy0);
-    d[2] = Math.max(d[2], sx1);
-    d[3] = Math.max(d[3], sy1);
+  if (!(bx1 > bx0 && by1 > by0)) return;
+  // ② 扫过区域（+bleed）从原像素拼一块 src，算一次滤波
+  const bleed = FilterClass.bleedRadius ? FilterClass.bleedRadius(params) : 0;
+  const ex0 = Math.max(lx0, bx0 - bleed), ey0 = Math.max(ly0, by0 - bleed);
+  const ex1 = Math.min(lx1, bx1 + bleed), ey1 = Math.min(ly1, by1 + bleed);
+  const ew = ex1 - ex0, eh = ey1 - ey0;
+  const src = new Uint8ClampedArray(ew * eh * 4);
+  const cov = new Float32Array(ew * eh);
+  for (let ty = Math.floor(ey0 / CB_TILE); ty * CB_TILE < ey1; ty++) {
+    for (let tx = Math.floor(ex0 / CB_TILE); tx * CB_TILE < ex1; tx++) {
+      const t = _cbTile(state, tx, ty);
+      if (!t) continue;
+      const px0 = Math.max(ex0, t.x0), py0 = Math.max(ey0, t.y0), px1 = Math.min(ex1, t.x0 + t.w), py1 = Math.min(ey1, t.y0 + t.h);
+      for (let py = py0; py < py1; py++) {
+        const so = ((py - t.y0) * t.w + (px0 - t.x0)) * 4, so1 = so + (px1 - px0) * 4;
+        const dOff = ((py - ey0) * ew + (px0 - ex0)) * 4;
+        src.set(t.orig.subarray(so, so1), dOff);
+        const co = (py - t.y0) * t.w + (px0 - t.x0);
+        cov.set(t.cov.subarray(co, co + (px1 - px0)), (py - ey0) * ew + (px0 - ex0));
+      }
+    }
   }
+  const dst = new Uint8ClampedArray(ew * eh * 4);
+  FilterClass.bake(src, dst, params, null, ew, eh);
+  // ③ 只写回 dab 覆盖的 bbox（bleed 环只是滤波输入）：out = lerp(orig, filtered, cov)，premult 权重（黑边病根同款防线）
+  const bw = bx1 - bx0, bh = by1 - by0;
+  const out = new ImageData(bw, bh);
+  const od = out.data;
+  for (let j = 0; j < bh; j++) {
+    for (let i = 0; i < bw; i++) {
+      const ex = bx0 + i - ex0, ey = by0 + j - ey0;
+      const q = ey * ew + ex, so = q * 4, oo = (j * bw + i) * 4;
+      const a = cov[q];
+      if (a <= 0) { od[oo] = src[so]; od[oo + 1] = src[so + 1]; od[oo + 2] = src[so + 2]; od[oo + 3] = src[so + 3]; continue; }
+      const la = src[so + 3] / 255, fa = dst[so + 3] / 255;
+      const na = la * (1 - a) + fa * a;
+      if (na <= 0) { od[oo] = 0; od[oo + 1] = 0; od[oo + 2] = 0; od[oo + 3] = 0; continue; }
+      const wl = (la * (1 - a)) / na, wf = (fa * a) / na;
+      od[oo]     = src[so]     * wl + dst[so]     * wf;
+      od[oo + 1] = src[so + 1] * wl + dst[so + 1] * wf;
+      od[oo + 2] = src[so + 2] * wl + dst[so + 2] * wf;
+      od[oo + 3] = na * 255;
+    }
+  }
+  layer.putImageData(bx0, by0, out);
+  const d = state.dirty;
+  if (!d) state.dirty = [bx0, by0, bx1, by1];
+  else { d[0] = Math.min(d[0], bx0); d[1] = Math.min(d[1], by0); d[2] = Math.max(d[2], bx1); d[3] = Math.max(d[3], by1); }
 }
 
 // 给插件 / 自定义 UI 用：返回一个 `<select>` row

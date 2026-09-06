@@ -4,6 +4,8 @@ interface CurvesBuildState {
     params: CurvesParams;
     _curveEditor?: CurveEditorHandle;
 }
+/** 曲线编辑器绘图区边长（device 偏好；坏值回 200）。 */
+export declare function plotSizePref(): number;
 export declare class CurvesFilter {
     static id: string;
     static title: string;

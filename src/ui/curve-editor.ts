@@ -123,6 +123,7 @@ export interface CurveEditorOpts {
   keyStep?: number;                 // 键盘微调步长（数据单位；默认 1/255）
   onInput(): void;                  // 形状每变一次
   onCommit(): void;                 // 一次手势结束
+  onPlotResize?(px: number): void;  // grip 拖完（宿主持久化；缺省只记 session）
 }
 export interface CurveEditorHandle {
   el: HTMLElement;
@@ -246,7 +247,7 @@ export function makeCurveEditor(o: CurveEditorOpts): CurveEditorHandle {
     min: { w: MIN_PLOT_SIZE, h: MIN_PLOT_SIZE },
     max: () => { const m = maxPlotPx(); return { w: m, h: m }; },
     onResize: ({ w, h }) => { plotPx = Math.min(maxPlotPx(), Math.round(Math.max(w, h))); applyPlotSize(); redraw(); },   // 正方形：取长边
-    onEnd: () => { _sessionPlotSize = plotPx; },
+    onEnd: () => { _sessionPlotSize = plotPx; o.onPlotResize?.(plotPx); },
   });
 
   // ---- 绘制 ----

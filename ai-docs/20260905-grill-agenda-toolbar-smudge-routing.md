@@ -21,7 +21,7 @@
 | 「工具栏放动词，动词绑 engine 族，preset 按 engine 族 typed……同意。动词原则进 adr」 | **ADR-0012**（`adr/0012-toolbar-verbs-engine-families-typed-presets.md`） |
 | 「小三角试试吧，不 zen，多了一个 visual distraction，但是 catsup (sketchup clone) 必然会小三角。blender 也小三角」 | 子工具长按 + 角上小三角 = 标准件（UI 抽象轮；形状工具条 v0.6.25 变体组槽已有小三角先例） |
 | 「橡皮是动词，即使再能用画笔复用也是动词」 | ADR-0012 §2 |
-| 「模糊笔 wash idempotent 同意」 | §E 提案转决策，落地归 UI 轮之后的引擎批 |
+| 「模糊笔 wash idempotent 同意」 | **已落地 v0.13.14**：`filters.ts attachColorBrushBehavior` 改成 dab 只累积覆盖(max)、flush 时对扫过区域从起笔原像素算一次滤波再 lerp（test/color-brush-wash.test.mjs：来回描=描一遍、满覆盖=一次 bake、密疏间距同值）|
 | 「ui/context-toolbar 从登记表升级为 DOM 工厂深模块 同意」「子工具长按成标准件 同意」「单画笔位 + 长按出子工具 同意」「『…』溢出位 同意，是工具条的自带功能，不用特殊实现」「布局断点表赞」；09-06 晚「小三角……放心大胆去做。不要怕」「desk.subTool 同意」 | **U1/U3 已落地 v0.13.10–v0.13.11**（`20260906-ui-abstraction-round-proposal.md` §4 回写）；U4 吸色等讨论 |
 | 「以后可以滤镜笔都搬家到手指这个 tool 栏位。每种都有一个自己的图标。用户可以切换。……你要么是形状笔和橡皮，要么是画笔和橡皮。反而不太会在形状笔和画笔之间切」 | ADR-0012 §2/理由；顶栏终形 `菜单 云保存 \| 笔 橡皮 手指 套索 \| fx 图层 颜色` |
 | 「油漆桶进套索试一下吧」 | 填色 = 套索位子工具（ADR-0004 不互通语义不变），UI 轮 |
@@ -104,7 +104,7 @@ user 原话：「4 关于不走间距语义。主要是我刚反悔，我今晚�
   现代抽象艺术这一套……油画，水彩，沙画，you name it……摆脱只能画二次元，不能做正经艺术，贴图，强纹理强材质工作流的污名」。
   没有可抄的 Procreate 方案、没有画这类的艺术家 grounding，「只能我们自己探索和 spiral」。入口 = §C 的平流引擎（泼溅 = 场驱动平流、搅拌 = 两色平流、吹画 = 气流场）。
 
-## H. 混色的超越函数 → LUT 路线（考古 + 提案）
+## H. 混色的超越函数 → LUT 路线（考古 + 提案；**层 1 已落地 v0.13.14**：`srgbToLinearFast/linearToSrgbFast` 4096 段查表，误差 <1/255，mixPremultInto 热路径用；层 2/3 等平流引擎轮一起做）
 
 考古：抱怨在 `src/plugins/smudge-engine.ts:22`「每像素十几个超越函数，大笔会慢」，来源 `backend/algorithms/color-mix.ts`：
 sRGB↔线性各一次 `pow`（去/重预乘路径）、OKLab 三个 `cbrt` 往返、颜料谱 WGM 每像素 10 段 `exp(u·log a + f·log b)`（:71）。是**超越函数**（transcendental functions）的调用成本，不是超越方程。

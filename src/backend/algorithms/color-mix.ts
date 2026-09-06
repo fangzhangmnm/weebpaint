@@ -25,6 +25,20 @@ export function linearToSrgb(c: number): number {
   const v = c <= 0 ? 0 : c >= 1 ? 1 : c;
   return v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055;
 }
+// 2026-09-06 LUT 层 1（议程 §H；smudge-engine.ts:22「每像素十几个超越函数」）：4096 段查表 + 线性插值替代 pow。
+//   误差 < 1/255（test/color-mix-lut.test.mjs 锁）；mixPremultInto 热路径用 fast 版，精确版留给测试/离线。
+const LUT_N = 4096;
+const _toLin = new Float32Array(LUT_N + 1), _toSrgb = new Float32Array(LUT_N + 1);
+for (let i = 0; i <= LUT_N; i++) { _toLin[i] = srgbToLinear(i / LUT_N); _toSrgb[i] = linearToSrgb(i / LUT_N); }
+function _lut(t: Float32Array, c: number): number {
+  const x = (c <= 0 ? 0 : c >= 1 ? 1 : c) * LUT_N;
+  const i = x | 0;
+  if (i >= LUT_N) return t[LUT_N];
+  const f = x - i;
+  return t[i] + (t[i + 1] - t[i]) * f;
+}
+export function srgbToLinearFast(c: number): number { return _lut(_toLin, c); }
+export function linearToSrgbFast(c: number): number { return _lut(_toSrgb, c); }
 
 // ---- OKLab（Björn Ottosson 2020；输入线性 sRGB）----
 export function linearRgbToOklab(r: number, g: number, b: number, out: Float32Array | number[], oi = 0): void {
@@ -103,9 +117,9 @@ export function mixPremultInto(
   if (A <= 1e-6) { out[oi] = out[oi + 1] = out[oi + 2] = out[oi + 3] = 0; return; }
   const f = wb / A;   // b 的颜色权
   // 去预乘 → 线性
-  if (aa > 1e-6) { _la[0] = srgbToLinear(a[ai] / aa); _la[1] = srgbToLinear(a[ai + 1] / aa); _la[2] = srgbToLinear(a[ai + 2] / aa); }
+  if (aa > 1e-6) { _la[0] = srgbToLinearFast(a[ai] / aa); _la[1] = srgbToLinearFast(a[ai + 1] / aa); _la[2] = srgbToLinearFast(a[ai + 2] / aa); }
   else { _la[0] = _la[1] = _la[2] = 0; }
-  if (ab > 1e-6) { _lb[0] = srgbToLinear(b[bi] / ab); _lb[1] = srgbToLinear(b[bi + 1] / ab); _lb[2] = srgbToLinear(b[bi + 2] / ab); }
+  if (ab > 1e-6) { _lb[0] = srgbToLinearFast(b[bi] / ab); _lb[1] = srgbToLinearFast(b[bi + 1] / ab); _lb[2] = srgbToLinearFast(b[bi + 2] / ab); }
   else { _lb[0] = _lb[1] = _lb[2] = 0; }
   if (f <= 1e-6) { _lin[0] = _la[0]; _lin[1] = _la[1]; _lin[2] = _la[2]; }
   else if (f >= 1 - 1e-6) { _lin[0] = _lb[0]; _lin[1] = _lb[1]; _lin[2] = _lb[2]; }
@@ -131,9 +145,9 @@ export function mixPremultInto(
     spectralToLinearRgb(_sm, 0, _lin);
   }
   // 线性 → sRGB → 重预乘
-  out[oi]     = linearToSrgb(_lin[0]) * A;
-  out[oi + 1] = linearToSrgb(_lin[1]) * A;
-  out[oi + 2] = linearToSrgb(_lin[2]) * A;
+  out[oi]     = linearToSrgbFast(_lin[0]) * A;
+  out[oi + 1] = linearToSrgbFast(_lin[1]) * A;
+  out[oi + 2] = linearToSrgbFast(_lin[2]) * A;
   out[oi + 3] = A;
 }
 

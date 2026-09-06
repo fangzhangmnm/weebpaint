@@ -14,13 +14,14 @@ function mockLayer(docW, docH) {
   };
   return L;
 }
-// 一笔 200px 直线，返回 dab 数（= putImageData 次数）
+// 一笔 200px 直线，返回 dab 数（2026-09-06 wash 幂等后写回按 flush 不按 dab → 观测 state.dabs）
 function dabs(spacing) {
   const L = mockLayer(300, 60);
   const st = SharpenBlurFilter.beginBrushStroke([L], { amount: -40 }, { size: 40, hardness: 0.5, flow: 1, spacing }, null, 40, 30, 1);
   for (let x = 41; x <= 240; x++) SharpenBlurFilter.extendBrushStamp(st, x, 30, 1);
   SharpenBlurFilter.endBrushStroke(st);
-  return L.puts;
+  assert(L.puts >= 1, "抬笔要把 pending dab 合成掉（至少一次写回）");
+  return st.dabs;
 }
 
 describe("color-brush 间距地板", () => {

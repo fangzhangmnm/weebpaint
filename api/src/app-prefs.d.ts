@@ -16,6 +16,10 @@ export declare const PREF_REGISTRY: {
         readonly scope: "device";
         readonly def: string;
     };
+    readonly "curve-plot-size": {
+        readonly scope: "device";
+        readonly def: number;
+    };
     readonly lang: {
         readonly scope: "gallery";
         readonly def: string | null;
