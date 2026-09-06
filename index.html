@@ -107,7 +107,7 @@
     <link rel="icon" href="./icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=79dd8e234b3a" />
+    <link rel="stylesheet" href="./styles.css?v=a8c2373a8ab3" />
     <!-- zip.js UMD bundle：自挂 window.zip。必须在 module bundle 之前。
          defer（v417）：原来是 parser-blocking 的，硬刷新时 SW 被绕过 → 直奔网络 → 网络一卡整个
          文档解析就停住（浏览器标签页转圈）。defer 后它与下面的 type=module bundle 同属延迟脚本、
@@ -493,9 +493,7 @@
                   → 2026-07-25 被推翻：形状笔以独立工具回归（ADR-0005，见下方 toolShape） -->
         <!-- 喷枪不再是独立工具 (v96)：是 brush preset 的特征（spacing.kind=time + bufferMode=direct）。
              用户点笔刷工具，picks 喷枪 / 喷枪笔 preset 就行（v0.5 #24 rename） -->
-        <button class="tool" id="toolPicker" type="button" data-tool="picker" data-i18n-title="tool.picker">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#eyedropper"/></svg>
-        </button>
+        <!-- 2026-09-06 吸色不是工具（ADR-0012 §6）：顶栏吸色钮撤 → 左栏一次性取样钮 #leftPick / 色板吸管 / I 键 / Alt+笔 / 画布长按 -->
         <!-- v0.6.31：套索/填色并列（fill 仍一等工具、不互通语义不变；lasso 二击 Esc v124 仍废除） -->
         <button class="tool" id="toolLasso" type="button" data-tool="lasso" data-verb="lasso" data-i18n-title="tool.lasso">
           <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#lasso"/></svg>
@@ -1595,6 +1593,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-60b4e828b0f9.mjs"></script>
+    <script type="module" src="./dist/weebpaint-9a577f92b094.mjs"></script>
   </body>
 </html>

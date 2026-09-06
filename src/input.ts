@@ -964,10 +964,11 @@ export class InputController {
       }
     }
     // role === "pick"：长按从 brush/eraser 转来的保持原工具不动；
-    // 但若是「显式吸管工具」吸完色，弹回 brush（user：吸好色就回笔）。
+    // 但若是「显式吸管工具」吸完色，一次性收工（user：吸好色就回笔）——2026-09-06 起回**原工具**（toolbar 记回程），
+    //   经 wp:pickdone 事件，不再写死 brush。
     else if (rec.role === "pick" && !cancelled &&
              this.editMode && this.editMode.current() === "picker") {
-      this._emitTool("brush");
+      window.dispatchEvent(new CustomEvent("wp:pickdone"));
     }
   }
 

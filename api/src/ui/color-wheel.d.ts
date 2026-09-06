@@ -6,4 +6,5 @@ export interface ColorWheelHandle {
 export declare function mountColorWheel(el: HTMLElement, opts: {
     getColor: () => string;
     onPick: (hex: string) => void;
+    onPickRequest?: () => void;
 }): ColorWheelHandle;

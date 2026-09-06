@@ -165,7 +165,7 @@ export function setVerb(verb: Verb, sub?: string): void;       // setTool 保留
 | U1 | v0.13.10 | `mountContextToolbar(spec)` 照 §2.1；chrome **复用 .lasso-toolbar-stack/.lasso-toolbar 现有皮**（没发明 .ct-* 新容器，只补 title/sep/select/more 小件）。溢出只折 button/select（slider/custom 永不折；select 折成 分组标题 + 选项）。滤镜笔条迁工厂（`filters-adjust._fbRows`，init 即 mount hidden，id 保留）；裁切条**只换皮不迁 spec**（控件 id 不变，输入框类保留）。实测手指条 y=50/h=38 与套索条同位。 |
 | U2 | v0.13.10 | 按「收编」完成：套索/形状/吸色/透视/裁切五条静态条同皮同位、继续 registerContextToolbar；**内容迁 spec 另批**（套索双行 + 集合运算 + 变换控件耦合 toolbar.ts 深，U2 原案的 custom 逃生口足够但收益低）。 |
 | U3 | v0.13.11 | 动词表落 `common/verbs.ts`（纯数据，含 mode→verb/subTool 反推，node 测）；标准件落 `ui/subtool-slot.ts`；`setVerb` 在 toolbar.ts。**橡皮位也挂了 slot**（单子工具无小三角，等智能橡皮追加）；**吸色钮暂留顶栏**（U4 等讨论）；抓手条件位不变。子工具记忆 = `desk.subTool`（per-doc）。小三角复用 `.lasso-slot-caret` 形制。缺 4 图标走 stopgap 字形「揉/糊/锐/化」。 |
-| U4 | — | 吸色搬家：等 user 讨论（三设备截图已出）。 |
+| U4 | v0.13.12 | user 拍板：吸管图标、两滑条之间、**一次性**（不做按住式）、图标随 context 变（克隆 = 定源）。落地：left-dial 加 `#leftPick`（opts.onPick/getPicking/getPickIcon/getPickTitle）；toolbar `pickOnce()` + 回程工具记忆（`_pickerReturnTool`，input 吸完派 `wp:pickdone`，旧行为写死回 brush 改为回原工具）；色板 HEX 行 `.cw-pick`（color-wheel emit pickRequest → `wp:pick-once`）；顶栏 `#toolPicker` 撤；吸色上下文条（取样模式）照旧随 picker 模式出现。探针 `tools/probes/pick-once.mjs`。 |
 | U5 | — | 清账未做：toolbar.ts 仍 1230+ 行（本轮只加不减）；registerContextToolbar 旧路保留给静态条。 |
 
 风险回执：长按曾在 v0.6.31 因「真机难受」回滚——这次是**独立标准件**（回滚 = 不 attach 三行），且 S/G 快捷键、双击笔↔橡皮、菜单入口全部照旧可达，长按只是多一条路。

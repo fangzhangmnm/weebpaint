@@ -26,6 +26,14 @@ export interface LeftDialOpts {
   onOpacity(frac: number): void;
   onBrushTap(): void;
   onBrushLongpress(): void;
+  // 2026-09-06 吸色搬家（ADR-0012 §6；user「先加吸色按钮吧，不要像 procreate 一样谜语人就一个方框，而是用我们的吸管……
+  //   先很没有创意的放两个滑条中间吧……我建议是一次性。按住形式容易误触碰」「仿制图章的时候就是需要变语义吧」）：
+  //   一次性取样钮——tap 进取样态，取一次自动回原工具；图标/标题随 context 变（现在 = 吸色 eyedropper；
+  //   将来克隆子工具活着时 = 定源点）。语义归宿主，本组件只画钮。
+  onPick(): void;
+  getPicking(): boolean;           // 取样态是否活着（钮 aria-pressed）
+  getPickIcon(): string;           // sprite symbol id（context 派生）
+  getPickTitle(): string;
 }
 export interface LeftDialHandle {
   flashSize(): void;              // 外部 [ ] 键盘调粗后闪 popup
@@ -42,6 +50,9 @@ export function mountLeftDial(el: HTMLElement, opts: LeftDialOpts): LeftDialHand
       const sizeMax = computed(() => opts.getSizeMax());
       const brushName = computed(() => opts.getBrushName());
       const canDraw = computed(() => opts.getCanDraw());
+      const picking = computed(() => opts.getPicking());
+      const pickIcon = computed(() => opts.getPickIcon());
+      const pickTitle = computed(() => opts.getPickTitle());
       const sizePos = computed(() => sizeToSliderPos(size.value, sizeMax.value));
       const sizePosMax = computed(() => sliderMaxPos(sizeMax.value));
       const opaPct = computed(() => Math.round(opacity.value * 100));
@@ -95,6 +106,7 @@ export function mountLeftDial(el: HTMLElement, opts: LeftDialOpts): LeftDialHand
       return {
         size, opacity, sizePos, sizePosMax, opaPct, brushName, canDraw, popup,
         sizeSlider, opaSlider, onSizeInput, onOpaInput, brushDown, brushUp, brushClick, L,
+        picking, pickIcon, pickTitle, onPick: () => opts.onPick(),
       };
     },
     template: `
@@ -109,6 +121,11 @@ export function mountLeftDial(el: HTMLElement, opts: LeftDialOpts): LeftDialHand
       <span class="left-sidebar-label" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><use href="#brush-width"/></svg>
       </span>
+      <!-- 2026-09-06 一次性取样钮（两滑条之间，Procreate 修饰键的位置，但用我们的吸管而不是方框；图标随 context 变） -->
+      <button class="left-sidebar-brush left-sidebar-pick" id="leftPick" type="button" :title="pickTitle" :aria-label="pickTitle"
+        :aria-pressed="picking ? 'true' : 'false'" @click="onPick">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><use :href="'#' + pickIcon"/></svg>
+      </button>
       <div class="size-popup" :class="{ hidden: !popup.visible }" :style="{ left: popup.left + 'px', top: popup.top + 'px' }" aria-hidden="true">
         <div class="size-popup-circle-frame">
           <div class="size-popup-circle" :style="{ width: popup.dia + 'px', height: popup.dia + 'px', opacity: popup.opacity }"></div>

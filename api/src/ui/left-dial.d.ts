@@ -9,6 +9,10 @@ export interface LeftDialOpts {
     onOpacity(frac: number): void;
     onBrushTap(): void;
     onBrushLongpress(): void;
+    onPick(): void;
+    getPicking(): boolean;
+    getPickIcon(): string;
+    getPickTitle(): string;
 }
 export interface LeftDialHandle {
     flashSize(): void;

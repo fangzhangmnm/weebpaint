@@ -341,6 +341,16 @@ export function updateLassoToolbar() {
   }
 }
 
+// ---- 一次性取样（2026-09-06 吸色搬家，ADR-0012 §6）----
+//   显式吸色 = 一次性：进 picker，吸一次（input 派 wp:pickdone）自动回**原工具**（旧行为回 brush；从橡皮/填色进来也回它们）。
+//   入口：左栏取样钮 / I 键 / 色板吸管钮（wp:pick-once 事件）；Alt+笔 / 画布长按是临时取色，不进 picker 模式，不经这里。
+let _pickerReturnTool: string | null = null;
+export function isPicking(mode: string): boolean { return mode === "picker"; }
+export function pickOnce(): void {
+  if (editMode.current() === "picker") { setTool(_pickerReturnTool || "brush"); return; }   // 再点 = 取消取样态
+  setTool("picker");
+}
+
 // ---- 工具 ----
 export function setTool(tool: string) {
   // v96：airbrush 工具不存在了。老 doc 持久化里可能存了 "airbrush" → 透明回退到 brush
@@ -362,6 +372,8 @@ export function setTool(tool: string) {
     const tb = document.getElementById("filterBrushToolbar");
     if (tb) tb.classList.add("hidden");
   }
+  // 进 picker 记回程工具（只记持久工具；transient 期间进来就回 brush）
+  if (tool === "picker" && editMode.current() !== "picker") _pickerReturnTool = editMode.isTransient() ? "brush" : editMode.current();
   document.body.dataset.tool = tool;   // 持久工具的 CSS hook（transient 期间保持不变）。
   //   v0.6.26：必须先于 editMode.setTool——modechange 里的组槽同步读它，后写会慢一拍（真机：图标反了）
   editMode.setTool(tool);   // emit wp:modechange → _syncEditModeUI 派生按钮高亮 / lasso 工具栏
@@ -1255,6 +1267,9 @@ export function initToolbar(ctx: AppContext) {
     });
   }
   window.addEventListener("wp:settool", (e: Event) => setTool((e as CustomEvent).detail));
+  // 一次性取样：吸完（input wp:pickdone）回原工具；色板吸管钮 / 其他入口经 wp:pick-once 进取样态
+  window.addEventListener("wp:pickdone", () => { if (editMode.current() === "picker") setTool(_pickerReturnTool || "brush"); });
+  window.addEventListener("wp:pick-once", () => pickOnce());
 
   // v120 删：Shapes 子工具栏（当时判「以后 shapes 改 brush preset 的 toggle 字段」）。
   //   2026-07-25 该判决被推翻：形状笔以独立工具回归（ADR-0005，engine=shape-brush.ts，UI=shapeToolbarStack）。

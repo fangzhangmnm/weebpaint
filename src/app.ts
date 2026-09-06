@@ -14,7 +14,7 @@
 //   currentBrush    ← 不可变 ResolvedBrush（从 dial+预设纯派生，引擎唯一吃）
 
 import { WEEBPAINT_VERSION } from "./version.ts";
-import { initI18n, t, reconcileLangFromPrefs } from "./i18n/index.ts";   // 本地化：<html lang> + 静态 HTML data-i18n 填充
+import { initI18n, t, reconcileLangFromPrefs, tLatin } from "./i18n/index.ts";   // 本地化：<html lang> + 静态 HTML data-i18n 填充
 import { Board } from "./board.ts";
 import { InputController } from "./input.ts";
 import { makeCurrentBrush } from "./resolved-brush.ts";   // 当前笔派生 computed + 引擎桥（手感数学在 resolveBrush，同文件）
@@ -45,7 +45,7 @@ import { initSettingsMenu, applyCheckerboard, renderSettingsFromPrefs } from "./
 import { initReadmePanel } from "./readme-panel.ts";       // 2026-09-02 内置说明书（菜单「帮助」+ #help/<id> 深链）
 import { initPressureToast } from "./pressure-toast.ts";   // 2026-09-02 压感自诊 toast（input.ts 探针 → wp:pressure-doubt）
 import { initFiltersAdjust } from "./filters-adjust.ts";
-import { initToolbar, RACK_PANEL_BY_TOOL } from "./toolbar.ts";
+import { initToolbar, RACK_PANEL_BY_TOOL, pickOnce, isPicking } from "./toolbar.ts";
 import { closePopupMenu } from "./ui/popup-menu.ts";
 import { showNotice } from "./ui/notice.ts";   // 2026-09-02 C7 通知栈   // 2026-09-02 C1：下笔一把关所有 popup（组槽/变体/stepper/主菜单/⋯）
 import { setColor, initColorPanel } from "./color-panel.ts";
@@ -213,6 +213,11 @@ const leftDial = mountLeftDial(els.leftDialMount, {
   onOpacity: (frac) => setOpacity(frac),
   onBrushTap: () => { const id = RACK_PANEL_BY_TOOL[editMode.current()]; if (id) openExclusive(id); },
   onBrushLongpress: () => { const b = rack.findToolBrush(_leftDial()); if (b) { closeExclusive(); rack.openBrushSettings(b.id); } },
+  // 2026-09-06 一次性取样钮（ADR-0012 §6）：context 派生图标——现在只有吸色；克隆子工具落地后 = 定源点（user「仿制图章的时候就是需要变语义吧」）
+  onPick: () => pickOnce(),
+  getPicking: () => isPicking(dialReactive.tool),
+  getPickIcon: () => "eyedropper",
+  getPickTitle: () => tLatin("tool.picker"),
 });
 // 【sunset 2026-08-28】v0.6.15/v0.6.32 的「禁用笔压」全局 toggle（独立按钮 + per-doc desk.pressureDisabled
 //   + input.ts 恒压 0.5 thunk）整条撤除——user 0823 问「笔刷压感toggle还是是否有压感做成不同的笔刷？」

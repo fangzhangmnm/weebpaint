@@ -482,6 +482,11 @@ body[data-mode="gallery"] .left-sidebar { display: none; }
   overflow: hidden;
 }
 .left-sidebar-brush:hover { filter: brightness(0.95); }
+/* 2026-09-06 左栏一次性取样钮：取样态反色（同顶栏工具钮 pressed） */
+.left-sidebar-pick[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.cw-pick { background: transparent; border: 1px solid var(--line); border-radius: 6px; width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--ink); cursor: pointer; flex: none; }
+.cw-pick svg { width: 16px; height: 16px; }
+.cw-pick:hover { background: var(--bg-soft); }
 /* v134 (user：「笔刷名碰到超级长不应变形」) 强制内容不撑父容器 */
 .left-sidebar-brush {
   flex-shrink: 0;

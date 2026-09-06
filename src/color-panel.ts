@@ -91,6 +91,7 @@ export function initColorPanel(ctx: AppContext) {
   colorWheel = mountColorWheel(els.colorPanelBody as HTMLElement, {
     getColor: () => currentPanelColor(),
     onPick: (hex: string) => setColor(hex),
+    onPickRequest: () => window.dispatchEvent(new CustomEvent("wp:pick-once")),   // 2026-09-06 色板吸管钮 → 一次性取样态（toolbar 听）
   });
   els.activeSwatch.addEventListener("click", () => toggleColorPanel());
   setColor(state.color);

@@ -30,6 +30,7 @@
 | 「液化选区进 wishlist，solve laplacian sounds interesting. despite my skeptical of bouncy and singularity, that is fun to explore. SDF is also okay」 | §G wishlist |
 | 「那么就用加权切线吧」（并纠正：反求 Bezier 参数是三次代数方程不是超越方程；烤 LUT 的地方照旧 LUT） | **已落地 v0.13.9**：`anim-curve` inWeight/outWeight + Bezier 段 + 编辑器「加权」钮/方形把手拉长 |
 | 「超越方程是混色那里你抱怨的，考古一下，看 lut 的可能性」 | §H |
+| 09-06 晚「先加吸色按钮吧……用我们的吸管……放两个滑条中间……一次性。按住形式容易误触碰」「仿制图章的时候就是需要变语义吧」 | **已落地 v0.13.12**（ADR-0012 修订节；策划稿 §4 U4） |
 
 ## A. UI 抽象轮（第三轮讨论）：上下文工具条 + 子工具长按 + SE2
 

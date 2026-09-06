@@ -18,14 +18,14 @@ import { hsvToHex, hexToHsv, sameHex } from "./color-model.ts";
 import { parseColorInput, searchColorNames, type ColorNameHit } from "../color-name.ts";
 import { attachInputSense, type InputSenseHandle } from "./input-sense.ts";
 import { attachDragValue, type DragValueHandle } from "./drag-value.ts";
-import { t } from "../i18n/index.ts";
+import { t, tLatin } from "../i18n/index.ts";
 
 export const ColorWheel = defineComponent({
   name: "ColorWheel",
   props: {
     color: { type: String, default: "#000000" },
   },
-  emits: ["pick"],
+  emits: ["pick", "pickRequest"],   // pickRequest（2026-09-06）：色板里的吸管钮 → 宿主进一次性取样态
   setup(props: { color: string }, { emit }: { emit: (e: "pick", hex: string) => void }) {
     const hsv = reactive(hexToHsv(props.color));
     const pad = ref<HTMLCanvasElement | null>(null);
@@ -169,7 +169,7 @@ export const ColorWheel = defineComponent({
     }
 
     // i18n：t() 在 setup 调（key 受 tsc 检查），模板只引 L.*（§5a 纪律）。
-    const L = { svPad: t("cw.svPad"), hue: t("cw.hue") };
+    const L = { svPad: t("cw.svPad"), hue: t("cw.hue"), pick: tLatin("tool.picker") };
     return { pad, hueEl, hueDeg, hsv, hex, hexText, hexInput, onHueKey, onHexKey, onHexBlur, onHexDblClick, L };
   },
   // 多根 = fragment：挂进 .float-panel-body 后三个节点成为它的直接 flex 子节点，
@@ -185,6 +185,9 @@ export const ColorWheel = defineComponent({
       <span class="picker-preview" :style="{ background: hex }"></span>
       <input ref="hexInput" type="text" maxlength="24" :value="hexText" @keydown="onHexKey" @blur="onHexBlur"
         @dblclick="onHexDblClick" aria-label="HEX" />
+      <button class="cw-pick" type="button" :title="L.pick" :aria-label="L.pick" @click="$emit('pickRequest')">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#eyedropper"/></svg>
+      </button>
     </div>
   `,
 });
@@ -198,15 +201,15 @@ export interface ColorWheelHandle {
 
 export function mountColorWheel(
   el: HTMLElement,
-  opts: { getColor: () => string; onPick: (hex: string) => void },
+  opts: { getColor: () => string; onPick: (hex: string) => void; onPickRequest?: () => void },
 ): ColorWheelHandle {
   const color = ref(opts.getColor());
   const app = createApp(defineComponent({
     components: { ColorWheel },
     setup() {
-      return { color, onPick: opts.onPick };
+      return { color, onPick: opts.onPick, onPickRequest: () => opts.onPickRequest?.() };
     },
-    template: `<ColorWheel :color="color" @pick="onPick" />`,
+    template: `<ColorWheel :color="color" @pick="onPick" @pick-request="onPickRequest" />`,
   }));
   app.mount(el);
   return {
