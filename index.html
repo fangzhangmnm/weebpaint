@@ -107,7 +107,7 @@
     <link rel="icon" href="./icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=a8c2373a8ab3" />
+    <link rel="stylesheet" href="./styles.css?v=1725f5b488e4" />
     <!-- zip.js UMD bundle：自挂 window.zip。必须在 module bundle 之前。
          defer（v417）：原来是 parser-blocking 的，硬刷新时 SW 被绕过 → 直奔网络 → 网络一卡整个
          文档解析就停住（浏览器标签页转圈）。defer 后它与下面的 type=module bundle 同属延迟脚本、
@@ -468,6 +468,10 @@
       <!-- #18 全库备份（2026-08-28）：整库文件打成一个 zip 下载；只读，不动库。逻辑 = src/gallery/library-backup.ts -->
       <button class="menu-item menu-item-with-icon" id="galleryMenuBackup" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#download"/></svg>
         <span class="menu-item-label" data-i18n="bk.menuItem">下载全库备份…</span>
+      </button>
+      <!-- 2026-09-06 诊断日志入口进图库菜单（user 晨案：图库卡住时 ☰ dev 页不可达，log 取不出）；同 #menuDiagLog 一张 sheet -->
+      <button class="menu-item menu-item-with-icon" id="galleryMenuDiagLog" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#file"/></svg>
+        <span class="menu-item-label" data-i18n="menu.diagLog">诊断日志…</span>
       </button>
     </div>
 
@@ -1125,6 +1129,8 @@
           <button type="button" id="adjustApply" class="primary" data-i18n="common.apply">应用</button>
         </div>
       </div>
+      <!-- 2026-09-06 整窗可拖大（user「resize curves window」）：只在声明了 onBodyResize 的滤镜（曲线）露出，见 .adjust-panel.resizable -->
+      <div class="float-panel-resize" id="adjustPanelResize" aria-hidden="true"></div>
     </div>
 
     <!-- v110 自由裁切：toolbar (8-handle crop) -->
@@ -1448,6 +1454,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-9574dad06e34.mjs"></script>
+    <script type="module" src="./dist/weebpaint-e67cd01dc232.mjs"></script>
   </body>
 </html>
