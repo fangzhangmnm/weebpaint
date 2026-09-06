@@ -60,13 +60,14 @@ type LassoState =
 //   抬笔经 _applySelectionUpdate 回到本类的选区合成契约。老版本读到 "pen" → beginPath fallthrough 软坏不崩。
 type SubTool = "freehand" | "rect" | "ellipse" | "polygon" | "magic" | "pen";
 type SetOpMode = "new" | "union" | "subtract" | "intersect";
-export type MagicAlgorithm = "classic" | "lineart" | "similar";
+export type MagicAlgorithm = "classic" | "lineart" | "gap" | "similar";   // 2026-09-06 gap = 形态学容隙升成具名算法（handoff 20260906-gap-closing）
 // 魔棒算法下拉的 SSoT（transform 采样 RESAMPLE_MODES 同款）：以后加算法（EDT-Dijkstra/AI）只改这里+引擎分叉
 // v0.7.21 similar=全图同色（user 2026-07-30：「魔术棒但不选 continuous」，批量改色用——
 //   选完直接走 fill 预览换色；容差独立持久化，度量默认 OKLab）
 export const MAGIC_ALGORITHMS: { id: MagicAlgorithm; labelKey: string }[] = [
   { id: "classic", labelKey: "la.algoClassic" },
   { id: "lineart", labelKey: "la.lineartAlgo" },
+  { id: "gap",     labelKey: "la.algoGap" },       // 形态学容隙：笨但可预期，与线稿闭合（论文法，偶尔自作聪明）平级供用户选
   { id: "similar", labelKey: "la.algoSimilar" },
 ];
 
@@ -151,13 +152,13 @@ export class LassoEngine {
   getColorMetric(): ColorMetric { return this._colorMetric; }
   setMagicAutoExpand(px: number) { this._magicAutoExpandPx = Math.max(0, Math.min(100, Math.round(px) || 0)); }
   getMagicAutoExpand() { return this._magicAutoExpandPx; }
-  // v0.7.24 容隙（classic 专属；lineart 自带论文闭合、similar 无连通）：0=关，>0=封宽<gapPx 的缺口
+  // v0.7.24 容隙 px（2026-09-06 起只被 gap 算法读；classic 永远 gapPx=0——toggle 并入具名算法，一个概念一个入口）
   setFillGap(px: number) { this._fillGapPx = Math.max(0, Math.min(32, Math.round(px) || 0)); }
   getFillGap() { return this._fillGapPx; }
   // 魔棒算法（v0.7 线稿填色）：classic=像素精确 flood；lineart=论文分区 oracle（断口自动闭合+填到线下）。
   //   交互完全同构，tap → Selection。v0.7.17 起 per-tool 持久化（desk.lassoTool/fillTool.algo，
   //   toolbar._pushSelToolToEngine 灌入；油漆桶默认 lineart、选区默认 classic，user 拍板）。
-  setMagicAlgorithm(v: MagicAlgorithm) { this._magicAlgorithm = v === "lineart" || v === "similar" ? v : "classic"; }
+  setMagicAlgorithm(v: MagicAlgorithm) { this._magicAlgorithm = v === "lineart" || v === "similar" || v === "gap" ? v : "classic"; }
   getMagicAlgorithm(): MagicAlgorithm { return this._magicAlgorithm; }
   /** 线稿分区缓存是否已就绪（首次 tap 前 UI 可提示「分析线稿中…」） */
   lineartReady(sourceLayer: ViewLeaf | null): boolean {
@@ -418,14 +419,16 @@ export class LassoEngine {
     // v0.7.23（user 2026-07-30）：classic + union 模式下**已选区当墙**——先套索糊一条「临时线」
     //   或先圈邻区，flood 撞选区即停（前线稿时代的缺线止痛；lineart 分区预计算不吃选区、similar
     //   无连通概念，都不参与）。drag 中 doc.selection=orig+accum 预览 → 本笔已选也顺势成墙，语义一致。
-    const stopMask = this._magicAlgorithm === "classic" && this._setOpMode === "union" && this.doc.selection
+    //   2026-09-06：gap（形态学容隙）与 classic 同一条 flood 路，只多一个 gapPx；选区墙同样吃。
+    const floodLike = this._magicAlgorithm === "classic" || this._magicAlgorithm === "gap";
+    const stopMask = floodLike && this._setOpMode === "union" && this.doc.selection
       ? this.doc.selection.bboxMask()
       : null;
     let sel: SelectionLike | null = this._magicAlgorithm === "lineart" && start
       ? this._flatColoringOracle.selectAt(this.doc, sourceLayer, start.x, start.y)
       : this._magicAlgorithm === "similar"
         ? similarSelectFrom(this.doc, start, sourceLayer, this._similarThreshold, this._colorMetric)
-        : floodSelectFrom(this.doc, start, sourceLayer, this._magicThreshold, this._colorMetric, stopMask, this._fillGapPx);
+        : floodSelectFrom(this.doc, start, sourceLayer, this._magicThreshold, this._colorMetric, stopMask, this._magicAlgorithm === "gap" ? this._fillGapPx : 0);
     // #31：可选 flood 后自动扩张（默认关）。在 setOp 合并**之前**做，語义 = 「这一下点出来的区域」本身变胖。
     // v0.7.8：auto-expand 收窄为 classic flood 的子管线 param——线稿分区自带墨线下扩语义，
     // 再叠形态学扩张是双重补偿（UI 侧线稿算法时也藏扩张钮）。

@@ -10,6 +10,10 @@ export interface Filter {
     defaults?(): FilterParams;
     buildBody?(container: HTMLElement, state: unknown, onChange: () => void): void;
     disposeBody?(state: unknown): void;
+    onBodyResize?(state: unknown, avail: {
+        w: number;
+        h: number;
+    }): void;
     supportsLayerGroup?: boolean;
     bake(srcData: Uint8ClampedArray, dstData: Uint8ClampedArray, params: FilterParams, mask: Uint8Array | null, w: number, h: number): void;
     beginBrushStroke?(layers: readonly BrushLayer[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, p: number): ColorBrushState;

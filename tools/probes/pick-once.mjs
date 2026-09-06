@@ -3,7 +3,7 @@
 // 契约：① 顶栏无吸色钮；左栏两滑条之间有 #leftPick（吸管图标）；色板有 .cw-pick；
 //   ② 点 #leftPick → picker 模式、钮 pressed；点画布（白纸）→ 笔色变 #ffffff、自动回 brush、钮不再 pressed；
 //   ③ 从橡皮（E）按 I 进取样、吸一次 → 回**橡皮**（不是 brush）；④ 取样态再点 #leftPick = 取消，回原工具；
-//   ⑤ 色板吸管钮同样进取样态；⑥ Alt+点画布（brush）= 临时吸色，不进 picker 模式。
+//   ⑤ 色板吸管钮同样进取样态；⑥ Alt+点画布（brush）= 临时吸色，不进 picker 模式；⑦ 手指按住钮 = 按住取样、松手回原工具；⑧ 手指短按 = tap。
 import { chromium } from "playwright";
 import { CTX_ZH, startServer, bootPage, makeChecker, evClick } from "../preflight/harness.mjs";
 
@@ -67,6 +67,28 @@ await tapCanvas();
 await page.keyboard.up("Alt");
 const s6 = await st();
 c.expect("Alt+点：仍 brush（临时吸色不切模式）", s6.tool === "brush", s6.tool);
+
+// ⑦ 手指按住取样（2026-09-06 晚 user「侧边的 eyedropper 还是用长按吧……都算 toggle 也可以长按」）：
+//   合成 touch pointerdown 按住钮 → 立刻进 picker；按住期间点画布吸色**不**回工具；松手（pointerup）→ 回原工具。
+const touchOn = (type) => page.evaluate((tp) => {
+  const b = document.getElementById("leftPick");
+  b.dispatchEvent(new PointerEvent(tp, { pointerId: 77, pointerType: "touch", isPrimary: true, bubbles: true, cancelable: true }));
+}, type);
+await page.keyboard.press("e"); await page.waitForTimeout(100);
+await touchOn("pointerdown"); await page.waitForTimeout(50);
+c.expect("手指按下钮 → 立刻 picker（等阈值期间笔落画布不能画出一笔）", (await st()).tool === "picker");
+await page.waitForTimeout(400);
+await tapCanvas();
+c.expect("按住期间吸一次 → 仍 picker（不回工具）", (await st()).tool === "picker", (await st()).tool);
+await tapCanvas();
+c.expect("按住期间再吸一次 → 仍 picker", (await st()).tool === "picker");
+await touchOn("pointerup"); await page.waitForTimeout(100);
+c.expect("松手 → 回原工具（橡皮）", (await st()).tool === "eraser", (await st()).tool);
+// ⑧ 手指短按（<250ms、没吸）= tap：一次性取样态留着；再短按 = 取消
+await touchOn("pointerdown"); await page.waitForTimeout(60); await touchOn("pointerup"); await page.waitForTimeout(100);
+c.expect("手指短按 → 一次性取样态留着", (await st()).tool === "picker", (await st()).tool);
+await touchOn("pointerdown"); await page.waitForTimeout(60); await touchOn("pointerup"); await page.waitForTimeout(100);
+c.expect("取样态再短按 → 取消回橡皮", (await st()).tool === "eraser", (await st()).tool);
 
 await browser.close(); await srv.close();
 c.finish(errors);

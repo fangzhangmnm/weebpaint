@@ -1,6 +1,7 @@
 # 魔棒第三 option「容隙（形态学）」handoff：现有 v0.7.24 容隙内核升级为「细部整块归属」（clean-room，无代码，不急）
 
-> 作者：Claude Fable 5.1（claude-fable-5-1）· created 20260906 · as-of dev v0.13.14 · 状态：**已拍板、不排期**。
+> 作者：Claude Fable 5.1（claude-fable-5-1）· created 20260906 · as-of dev v0.13.14 · 状态：**已落地 dev v0.13.15**（user 2026-09-06「既然我们过去都做的也只差一步了……那么一起做吧」）。
+> 落地记：内核 `_gapFloodMask` 按 §3 重写（膨胀取**严格** < r 的欧氏球——取 ≤ 时缺口口部相切格会把两头接通）；魔棒算法下拉加具名「容隙」(id `gap`)，px stepper 跟它走；**classic 上的 toggle 已并入**（§4 建议合并；`desk.magicWand.fillGap` 字段留在持久化结构不再读，形状不动）——user 若要保留 toggle 一句话可回。测试 `test/gap-flood-morph.test.mjs` 六案 + 2048² 计时。
 > 出处：user 2026-09-06「gap 也记一下，做完另外一个 alternative（= 湿画笔补全 handoff），我们那个算法其实有时候蛮自作聪明的，做魔棒的第三个 option 供用户选择。先不急着做。」
 > clean-room：作者读过 GPL 源码（npainter）故不写代码；**实现者不得阅读 npainter 源码**，本文是唯一输入；`20260906-npainter-water-brush-study.md` §10.1 是出处记录（纯文字），可读。
 

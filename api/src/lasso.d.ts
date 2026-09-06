@@ -33,7 +33,7 @@ type LiftOpts = {
 type LassoState = "idle" | "drawing-freehand" | "drawing-rect" | "drawing-ellipse" | "magic-tentative" | "magic-drag" | "drawing-polygon" | "floating";
 type SubTool = "freehand" | "rect" | "ellipse" | "polygon" | "magic" | "pen";
 type SetOpMode = "new" | "union" | "subtract" | "intersect";
-export type MagicAlgorithm = "classic" | "lineart" | "similar";
+export type MagicAlgorithm = "classic" | "lineart" | "gap" | "similar";
 export declare const MAGIC_ALGORITHMS: {
     id: MagicAlgorithm;
     labelKey: string;

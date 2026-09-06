@@ -58,6 +58,8 @@ export interface Filter {
   buildBody?(container: HTMLElement, state: unknown, onChange: () => void): void;
   // 2026-09-05：面板关闭 / 重置重建前的收口钩（注销 color target、dispose 编辑器等）。没副作用的插件不用实现。
   disposeBody?(state: unknown): void;
+  // 2026-09-06：声明即让调整浮窗可整窗拖大；收 body 可用尺寸（px）自己撑内容（曲线滤镜把绘图区贴满）。
+  onBodyResize?(state: unknown, avail: { w: number; h: number }): void;
   // 能力声明（2026-08-28）：active 是图层组时，本 filter 能不能一次吃下整组的叶？
   //   true  = beginBrushStroke 会收到组内全部叶（含隐藏），自负「所有叶同待遇」的语义（液化=共享位移场）。
   //   缺省/false = 只吃单叶；input 侧照旧硬拒组（st.groupNoDraw）。

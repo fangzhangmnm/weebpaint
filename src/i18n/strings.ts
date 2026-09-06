@@ -365,7 +365,9 @@ export const S = {
   // A2 首帧看门狗（2026-08-31 案：首帧永不来 → loading 空白）
   "gal.retry":             { zh: "重试", en: "Retry", ja: "再試行" },
   "gal.firstFrameTimeout": { zh: "图库读取超时：本地存储没有响应", en: "Gallery listing timed out: local storage did not respond", ja: "ギャラリーの読み込みがタイムアウトしました：ローカルストレージが応答しません" },
-  "gal.firstFrameFailed":  { zh: "图库读取失败（详见 dev 页诊断日志）", en: "Gallery listing failed (see the diagnostic log on the dev tab)", ja: "ギャラリーの読み込みに失敗しました（dev タブの診断ログ参照）" },
+  "gal.firstFrameFailed":  { zh: "图库读取失败（详见诊断日志）", en: "Gallery listing failed (see the diagnostic log)", ja: "ギャラリーの読み込みに失敗しました（診断ログ参照）" },
+  "gal.openDiag":          { zh: "诊断日志", en: "Diagnostic log", ja: "診断ログ" },   // 2026-09-06 卡住态就地开黑匣子
+  "gal.reload":            { zh: "重新载入应用", en: "Reload app", ja: "アプリを再読み込み" },
   "gal.folder":      { zh: "文件夹", en: "Folder", ja: "フォルダ", tok: "poki" },
   "gal.emptyFolder": { zh: "空文件夹", en: "Empty folder", ja: "空のフォルダ", tok: "poki pi jo ala" },
   "gal.more":        { zh: "更多操作", en: "More actions", ja: "その他の操作", tok: "ijo ante" },
@@ -599,6 +601,7 @@ export const S = {
   "la.inkAuto":      { zh: "动态", en: "Auto", ja: "自動", tok: "nasin ilo" },
   "la.algoClassic":  { zh: "像素精确", en: "Pixel-perfect flood", ja: "ピクセル精確", tok: "nasin pi kule sama" },
   "la.lineartAlgo":  { zh: "线稿闭合", en: "Line-art closing", ja: "線画クロージング", tok: "nasin pi linja pini" },
+  "la.algoGap":      { zh: "容隙", en: "Gap-tolerant", ja: "隙間許容", tok: "nasin pi pini lupa" },   // 2026-09-06 形态学容隙升成具名算法（工作名，文案归 user）
   "la.algoSimilar":  { zh: "全图同色", en: "Similar color (global)", ja: "全域同色", tok: "nasin pi kule sama lon ale" },
   "la.metric":       { zh: "色差", en: "Color distance", ja: "色差", tok: "nasin pi ante kule" },
   "la.fillGap":      { zh: "容隙", en: "Close gaps", ja: "隙間とじ", tok: "pini lupa" },
@@ -738,6 +741,8 @@ export const S = {
   "flt.smudge.dull":         { zh: "混色（揉）", en: "Blend (dull)", ja: "色混ぜ（なじませ）" },
   "flt.smudge.paint":        { zh: "带颜料的手指", en: "Wet finger (paint)", ja: "絵の具つき指先" },
   "flt.smudge.dullKnob":     { zh: "揉匀", en: "Dull", ja: "なじませ" },   // 2026-09-05 smear↔dull 连续旋钮
+  "flt.smudge.dilution":     { zh: "稀释", en: "Dilution", ja: "希釈" },   // 2026-09-06 湿画笔补全（带颜料的手指专属）
+  "flt.smudge.memory":       { zh: "记忆", en: "Memory", ja: "記憶" },     // 2026-09-06 湿色记忆长度（直径数）
   // 滤镜笔条下拉的分组标题（折进「…」菜单时显示；2026-09-06 U1）
   "fb.variant":              { zh: "算法", en: "Mode", ja: "モード" },
   "fb.sample":               { zh: "采样", en: "Sampling", ja: "サンプリング" },

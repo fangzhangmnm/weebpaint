@@ -14,6 +14,8 @@
 | 「嗯smear dull连续量。krita的也可以参考」 | smudge-engine `dull` 0..1 连续量（块记忆与平均色记忆同时维护，出料 lerp）；滤镜笔条「揉匀」旋钮（session 态；持久化键要 user 点头） |
 | 「大滤镜笔性能确实不可接受，有模糊的话改回10%?」「模糊锐化自己的地板同意」 | 色彩类滤镜笔（模糊/锐化）自己的间距地板 10%（`COLOR_BRUSH_MIN_SPACING`），不改共享出厂笔 JSON，手指仍 2% |
 
+> **2026-09-06 晚续篇**：墨点案修法 / 时间制 taper / 速度→压感 / 小三角双语义的 grill 稿在 `20260906-grill-taper-time-velocity-and-subtool-ux.md`（§0 已落地，§2–§4 等 user 逐条回复）。
+
 ## 0b. 2026-09-06 grill 拍板（user 逐条回复；本节是决策，其余章节仍是讨论/提案）
 
 | user 原话 | 落成 / 去处 |

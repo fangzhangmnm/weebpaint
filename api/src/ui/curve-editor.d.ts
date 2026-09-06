@@ -47,11 +47,12 @@ export interface CurveEditorOpts {
     keyStep?: number;
     onInput(): void;
     onCommit(): void;
-    onPlotResize?(px: number): void;
 }
 export interface CurveEditorHandle {
     el: HTMLElement;
     setCurve(c: AnimCurve): void;
+    setPlotSize(px: number): void;
+    plotSize(): number;
     redraw(): void;
     selected(): number;
     select(i: number): void;

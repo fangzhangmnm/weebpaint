@@ -3,6 +3,9 @@ import type { AppContext } from "./app-context.ts";
 export declare function updateShapeToolbar(): void;
 export declare function updateLassoToolbar(): void;
 export declare function isPicking(mode: string): boolean;
+export declare function pickHoldBegin(): void;
+export declare function pickHoldEnd(): void;
+export declare function isPickHolding(): boolean;
 export declare function pickOnce(): void;
 export declare function setTool(tool: string): void;
 /** 切到动词（可指定子工具）：写 desk.subTool 记忆，再按表路由到老入口——行为语义零变更。 */

@@ -5,6 +5,15 @@ interface SmudgeBrushState {
 }
 /** "#rrggbb" → straight sRGB 0..1（解析失败 → 黑）。 */
 export declare function parseHexColor(hex: unknown): [number, number, number];
+export declare const PAINT_DEFAULTS: {
+    readonly mode: "paint";
+    readonly colorRate: 0.49;
+    readonly dull: 0.5;
+    readonly dilution: 0.32;
+    readonly memoryLength: 0.085;
+    readonly strengthScale: 0.4;
+};
+export declare const MEMORY_MIN = 0.02, MEMORY_MAX = 2;
 /** 纯函数：variant params + 当前笔（ResolvedBrush 形）+ 图层 → 引擎设置（可单测）。 */
 export declare function smudgeSettingsFrom(params: FilterParams, bs: BrushSettings, layer: {
     lockAlpha?: boolean;
@@ -21,7 +30,7 @@ export declare class SmudgeFilter {
         dull: number;
     };
     static supportsLayerGroup: boolean;
-    static brushVariants: {
+    static brushVariants: ({
         id: string;
         title: string;
         params: {
@@ -29,15 +38,49 @@ export declare class SmudgeFilter {
             colorRate: number;
             dull: number;
         };
-    }[];
-    static brushSliders: {
+    } | {
+        id: string;
+        title: string;
+        params: {
+            mode: "paint";
+            colorRate: 0.49;
+            dull: 0.5;
+            dilution: 0.32;
+            memoryLength: 0.085;
+            strengthScale: 0.4;
+        };
+    })[];
+    static brushSliders: ({
         key: string;
         title: string;
         min: number;
         max: number;
         step: number;
         fmt: (v: number) => string;
-    }[];
+        variants?: undefined;
+        map?: undefined;
+    } | {
+        key: string;
+        title: string;
+        min: number;
+        max: number;
+        step: number;
+        fmt: (v: number) => string;
+        variants: string[];
+        map?: undefined;
+    } | {
+        key: string;
+        title: string;
+        min: number;
+        max: number;
+        step: number;
+        variants: string[];
+        map: {
+            toParam: (v: number) => number;
+            fromParam: (p: number) => number;
+        };
+        fmt: (v: number) => string;
+    })[];
     static mixModes: {
         id: string;
         title: string;

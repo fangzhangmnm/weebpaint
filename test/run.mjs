@@ -107,6 +107,7 @@ import "./selection-tiles.test.mjs";       // S5：gray8 tile 选区底座（布
 import "./pending-fill.test.mjs";         // T4c：PendingFill 组件（预览换色可撤/笔刷色不被 undo 碰）
 import "./persp-component.test.mjs";      // T4d：PerspComponent（doc 变换 remap 记账，信封退役）
 import "./flood-select.test.mjs";
+import "./gap-flood-morph.test.mjs";         // 2026-09-06 容隙形态学内核「细部整块归属」（handoff 20260906-gap-closing）
 import "./flat-coloring-partition.test.mjs";  // 线稿分区管线（论文 Fourey-Tschumperlé-Revoy）：EDT/曲率端点/样条闭合/label map/线下瓜分
 import "./flat-coloring-oracle.test.mjs";     // 线稿 oracle 接缝：tap→Selection + contentRev 缓存失效
 import "./magic-drag.test.mjs";        // 魔棒 drag 连续选：多区累积/跳过已盖点/一笔一 undo/cancel 无痕
@@ -121,6 +122,7 @@ import "./doc-offset.test.mjs";             // 偏移接缝（环绕）：像素
 import "./doc-mergedown-clip.test.mjs";     // v258 剪裁层向下合并（dst-in 裁基底 + 链内保剪裁 + 拒绝反向）
 import "./layer-cap-budget.test.mjs";        // v339 动态字节预算图层上限（预算内放硬顶 / 达预算冻结 / 模式档 countMat）
 import "./brush-collect-stamps.test.mjs";    // Stage 3：brush.collectStamps GPU stamp-list 出栈（复用手感数学 / 椭圆透传 / pixelMode null）
+import "./brush-dwell-pressure.test.mjs";   // 2026-09-06 起笔静止期不积压感（墨点案）
 import "./layer-composite.test.mjs";        // deep module A：clip 基底解析（同级/链共基底/基底隐显/组作基底）
 import "./tile-geometry.test.mjs";          // tile 几何纯函数（自 tile-store.test 迁出）
 import "./gpu-tile-pool.test.mjs";          // S7：GPU tile 池（fake backend；pin 两档/批次/grow/leaky-GPU 对抗）
@@ -164,6 +166,7 @@ import "./pressure-level.test.ts";          // 2026-09-05 压感四档（无/弱
 import "./color-mix.test.ts";               // 2026-09-05 混色空间（srgb / oklab 保色度 / 颜料谱 WGM）
 import "./smudge-engine.test.mjs";          // 2026-09-05 手指/涂抹引擎（smear/dull/paint，premult，夹 doc，选区，lockAlpha）
 import "./smudge-plugin.test.mjs";          // 2026-09-05 手指插件：ResolvedBrush→设置映射 + Filter brush 契约跑一笔
+import "./smudge-wet.test.mjs";              // 2026-09-06 湿画笔补全（稀释/压感反向/多分辨率/记忆解耦；handoff 20260906-wet-brush）
 import "./color-brush-premul.test.mjs";     // 2026-09-05 滤镜笔混回图层末步预乘（模糊黑边残留回归）
 import "./color-brush-spacing.test.mjs";    // 2026-09-05 晚 模糊/锐化间距地板 10%（user「有模糊的话改回10%」；大滤镜笔性能）
 import "./color-brush-wash.test.mjs";       // 2026-09-06 模糊/锐化 wash 幂等：来回描 = 描一遍 / 满覆盖处 = 一次滤波 / 密疏间距同值（议程 §E）

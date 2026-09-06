@@ -32,7 +32,6 @@ function resolveRef<T extends { id?: unknown; name?: unknown }>(list: T[], ref: 
 import { collectFolders } from "./brush-rack-view.ts";
 import { mountRackSheet } from "./ui/rack-sheet.ts";
 import { mountBrushSettings } from "./ui/brush-config-view.ts";
-import { plotSizePref } from "./plugins/curves.ts";
 import { preferences } from "./app-prefs.ts";
 import { exportBrush, exportRackFolder, buildRackCode, shareOrDownloadJSON } from "./brush-io.ts";
 import type { Brush, BrushRackData } from "./brush-types.ts";
@@ -467,7 +466,6 @@ export class BrushRackController {
     // brush-settings 编辑器 Vue 组件
     this._settingsUI = mountBrushSettings(sEls.body, {
       blendModes: this.d.blendModes,
-      curvePlotSize: { get: () => plotSizePref(), set: (px) => preferences.set("curve-plot-size", px) },   // 2026-09-06 压感曲线编辑器尺寸跟机器
       onDelete: () => this.deleteEditingBrush(),
       onExport: () => { if (this._editingDraft) exportBrush(this._editingDraft); },
     });

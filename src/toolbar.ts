@@ -20,7 +20,7 @@ import { resampleItems } from "./frontend/resample-modes.ts";
 import { mountSelectField, type SelectField } from "./ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
 import { t, tLatin } from "./i18n/index.ts";
 import { fillPreviewActive, commitFillNow, sendSelectionToFill } from "./fill-mode.ts";
-import { openAdoptedPopup, toggleAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";
+import { isPopupOpen, openAdoptedPopup, toggleAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";
 import { registerContextToolbar, mountContextToolbar, type ContextToolbarHandle } from "./ui/context-toolbar.ts";
 import { attachSubToolSlot, type SubToolSlotHandle } from "./ui/subtool-slot.ts";   // 2026-09-06 U3 动词位长按子工具
 import { VERB_SUBTOOLS, DEFAULT_SUBTOOL, isVerb, subToolDef, verbOfMode, subToolOfMode, type Verb } from "./common/verbs.ts";   // ADR-0012 动词表   // 2026-09-02 C4：顶栏条登记（让位高度由登记表算）   // 2026-09-02 C1：组槽/配置菜单收养（外点关/Escape/栈/定位归 module）
@@ -290,11 +290,10 @@ export function updateLassoToolbar() {
   const expandApplies = magicOn && algoNow !== "lineart";
   lassoExpandToggle.setAttribute("aria-pressed", desk.magicWand.expand ? "true" : "false");
   if (!expandApplies || !desk.magicWand.expand) closePopupMenuOf(lassoMagicExpandMenu);
-  // v0.7.24 容隙钮：classic 专属（lineart 自带论文闭合、similar 无连通概念）
-  const gapApplies = magicOn && algoNow === "classic";
+  // v0.7.24 容隙钮 → 2026-09-06 只在「容隙」具名算法下显（toggle 语义并入算法选择；钮 = px stepper 入口）
+  const gapApplies = magicOn && algoNow === "gap";
   const gapToggle = document.getElementById("lassoGapToggle");
-  gapToggle?.setAttribute("aria-pressed", desk.magicWand.fillGap ? "true" : "false");
-  if (!gapApplies || !desk.magicWand.fillGap) closePopupMenuOf(document.getElementById("lassoGapMenu"));
+  if (!gapApplies) closePopupMenuOf(document.getElementById("lassoGapMenu"));
   // ⋯ 菜单钮：modal 开着时(_selEdit)恒亮（预览 shrink 到空不能把 modal 撕掉）。
   const showSelEdit = !!_selEdit || (showRow1 && !otherToolSel);
   if (!showSelEdit) closeSelEditUI();
@@ -345,6 +344,26 @@ export function updateLassoToolbar() {
 //   入口：左栏取样钮 / I 键 / 色板吸管钮（wp:pick-once 事件）；Alt+笔 / 画布长按是临时取色，不进 picker 模式，不经这里。
 let _pickerReturnTool: string | null = null;
 export function isPicking(mode: string): boolean { return mode === "picker"; }
+// 2026-09-06 晚 user「侧边的 eyedropper 还是用长按吧，确实有人体工程学考量的……都算 toggle 也可以长按……第二个 less confusing」：
+//   两种手势并存——tap = 一次性取样态（toggle，吸一次自动回）；**手指按住**钮 = 按住期间一直取样（Procreate 修饰键的
+//   双手姿势：一指按钮、笔点画布连吸几次），松手回原工具。鼠标/数位笔单指针没法同时点画布 → 只走 tap。
+//   判定：按下即进取样态（不然按住等阈值期间笔落画布会画出一笔）；松手时若吸过 / 本来就在取样态 / 按了 ≥ PICK_HOLD_MS
+//   → 回原工具；否则（短按没吸）= tap，取样态留着。
+const PICK_HOLD_MS = 250;
+let _pickHold = false, _pickHoldPicked = false, _pickHoldT0 = 0, _pickHoldWasPicking = false;
+export function pickHoldBegin(): void {
+  _pickHoldWasPicking = editMode.current() === "picker";
+  _pickHold = true; _pickHoldPicked = false; _pickHoldT0 = performance.now();
+  if (!_pickHoldWasPicking) setTool("picker");
+}
+export function pickHoldEnd(): void {
+  if (!_pickHold) return;
+  _pickHold = false;
+  if (editMode.current() !== "picker") return;
+  const held = performance.now() - _pickHoldT0 >= PICK_HOLD_MS;
+  if (_pickHoldPicked || _pickHoldWasPicking || held) setTool(_pickerReturnTool || "brush");
+}
+export function isPickHolding(): boolean { return _pickHold; }
 export function pickOnce(): void {
   if (editMode.current() === "picker") { setTool(_pickerReturnTool || "brush"); return; }   // 再点 = 取消取样态
   setTool("picker");
@@ -998,13 +1017,14 @@ export function initToolbar(ctx: AppContext) {
   };
   byId("lassoMagicExpandMinus").addEventListener("click", () => stepMagicExpand(-1));
   byId("lassoMagicExpandPlus").addEventListener("click", () => stepMagicExpand(+1));
-  // v0.7.24 容隙 toggle + px stepper（auto-expand 同款样板；user：两个不同的 knob）。
-  //   引擎只认一个数：effective px = toggle 开 ? fillGapPx : 0。classic 专属（显隐在 updateLassoToolbar）。
+  // v0.7.24 容隙 toggle + px stepper → 2026-09-06 toggle 退役（容隙升成魔棒具名算法「gap」，一个概念一个入口）：
+  //   钮 = px stepper 弹出入口，只在 gap 算法下显；引擎 gapPx 恒 = fillGapPx，classic 路径传 0（lasso.ts 路由）。
+  //   desk.magicWand.fillGap 字段留在持久化结构里不再读（不动持久化形状，家规）。
   const lassoGapToggle = byId("lassoGapToggle");
   const lassoGapMenu = byId("lassoGapMenu");
   const lassoGapVal = byId("lassoGapVal");
   const pushGapToEngine = () => {
-    input.lasso.setFillGap(desk.magicWand.fillGap ? desk.magicWand.fillGapPx : 0);
+    input.lasso.setFillGap(desk.magicWand.fillGapPx);
   };
   const syncGapUI = () => {
     lassoGapVal.textContent = String(desk.magicWand.fillGapPx);
@@ -1013,14 +1033,8 @@ export function initToolbar(ctx: AppContext) {
   };
   lassoGapToggle.addEventListener("click", (e: Event) => {
     e.stopPropagation();
-    desk.magicWand.fillGap = !desk.magicWand.fillGap;
-    pushGapToEngine();
-    if (desk.magicWand.fillGap) {
-      openAdoptedPopup(lassoGapMenu, { anchor: lassoGapToggle, align: "left", offsetY: 6 });
-    } else {
-      closePopupMenuOf(lassoGapMenu);
-    }
-    updateLassoToolbar();
+    if (isPopupOpen(lassoGapMenu)) closePopupMenuOf(lassoGapMenu);
+    else openAdoptedPopup(lassoGapMenu, { anchor: lassoGapToggle, align: "left", offsetY: 6 });
   });
   const stepGap = (d: number) => {
     desk.magicWand.fillGapPx = Math.max(2, Math.min(32, desk.magicWand.fillGapPx + d));
@@ -1265,7 +1279,10 @@ export function initToolbar(ctx: AppContext) {
   }
   window.addEventListener("wp:settool", (e: Event) => setTool((e as CustomEvent).detail));
   // 一次性取样：吸完（input wp:pickdone）回原工具；色板吸管钮 / 其他入口经 wp:pick-once 进取样态
-  window.addEventListener("wp:pickdone", () => { if (editMode.current() === "picker") setTool(_pickerReturnTool || "brush"); });
+  window.addEventListener("wp:pickdone", () => {
+    if (_pickHold) { _pickHoldPicked = true; return; }   // 按住取样：松手才回
+    if (editMode.current() === "picker") setTool(_pickerReturnTool || "brush");
+  });
   window.addEventListener("wp:pick-once", () => pickOnce());
 
   // v120 删：Shapes 子工具栏（当时判「以后 shapes 改 brush preset 的 toggle 字段」）。

@@ -32,7 +32,17 @@ describe("smudge 插件 · 设置映射", () => {
     eq(smudgeSettingsFrom({ mode: "smear" }, { size: 10 }, {}).dull, 0);
     eq(smudgeSettingsFrom({ mode: "smear", dull: 0.3 }, { size: 10 }, {}).dull, 0.3);
     eq(smudgeSettingsFrom({ mode: "dull", dull: 7 }, { size: 10 }, {}).dull, 1);
-    eq(SmudgeFilter.brushSliders.length, 1); eq(SmudgeFilter.brushSliders[0].key, "dull");
+    eq(SmudgeFilter.brushSliders.length, 3); eq(SmudgeFilter.brushSliders[0].key, "dull");
+    // 2026-09-06 湿画笔补全：稀释 / 记忆只在 paint（variants 白名单）；记忆滑杆对数刻度 map 双向可逆
+    const dil = SmudgeFilter.brushSliders.find((s) => s.key === "dilution"), mem = SmudgeFilter.brushSliders.find((s) => s.key === "memoryLength");
+    eq(dil.variants[0], "paint"); eq(mem.variants[0], "paint");
+    assert(Math.abs(mem.map.toParam(mem.map.fromParam(0.085)) - 0.085) < 1e-9, "记忆 map 可逆");
+    const paint = SmudgeFilter.brushVariants.find((v) => v.id === "paint").params;
+    eq(paint.dilution, 0.32); eq(paint.memoryLength, 0.085); eq(paint.colorRate, 0.49); eq(paint.dull, 0.5);
+    const sp = smudgeSettingsFrom(paint, { size: 20, flow: 1, opacity: 0.5 }, {});
+    eq(sp.dilution, 0.32); eq(sp.memoryLength, 0.085); assert(Math.abs(sp.strength - 0.2) < 1e-9, "paint strengthScale 0.4 × 0.5 = 0.2");
+    const ss = smudgeSettingsFrom({ mode: "smear", dilution: 0.9, memoryLength: 1 }, { size: 20 }, {});
+    eq(ss.dilution, 0); eq(ss.memoryLength, 0, "smear 不吃稀释/记忆");
     eq(SmudgeFilter.brushVariants.find((v) => v.id === "dull").params.dull, 1);
   });
   it("parseHexColor：带/不带 #、非法 → 黑", () => {

@@ -32,6 +32,12 @@ export function parseHexColor(hex: unknown): [number, number, number] {
   return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255];
 }
 
+// 带颜料的手指 = 湿画笔（2026-09-06 handoff §4 出厂值；手感数字归 user 钉死区，真机后改）：
+//   colorRate 0.49 / dilution 0.32 / dull 0.5（多分辨率中段）/ 记忆 0.085 直径 / strengthScale 0.4（× 笔架 0.5 ≈ 每 dab 0.2）
+export const PAINT_DEFAULTS = { mode: "paint", colorRate: 0.49, dull: 0.5, dilution: 0.32, memoryLength: 0.085, strengthScale: 0.4 } as const;
+export const MEMORY_MIN = 0.02, MEMORY_MAX = 2;   // 记忆滑杆范围（直径数，对数刻度）
+const log10 = (v: number) => Math.log(v) / Math.LN10;
+
 /** 纯函数：variant params + 当前笔（ResolvedBrush 形）+ 图层 → 引擎设置（可单测）。 */
 export function smudgeSettingsFrom(params: FilterParams, bs: BrushSettings, layer: { lockAlpha?: boolean }): SmudgeSettings {
   const modeRaw = params.mode;
@@ -51,6 +57,9 @@ export function smudgeSettingsFrom(params: FilterParams, bs: BrushSettings, laye
     pressureGamma: num(bs.pressureGamma, 1),
     pressureCurve: bs.pressureCurve == null ? null : sanitizeCurve(bs.pressureCurve),   // 2026-09-05 压感曲线透传
     colorRate: mode === "paint" ? clamp01(num(params.colorRate, 0.5)) : 0,
+    // 2026-09-06 湿画笔补全（handoff §3-B/§3-D；出厂值 §4）：稀释 / 记忆长度只在 paint；smear/dull 不吃（0 = 沿用旧记忆律）
+    dilution: mode === "paint" ? clamp01(num(params.dilution, 0)) : 0,
+    memoryLength: mode === "paint" ? Math.max(MEMORY_MIN, Math.min(MEMORY_MAX, num(params.memoryLength, PAINT_DEFAULTS.memoryLength))) : 0,
     color: parseHexColor(bs.color),
     mix: isMixSpace(params.mix) ? params.mix : "srgb",
     lockAlpha: !!layer.lockAlpha,
@@ -70,11 +79,16 @@ export class SmudgeFilter {
   static brushVariants = [
     { id: "smear", title: tLatin("flt.smudge.smear"), params: { mode: "smear", colorRate: 0, dull: 0 } },
     { id: "dull",  title: tLatin("flt.smudge.dull"),  params: { mode: "dull",  colorRate: 0, dull: 1 } },
-    { id: "paint", title: tLatin("flt.smudge.paint"), params: { mode: "paint", colorRate: 0.5, dull: 0 } },
+    { id: "paint", title: tLatin("flt.smudge.paint"), params: { ...PAINT_DEFAULTS } },
   ];
   // 2026-09-05 user「嗯 smear dull 连续量」：滤镜笔条上的「揉匀」旋钮，0 = 纯搬块 … 1 = 纯揉平均色（值经 params.dull）。
+  // 2026-09-06：稀释 / 记忆只在 paint variant（variants 白名单）；记忆滑杆对数刻度（slider 值 = log10(直径数)，map 双向换）。
   static brushSliders = [
     { key: "dull", title: tLatin("flt.smudge.dullKnob"), min: 0, max: 1, step: 0.05, fmt: (v: number) => `${Math.round(v * 100)}%` },
+    { key: "dilution", title: tLatin("flt.smudge.dilution"), min: 0, max: 1, step: 0.05, fmt: (v: number) => `${Math.round(v * 100)}%`, variants: ["paint"] },
+    { key: "memoryLength", title: tLatin("flt.smudge.memory"), min: log10(MEMORY_MIN), max: log10(MEMORY_MAX), step: 0.05, variants: ["paint"],
+      map: { toParam: (v: number) => Math.pow(10, v), fromParam: (p: number) => log10(Math.max(MEMORY_MIN, Math.min(MEMORY_MAX, p))) },
+      fmt: (v: number) => (v >= 1 ? `${v.toFixed(1)}D` : `${v.toFixed(2)}D`) },
   ];
   // 混色空间（filters-adjust 通用渲染第 2 个下拉；值经 params.mix 透传，持久化 preferences "smudge-mix"）
   static mixModes = [

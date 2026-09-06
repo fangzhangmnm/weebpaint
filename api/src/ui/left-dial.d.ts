@@ -10,6 +10,8 @@ export interface LeftDialOpts {
     onBrushTap(): void;
     onBrushLongpress(): void;
     onPick(): void;
+    onPickHoldStart(): void;
+    onPickHoldEnd(): void;
     getPicking(): boolean;
     getPickIcon(): string;
     getPickTitle(): string;

@@ -35,6 +35,7 @@ import { importImageAsNewDoc } from "../import-image.ts";
 import { createFrameGate } from "./frame-gate.ts";
 import { naturalCompare } from "./natural-order.ts";
 import { reportError } from "../error-badge.ts";
+import { openDiagLogSheet } from "../diag-log-sheet.ts";   // 2026-09-06 卡住态就地开黑匣子
 import { createFirstFrameWatchdog } from "./first-frame-watchdog.ts";   // A2（2026-08-31 案）：首帧看门狗
 import { note as diagNote } from "../diag-log.ts";                        // 面包屑：订阅/首帧/超时进黑匣子
 // 加密（ADR-0012）：tile 锁样式 + 解锁浏览；transform/密码循环全在 store（flow.encrypt/decrypt +
@@ -335,7 +336,9 @@ function makeGallery(host: GalleryHost) {
       const wd = createFirstFrameWatchdog(({ folder: f, elapsedMs }) => {
         if (!loading.value) return;               // 帧其实到了（竞态）→ 无事
         stalled.value = t("gal.firstFrameTimeout");
-        reportError(new Error(`[gallery] first frame timeout: folder="${f}" after ${elapsedMs}ms (store listing did not respond — IDB wedged?)`), "warning");
+        // 2026-09-06 晨案复发（user：起床后同样的丢 gallery，重启自愈）：带上根因分析要的上下文（可见性 / 在线 / 独立窗）
+        const standalone = matchMedia("(display-mode: standalone)").matches;
+        reportError(new Error(`[gallery] first frame timeout: folder="${f}" after ${elapsedMs}ms (store listing did not respond — IDB wedged?) visibility=${document.visibilityState} online=${navigator.onLine} standalone=${standalone}`), "warning");
       }, { timeoutMs: 8000 });
       function onFrameError(err: unknown, phase: "local" | "remote"): void {
         diagNote("gallery", `frame error phase=${phase} folder="${folder.value}" loading=${loading.value}: ${String(err)}`);
@@ -347,6 +350,10 @@ function makeGallery(host: GalleryHost) {
         _framedFolder = null;                     // 强制走 loading 首帧路（重新武装看门狗 + 显 loading）
         subscribe();
       }
+      // 2026-09-06：卡住态就地给两条出路——看黑匣子（以前只在 ☰ dev 页，图库模式下顶栏整条被藏，取不出 log）；
+      //   重新载入（user 实测「重启之后自愈」；黑匣子住 localStorage，reload 前 pagehide flush，日志不丢）。
+      function openDiag(): void { diagNote("gallery", "open diag log from stalled grid"); openDiagLogSheet(); }
+      function reloadApp(): void { diagNote("gallery", `reload from stalled grid folder="${folder.value}"`); location.reload(); }
       function subscribe() {
         _unsub?.(); _unsub = null;
         if (view.value !== "files") return;
@@ -772,10 +779,10 @@ function makeGallery(host: GalleryHost) {
         pushCloud: t("gal.pushCloud"), unloadLocal: t("gal.unloadLocal"), encrypt: t("menu.encrypt"), decrypt: t("menu.decrypt"),
         toTrash: t("gal.toTrash"), deleted: t("gal.deleted"), restore: t("gal.restore"), purge: t("gal.purge"),
         reupload: t("gal.reupload"), imageFile: t("gal.imageFile"), otherFile: t("gal.otherFile"),
-        retry: t("gal.retry"),
+        retry: t("gal.retry"), openDiag: t("gal.openDiag"), reload: t("gal.reload"),
       };
       return {
-        view, folder, loading, stalled, retry, openMenu, isEmpty, emptyText, L,
+        view, folder, loading, stalled, retry, openDiag, reloadApp, openMenu, isEmpty, emptyText, L,
         folderTiles, fileTiles, imageTiles, otherTiles, trashTiles, crumbs,
         badgeIcon, fmtMeta, ICON, toggleMenu, menuUp, invalidateEncrypted, setFolder, hydrateFolder, enterFolder,
         openTile, openImageTile, deleteImage, rename, move, copy, push, reupload, unload, del, folderDelete, trashRestore, trashPurge, emptyTrash,
@@ -796,7 +803,11 @@ function makeGallery(host: GalleryHost) {
           <template v-if="!stalled">{{ L.loading }}</template>
           <template v-else>
             <div class="gallery-stalled">{{ stalled }}</div>
-            <button type="button" class="sheet-action ghost gallery-retry-btn" @click="retry">{{ L.retry }}</button>
+            <div class="gallery-stalled-actions">
+              <button type="button" class="sheet-action ghost gallery-retry-btn" @click="retry">{{ L.retry }}</button>
+              <button type="button" class="sheet-action ghost" @click="openDiag">{{ L.openDiag }}</button>
+              <button type="button" class="sheet-action ghost" @click="reloadApp">{{ L.reload }}</button>
+            </div>
           </template>
         </div>
 

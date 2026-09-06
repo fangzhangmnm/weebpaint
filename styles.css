@@ -1752,6 +1752,11 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
   box-shadow: var(--shadow);
   display: flex; flex-direction: column;
 }
+/* 2026-09-06 整窗 grip：只有声明 onBodyResize 的滤镜（曲线）露；其余滤镜内容定高，拖大无意义 */
+.adjust-panel .float-panel-resize { display: none; }
+/* 2026-09-06 图库卡住态三钮（重试 / 诊断日志 / 重新载入） */
+.gallery-stalled-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.adjust-panel.resizable .float-panel-resize { display: block; }
 /* 排版紧凑（2026-08-19 user）：标签列 6.4em（=76px@12px；em 随字号缩放，user 拍板）。
    宽度地板 = コントラスト / ボケ ⟷ 鮮鋭 / 模糊 ⟷ 锐化 三条 72px（playwright 实测），
    其余标签已按语言缩写（cb 三轴 en/ja=CMY/RGB 单字母，v0.9.10）；长说明走 section title 整行。
@@ -1807,7 +1812,7 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
 .curve-editor { display: flex; flex-direction: column; gap: 6px; outline: none; user-select: none; -webkit-user-select: none; }
 .curve-editor:focus-visible .ce-plot { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
 .ce-plot {
-  position: relative; width: 200px; height: 200px;   /* 边长由 curve-editor inline 写（默认 200，grip 可拖）；这里只是兜底 */
+  position: relative; width: 200px; height: 200px;   /* 边长由 curve-editor inline 写（默认 200，宿主 setPlotSize 改）；这里只是兜底 */
   margin: 8px auto;                        /* 居中；端点键半径露出 plot 边界，留白别裁 */
   border: 1px solid var(--line); border-radius: 4px;
   background: var(--bg-soft);
@@ -1835,19 +1840,6 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
 }
 .ce-knob::before { content: ""; position: absolute; inset: -8px; border-radius: 50%; }   /* 命中面 32px */
 .ce-knob.weighted { border-radius: 3px; }   /* 加权把手钮 = 方形（Unity 同款区分），拖它同时改斜率与长度 */
-/* 右下角 grip（沿 .float-panel-resize 家族斜纹，裁成三角）：拖拽改绘图区边长 */
-.ce-grip {
-  position: absolute; right: 0; bottom: 0; width: 19px; height: 19px; z-index: 2;
-  cursor: nwse-resize; touch-action: none;
-  color: var(--ink); opacity: 0.85;
-  background: color-mix(in srgb, var(--bg) 72%, transparent);
-  clip-path: polygon(100% 0, 100% 100%, 0 100%);
-  transition: opacity 0.35s;
-}
-.ce-grip::after {
-  content: ""; position: absolute; inset: 0;
-  background: linear-gradient(135deg, transparent 0 58%, currentColor 58% 65%, transparent 65% 79%, currentColor 79% 86%, transparent 86%);
-}
 /* gizmo 落左上角：右上角 (1,1) 是恒等曲线的末端键，放那儿会盖住键（截图实测）。 */
 .ce-gizmos { position: absolute; top: 4px; left: 4px; z-index: 3; display: flex; gap: 4px; transition: opacity 0.35s; }
 .ce-gizmo {
@@ -1858,8 +1850,8 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
 .ce-gizmo svg { width: 16px; height: 16px; pointer-events: none; }
 .ce-gizmo:hover { background: color-mix(in srgb, var(--bg) 90%, transparent); }
 .ce-gizmo:disabled { opacity: 0.3; cursor: default; }
-.curve-editor.idle .ce-gizmos, .curve-editor.idle .ce-grip { opacity: 0.35; }
-.curve-editor.away .ce-gizmos, .curve-editor.away .ce-grip { opacity: 0; }
+.curve-editor.idle .ce-gizmos { opacity: 0.35; }
+.curve-editor.away .ce-gizmos { opacity: 0; }
 .ce-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink); min-height: 22px; }
 .ce-row-readout { justify-content: flex-end; color: var(--ink-soft); font-variant-numeric: tabular-nums; min-height: 16px; }
 .ce-label { color: var(--ink-soft); }

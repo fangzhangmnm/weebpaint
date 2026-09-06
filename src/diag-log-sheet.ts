@@ -11,6 +11,10 @@ import { openSheet, closeSheet } from "./ui/sheet.ts";   // 2026-09-02 C3
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement | null;
 
+// 2026-09-06：图库侧入口（图库菜单项 + 卡住态钮）。图库模式下 ☰ 整条被藏 → 以前 log 取不出（user 晨案）。
+let _open: (() => void) | null = null;
+export function openDiagLogSheet(): void { _open?.(); }
+
 export function initDiagLogSheet(deps: { status: (msg: string, persist?: boolean) => void }): void {
   const btn = $("menuDiagLog"), sheet = $("diagLogSheet"),
     pre = $("diagLogText"), hint = $("diagLogHint"), copyBtn = $("diagLogCopy"), clearBtn = $("diagLogClear"), closeBtn = $("diagLogClose");
@@ -23,6 +27,7 @@ export function initDiagLogSheet(deps: { status: (msg: string, persist?: boolean
     pre!.scrollTop = pre!.scrollHeight;   // 最新在底
   }
   function open(): void { setMenuOpen(false); render(); openSheet(sheet!); }
+  _open = open;
   function close(): void { closeSheet(sheet!); }
 
   async function copy(): Promise<void> {

@@ -45,7 +45,7 @@ import { initSettingsMenu, applyCheckerboard, renderSettingsFromPrefs } from "./
 import { initReadmePanel } from "./readme-panel.ts";       // 2026-09-02 内置说明书（菜单「帮助」+ #help/<id> 深链）
 import { initPressureToast } from "./pressure-toast.ts";   // 2026-09-02 压感自诊 toast（input.ts 探针 → wp:pressure-doubt）
 import { initFiltersAdjust } from "./filters-adjust.ts";
-import { initToolbar, RACK_PANEL_BY_TOOL, pickOnce, isPicking } from "./toolbar.ts";
+import { initToolbar, RACK_PANEL_BY_TOOL, pickOnce, pickHoldBegin, pickHoldEnd, isPicking } from "./toolbar.ts";
 import { closePopupMenu } from "./ui/popup-menu.ts";
 import { showNotice } from "./ui/notice.ts";   // 2026-09-02 C7 通知栈   // 2026-09-02 C1：下笔一把关所有 popup（组槽/变体/stepper/主菜单/⋯）
 import { setColor, initColorPanel } from "./color-panel.ts";
@@ -215,6 +215,8 @@ const leftDial = mountLeftDial(els.leftDialMount, {
   onBrushLongpress: () => { const b = rack.findToolBrush(_leftDial()); if (b) { closeExclusive(); rack.openBrushSettings(b.id); } },
   // 2026-09-06 一次性取样钮（ADR-0012 §6）：context 派生图标——现在只有吸色；克隆子工具落地后 = 定源点（user「仿制图章的时候就是需要变语义吧」）
   onPick: () => pickOnce(),
+  onPickHoldStart: () => pickHoldBegin(),
+  onPickHoldEnd: () => pickHoldEnd(),
   getPicking: () => isPicking(dialReactive.tool),
   getPickIcon: () => "eyedropper",
   getPickTitle: () => tLatin("tool.picker"),

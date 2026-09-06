@@ -31,6 +31,10 @@ export interface LeftDialOpts {
   //   一次性取样钮——tap 进取样态，取一次自动回原工具；图标/标题随 context 变（现在 = 吸色 eyedropper；
   //   将来克隆子工具活着时 = 定源点）。语义归宿主，本组件只画钮。
   onPick(): void;
+  // 2026-09-06 晚 按住取样（user「侧边的 eyedropper 还是用长按吧……都算 toggle 也可以长按」）：手指按下 → Start，松手 → End；
+  //   期间用笔点画布连吸；语义（进/回哪个工具、短按当 tap）全归宿主 toolbar.pickHoldBegin/End。鼠标/笔只走 onPick（click）。
+  onPickHoldStart(): void;
+  onPickHoldEnd(): void;
   getPicking(): boolean;           // 取样态是否活着（钮 aria-pressed）
   getPickIcon(): string;           // sprite symbol id（context 派生）
   getPickTitle(): string;
@@ -101,12 +105,19 @@ export function mountLeftDial(el: HTMLElement, opts: LeftDialOpts): LeftDialHand
       function brushUp() { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } }
       function brushClick() { if (lpFired) { lpFired = false; return; } opts.onBrushTap(); }
 
+      // 取样钮：手指 pointerdown/up = 按住取样（宿主判短按=tap）；之后的 click 吞掉；鼠标/笔 click = 一次性 toggle
+      let pickTouch = false;
+      let pickClickMuteUntil = 0;
+      function pickDown(e: PointerEvent) { if (e.pointerType !== "touch") return; pickTouch = true; opts.onPickHoldStart(); }
+      function pickUp() { if (!pickTouch) return; pickTouch = false; pickClickMuteUntil = performance.now() + 500; opts.onPickHoldEnd(); }
+      function pickClick() { if (performance.now() < pickClickMuteUntil) return; opts.onPick(); }
+
       // i18n：t() 在 setup 调（§5a），模板引 L.*。
       const L = { brush: t("ld.brush"), size: t("ld.size"), opacity: t("ld.opacity") };
       return {
         size, opacity, sizePos, sizePosMax, opaPct, brushName, canDraw, popup,
         sizeSlider, opaSlider, onSizeInput, onOpaInput, brushDown, brushUp, brushClick, L,
-        picking, pickIcon, pickTitle, onPick: () => opts.onPick(),
+        picking, pickIcon, pickTitle, pickDown, pickUp, pickClick,
       };
     },
     template: `
@@ -123,7 +134,7 @@ export function mountLeftDial(el: HTMLElement, opts: LeftDialOpts): LeftDialHand
       </span>
       <!-- 2026-09-06 一次性取样钮（两滑条之间，Procreate 修饰键的位置，但用我们的吸管而不是方框；图标随 context 变） -->
       <button class="left-sidebar-brush left-sidebar-pick" id="leftPick" type="button" :title="pickTitle" :aria-label="pickTitle"
-        :aria-pressed="picking ? 'true' : 'false'" @click="onPick">
+        :aria-pressed="picking ? 'true' : 'false'" @pointerdown="pickDown" @pointerup="pickUp" @pointercancel="pickUp" @click="pickClick">
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><use :href="'#' + pickIcon"/></svg>
       </button>
       <div class="size-popup" :class="{ hidden: !popup.visible }" :style="{ left: popup.left + 'px', top: popup.top + 'px' }" aria-hidden="true">

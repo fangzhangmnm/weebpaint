@@ -1783,9 +1783,19 @@ export declare const S: {
         readonly ja: "ギャラリーの読み込みがタイムアウトしました：ローカルストレージが応答しません";
     };
     readonly "gal.firstFrameFailed": {
-        readonly zh: "图库读取失败（详见 dev 页诊断日志）";
-        readonly en: "Gallery listing failed (see the diagnostic log on the dev tab)";
-        readonly ja: "ギャラリーの読み込みに失敗しました（dev タブの診断ログ参照）";
+        readonly zh: "图库读取失败（详见诊断日志）";
+        readonly en: "Gallery listing failed (see the diagnostic log)";
+        readonly ja: "ギャラリーの読み込みに失敗しました（診断ログ参照）";
+    };
+    readonly "gal.openDiag": {
+        readonly zh: "诊断日志";
+        readonly en: "Diagnostic log";
+        readonly ja: "診断ログ";
+    };
+    readonly "gal.reload": {
+        readonly zh: "重新载入应用";
+        readonly en: "Reload app";
+        readonly ja: "アプリを再読み込み";
     };
     readonly "gal.folder": {
         readonly zh: "文件夹";
@@ -3101,6 +3111,12 @@ export declare const S: {
         readonly ja: "線画クロージング";
         readonly tok: "nasin pi linja pini";
     };
+    readonly "la.algoGap": {
+        readonly zh: "容隙";
+        readonly en: "Gap-tolerant";
+        readonly ja: "隙間許容";
+        readonly tok: "nasin pi pini lupa";
+    };
     readonly "la.algoSimilar": {
         readonly zh: "全图同色";
         readonly en: "Similar color (global)";
@@ -3863,6 +3879,16 @@ export declare const S: {
         readonly zh: "揉匀";
         readonly en: "Dull";
         readonly ja: "なじませ";
+    };
+    readonly "flt.smudge.dilution": {
+        readonly zh: "稀释";
+        readonly en: "Dilution";
+        readonly ja: "希釈";
+    };
+    readonly "flt.smudge.memory": {
+        readonly zh: "记忆";
+        readonly en: "Memory";
+        readonly ja: "記憶";
     };
     readonly "fb.variant": {
         readonly zh: "算法";

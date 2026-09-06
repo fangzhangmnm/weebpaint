@@ -7,8 +7,4 @@ export declare function mountBrushSettings(el: HTMLElement, opts: {
     blendModes: Record<string, string>;
     onDelete: () => void;
     onExport: () => void;
-    curvePlotSize?: {
-        get(): number;
-        set(px: number): void;
-    };
 }): BrushSettingsHandle;

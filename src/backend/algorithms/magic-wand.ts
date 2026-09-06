@@ -1,7 +1,7 @@
 // 魔棒算法内核（C3 从 lasso.ts 析出；窄 I/O：像素平面进 → gray8 region 出，零 Selection/UI 知识）。
 // 三个算法（同一 makeSeedDist 判据族，行为逐字保留 v242 起的历史语义——出口包装在 lasso.ts）：
 //   - floodRegionFrom：四连通泛洪（贴 AA 边缘半透明处停，不 bake 膨胀）
-//   - 容隙（gapPx>0）：EDT 受限 flood + 回贴膨胀 = 形态学闭（v0.7.24）
+//   - 容隙（gapPx>0）：形态学开运算切主体/细部，细部整块归属种子侧（v0.7.24 立，2026-09-06 升级）
 //   - similarRegionFrom：同色全图（同判据不要求连通，v0.7.21）
 //
 // 经典 bug（v66 + v69 又犯）：iteration 局限在 layer.bbox 内 → 点空白只选到 bbox 矩形。
@@ -102,7 +102,7 @@ export function floodRegionFrom(
   const startIdx = sx + sy * docW;
   if (isBarrier(startIdx)) return null;
 
-  // v0.7.24 容隙：EDT 受限 flood 的形态学闭——不是 v71 的 barrier dilate（会盖死 tap 点）。
+  // v0.7.24 容隙（2026-09-06 升级为「细部整块归属」，见 _gapFloodMask 头注释）——不是 v71 的 barrier dilate（会盖死 tap 点）。
   if (gapPx > 0) {
     const mark = _gapFloodMask(docW, docH, startIdx, gapPx, isBarrier);
     if (mark) {
@@ -138,11 +138,16 @@ export function floodRegionFrom(
   return markToRegion(combined, docW, mnx, mny, mxx, mxy);
 }
 
-// ---- 容隙内核（v0.7.24）：EDT 受限 flood + 回贴膨胀 = 形态学闭，种子口袋接种防 tap 哑 ----
-// r=gapPx/2。core=离 barrier ≥r 的开阔像素；flood 只走 core（宽 <gapPx 的缺口/走廊过不去）；
-// 结果沿非 barrier 膨胀 r 步回贴墨线（把被 core 腐蚀掉的贴线余量补回来，缺口口部圆角封住）。
-// tap 点不在 core（画师爱贴线点，v71 教训）→ 先 ≤r 步口袋 BFS 找 core 接种；摸不到 → 返 null
-// 让调用方降级普通 flood。O(N)×4 遍 + EDT，2048² 实测百 ms 级（worker 化在 parked 单）。
+// ---- 容隙内核（v0.7.24 立；2026-09-06 升级「细部整块归属」，handoff ai-docs/20260906-gap-closing-morphological-handoff.md §3）----
+// 形态学开运算切分主体与细部：r = gapPx/2；N = 非 barrier；E = N 中离 barrier ≥ r（腐蚀核，Meijster 精确 EDT）；
+// O = E 沿欧氏球 < r 膨胀（开运算；对全图所有 E 连通块做，不只种子那块）；T = N \ O = 细部（宽 < 2r 的通道、比圆盘尖的角、
+// 细颈、缺口口部）。结果 = 种子所在的 O 连通块 ∪ 所有贴着它的 T 连通块（整块，不管多长——发梢填到尖端、走廊归先点的一侧），
+// 绝不进入别的 O 连通块（缺口另一边的房间永远不漏）。
+// 膨胀取**严格** < r：erosion 取 ≥ r、dilation 取 < r 才是连续开运算的离散对应——缺口口部离房间 E 恰好 r 的那一格是相切点，
+// 取 ≤ 会把缺口两头各补一格接通（2 px 厚的墙留 3 px 缺口 r=3 就漏）。
+// 旧版（v0.7.24）第 ③ 步只沿非 barrier 回贴膨胀 r 步，于是比 r 长的细尖填不到头、走廊只进 r 像素、缺口只填到中线。
+// 种子在 T（画师爱贴线点，v71 教训）→ ≤ceil(r) 步口袋 BFS 找 O 接种；摸不到 / 全图无 E → 返 null 让调用方降级普通 flood。
+// O(N)：两次 EDT + 一次 flood；2048² 百 ms 级（worker 化在 parked 单）。
 function _gapFloodMask(
   docW: number, docH: number, startIdx: number, gapPx: number,
   isBarrier: (p: number) => boolean,
@@ -154,7 +159,6 @@ function _gapFloodMask(
   const r = gapPx / 2;
   const r2 = r * r;
   const rCeil = Math.ceil(r);
-  // 4 邻枚举（三处 BFS/flood 共用）
   const forNeighbors = (p: number, fn: (q: number) => void) => {
     const px = p % docW, py = (p - px) / docW;
     if (px > 0) fn(p - 1);
@@ -162,51 +166,42 @@ function _gapFloodMask(
     if (py > 0) fn(p - docW);
     if (py < docH - 1) fn(p + docW);
   };
-  // ① 种子口袋：≤rCeil 步 BFS 找 core 接种点（种子本身是 core 则直接开花）
-  const coreSeeds: number[] = [];
-  if (edt2[startIdx] >= r2) coreSeeds.push(startIdx);
+  // ① E（腐蚀核）→ O（开运算：离 E 严格 < r 的非 barrier 像素）
+  const E = new Uint8Array(total);
+  let anyE = false;
+  for (let p = 0; p < total; p++) if (!bar[p] && edt2[p] >= r2) { E[p] = 1; anyE = true; }
+  if (!anyE) return null;   // 整图没有开阔区（r 大于一切房间半宽）→ 调用方降级普通 flood
+  const edtE2 = edtSquared(E, docW, docH);
+  const inO = new Uint8Array(total);
+  for (let p = 0; p < total; p++) if (!bar[p] && edtE2[p] < r2) inO[p] = 1;
+  // ② 种子：在 O 里直接开花；在 T 里 → ≤rCeil 步口袋 BFS 找 O 接种；摸不到 → null 降级
+  const seeds: number[] = [];
+  if (inO[startIdx]) seeds.push(startIdx);
   else {
     const seen = new Uint8Array(total);
     seen[startIdx] = 1;
     let frontier = [startIdx];
-    for (let depth = 0; depth < rCeil && frontier.length && !coreSeeds.length; depth++) {
+    for (let depth = 0; depth < rCeil && frontier.length && !seeds.length; depth++) {
       const next: number[] = [];
       for (const p of frontier) forNeighbors(p, (q) => {
         if (seen[q] || bar[q]) return;
         seen[q] = 1;
-        if (edt2[q] >= r2) coreSeeds.push(q);
+        if (inO[q]) seeds.push(q);
         next.push(q);
       });
       frontier = next;
     }
-    if (!coreSeeds.length) return null;   // 可达区整个窄于 r → 调用方降级
+    if (!seeds.length) return null;
   }
-  // ② core flood（1=入选 2=拒过）
+  // ③ flood：O 内自由走（可进 T）；T 只进不出（从 T 只能继续走 T）→ 种子的 O 连通块 ∪ 贴着它的 T 连通块整块
   const mark = new Uint8Array(total);
-  const stack = coreSeeds.slice();
+  const stack = seeds.slice();
   while (stack.length) {
     const p = stack.pop()!;
-    if (mark[p] !== 0) continue;
-    if (bar[p] || edt2[p] < r2) { mark[p] = 2; continue; }
+    if (mark[p]) continue;
     mark[p] = 1;
-    forNeighbors(p, (q) => { if (mark[q] === 0) stack.push(q); });
-  }
-  // ③ 回贴膨胀 rCeil 步（4 邻曼哈顿球，保守不越缺口中线太多）：从选中边界起，走非 barrier
-  let frontier: number[] = [];
-  for (let p = 0; p < total; p++) {
-    if (mark[p] !== 1) continue;
-    let border = false;
-    forNeighbors(p, (q) => { if (mark[q] !== 1 && !bar[q]) border = true; });
-    if (border) frontier.push(p);
-  }
-  for (let depth = 0; depth < rCeil && frontier.length; depth++) {
-    const next: number[] = [];
-    for (const p of frontier) forNeighbors(p, (q) => {
-      if (mark[q] === 1 || bar[q]) return;
-      mark[q] = 1;
-      next.push(q);
-    });
-    frontier = next;
+    const fromO = inO[p] === 1;
+    forNeighbors(p, (q) => { if (mark[q] || bar[q]) return; if (fromO || !inO[q]) stack.push(q); });
   }
   return mark;
 }

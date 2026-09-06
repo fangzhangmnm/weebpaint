@@ -23,6 +23,8 @@ export interface SmudgeSettings {
     pressureGamma: number;
     pressureCurve?: AnimCurve | null;
     colorRate: number;
+    dilution?: number;
+    memoryLength?: number;
     color: readonly [number, number, number];
     mix: MixSpace;
     lockAlpha: boolean;
@@ -37,6 +39,7 @@ export declare class SmudgeEngine {
     flushDirty(): Rect | null;
     private _radius;
     private _dab;
+    private _multiRes;
     private _weightedAverage;
 }
 export {};

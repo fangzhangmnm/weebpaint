@@ -13,14 +13,14 @@ describe("diag-log · 环形诊断日志", () => {
     eq(es[0].l, "error"); eq(es[0].m, "boom");
     eq(es[1].l, "note"); eq(es[1].m, "[gallery] subscribe folder=\"\"");
   });
-  it("环满 300 丢最旧；单条截 600 字符", () => {
+  it("环满 500 丢最旧（2026-09-06 300→500：过夜面包屑别把事故顶出环）；单条截 600 字符", () => {
     clear();
-    for (let i = 0; i < 305; i++) record("log", "m" + i);
+    for (let i = 0; i < 505; i++) record("log", "m" + i);
     const es = entries();
-    eq(es.length, 300);
+    eq(es.length, 500);
     eq(es[0].m, "m5", "最旧五条被丢");
     record("log", "x".repeat(2000));
-    eq(entries()[299].m.length, 600);
+    eq(entries()[499].m.length, 600);
   });
   it("toText：环境头 + 分隔 + 每条一行；清空后 (empty)", () => {
     clear();

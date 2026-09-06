@@ -34,12 +34,13 @@ interface FilterLike {
   defaults(): Record<string, unknown>;
   buildBody(body: HTMLElement, state: unknown, onChange: () => void): void;
   disposeBody?(state: unknown): void;   // 2026-09-05：关面板 / 重置重建前收口（渐变映射注销 color target）
+  onBodyResize?(state: unknown, avail: { w: number; h: number }): void;   // 2026-09-06：声明 = 调整浮窗露右下角 grip；整窗拖大时收 body 可用尺寸（曲线滤镜贴满绘图区）
   bake(src: Uint8ClampedArray, out: Uint8ClampedArray, params: unknown, mask: Uint8Array | null, w: number, h: number): void;
   brushVariants?: { id: string; title: string; params: Record<string, unknown> }[];
   boundaryModes?: { id: string; title: string }[];
   sampleModes?: boolean;   // v0.6.36：声明即渲染采样核下拉（液化；选项 = RESAMPLE_MODES 的 liquify context）
   mixModes?: { id: string; title: string }[];   // 2026-09-05：混色空间下拉（手指 smudge 声明；值经 params.mix，持久化 preferences "smudge-mix"）
-  brushSliders?: { key: string; title: string; min: number; max: number; step: number; fmt?: (v: number) => string }[];   // 2026-09-05：连续旋钮（手指 smear↔dull「揉匀」；值经 params[key]，session 态）
+  brushSliders?: { key: string; title: string; min: number; max: number; step: number; fmt?: (v: number) => string; variants?: string[]; map?: { toParam(v: number): number; fromParam(p: number): number } }[];   // 2026-09-05：连续旋钮（手指 smear↔dull「揉匀」；值经 params[key]，session 态）；2026-09-06 variants 白名单 + map（对数刻度等）
 }
 // adjust panel 操作的 doc 活层（doc.js 未类型化 → 只描述用到的）。
 interface AdjustLayer { id: number; name: string; bboxX: number; bboxY: number; bboxW: number; bboxH: number; snapshot(): LayerSnap; }
@@ -144,7 +145,14 @@ function _openFilterPanel(filterId: string, opts: { picker?: FilterLike[] } = {}
     els.adjustParamsBody.appendChild(wrap);
   }
   Filter.buildBody(els.adjustParamsBody, _adjustState, _onFilterChange);
+  // 2026-09-06 整窗可拖大：只有声明 onBodyResize 的滤镜露 grip；宽回 CSS 默认，内容比默认宽（记住的大绘图区）就撑开
+  els.adjustPanel.classList.toggle("resizable", !!Filter.onBodyResize);
+  els.adjustPanel.style.width = "";
   _adjustWin?.open();   // 显示 + 置顶（z 归 floating-window）
+  if (Filter.onBodyResize) {
+    const over = els.adjustParamsBody.scrollWidth - els.adjustParamsBody.clientWidth;
+    if (over > 0) els.adjustPanel.style.width = (els.adjustPanel.offsetWidth + over) + "px";
+  }
   const w = els.adjustPanel.offsetWidth || 320;
   // v270：滤镜面板（液化等）走统一 positionPopup——钉视口右边 16px、让到顶栏条以下、读 safe-area、
   //   夹视口。取代原来手搓的 left=innerWidth-w-16 / top=max(104,…)（漏 safe-area、和 toolbar 挤）。
@@ -182,6 +190,8 @@ function _closeFilterPanel(applied: boolean) {
   if (_adjustState._rafId) { cancelAnimationFrame(_adjustState._rafId); _adjustState._rafId = 0; }
   board.setActiveLayerSurrogate?.(null, null);
   _adjustState.Filter.disposeBody?.(_adjustState);   // 插件收口（color target 注销等），在 DOM 清空前
+  els.adjustPanel.classList.remove("resizable");
+  els.adjustPanel.style.width = "";
   if (applied) {
     // 烤进 layer（surrogate 字节已是最终结果 → 直落 tile，零 canvas）。
     // C6 顺手账（census §6.4）：replaceFromBytes（整层 clear+重写 → collector 扣押整层）换
@@ -360,11 +370,15 @@ function _fbRows(): ToolbarItem[][] {
   }
   // ②c 连续旋钮（手指 smear↔dull「揉匀」）：值 → params[key]；session 态
   for (const sl of Filter.brushSliders || []) {
-    items.push({ kind: "slider", id: `filterBrushSlider-${sl.key}`, label: sl.title, min: sl.min, max: sl.max, step: sl.step, fmt: sl.fmt,
-      value: () => (typeof fb.params[sl.key] === "number" ? (fb.params[sl.key] as number) : sl.min),
+    if (sl.variants && !sl.variants.includes(fb.variantId || "")) continue;   // 2026-09-06 variant 专属旋钮（稀释/记忆只在带颜料的手指）
+    const toP = sl.map?.toParam ?? ((v: number) => v), fromP = sl.map?.fromParam ?? ((p: number) => p);
+    items.push({ kind: "slider", id: `filterBrushSlider-${sl.key}`, label: sl.title, min: sl.min, max: sl.max, step: sl.step, fmt: sl.fmt ? (v) => sl.fmt!(toP(v)) : undefined,
+      value: () => (typeof fb.params[sl.key] === "number" ? fromP(fb.params[sl.key] as number) : sl.min),
       onInput: (v) => {
-        fb.params = { ...fb.params, [sl.key]: v };
-        if (sl.key === "dull") { const ts = state.toolStates[_toolStateKeyFor(Filter)]; if (ts) ts.dull = v; }   // 持久化（per-doc）
+        const pv = toP(v);
+        fb.params = { ...fb.params, [sl.key]: pv };
+        // 持久化只有 dull（per-doc，user 点头）；稀释/记忆 = 新持久化字段，落地前要 user 一句话同意（handoff §5）→ 先 session 态
+        if (sl.key === "dull") { const ts = state.toolStates[_toolStateKeyFor(Filter)]; if (ts) ts.dull = pv; }
       } });
   }
   // ③ 边界取样（液化且有选区）
@@ -407,8 +421,26 @@ export function initFiltersAdjust(ctx: AppContext) {
     if (F && (F.modes || []).includes("brush")) _enterFilterBrushMode(F, variant);
     else setStatus(t("st.filterBrushErr", { msg: `unknown filter brush "${id}"` }));
   });
+  // 2026-09-06 晚 整窗可拖大（user「resize curves window」）：右下角 grip 归 floating-window；本窗只写宽（高由内容撑，
+  //   滤镜按 onBodyResize 收到的可用尺寸自己撑内容——曲线滤镜把绘图区贴满）。没声明 onBodyResize 的滤镜不露 grip（.resizable）。
   _adjustWin = registerFloatingWindow(els.adjustPanel, {
     id: "adjust", head: els.adjustPanelHead, ignoreDragOn: (t) => !!t.closest(".float-panel-close"), fallbackSize: { w: 320, h: 300 },
+    resize: {
+      grip: document.getElementById("adjustPanelResize"),
+      min: { w: 240, h: 200 },
+      apply: ({ w, h }) => {
+        const st = _adjustState;
+        const panel = els.adjustPanel;
+        const F = st?.Filter as FilterLike | undefined;
+        if (!st || !F?.onBodyResize) return;
+        // 面板非 body 的 chrome 高（标题栏 + 参数区里绘图区以外的行 + 脚）：= 现高 − 现 body 内容区高
+        const bodyEl = els.adjustParamsBody;
+        const chromeH = panel.offsetHeight - bodyEl.clientHeight;
+        const padX = panel.offsetWidth - bodyEl.clientWidth;
+        panel.style.width = Math.round(w) + "px";
+        F.onBodyResize(st, { w: w - padX, h: h - chromeH });
+      },
+    },
   });
 
   els.topAdjustBtn.addEventListener("click", (e: Event) => {

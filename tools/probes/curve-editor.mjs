@@ -106,6 +106,26 @@ const s5 = await readState();
 c.expect("R 通道 tab 高亮", s5.tabs[1] === "true" && s5.tabs[0] === "false", JSON.stringify(s5.tabs));
 c.expect("R 通道恒等 2 键", s5.keyCount === 2);
 
+// 2026-09-06 整窗可拖大（user「我说的是 resize curves window，而不是 resize 曲线窗」）：曲线滤镜面板带 .resizable、grip 可见；
+//   先把面板往左拖开（钉右边时右下 grip 没地方长宽），再真指针拖 grip → 绘图区边长变大、面板变宽。
+const geo = () => page.evaluate(() => {
+  const p = document.getElementById("adjustPanel"), g = document.getElementById("adjustPanelResize"), plot = document.querySelector("#adjustParamsBody .ce-plot");
+  return { resizable: p.classList.contains("resizable"), gripVisible: getComputedStyle(g).display !== "none", plot: Math.round(plot.getBoundingClientRect().width), panelW: Math.round(p.getBoundingClientRect().width) };
+});
+const r0 = await geo();
+c.expect("曲线滤镜：面板 .resizable、右下 grip 可见", r0.resizable && r0.gripVisible, JSON.stringify(r0));
+{
+  const hb = await page.locator("#adjustPanelHead").boundingBox();
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2); await page.mouse.down();
+  await page.mouse.move(hb.x + hb.width / 2 - 120, hb.y + hb.height / 2, { steps: 5 }); await page.mouse.move(hb.x + hb.width / 2 - 240, hb.y + hb.height / 2, { steps: 5 }); await page.mouse.up();
+  const gb = await page.locator("#adjustPanelResize").boundingBox();
+  await page.mouse.move(gb.x + gb.width / 2, gb.y + gb.height / 2); await page.mouse.down();
+  await page.mouse.move(gb.x + 60, gb.y + 60, { steps: 6 }); await page.mouse.move(gb.x + 130, gb.y + 130, { steps: 6 }); await page.mouse.up();
+  await page.waitForTimeout(150);
+}
+const r1 = await geo();
+c.expect("拖 grip → 绘图区边长变大、面板变宽", r1.plot > r0.plot + 40 && r1.panelW > r0.panelW + 40, `${JSON.stringify(r0)} → ${JSON.stringify(r1)}`);
+
 // 应用不炸
 await evClick(page, "adjustApply");
 await page.waitForTimeout(300);

@@ -46,6 +46,7 @@ import { t } from "../i18n/index.ts";
 import { loadCanvasTemplates, templateItems, templateById, templatePx } from "../canvas-templates.ts";
 import { mountSelectField, type SelectField } from "../ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
 import { bindInstallButton } from "../install-prompt.ts";
+import { openDiagLogSheet } from "../diag-log-sheet.ts";   // 2026-09-06 图库菜单诊断日志入口
 
 import type { AppContext } from "../app-context.ts";
 const errMsg = (e: unknown): string => String((e as { message?: unknown })?.message || e);
@@ -449,6 +450,11 @@ export function initGalleryShell(ctx: AppContext) {
   document.getElementById("galleryMenuTrash")?.addEventListener("click", () => {
     closePopupMenuOf(els.galleryMenuPopup);
     _switchView("trash");
+  });
+  // 2026-09-06 诊断日志（图库模式下 ☰ dev 页不可达 → 图库菜单自己开同一张 sheet）
+  document.getElementById("galleryMenuDiagLog")?.addEventListener("click", () => {
+    closePopupMenuOf(els.galleryMenuPopup);
+    openDiagLogSheet();
   });
   // 图库菜单 popup 内动作代理到主菜单已有 handler（.click() 即触发，不重复逻辑/状态）。
   els.galleryMenuForceUpdate?.addEventListener("click", () => {

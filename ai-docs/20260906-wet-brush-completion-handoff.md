@@ -1,6 +1,7 @@
 # 湿画笔补全 handoff：paint variant 加「稀释 · 压感反向 · 多分辨率出料 · 记忆解耦」四件（clean-room 交接，无代码）
 
-> 作者：Claude Fable 5.1（claude-fable-5-1）· created 20260906 · as-of dev v0.13.14 · 状态：**交接稿，等实现 agent 接手**。
+> 作者：Claude Fable 5.1（claude-fable-5-1）· created 20260906 · as-of dev v0.13.14 · 状态：**已落地 dev v0.13.15（2026-09-06 晚，实现者 = 另一 Claude Fable 5.1 session，只读本文）**。
+> 落地记：§3 A–D 全部照 spec；§4 出厂值照表（strength ≈0.2 经 paint variant `strengthScale 0.4` × 笔架 0.5）；§5 稀释/记忆滑杆 **session 态**（持久化等 user 一句话）；`accumColor` 保留给 dull=1 端（回归逐字节一致），中段走 Accum 多分辨率；测试 `test/smudge-wet.test.mjs`。§7 形状：`dilution?` / `memoryLength?` 可选字段（旧 settings 形零改动）。
 > 拍板出处：user 2026-09-06「回到混色，123 同意，4 是我 confusing 的问题。他这个东西的本质是另外一种笔刷，还是我们这几个还没被我 grounding 的笔刷的补全？」
 > 「你因为看过他的 code 了所以不要生成代码。然后别的 agent 只看你的 handoff」。
 > 答：**是补全，不是另一种笔刷**（§1）。本文是实现的唯一输入。

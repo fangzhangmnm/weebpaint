@@ -20,7 +20,7 @@ export type DiagLevel = "error" | "warning" | "info" | "log" | "note";
 export interface DiagEntry { t: number; l: DiagLevel; m: string }
 
 const KEY = "diag-log";
-const MAX_ENTRIES = 300;
+const MAX_ENTRIES = 500;   // 2026-09-06 300→500：过夜 session 的可见性/在线面包屑会把事故顶出环（晨案）
 const MAX_MSG = 600;
 const FLUSH_MS = 250;
 

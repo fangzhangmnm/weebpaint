@@ -18,6 +18,13 @@
 // footprint 夹 **doc 边界**，不夹 layer.bbox——颜料要能拖出内容框（同液化 tile era 的结论；tile 按需分配，写哪都行）。
 // 全程 premult：透明像素 RGB 永不参与（黑边病根的反面）。
 //
+// 2026-09-06 湿画笔补全（ai-docs/20260906-wet-brush-completion-handoff.md，user「回到混色，123 同意」；clean-room：本实现只读 handoff）：
+//   A) paint 压感反向：colorRate_eff = colorRate × s_p（轻按只揉、重按落色）；稀释反向默认关（PAINT_PRESSURE_DILUTION）。
+//   B) 稀释 dilution（paint）：出料 P 上色前整体 × (1 − d·(1 − ā))，ā = 本 dab mask 加权的画布 alpha → 透明处画不上、半透明按比例。
+//   C) 多分辨率出料（三 variant 共用「揉匀」中段）：k = round(B^(1−dull)) ∈ [2, B−1]，Accum 按 k×k 格 mask 加权 premult 平均
+//      （无 mask 像素 = 死格）→ 活格 3×3 盒滤 → 双线性放大回 B×B。两端不变：dull=0 块、dull=1 单色（accumColor 回归一致）。
+//   D) 记忆解耦（paint）：ρ = exp(−(step/D)/L)，L = memoryLength（直径数，1/e 衰减）；smear/dull 仍 ρ = (s³)^(step/D)。
+//
 // 性能（CPU）：每 dab B² 像素 × 一次 mix（smear 再 + 一次记忆 mix）。srgb 档 = 4 mul-add/px；oklab/spectral 档
 //   每像素十几个超越函数，大笔会慢——这是「先 CPU 原型」的已知代价，GPU 契约等手感定了再看（survey §5 候选 B）。
 
@@ -38,7 +45,7 @@ export type SmudgeMode = "smear" | "dull" | "paint";
 
 export interface SmudgeSettings {
   mode: SmudgeMode;
-  dull: number;          // 0..1 smear↔dull 连续量：0 = 搬块（smear），1 = 揉平均色（dull），中间 = 两者 lerp（user 2026-09-05「smear dull 连续量」；Krita 是二选一 + smudge radius）
+  dull: number;          // 0..1 smear↔dull 连续量：0 = 搬块（smear），1 = 揉平均色（dull），中间 = 多分辨率出料（2026-09-06 handoff §3-C；旧版 lerp 两端）
   size: number;          // dab 直径（p=1 时，doc px）
   hardness: number;      // 0..1（硬芯比例）
   spacing: number;       // dab 间距 = 直径 × spacing
@@ -48,7 +55,9 @@ export interface SmudgeSettings {
   opaCoeff: number;      // 压感→强度（第二乘子，同画笔 opa_mul）
   pressureGamma: number;
   pressureCurve?: AnimCurve | null;   // 2026-09-05 可选压感曲线（有则替代 gamma）
-  colorRate: number;     // paint 模式：每 dab 掺入画笔色的比例（0..1）
+  colorRate: number;     // paint 模式：每 dab 掺入画笔色的比例（0..1）；引擎再乘压感 s_p（handoff §3-A）
+  dilution?: number;     // paint 模式：稀释 0..1（缺省 0 = 现状；handoff §3-B）
+  memoryLength?: number; // paint 模式：湿色记忆长度（直径数，>0 → 解耦记忆律；缺省/0 = 沿用 s³ 律；handoff §3-D）
   color: readonly [number, number, number];   // 画笔色 straight sRGB 0..1
   mix: MixSpace;
   lockAlpha: boolean;
@@ -70,6 +79,10 @@ interface StrokeState {
   cur: Float32Array;         // 本 dab 的画布块（B×B premult；doc 外 = 0）
   mask: Float32Array;        // 本 dab 的 M（B×B）
   tmp: Float32Array;         // 4 floats scratch
+  avg: Float32Array;         // 本 dab mask 加权的画布平均色（premult；alpha 分量 = ā）
+  release: Float32Array;     // 多分辨率出料块（B×B premult）
+  cellK: number;             // 多分辨率格数缓存（k 变了重分配）
+  cellSum: Float32Array | null; cellW: Float32Array | null; cellBox: Float32Array | null; cellLive: Uint8Array | null; cellBoxLive: Uint8Array | null;
   primed: boolean;
   lastX: number; lastY: number;
   pendingDist: number;
@@ -83,6 +96,8 @@ function signedLerp(coeff: number, p: number): number {
 }
 const clamp01 = (v: number) => (v <= 0 ? 0 : v >= 1 ? 1 : v);
 const MEMORY_EXP = 3;   // 每直径残留 = s^MEMORY_EXP（手感数字，见文件头）
+const PAINT_PRESSURE_COLOR_RATE = true;   // handoff §3-A：paint 掺色率吃压感（作者出厂开）
+const PAINT_PRESSURE_DILUTION = false;    // handoff §3-A：稀释吃压感（作者出厂关；要不要暴露开关归 user）
 
 export class SmudgeEngine {
   private _st: StrokeState | null = null;
@@ -99,6 +114,9 @@ export class SmudgeEngine {
       cur: new Float32Array(n * 4),
       mask: new Float32Array(n),
       tmp: new Float32Array(4),
+      avg: new Float32Array(4),
+      release: new Float32Array(n * 4),
+      cellK: 0, cellSum: null, cellW: null, cellBox: null, cellLive: null, cellBoxLive: null,
       primed: false,
       lastX: x, lastY: y, pendingDist: 0, dirty: null,
     };
@@ -198,13 +216,16 @@ export class SmudgeEngine {
       st.primed = true;
       return;
     }
-    // 1) 记忆更新：ρ = s^(step/D)
+    // 1) 记忆更新：smear/dull ρ = (s³)^(step/D)；paint 带 memoryLength 时 ρ = exp(−(step/D)/L)（handoff §3-D 解耦）
     const D = 2 * r;
-    const rho = strength >= 1 ? 1 : strength <= 0 ? 0 : Math.pow(strength, MEMORY_EXP * Math.max(0, step) / D);
-    if (dullK > 0) {
-      this._weightedAverage(cur, mask, n, st.tmp);
-      mixPremultInto(st.accumColor, 0, st.tmp, 0, st.accumColor, 0, rho, space);
-    }
+    const memL = mode === "paint" && Number.isFinite(s0.memoryLength) && (s0.memoryLength as number) > 0 ? (s0.memoryLength as number) : 0;
+    const rho = memL > 0
+      ? Math.exp(-(Math.max(0, step) / D) / memL)
+      : (strength >= 1 ? 1 : strength <= 0 ? 0 : Math.pow(strength, MEMORY_EXP * Math.max(0, step) / D));
+    const dil = mode === "paint" ? clamp01(Number.isFinite(s0.dilution) ? (s0.dilution as number) : 0) : 0;
+    const dilEff = PAINT_PRESSURE_DILUTION ? 1 - pc * (1 - dil) : dil;
+    if (dullK > 0 || dilEff > 0) this._weightedAverage(cur, mask, n, st.avg);
+    if (dullK > 0) mixPremultInto(st.accumColor, 0, st.avg, 0, st.accumColor, 0, rho, space);
     if (dullK < 1 && rho < 1) {
       const acc = st.accum;
       for (let q = 0; q < n; q++) {
@@ -220,7 +241,9 @@ export class SmudgeEngine {
     // 2)+3) 出料 + 上色
     const tmp = st.tmp;
     const lock = s0.lockAlpha;
-    const colorRate = clamp01(s0.colorRate);
+    const colorRate = mode === "paint" ? clamp01(s0.colorRate) * (PAINT_PRESSURE_COLOR_RATE ? pc : 1) : 0;   // §3-A 压感反向
+    const dilF = dilEff > 0 ? 1 - dilEff * (1 - clamp01(st.avg[3])) : 1;                                       // §3-B 稀释系数
+    if (dullK > 0 && dullK < 1) this._multiRes(st, dullK);                                                        // §3-C 中段出料块
     let dirty = false;
     for (let j = 0; j < h; j++) {
       const wy = y0 + j - oy;
@@ -237,8 +260,12 @@ export class SmudgeEngine {
         let P: Float32Array, pi: number;
         if (dullK >= 1) { P = st.accumColor; pi = 0; }
         else if (dullK <= 0) { P = st.accum; pi = o; }
-        else { mixPremultInto(tmp, 0, st.accum, o, st.accumColor, 0, dullK, space); P = tmp; pi = 0; }   // 连续量：块与平均色 lerp
-        if (mode === "paint" && colorRate > 0) { mixPremultInto(tmp, 0, P, pi, st.paint, 0, colorRate, space); P = tmp; pi = 0; }
+        else { P = st.release; pi = o; }   // 中段 = 多分辨率出料（handoff §3-C；旧版是块与平均色 lerp）
+        if (colorRate > 0) { mixPremultInto(tmp, 0, P, pi, st.paint, 0, colorRate, space); P = tmp; pi = 0; }
+        if (dilF < 1) {   // 稀释：出料四通道同乘（保持 premult）
+          if (P !== tmp) { tmp[0] = P[pi]; tmp[1] = P[pi + 1]; tmp[2] = P[pi + 2]; tmp[3] = P[pi + 3]; P = tmp; pi = 0; }
+          tmp[0] *= dilF; tmp[1] *= dilF; tmp[2] *= dilF; tmp[3] *= dilF;
+        }
         // 上色（写进 cur 就地）
         mixPremultInto(cur, o, cur, o, P, pi, a, space);
         const k = (j * w + i) * 4;
@@ -264,6 +291,68 @@ export class SmudgeEngine {
     const dr = st.dirty;
     if (!dr) st.dirty = [x0, y0, x1, y1];
     else { dr[0] = Math.min(dr[0], x0); dr[1] = Math.min(dr[1], y0); dr[2] = Math.max(dr[2], x1); dr[3] = Math.max(dr[3], y1); }
+  }
+
+  // 多分辨率出料（handoff §3-C）：Accum 按 k×k 格 mask 加权 premult 平均 → 活格 3×3 盒滤 → 双线性放大回 B×B 进 st.release。
+  //   死格（无 mask 像素）不进平均；盒滤只数活格（死格自身也拿邻活格均值，双线性时邻格有料）；透明像素 RGB 全程 premult。
+  private _multiRes(st: StrokeState, dullK: number): void {
+    const B = st.B, n = B * B;
+    const k = Math.max(2, Math.min(B - 1, Math.round(Math.pow(B, 1 - dullK))));
+    if (st.cellK !== k || !st.cellSum) {
+      st.cellK = k;
+      st.cellSum = new Float32Array(k * k * 4); st.cellW = new Float32Array(k * k); st.cellBox = new Float32Array(k * k * 4);
+      st.cellLive = new Uint8Array(k * k); st.cellBoxLive = new Uint8Array(k * k);
+    }
+    const sum = st.cellSum!, wsum = st.cellW!, box = st.cellBox!, live = st.cellLive!, boxLive = st.cellBoxLive!;
+    sum.fill(0); wsum.fill(0); live.fill(0); boxLive.fill(0);
+    const acc = st.accum, mask = st.mask, rel = st.release;
+    const scale = k / B;
+    for (let q = 0; q < n; q++) {
+      const m = mask[q];
+      if (m <= 0) continue;
+      const x = q % B, y = (q - x) / B;
+      const c = Math.min(k - 1, Math.floor(y * scale)) * k + Math.min(k - 1, Math.floor(x * scale));
+      const o = q * 4, co = c * 4;
+      sum[co] += acc[o] * m; sum[co + 1] += acc[o + 1] * m; sum[co + 2] += acc[o + 2] * m; sum[co + 3] += acc[o + 3] * m; wsum[c] += m;
+    }
+    for (let c = 0; c < k * k; c++) {
+      const w = wsum[c];
+      if (w <= 0) continue;
+      live[c] = 1;
+      const co = c * 4; sum[co] /= w; sum[co + 1] /= w; sum[co + 2] /= w; sum[co + 3] /= w;
+    }
+    for (let cy = 0; cy < k; cy++) for (let cx = 0; cx < k; cx++) {
+      let r = 0, g = 0, b = 0, a = 0, cnt = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        const yy = cy + dy; if (yy < 0 || yy >= k) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = cx + dx; if (xx < 0 || xx >= k) continue;
+          const c2 = yy * k + xx; if (!live[c2]) continue;
+          const o2 = c2 * 4; r += sum[o2]; g += sum[o2 + 1]; b += sum[o2 + 2]; a += sum[o2 + 3]; cnt++;
+        }
+      }
+      const c = cy * k + cx, co = c * 4;
+      if (cnt > 0) { box[co] = r / cnt; box[co + 1] = g / cnt; box[co + 2] = b / cnt; box[co + 3] = a / cnt; boxLive[c] = 1; }
+    }
+    for (let q = 0; q < n; q++) {
+      const o = q * 4;
+      if (mask[q] <= 0) { rel[o] = rel[o + 1] = rel[o + 2] = rel[o + 3] = 0; continue; }   // mask 外用不到
+      const x = q % B, y = (q - x) / B;
+      const u = (x + 0.5) * scale - 0.5, v = (y + 0.5) * scale - 0.5;
+      const i0 = Math.floor(u), j0 = Math.floor(v), fu = u - i0, fv = v - j0;
+      let r = 0, g = 0, b = 0, a = 0, wt = 0;
+      for (let dj = 0; dj <= 1; dj++) {
+        const jj = Math.min(k - 1, Math.max(0, j0 + dj)), wv = dj ? fv : 1 - fv;
+        for (let di = 0; di <= 1; di++) {
+          const ii = Math.min(k - 1, Math.max(0, i0 + di)), w = (di ? fu : 1 - fu) * wv;
+          const c = jj * k + ii;
+          if (w <= 0 || !boxLive[c]) continue;
+          const co = c * 4; r += box[co] * w; g += box[co + 1] * w; b += box[co + 2] * w; a += box[co + 3] * w; wt += w;
+        }
+      }
+      if (wt > 0) { rel[o] = r / wt; rel[o + 1] = g / wt; rel[o + 2] = b / wt; rel[o + 3] = a / wt; }
+      else { rel[o] = rel[o + 1] = rel[o + 2] = rel[o + 3] = 0; }
+    }
   }
 
   // mask 加权平均（premult；alpha 也平均——透明处会把平均色拉淡，与 Krita dulling 同）

@@ -45,6 +45,7 @@ export class StrokeSmoother {
   _vx: number;
   _vy: number;
   _sx: number;
+  _moved = false;   // 2026-09-06 死区锚是否离开过落笔点（起笔静止期判据，brush.ts 压感 LPF 用）
   _sy: number;
   _lastT: number | null;
   _lastP: number;
@@ -65,6 +66,11 @@ export class StrokeSmoother {
   }
 
   get count() { return this.cx.length; }
+  /** 这个 raw 点会不会让死区锚离开落笔点（或已经离开过）——起笔静止期 = 还没有。 */
+  wouldMove(x: number, y: number): boolean {
+    if (this._moved || this.cx.length === 0) return this._moved || this.cx.length === 0;
+    return Math.hypot(x - this._sx, y - this._sy) > this.r;
+  }
 
   push(x: number, y: number, p: number, t: number | null | undefined) {
     this.seq++;
@@ -81,8 +87,8 @@ export class StrokeSmoother {
     // ① stabilization 死区（与 tau 正交：硬空间阈值 vs 频域）
     if (this.r > 0) {
       const dx = x - this._sx, dy = y - this._sy, d = Math.hypot(dx, dy);
-      if (d > this.r) { const k = (d - this.r) / d; this._sx += dx * k; this._sy += dy * k; }
-    } else { this._sx = x; this._sy = y; }
+      if (d > this.r) { const k = (d - this.r) / d; this._sx += dx * k; this._sy += dy * k; this._moved = true; }
+    } else { if (x !== this._sx || y !== this._sy) this._moved = true; this._sx = x; this._sy = y; }
 
     // ② 时间缓冲：二阶时间制 SmoothDamp（推进 pos + vel）
     let dt = FALLBACK_DT;
@@ -149,6 +155,11 @@ export class PressureLPF {
     } else {
       this.p = pressure;
     }
+    if (t != null) this.lastT = t;
+    return this.p;
+  }
+  /** 只对钟不积压感：值不动、时间原点挪到 t（起笔静止期用——顿多久都等于没顿）。 */
+  rebase(t: number | null = null): number {
     if (t != null) this.lastT = t;
     return this.p;
   }

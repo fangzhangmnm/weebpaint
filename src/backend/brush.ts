@@ -140,7 +140,12 @@ export class BrushEngine {
     // NaN/inf 护栏：甩太快 / 坏事件可能传入非有限坐标 → 跳过
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
     // 压感 LPF：dt 取事件 t 差（与位置平滑同一口钟；壁钟已拔除——backend/stroke-smoother.ts）
-    const pEff = st.pLPF.step(pressure, t);
+    // 2026-09-06 起笔静止期不积压感（user「大笔刷 flat 顿一下会产生墨点」；考古 ai-docs/20260604-stroke-smoother-time-gate.md：
+    //   弧长看不见顿）：压感 LPF 走时间、taper-in 走弧长——落笔顿住时 LPF 已涨到按压力、strokeDist 仍为 0，起步后
+    //   taper 在半个笔宽内放开 → 满压粗头。修法：死区锚没离开落笔点前 LPF 只对钟不积压感，起步时从落笔压感起追，
+    //   与不顿的起笔完全同形（顿多久都等于没顿）。pixel（immediate）路径无 smoother，不动。
+    const dwell = st.buffered && st.sm != null && !st.sm.wouldMove(x, y);
+    const pEff = dwell ? st.pLPF.rebase(t) : st.pLPF.step(pressure, t);
     if (st.buffered) this._extendBuffered(x, y, pEff, t);
     else this._extendImmediate(x, y, pEff);
   }

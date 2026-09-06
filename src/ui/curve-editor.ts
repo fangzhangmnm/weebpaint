@@ -22,7 +22,6 @@ import {
   evaluate, insertKey, removeKey, moveKey, setTangentMode, setTangent, setBroken, identityCurve, setWeighted, setWeight, isWeighted,
 } from "../common/anim-curve.ts";
 import { dragMove, type DragState } from "./drag-value.ts";
-import { attachPanelResize } from "./panel-gizmo.ts";
 import { createSelectField, type SelectField } from "./select-field.ts";
 import { iconHtml } from "./icon.ts";
 import { t as tr } from "../i18n/index.ts";
@@ -115,7 +114,7 @@ export function keyboardNudge(key: string, shift: boolean, step: number): { dt: 
 
 export interface CurveEditorOpts {
   curve: AnimCurve;                 // 引用持有，原地改
-  plotSize?: number;                // 初始绘图区边长 px（缺省 = 本 session 上次拖到的尺寸，起始 DEFAULT_PLOT_SIZE）
+  plotSize?: number;                // 绘图区边长 px（缺省 DEFAULT_PLOT_SIZE；宿主之后可 setPlotSize）
   lockEndpointsT?: boolean;         // 首尾 key t 钉 0/1 且不可删（调整曲线 / 压感 = true）
   showIdentity?: boolean;           // 对角参考线（默认 true）
   accent?: string;                  // 曲线色（缺省 --accent）
@@ -123,11 +122,12 @@ export interface CurveEditorOpts {
   keyStep?: number;                 // 键盘微调步长（数据单位；默认 1/255）
   onInput(): void;                  // 形状每变一次
   onCommit(): void;                 // 一次手势结束
-  onPlotResize?(px: number): void;  // grip 拖完（宿主持久化；缺省只记 session）
 }
 export interface CurveEditorHandle {
   el: HTMLElement;
   setCurve(c: AnimCurve): void;
+  setPlotSize(px: number): void;   // 2026-09-06 宿主定绘图区边长（曲线滤镜 = 调整浮窗整窗拖大）
+  plotSize(): number;
   redraw(): void;
   selected(): number;
   select(i: number): void;
@@ -138,7 +138,6 @@ const IDLE_DIM_MS = 2500;
 const VB = 1000;   // svg viewBox 边长（逻辑单位）
 export const DEFAULT_PLOT_SIZE = 200;
 const MIN_PLOT_SIZE = 120;
-let _sessionPlotSize = DEFAULT_PLOT_SIZE;   // 本 session 上次拖到的边长（所有曲线编辑器共用）
 
 export function makeCurveEditor(o: CurveEditorOpts): CurveEditorHandle {
   let curve = o.curve;
@@ -166,7 +165,6 @@ export function makeCurveEditor(o: CurveEditorOpts): CurveEditorHandle {
         `<button type="button" class="ce-gizmo" data-act="add">${iconHtml("new")}</button>` +
         `<button type="button" class="ce-gizmo" data-act="del">${iconHtml("trash-can")}</button>` +
       `</div>` +
-      `<div class="ce-grip" data-act="resize" aria-hidden="true"></div>` +
     `</div>` +
     `<div class="ce-row ce-row-readout"><span class="ce-readout"></span></div>` +
     `<div class="ce-row ce-row-tangent">` +
@@ -191,7 +189,6 @@ export function makeCurveEditor(o: CurveEditorOpts): CurveEditorHandle {
   const addBtn = q<HTMLButtonElement>('.ce-gizmo[data-act="add"]');
   const delBtn = q<HTMLButtonElement>('.ce-gizmo[data-act="del"]');
   const readout = q(".ce-readout");
-  const grip = q(".ce-grip");
   const brokenBtn = q<HTMLButtonElement>('.ce-btn[data-act="broken"]');
   const weightedBtn = q<HTMLButtonElement>('.ce-btn[data-act="weighted"]');
   const resetBtn = q<HTMLButtonElement>('.ce-btn[data-act="reset"]');
@@ -237,18 +234,12 @@ export function makeCurveEditor(o: CurveEditorOpts): CurveEditorHandle {
     return { w: r.width || plotPx, h: r.height || plotPx };
   };
 
-  // 绘图区边长：inline 写死 px（CSS 只给 margin/边框），grip 拖拽改；本 session 记忆
-  let plotPx = Math.max(MIN_PLOT_SIZE, Math.round(o.plotSize ?? _sessionPlotSize));
-  const maxPlotPx = () => Math.max(MIN_PLOT_SIZE, (el.clientWidth || 380) - 4);
+  // 绘图区边长：inline 写死 px（CSS 只给 margin/边框）。2026-09-06 晚：绘图区自己的 grip 撤——user「我说的是 resize
+  //   curves window，而不是 resize 曲线窗」→ 边长由宿主定（曲线滤镜 = 调整浮窗整窗右下角拖，见 filters-adjust
+  //   onBodyResize；笔设置里的压感曲线 = 固定 DEFAULT_PLOT_SIZE）。setPlotSize 是宿主的唯一入口。
+  let plotPx = Math.max(MIN_PLOT_SIZE, Math.round(o.plotSize ?? DEFAULT_PLOT_SIZE));
   const applyPlotSize = () => { plot.style.width = `${plotPx}px`; plot.style.height = `${plotPx}px`; };
   applyPlotSize();
-  const resizeGizmo = attachPanelResize(plot, grip, {
-    getSize: () => ({ w: plotPx, h: plotPx }),
-    min: { w: MIN_PLOT_SIZE, h: MIN_PLOT_SIZE },
-    max: () => { const m = maxPlotPx(); return { w: m, h: m }; },
-    onResize: ({ w, h }) => { plotPx = Math.min(maxPlotPx(), Math.round(Math.max(w, h))); applyPlotSize(); redraw(); },   // 正方形：取长边
-    onEnd: () => { _sessionPlotSize = plotPx; o.onPlotResize?.(plotPx); },
-  });
 
   // ---- 绘制 ----
   const fmt = o.fmt ?? ((t: number, v: number) => `${t.toFixed(3)} → ${v.toFixed(3)}`);
@@ -485,6 +476,8 @@ export function makeCurveEditor(o: CurveEditorOpts): CurveEditorHandle {
   return {
     el,
     setCurve(c: AnimCurve) { curve = c; sel = -1; redraw(); },
+    setPlotSize(px: number) { plotPx = Math.max(MIN_PLOT_SIZE, Math.round(px)); applyPlotSize(); redraw(); },
+    plotSize: () => plotPx,
     redraw,
     selected: () => sel,
     select,
@@ -503,7 +496,7 @@ export function makeCurveEditor(o: CurveEditorOpts): CurveEditorHandle {
       el.removeEventListener("pointerleave", onLeave);
       if (idleTimer) clearTimeout(idleTimer);
       ro?.disconnect();
-      resizeGizmo.dispose();
+      
       modeField.dispose();
       svg.remove();
     },
