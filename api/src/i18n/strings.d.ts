@@ -645,9 +645,19 @@ export declare const S: {
         readonly ja: "ログ {n} 件をコピーしました";
     };
     readonly "diag.copyFailed": {
-        readonly zh: "复制失败：文本已选中，请长按「拷贝」";
-        readonly en: "Copy failed: text is selected — long-press to copy";
-        readonly ja: "コピーに失敗：テキストを選択済み。長押しでコピーしてください";
+        readonly zh: "复制失败：文本已选中，请长按「拷贝」，或用「分享…」";
+        readonly en: "Copy failed: text is selected — long-press to copy, or use Share…";
+        readonly ja: "コピーに失敗：テキストを選択済み。長押しでコピー、または「共有…」を使ってください";
+    };
+    readonly "diag.share": {
+        readonly zh: "分享…";
+        readonly en: "Share…";
+        readonly ja: "共有…";
+    };
+    readonly "diag.shareFailed": {
+        readonly zh: "分享未完成";
+        readonly en: "Share did not complete";
+        readonly ja: "共有は完了しませんでした";
     };
     readonly "diag.cleared": {
         readonly zh: "日志已清空";

@@ -2898,6 +2898,8 @@ body[data-no-gallery] svg.menu-scope-badge[data-i18n-title="menu.scopeGalleryTip
 .gallery-retry-btn { display: inline-block; width: auto; padding: 8px 20px; }
 /* dev 诊断日志窗口（diag-log-sheet.ts） */
 .diag-log-sheet { max-width: 720px; }
+/* 2026-09-06 user「手动 copy 也选不中」：全局 user-select:none 把日志 <pre> 也压死了 → 豁免（同 input/textarea） */
+.diag-log-pre { -webkit-touch-callout: default; -webkit-user-select: text; user-select: text; cursor: text; }
 .diag-log-pre {
   max-height: 50vh; overflow: auto; margin: 8px 0; padding: 8px; border-radius: 8px;
   font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

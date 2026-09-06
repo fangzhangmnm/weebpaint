@@ -1,6 +1,7 @@
 // diag-log-sheet.ts —— ☰ dev 页「诊断日志」窗口：看 + 复制 + 清空（数据源 = diag-log.ts）。
 // created 2026-08-31 by Claude Fable 5（user 2026-08-31「dev 里面加一个日志窗口和拷贝按钮」）。
-// 复制走 navigator.clipboard.writeText（点击手势内，iPad PWA 可用）；失败回退选中 <pre> 文本让用户长按复制。
+// 复制走 navigator.clipboard.writeText（点击手势内）→ 失败回退 textarea+execCommand → 再失败选中 <pre> 让用户长按复制；iPad 另给 Web Share。
+// 2026-09-06 user「copy 按钮没有用，手动 copy 也选不中」：反馈进 sheet 提示行（图库模式状态栏被藏）；<pre> 豁免全局 user-select:none（styles.css）。
 // 无系统弹窗（家规）：结果走状态栏。
 
 import { t } from "./i18n/index.ts";
@@ -17,7 +18,7 @@ export function openDiagLogSheet(): void { _open?.(); }
 
 export function initDiagLogSheet(deps: { status: (msg: string, persist?: boolean) => void }): void {
   const btn = $("menuDiagLog"), sheet = $("diagLogSheet"),
-    pre = $("diagLogText"), hint = $("diagLogHint"), copyBtn = $("diagLogCopy"), clearBtn = $("diagLogClear"), closeBtn = $("diagLogClose");
+    pre = $("diagLogText"), hint = $("diagLogHint"), copyBtn = $("diagLogCopy"), shareBtn = $("diagLogShare"), clearBtn = $("diagLogClear"), closeBtn = $("diagLogClose");
   if (!btn || !sheet || !pre || !hint || !copyBtn || !clearBtn || !closeBtn) return;   // 标记缺席（single-html 裁剪等）→ 功能静默不在
 
   function render(): void {
@@ -26,30 +27,56 @@ export function initDiagLogSheet(deps: { status: (msg: string, persist?: boolean
     pre!.textContent = n ? toText() : t("diag.empty");
     pre!.scrollTop = pre!.scrollHeight;   // 最新在底
   }
+  // 2026-09-06 user「黑匣子 copy 按钮没有用」：反馈以前只走状态栏，图库模式下状态栏整条被藏 → 看起来没反应。
+  //   现在反馈写进 sheet 自己的提示行（status 仍报一份）。
+  function say(msg: string, persist = false): void { hint!.textContent = msg; deps.status(msg, persist); }
   function open(): void { setMenuOpen(false); render(); openSheet(sheet!); }
   _open = open;
   function close(): void { closeSheet(sheet!); }
 
+  // 剪贴板三级回退：navigator.clipboard → 隐藏 textarea + execCommand("copy")（iOS 手势内仍可用）→ 选中 <pre> 让用户长按拷贝
+  function copyViaTextarea(text: string): boolean {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.left = "-9999px"; ta.style.top = "0";
+    document.body.appendChild(ta);
+    ta.focus(); ta.select(); ta.setSelectionRange(0, text.length);
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch { ok = false; }
+    ta.remove();
+    return ok;
+  }
   async function copy(): Promise<void> {
     const text = toText();
     const n = entries().length;
     try {
       if (!navigator.clipboard?.writeText) throw new Error("navigator.clipboard.writeText unavailable");
       await navigator.clipboard.writeText(text);
-      deps.status(t("diag.copied", { n }));
+      say(t("diag.copied", { n }));
+      return;
     } catch (e) {
-      // 回退：选中文本，用户长按「拷贝」；同时上报（log 级：本身就是诊断路径，别叠横幅）
-      try {
-        const range = document.createRange(); range.selectNodeContents(pre!);
-        const sel = window.getSelection(); sel?.removeAllRanges(); sel?.addRange(range);
-      } catch { /* 选区都做不了：只剩状态栏提示 */ }
-      reportError(new Error("[diag-log] clipboard copy failed: " + String(e)), "log");
-      deps.status(t("diag.copyFailed"), true);
+      reportError(new Error("[diag-log] clipboard.writeText failed: " + String(e)), "log");
     }
+    if (copyViaTextarea(text)) { say(t("diag.copied", { n })); return; }
+    // 回退：选中文本，用户长按「拷贝」；同时上报（log 级：本身就是诊断路径，别叠横幅）
+    try {
+      const range = document.createRange(); range.selectNodeContents(pre!);
+      const sel = window.getSelection(); sel?.removeAllRanges(); sel?.addRange(range);
+    } catch { /* 选区都做不了：只剩提示行 */ }
+    reportError(new Error("[diag-log] execCommand copy failed too"), "log");
+    say(t("diag.copyFailed"), true);
+  }
+  // Web Share（iPad：直接发给备忘录 / 邮件 / 任何 app）；不支持的环境隐掉钮
+  const canShare = typeof navigator.share === "function";
+  if (shareBtn) {
+    shareBtn.hidden = !canShare;
+    shareBtn.addEventListener("click", async () => {
+      try { await navigator.share({ title: t("diag.title"), text: toText() }); }
+      catch (e) { if ((e as { name?: string })?.name !== "AbortError") { reportError(new Error("[diag-log] share failed: " + String(e)), "log"); say(t("diag.shareFailed"), true); } }
+    });
   }
 
   btn.addEventListener("click", open);
   copyBtn.addEventListener("click", () => { void copy(); });
-  clearBtn.addEventListener("click", () => { clear(); render(); deps.status(t("diag.cleared")); });
+  clearBtn.addEventListener("click", () => { clear(); render(); say(t("diag.cleared")); });
   closeBtn.addEventListener("click", close);
 }

@@ -299,8 +299,12 @@ function _enterFilterBrushMode(Filter: FilterLike, variantId?: string) {
     : variant.params;
   if (Filter.sampleModes) params = { ...params, sample: desk.liquify.sample };
   if (Filter.mixModes) params = { ...params, mix: _currentMixSpace() };   // 2026-09-05 手指：混色空间跟偏好
-  // 2026-09-06 「揉匀」旋钮值跟画走（toolStates.<key>.dull）：有记录 → 覆盖 variant 预设
-  { const savedDull = state.toolStates[tsKey]?.dull; if (Filter.brushSliders?.some((sl) => sl.key === "dull") && typeof savedDull === "number") params = { ...params, dull: savedDull }; }
+  // 2026-09-06 旋钮值跟画走（toolStates.<key>.{dull,dilution,memoryLength}，user 点头）：有记录 → 覆盖 variant 预设（只认本 variant 露出的旋钮）
+  { const ts = state.toolStates[tsKey] as unknown as Record<string, unknown> | undefined;
+    for (const sl of Filter.brushSliders || []) {
+      if (!PERSISTED_SLIDER_KEYS.has(sl.key) || (sl.variants && !sl.variants.includes(variant.id))) continue;
+      const saved = ts?.[sl.key]; if (typeof saved === "number") params = { ...params, [sl.key]: saved };
+    } }
   state.filterBrush = { Filter, params, variantId: variant.id, variantLabel: variant.title };
   if (state.toolStates[tsKey]) state.toolStates[tsKey].variantId = variant.id;
   dialReactive.payload = Filter.id;   // 先于 setTool：currentBrush/rack 按 payload 选 dial key
@@ -329,6 +333,8 @@ function _exitFilterBrushMode() {
 //   按 filter 声明的能力**按序**出 spec：title → variant → sample → mix → 连续旋钮 → bleed（有选区）→ | → 笔架 → ✓。
 //   chrome/定位/「…」溢出全归工厂（与套索/形状条同皮同位——user 2026-09-05「smudge 笔刷工具条位置不对」的病根是 .crop-toolbar 皮）。
 let _fbToolbar: ContextToolbarHandle | null = null;
+// 滤镜笔旋钮里跟画持久化的键（toolStates.<key>.*；类型面在 app-context ToolDial）。新键 = 新持久化字段，加之前先问 user（家规）。
+const PERSISTED_SLIDER_KEYS = new Set(["dull", "dilution", "memoryLength"]);
 function _fbRows(): ToolbarItem[][] {
   const fb = state.filterBrush;
   if (!fb) return [];
@@ -347,7 +353,8 @@ function _fbRows(): ToolbarItem[][] {
       fb.params = np;
       fb.variantId = v.id;
       fb.variantLabel = v.title;
-      { const k = _toolStateKeyFor(Filter); const ts = state.toolStates[k]; if (ts) { ts.variantId = v.id; ts.dull = typeof np.dull === "number" ? np.dull : undefined; } }   // 切 variant：旋钮记忆回预设
+      { const k = _toolStateKeyFor(Filter); const ts = state.toolStates[k] as unknown as Record<string, unknown> | undefined;
+        if (ts) { ts.variantId = v.id; for (const key of PERSISTED_SLIDER_KEYS) ts[key] = typeof np[key] === "number" ? np[key] : undefined; } }   // 切 variant：旋钮记忆回预设
       // UI 态不 mark dirty（user 2026-06-10）：variant 选择是工具态，保存时顺手捞；真应用滤镜走 histchange 门。
       setStatus(t("mi.switchedTo", { title: v.title }));
       _renderFilterBrushToolbar();   // 旋钮值随 variant 预设变 → 重画条
@@ -377,8 +384,8 @@ function _fbRows(): ToolbarItem[][] {
       onInput: (v) => {
         const pv = toP(v);
         fb.params = { ...fb.params, [sl.key]: pv };
-        // 持久化只有 dull（per-doc，user 点头）；稀释/记忆 = 新持久化字段，落地前要 user 一句话同意（handoff §5）→ 先 session 态
-        if (sl.key === "dull") { const ts = state.toolStates[_toolStateKeyFor(Filter)]; if (ts) ts.dull = pv; }
+        // 持久化（per-doc）：dull（user 09-06「尾巴」点头）+ dilution / memoryLength（user 09-06 晚「要」）
+        if (PERSISTED_SLIDER_KEYS.has(sl.key)) { const ts = state.toolStates[_toolStateKeyFor(Filter)] as unknown as Record<string, unknown> | undefined; if (ts) ts[sl.key] = pv; }
       } });
   }
   // ③ 边界取样（液化且有选区）
