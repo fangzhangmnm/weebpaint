@@ -155,6 +155,13 @@ export function onFilterRegistered(fn: (item: Filter) => void): () => void {
   return _reg.onRegistered(fn);
 }
 
+// ============= 前景色读口（2026-09-05）=============
+// 插件（渐变映射「取前景色」）要读当前前景色，但 plugins/ 不该 import app 层（color-panel / app-context）——
+// 由 filters-adjust.initFiltersAdjust 注入 provider，这里只做转发。缺省黑。
+let _fgProvider: (() => string) | null = null;
+export function setFilterForegroundColorProvider(fn: () => string): void { _fgProvider = fn; }
+export function filterForegroundColor(): string { return _fgProvider ? _fgProvider() : "#000000"; }
+
 // ============= 共享 helper =============
 
 // 一行 slider row：label + 滑块 + 数字

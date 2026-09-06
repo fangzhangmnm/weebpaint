@@ -140,14 +140,14 @@ describe("filter-gate · 选区 mask", () => {
 });
 
 describe("filter-gate · kernel 清单 / 生命周期", () => {
-  it("六 region kernel 全注册；defaults JSON-able（MCP schema 前提）", () => {
-    for (const id of ["hsb", "colorBalance", "curves", "mosaic", "halftone", "stainedGlass"]) {
+  it("七 region kernel 全注册；defaults JSON-able（MCP schema 前提）", () => {
+    for (const id of ["hsb", "colorBalance", "curves", "gradientMap", "mosaic", "halftone", "stainedGlass"]) {
       const k = getFilterKernel(id);
       eq(k.id, id);
       const d = k.defaults();
       assert(bytesEqJson(d), `${id}.defaults() JSON round-trip 结构不变`);
     }
-    eq(Object.keys(FILTER_KERNELS).length, 6, "清单封闭集 = 6（新 region filter 必须显式入册）");
+    eq(Object.keys(FILTER_KERNELS).length, 7, "清单封闭集 = 7（新 region filter 必须显式入册；2026-09-05 +gradientMap）");
     function bytesEqJson(d) { return JSON.stringify(JSON.parse(JSON.stringify(d))) === JSON.stringify(d); }
   });
 

@@ -11,7 +11,7 @@ import { registerFloatingWindow, type FloatingWindowHandle } from "./ui/floating
 import { t, tLatin } from "./i18n/index.ts";
 import { desk } from "./workbench-state.ts";
 import { PANELS, openExclusive, closeExclusive } from "./panel-state.ts";
-import { getFilter, listFilters, onFilterRegistered } from "./filters.ts";
+import { getFilter, listFilters, onFilterRegistered, setFilterForegroundColorProvider } from "./filters.ts";
 import { positionPopup } from "./anchored-popup.ts";
 import { openAdoptedPopup, closePopupMenuOf, isPopupOpen } from "./ui/popup-menu.ts";   // 2026-09-02 C1：调整 popup 收养
 import { registerContextToolbar } from "./ui/context-toolbar.ts";   // 2026-09-02 C4
@@ -395,6 +395,7 @@ function _renderFilterBrushToolbar() {
 export function initFiltersAdjust(ctx: AppContext) {
   ({ state, editMode, doc, board, history, setStatus, updateSaveStatus, wp2,
      _suppressTransientPanels, _restoreTransientPanels, dialReactive } = ctx);
+  setFilterForegroundColorProvider(() => state.color);   // 2026-09-05 渐变映射「取前景色」读口（插件不 import app 层）
   // 调整面板 = 浮窗（2026-09-02 C2）：z/拖/钳制归 ui/floating-window；初始摆位仍走 positionPopup（钉右、让顶栏）。
   //   不进 transient 抑制（它本身就是 adjust-color transient 的 UI）。拖动那份原在 topbar-menu.ts，已删。
   registerContextToolbar(document.getElementById("filterBrushToolbar"));   // C4：滤镜笔条登记

@@ -58,6 +58,8 @@ export declare function registerFilter(FilterClass: Filter): void;
 export declare function getFilter(id: string): Filter | null;
 export declare function listFilters(): Filter[];
 export declare function onFilterRegistered(fn: (item: Filter) => void): () => void;
+export declare function setFilterForegroundColorProvider(fn: () => string): void;
+export declare function filterForegroundColor(): string;
 export interface SliderRowOpts {
     fmt?: (value: number) => string;
     gradient?: string;

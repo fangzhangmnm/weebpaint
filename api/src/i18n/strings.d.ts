@@ -6973,6 +6973,61 @@ export declare const S: {
         readonly en: "Delete key";
         readonly ja: "キーを削除";
     };
+    readonly "flt.gm.title": {
+        readonly zh: "渐变映射";
+        readonly en: "Gradient map";
+        readonly ja: "グラデーションマップ";
+    };
+    readonly "ramp.interp": {
+        readonly zh: "插值";
+        readonly en: "Interpolation";
+        readonly ja: "補間";
+    };
+    readonly "ramp.interp.linear": {
+        readonly zh: "线性";
+        readonly en: "Linear";
+        readonly ja: "リニア";
+    };
+    readonly "ramp.interp.constant": {
+        readonly zh: "阶跃";
+        readonly en: "Constant";
+        readonly ja: "一定";
+    };
+    readonly "ramp.interp.ease": {
+        readonly zh: "缓和";
+        readonly en: "Ease";
+        readonly ja: "イーズ";
+    };
+    readonly "ramp.space": {
+        readonly zh: "色彩空间";
+        readonly en: "Color space";
+        readonly ja: "色空間";
+    };
+    readonly "ramp.flip": {
+        readonly zh: "翻转";
+        readonly en: "Flip";
+        readonly ja: "反転";
+    };
+    readonly "ramp.pickForeground": {
+        readonly zh: "取前景色";
+        readonly en: "Use foreground color";
+        readonly ja: "描画色を使う";
+    };
+    readonly "ramp.addStop": {
+        readonly zh: "加色标";
+        readonly en: "Add stop";
+        readonly ja: "ストップを追加";
+    };
+    readonly "ramp.removeStop": {
+        readonly zh: "删色标";
+        readonly en: "Delete stop";
+        readonly ja: "ストップを削除";
+    };
+    readonly "ramp.pos": {
+        readonly zh: "位置";
+        readonly en: "Position";
+        readonly ja: "位置";
+    };
     readonly "flt.liq.title": {
         readonly zh: "液化";
         readonly en: "Liquify";

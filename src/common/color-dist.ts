@@ -30,6 +30,24 @@ export function srgbToOklab(r8: number, g8: number, b8: number): [number, number
   ];
 }
 
+/** OKLab → 8-bit sRGB（srgbToOklab 的逆；Ottosson 标准系数）。色带 OKLab 插值用（2026-09-05，color-ramp.ts）。
+ *  出 gamut 的分量钳到 0..255；端点回归原色由 test/color-ramp.test.mjs 锁。edited by Claude Fable 5.1 */
+export function oklabToSrgb(L: number, a: number, b: number): [number, number, number] {
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+  const l = l_ * l_ * l_, m = m_ * m_ * m_, s = s_ * s_ * s_;
+  const rl = +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+  const gl = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+  const bl = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s;
+  const enc = (c: number): number => {
+    const v = c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(Math.max(c, 0), 1 / 2.4) - 0.055;
+    const x = v * 255;
+    return x < 0 ? 0 : x > 255 ? 255 : x;
+  };
+  return [enc(rl), enc(gl), enc(bl)];
+}
+
 /**
  * 以种子色为锚的距离闭包：`(r,g,b,a) => [0,1]`。flood barrier / 同色全图逐像素调用。
  * 直读 tiles 的 RGBA 是 straight alpha（v0.6.39）；α=0 处 RGB 可能是烂值，但 α 差先顶满 → 不受污染

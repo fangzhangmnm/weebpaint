@@ -8,11 +8,13 @@ import { HsbKernel } from "./hsb-kernel.ts";
 import { ColorBalanceKernel } from "./color-balance-kernel.ts";
 import { CurvesKernel } from "./curves-kernel.ts";
 import { MosaicKernel, HalftoneKernel, StainedGlassKernel } from "./stylize-kernels.ts";
+import { GradientMapKernel } from "./gradient-map-kernel.ts";   // 2026-09-05 渐变映射（color-ramp 首消费者）
 
 export const FILTER_KERNELS: Readonly<Record<string, FilterKernel>> = Object.freeze({
   [HsbKernel.id]: HsbKernel,
   [ColorBalanceKernel.id]: ColorBalanceKernel,
   [CurvesKernel.id]: CurvesKernel,
+  [GradientMapKernel.id]: GradientMapKernel,
   [MosaicKernel.id]: MosaicKernel,
   [HalftoneKernel.id]: HalftoneKernel,
   [StainedGlassKernel.id]: StainedGlassKernel,

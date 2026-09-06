@@ -10,6 +10,7 @@
 import "./hsb.ts";
 import "./color-balance.ts";
 import "./curves.ts";
+import "./gradient-map.ts";   // 2026-09-05 渐变映射（color-ramp 首消费者）
 // 笔刷类（modes=["brush"]）：sharpenBlur 和 liquify 走 filter brush engine
 import "./sharpen-blur.ts";
 import "./liquify.ts";
