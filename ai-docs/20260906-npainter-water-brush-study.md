@@ -126,3 +126,65 @@ Water：**blending 51、dilution 32、persistence 20、watering 68**、colouring
 - itch：https://mrgaturus.itch.io/npainter（截图二、三来自该页/作者演示）
 - GitHub：https://github.com/mrgaturus/npainter（master @ e3d029d「readme.md: this project is not dead」；作者正改写为 C + SDL3，Mastodon @mrgaturus）
 - 本仓：`ai-docs/20260905-smudge-math-survey.md`（GIMP/MyPaint/Krita 三家公式）、`src/plugins/smudge-engine.ts`、`src/backend/algorithms/color-mix.ts`
+
+## 10. 同日追加：gap closing 不是同款论文 · 演示视频 · 「不是 AI 写的」证据
+
+> user 2026-09-06 追问：「顺便看一下他的 gap closing 是不是同款论文。以及突然发现他这个完成度可能不是 ai 写的」「帮我看一下有没有演示视频，我想看一下他的那些笔刷的 nature」。
+> 读过的文件：`src/wip/binary.nim`、`src/wip/binary/{binary.h,ffi.nim,convert.c,floodfill0.c,floodfill1.c,distance0.c,distance1.c,smooth.c}`。
+> 验证方式：把他的 `.c` 目标文件链进本机 harness（job tmp，`gaptest/harness.c`，随 job 删除；不落仓、不分发）在 44×22 合成图上跑，下面每条「实测」都有输出为证。
+
+### 10.1 gap closing：形态学派，不是几何派
+
+**他的流程**（油漆桶 `flood`）：
+
+1. 二值化：与种子色差 > 容差 = 障碍（255），其余可填（0）。
+2. 普通扫描线 flood → 填充区 R（此时会从缺口漏出去）。
+3. **开运算**，用两趟带位置传播的近似平方欧氏距离变换（3-pass chamfer，SSE4.1）做：
+   第一趟以「非 R」为源，输出「距离 < gap」= 全图减去腐蚀核 E（距任何障碍/外部 ≥ gap 的 R 像素）；
+   第二趟以 E 为源，输出「距离 < gap」= dilate(E, gap) = O。O = R 的开运算：宽 < 2·gap 的通道、比圆盘尖的角、细颈全被剔掉。
+4. 取反 O，跑**双层扫描线 flood**：每条 scanline 先走「主体」R∩O，走完可以**顺势拐进**「细缝」R\O 再走到头；从细缝出发的 scanline 只能在细缝里走、**不能回到主体**（左向还有一条显式护栏）。竖向推栈同理：主体推任何 R 邻居，细缝只推细缝邻居。标 127。
+5. 127 上色（可选 AA：3×3 邻域 → 256 项「magic number」查表 → 边缘灰阶，不是超采样）。
+
+**实测（gap=3，两个房间共一堵墙、墙上 3 px 缺口，左房内一个尖角）**：
+
+| 种子 | 结果 |
+|---|---|
+| 左房中央 | 填满左房 + 缺口本身 + 尖角，**不进右房** |
+| 贴左墙 1 px | 与中央完全一致（**v71 致命问题 1 消失**：他是 flood 之后腐蚀「填充区」再膨胀回来，不是 flood 之前膨胀障碍，所以带状区在 O 里） |
+| 尖角尖端 | 只填尖角 7 px（sliver）|
+| 缺口里 | 只填缺口 3 px |
+| 右房中央 | 填满右房 + 缺口，不进左房（缺口归先点的那边）|
+| gap=12 > 房半宽 9.5 | E 空 → O 空 → 全是「细缝」→ 退化成普通 flood（两房全填 = 漏）。gap 太大不是「填不了」而是「回到无 gap closing」 |
+
+⇒ **v71 的问题 2（细特征消失）变成：细特征跟着你点的主体一起填；直接点细特征只得到细特征本身**。这是可接受的行为（sliver 至少可见）。
+
+**对比 WeebPaint**：
+
+| | npainter | WeebPaint 现役（`src/lineart/`，v0.7+） | WeebPaint v71（已撤，`20260528-lessons-magic-wand-gap-closing.md`） |
+|---|---|---|---|
+| 派别 | 形态学：开运算 + 有方向 flood | 几何：Fourey–Tschumperlé–Revoy 2018（端点法线 ω 配对 + Hermite 桥 + label map） | 形态学：先膨胀障碍再 flood 再膨胀选区 |
+| 能补 | 宽 < 2·gap 的任何形状缺口，**U 型平行开口无感**（只要窄） | 端点相向的缺口，dmax 可到 64 px | 同 npainter 的意图，实现错 |
+| 不能 | 大缺口（gap 大会切细颈、最终退化）；直接点细特征只得 sliver | **U 型平行开口 ω=0 盲区**（doc §「已知偏差」）| 贴线点失灵、细特征消失 |
+| 成本 | 全图 O(N)：两趟 DT + 两趟 flood，他说「huge images 也够快」 | per 层 prepare（EDT + 边界参数化 + 配对）缓存，query 查表 | — |
+| 交互 | 每次点击全算，gap 滑杆 + AA 勾选 | tap → 查 label map | — |
+
+两派**互补**：几何派补大缺口、形态学派补 U 型开口。**候选（未决策）**：把 npainter 形做成魔棒第三个 option（经典 / 线稿闭合 / 容隙），或作为线稿闭合的 fallback（ω 排除的开口交给开运算）。作者 2025-05-23 Mastodon 说 PoC 已久、另有「更好的 gap detection 且更快」的想法，未公开细节。
+
+### 10.2 演示视频（找到的全部）
+
+没有笔刷专题视频：itch 页 `video_embed` 为空、YouTube 搜索零命中、X/Twitter 不可抓（2023-12 之前的进展都发在 X）。Mastodon（`@mrgaturus@mastodon.gamedev.place`，2023-12 起，104 条）有三段：
+
+| 日期 | 内容 | 帖子 | 直链 mp4 |
+|---|---|---|---|
+| 2024-12-11 | Pepper & Carrot 同人 timelapse 42 s 1080p | https://mastodon.gamedev.place/@mrgaturus/113633836030652461 | https://cdn.masto.host/mastodongamedevplace/media_attachments/files/113/633/824/064/486/035/original/8479b2529f79402e.mp4 |
+| 2025-01-02 | drawing battle timelapse 30 s（v0.0.2 猫，测 infinite undo） | https://mastodon.gamedev.place/@mrgaturus/113759701671819567 | https://cdn.masto.host/mastodongamedevplace/media_attachments/files/113/759/699/749/526/731/original/26eda40d27e95c9b.mp4 |
+| 2025-05-23 | gap closing 演示 9 s（三角+圆各留缺口，滑杆 0 全漏 / 65 干净）| https://mastodon.gamedev.place/@mrgaturus/114557787977904426 | https://cdn.masto.host/mastodongamedevplace/media_attachments/files/114/557/784/747/345/038/original/65a461925970509b.mp4 |
+
+抽帧看过（两段 timelapse 各 12 帧 + 局部放大）：**都是赛璐璐流程**——Pen 勾线（压感粗细、稳定器）→ 油漆桶平涂 → clipping 层软笔阴影 → 大软笔背景 wash（平色、软边，看不出湿混）。**水彩笔的混色只在 itch 截图二那张色块图里能看到**；他自己画画不用水彩笔。其余 Mastodon 视频是功能演示（mask 层 / 选区蚂蚁线 / 多边形光栅器 / 图层系统 / undo）。
+
+### 10.3 「不是 AI 写的」——是
+
+- git：2019-12-06 首 commit，580 commits，逐年 42 / 190 / 87 / 11 / 101 / 125 / 24（2019→2025）；SIMD 笔刷引擎 2021 年初（Copilot 公测之前）；commit 文案「brush: alpha semi-consistency」式短句；跨六年一致的拼写癖（Ajust / Acumulator / Minimun / Smothstep / Clammped / Filinear）。
+- 本人声明：2025-03-27「⚠️this is not vibe coding⚠️」；2024-12-11「No AI, this is a program for real artists」「my art is not very good yet but at least is not an AI slop」；2023-12-08「i hate so much AI art」。
+- **对 §1「作者态度」的补充：他反 AI 立场明确**。WeebPaint 是 AI 结对仓。我们不抄代码，法律上没有致谢义务；但将来若在文案里提到他，要有心理准备他未必领情。这不改变「算法可学」的结论。
+- 灵感自述：2025-06-01「my two beloved programs are SAI and medibang paint, I know everything about those two」；2024-12-14 + openCanvas（UI 面板）；2023-12-07「brush engine is cpu rendered but optimized (a lot) with integer SIMD like SAI does」「i think i can use MyPaint spectral to aproximate realistic color mixing」（= 本仓 `color-mix.ts` spectral 档同源，他没做）。
