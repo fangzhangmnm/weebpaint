@@ -227,7 +227,12 @@ export function attachColorBrushBehavior(FilterClass: Filter): void {
     if (dist <= 0) return;
     const bs = state.brushSettings;
     const R = Math.max(2, bs.size / 2);
-    const spacingPx = Math.max(1, R * 2 * (bs.spacingValue || 0.06));
+    // 2026-09-05（user「模糊也改，都统一。之前不读可能是错误的」）：v132 起这里读 bs.spacingValue，而传进来的是
+    //   ResolvedBrush（字段名 spacing = 归一后的直径比例）→ 一直落到 0.06 写死，预设的 spacing 从未生效。改读 spacing
+    //   （spacingValue 兜底，最后 0.06）。代价（node 实测 amount −50/5 轮 box）：32px 0.6ms/dab、100px 3.9ms、300px 28ms；
+    //   滤镜笔出厂 2%（v0.13.3）后 1000px 一笔 ≈ 0.6s / 2.0s / 4.7s（6% 时 0.3 / 0.7 / 1.6s）。大笔模糊要快得另做可分离核/GPU。
+    const spacingFrac = (typeof bs.spacing === "number" && bs.spacing > 0) ? bs.spacing : (bs.spacingValue || 0.06);
+    const spacingPx = Math.max(1, R * 2 * spacingFrac);
     state.pendingDist += dist;
     if (state.pendingDist < spacingPx) {
       state.lastX = x; state.lastY = y;

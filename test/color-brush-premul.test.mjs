@@ -37,3 +37,25 @@ describe("color-brush 末步预乘（模糊笔黑边残留）", () => {
     assert(checked > 0 && spread > 0, "模糊应把 alpha 扩进原本透明的一侧（否则测不到边）");
   });
 });
+
+describe("滤镜笔间距沿笔（2026-09-05 user「模糊也改，都统一」）", () => {
+  it("同一笔画：spacing 0.1 的 dab 数明显多于 0.5；缺 spacing 时 spacingValue 兜底", () => {
+    const orig = SharpenBlurFilter.bake;
+    const count = (bs) => {
+      let n = 0;
+      SharpenBlurFilter.bake = function (...a) { n++; return orig.apply(this, a); };
+      try {
+        const L = mockLayer(80, 24); L.fill(0, 0, 80, 24, [200, 100, 50, 255]);
+        const st = SharpenBlurFilter.beginBrushStroke([L], { amount: -20 }, bs, null, 10, 12, 1);
+        for (let x = 11; x <= 60; x++) SharpenBlurFilter.extendBrushStamp(st, x, 12, 1);
+        SharpenBlurFilter.endBrushStroke(st);
+      } finally { SharpenBlurFilter.bake = orig; }
+      return n;
+    };
+    const coarse = count({ size: 10, hardness: 0.5, flow: 1, spacing: 0.5 });
+    const fine = count({ size: 10, hardness: 0.5, flow: 1, spacing: 0.1 });
+    const legacy = count({ size: 10, hardness: 0.5, flow: 1, spacingValue: 0.5 });
+    assert(fine > coarse * 3, `0.1 应比 0.5 多得多 (fine=${fine}, coarse=${coarse})`);
+    assert(Math.abs(legacy - coarse) <= 1, `spacingValue 兜底与 spacing 同值同 dab 数 (legacy=${legacy}, coarse=${coarse})`);
+  });
+});
