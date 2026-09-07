@@ -17,6 +17,8 @@
   范围：index.html 注释剥离（注意别碰 `ICON-SPRITE:BEGIN` 之类的生成器标记注释，它们是脚本锚点）、
   mjs 产物的进一步优化。**未动码**。edited by Claude Opus 5 (claude-opus-5[1m]) 2026-08-30。
 
+- **defringe 审计 + 范围讨论**（user 2026-09-07，matte painting/贴图缘起）：优先检查导出 PNG / .ora `mergedimage.png` / Blender push 是否都默认 defringe——静态读码：导出开、mergedimage 与 Blender push **未过** defringe，待测试验证 + user 一句话定默认；**待讨论项 = defringe 范围有多大（是不是每个图层都 defringe / 铺满 vs N px 环 / 导出时 vs 落盘时）**，user 要亲自和接手 agent 讨论。全文 = `ai-docs/inbox/20260907-defringe-audit-mergedimage-and-blender-push.md`。edited by Claude Fable 5.1 2026-09-07。
+
 ## user 拍板 park（「可以先把之前一些不能随手修的需求parked」2026-08-29）
 
 1. **reference 窗口整改批** → **0830 全落地 v0.12.7 推 dev**（spec =
