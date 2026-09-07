@@ -103,6 +103,33 @@ concurrency:
 - **超出记录在案手段就停**：空 commit 后仍不切 = 新情况，找人，别再自创花招（08-31 教训：修法早在 memory 索引里，
   却从零排查了 20 分钟、还把已验证的空 commit 误判成「动历史的高危操作」）。
 
+## 坑三：deploy-pages 硬失败 `Multiple artifacts named "github-pages" were unexpectedly found for this workflow run. Artifact count is 3`
+
+> added 2026-09-07 by Claude Fable 5.1；案发 CatsUp `ac0cacc`（run 34091198532）。与坑一/坑二**都不是一回事**：run 直接 **failure**，不是 success 骗人。
+
+### 现象
+
+- workflow 只有一个 job、一次 `upload-pages-artifact@v3`（同 deploy 模板），但该 run 的 artifacts API 列出 **3 个同名 `github-pages`**，
+  大小完全相同（307561 B）、创建时间相隔 <1 s（06:31:59 / 06:31:59 / 06:32:00），`run_attempt=1`——同一次上传在 GitHub 侧被记了三份。
+- `deploy-pages@v4` 拒绝歧义：`Fetching artifact metadata failed … Multiple artifacts named "github-pages"` → 整个 run failure。
+  站点保持上一次成功部署的内容（`/dev/` 仍是旧 bundle），不是半成品。
+- 前后几次 push 的 run 都正常，说明是 GitHub 侧的偶发（Actions/Artifacts 抖动），仓库与 workflow 没变。
+
+### 记录在案的修法（09-07 验证，新 run 成功后 15 秒源站即切）
+
+**起一个全新 run**：`gh workflow run "Deploy Pages" --ref main`（模板有 `workflow_dispatch`）。新 run 只会有自己那一份 artifact。
+**别 `gh run rerun` 同一个 run**：artifact 挂在 run 上不按 attempt 区分，重跑会看到旧的 3 份 + 新的 1 份，大概率再撞。
+（坑二里「workflow_dispatch 无效」说的是同 sha 去重那种情形；坑三是 run 根本没部署，dispatch 就是对症的。）
+**验证仍按规程探 content-hash bundle URL**（`/dev/dist/catsup-<hash>.mjs?probe=$RANDOM` 应 200；旧 hash 应 404），不探 index.html。
+
+### 怎么分辨是哪个坑
+
+| 症状 | 坑 | 处方 |
+|---|---|---|
+| 两个 run 都 success，`/` 旧 `/dev/` 新，两 run 时间重叠 | 一 | 模板 `cancel-in-progress: true`（已落） |
+| run success、内容对、prod 与 main 同 sha、源站不切 | 二 | `scripts/kick-pages.sh`（空 commit + `git push origin main main:prod` 原子推） |
+| run **failure**，日志 `Multiple artifacts named "github-pages"` | 三 | `gh workflow run "Deploy Pages" --ref <branch>` 起新 run |
+
 ## 救活已经搞砸的 deploy
 
 如果已经踩进去（live 还显示旧内容）：
