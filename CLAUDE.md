@@ -2,6 +2,8 @@
 
 Procreate 级绘画 PWA。UI 中文。iPad 是手感的最终裁判。
 
+- **开工先看便条箱 `ai-docs/inbox/`**（兄弟仓 agent 留的便条，如 CatsUp 将来要的 iframe+ora 交接协议 / `@internal/paint-engine` 抽库；看完在便条末尾签「已阅」，不删。user 2026-09-07 立：「你 weebpaint 那里留个便条和看便条的钩子呗」；edited by Claude Fable 5.1）。
+
 ## 【宣发红线】（2026-08-28 user 拍板，字面执行；edited by Claude Fable 5）
 
 - **清干净任务前永不宣发**：只要还有**一条用户没有明确 park 的提案/工单**，禁止宣发、禁止 nudge 用户测试、禁止提写作文案。「做一半 + 加床垫（兼容垫层/替身/过渡兜底）」一律算未完成；「不挡宣发/发后清账」这类软化分栏禁止使用。完成状态 SSoT = `ai-docs/20260828-localfile-knight-completion-ledger.md`（每条 = done / 半成品缺什么 / 未动 / user-park 带出处）。背景：user「我就要一个干净的全做完」「打扫干净屋子再接待客人」「我不想让用户一开始建持久化的是一个半成品」。
