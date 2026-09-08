@@ -3,6 +3,7 @@
 Procreate 级绘画 PWA。UI 中文。iPad 是手感的最终裁判。
 
 - **开工先看便条箱 `ai-docs/inbox/`**（兄弟仓 agent 留的便条，如 CatsUp 将来要的 iframe+ora 交接协议 / `@internal/paint-engine` 抽库；看完在便条末尾签「已阅」，不删。user 2026-09-07 立：「你 weebpaint 那里留个便条和看便条的钩子呗」；edited by Claude Fable 5.1）。
+- **待办总账 = `ai-docs/20260907-ledger.md`（纯索引，一条一行，详情在别处；`test/ledger-lint.test.mjs` 守格式/编号/指针）**：取活从这里取（丢「文件 + #编号」给新 agent）；新冒出来的事只加一行到这里，不在聊天里散养；`已问`/`待拍板` 行**不催**；user 提到 §6 远景行的触发词先翻详情再动手；便条箱每条便条在 §10 有对应行。user 2026-09-07 立：「wishlist 只放引用和概括，这样改 priority, reshuffle 的时候就比较好管理」。edited by Claude Fable 5.1 2026-09-07
 
 ## 【宣发红线】（2026-08-28 user 拍板，字面执行；edited by Claude Fable 5）
 
