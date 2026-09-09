@@ -41,11 +41,14 @@
 `desk.ruler = { on, kind, constrain, geo, gridNu, gridNv }`（per-doc `editor-state.json`）；`desk.shapeBrush.*` 删除（老 doc 的 stale 键 mergeInto 静默忽略）。
 doc 裁切 / 翻转 / 旋转 / 缩放 / 偏移经 `remapDeskRuler`（desk 直写，与 persp 同点挂钩）。
 
-## 待讨论（user「45 我需要讨论下」）
+## 待讨论（user「45 我需要讨论下」；Q5 已决见下）
 
 - **Q4 谁吸尺**：现 `RULER_ROLES = draw / erase / filterBrush`（画笔 / 橡皮 / 手指族）。选区笔不走 input 的像素笔切口（lasso role 里借 brush 引擎），
   要吸尺得另开一个钩子。总账 #64。
-- **Q5 像素画模式**：投影点进像素笔后落整数像素，不再保证 Bresenham 整数圆锥；`pixel-conic.ts` 与其测试暂留（未被引用），user 拍板后删或做「描尺」命令。总账 #65。
+- ~~Q5 像素画模式~~ **已决（v0.14.8）**：user「B 同意，必须用整数的像素算法，不然像素画场景就是废」→ 像素画模式下尺子 = **整数像素链投影器**
+  （`ruler.ts pixelGuide`：直线 Bresenham / 轴对齐椭圆 midpoint / 任意四边形内切圆 Zingl conic（`pixel-conic.ts` 继续活着）/ 矩形周界 / 格线逐段），
+  投影 = 链上最近像素，上次到这次之间的链像素按序经 `StrokeSession.stampPixels` 落点，每像素恰好一次（本笔 seen-set），永不走弦。
+  椭圆尺放置时记外接 quad（透视下 = 平面方框的像）供 conic 用；老档无 quad 退化成 polyline 逐段 Bresenham。
 
 ## 已知余量（本 ADR 记着，不是 bug）
 

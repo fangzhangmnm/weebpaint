@@ -202,6 +202,11 @@ export class StrokeSession {
   extend(x: number, y: number, pressure: number, t: number | null = null) {
     this.engine.extendStroke(x, y, pressure, t);
   }
+  /** ADR-0013 像素链尺：整数像素按序落点（引擎 stampPixels，每像素恰好一次，绕过 spacing 走步 / 弦）。引擎没有 stampPixels → no-op。 */
+  stampPixels(pts: Array<{ x: number; y: number }>, pressure: number) {
+    const eng = this.engine as { stampPixels?: (pts: Array<{ x: number; y: number }>, pressure: number) => void };
+    eng.stampPixels?.(pts, pressure);
+  }
 
   /** 引擎累积的 dirty bbox（board.markDocDirty 用）；无 → null */
   flushDirty() { return this.engine.flushDirty(); }

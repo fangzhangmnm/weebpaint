@@ -93,7 +93,8 @@ export function rulerOverlay(r: Ruler, frame: PerspConfig | null, view: ViewInfo
 - 放置**不进 undo**（§3.3 原写「放置 = 一步 undo」，改：重拖即换，省 RulerComponent；记 ADR-0013 余量）。
 - `LeftDialOpts += getDialVisible / getPickVisible / getRuler / onRulerTap / onRulerLongpress`；`dialReactive += transient / rulerOn / rulerPlacing`。
 - `input.ts`：`setRulerGuideProvider(fn)`、`shiftDown`；S 键派 `wp:ruler-tap`（不 import ruler-ui，防环）。edit-mode `rulerPlace` ctrlZ = abort-transient。
-- 选区笔不在切口内（lasso role 借 brush 引擎）→ Q4 待讨论（总账 #64）；pixel-conic.ts 暂留（Q5，#65）。
+- 选区笔不在切口内（lasso role 借 brush 引擎）→ Q4 待讨论（总账 #64）。
+- Q5 已决（v0.14.8）：`StrokeGuide.projectPath?` + `guideFor(r, frame, { box })` 像素分支 = 整数像素链（`pixelGuide`）；`RulerEllipse.quad?` 外接四边形；input 像素笔走 `StrokeSession.stampPixels` 不 extend。
 
 ## 3. 行为
 

@@ -87,6 +87,11 @@ export declare class StrokeSession {
     get open(): boolean;
     /** 投喂一个输入事件（x,y 为 doc 坐标；t = 事件 timeStamp，手感数学的唯一时钟） */
     extend(x: number, y: number, pressure: number, t?: number | null): void;
+    /** ADR-0013 像素链尺：整数像素按序落点（引擎 stampPixels，每像素恰好一次，绕过 spacing 走步 / 弦）。引擎没有 stampPixels → no-op。 */
+    stampPixels(pts: Array<{
+        x: number;
+        y: number;
+    }>, pressure: number): void;
     /** 引擎累积的 dirty bbox（board.markDocDirty 用）；无 → null */
     flushDirty(): [number, number, number, number] | null;
     /** GPU stamp overlay 拉取（brush/形状笔有；liquify/filterBrush 无 → null，走 shadow/live-sync） */

@@ -94,7 +94,7 @@ export declare class InputController {
     lasso: LassoEngine;
     filterBrush: FilterBrushEngine;
     _strokeGuide: StrokeGuide | null;
-    _rulerGuideProvider: ((role: string) => StrokeGuide | null) | null;
+    _rulerGuideProvider: ((role: string, pixel: boolean) => StrokeGuide | null) | null;
     shiftDown: boolean;
     getTool: () => string;
     editMode: EditMode | null;
@@ -144,7 +144,7 @@ export declare class InputController {
     _endStroke(): void;
     _abortStroke(): void;
     /** ADR-0013：尺子投影器提供方（app 接 ruler-ui.guideForStroke）；返回 null = 本笔不吸。 */
-    setRulerGuideProvider(fn: ((role: string) => StrokeGuide | null) | null): void;
+    setRulerGuideProvider(fn: ((role: string, pixel: boolean) => StrokeGuide | null) | null): void;
     isStrokeActive(): boolean;
     collectActiveStamps(): ReturnType<BrushEngine["collectStamps"]>;
     abortActiveStroke(): void;

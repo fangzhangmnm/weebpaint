@@ -117,3 +117,103 @@ describe("ruler · remap / 校验", () => {
     eq(R.rulerSegments({ kind: "persp" }, 800, 600).length, 0);
   });
 });
+
+describe("ruler · 像素链（Q5，user 2026-09-09「B 同意，必须用整数的像素算法，不然像素画场景就是废」）", () => {
+  const box = { x0: -64, y0: -64, x1: 864, y1: 664 };
+  const key = (p) => p.x + "," + p.y;
+  const conn8 = (seq) => { for (let i = 1; i < seq.length; i++) if (Math.abs(seq[i].x - seq[i - 1].x) > 1 || Math.abs(seq[i].y - seq[i - 1].y) > 1) return false; return true; };
+  it("正圆尺：链 = midpoint 椭圆像素集（与 bresenhamEllipseRect 同集）；绕一圈每像素恰好一次、8 连通；回头不重吐", async () => {
+    const { bresenhamEllipseRect } = await import("../src/shape-geometry.ts");
+    const r = R.placeFromLoop([{ x: 20.5, y: 20.5 }, { x: 28.5, y: 20.5 }], { ...O, constrain: true });   // 圆心 (20.5,20.5) r=8 → 盒像素 12..28
+    assert(r.quad, "正圆尺带外接 quad");
+    const g = R.guideFor(r, null, { box });
+    assert(g && g.projectPath, "像素链投影器（projectPath）");
+    const expect = new Set(bresenhamEllipseRect(12, 12, 28, 28).map(key));
+    const got = [g.begin(28.5, 20.5)];
+    for (let k = 1; k <= 64; k++) { const a = (k / 64) * Math.PI * 2; got.push(...g.projectPath(20.5 + 9 * Math.cos(a), 20.5 + 9 * Math.sin(a))); }
+    const keys = got.map(key);
+    eq(new Set(keys).size, keys.length, "每像素恰好一次");
+    eq(new Set(keys).size, expect.size, "绕完一圈 = 整个 midpoint 圆（" + expect.size + " 颗）");
+    for (const k of keys) assert(expect.has(k), "像素在 midpoint 圆上：" + k);
+    assert(conn8(got), "沿链 8 连通");
+    eq(g.projectPath(29.5, 20.5).length, 0, "回头：已画过不重吐");
+  });
+  it("斜椭圆尺（quad 非轴对齐）走 Zingl conic：链非空、闭环 8 连通、像素在拟合椭圆 ≤ 1px 内", () => {
+    const pts = [];
+    const rot = Math.PI / 6;
+    for (let i = 0; i <= 90; i++) { const a = (i / 90) * Math.PI * 2; const x = 40 * Math.cos(a), y = 18 * Math.sin(a); pts.push({ x: 100 + x * Math.cos(rot) - y * Math.sin(rot), y: 80 + x * Math.sin(rot) + y * Math.cos(rot) }); }
+    const r = R.placeFromLoop(pts, { ...O, rot: -rot });   // 视口转了 -rot → 屏幕轴对齐拟合 = doc 里转 rot 的椭圆
+    assert(r && r.quad, "带 quad");
+    const g = R.guideFor(r, null, { box });
+    assert(g && g.projectPath, "conic 链");
+    const got = [g.begin(140, 80)];
+    for (let k = 1; k <= 72; k++) { const a = (k / 72) * Math.PI * 2; const x = 44 * Math.cos(a), y = 20 * Math.sin(a); got.push(...g.projectPath(100 + x * Math.cos(rot) - y * Math.sin(rot), 80 + x * Math.sin(rot) + y * Math.cos(rot))); }
+    assert(got.length > 100, "链非空 " + got.length);
+    assert(conn8(got), "8 连通");
+    let worst = 0;
+    for (const p of got) {
+      const dx = p.x - 100, dy = p.y - 80;
+      const u = dx * Math.cos(rot) + dy * Math.sin(rot), v = -dx * Math.sin(rot) + dy * Math.cos(rot);
+      const e = Math.abs(Math.hypot(u / 40, v / 18) - 1) * 18;   // 粗略径向像素误差（短轴尺度）
+      if (e > worst) worst = e;
+    }
+    assert(worst < 1.6, "像素贴着椭圆（最坏 " + worst.toFixed(2) + "px）");
+  });
+  it("平行线尺：起笔定链（过起点像素、沿方向的 Bresenham 线）；顺着走按序吐、倒回去不重吐", () => {
+    const g = R.guideFor({ kind: "parallel", angle: 0, anchor: { x: 0, y: 0 } }, null, { box });
+    const b = g.begin(5.3, 5.7);
+    assert(b.x === 5.5 && b.y === 5.5, "起点落格到像素中心");
+    const a1 = g.projectPath(20.2, 7);
+    eq(a1.length, 15, "6.5..20.5 共 15 颗");
+    assert(a1.every((p) => p.y === 5.5), "全在 y=5.5 那行");
+    eq(a1[0].x, 6.5); eq(a1[14].x, 20.5);
+    eq(g.projectPath(10, 5).length, 0, "倒回去：已画过");
+    const a2 = g.projectPath(-3, 5);
+    assert(a2.length > 0 && a2.every((p) => p.y === 5.5 && p.x < 5.5), "越过起点往左：吐左边新像素");
+  });
+  it("透视尺：首段 < 6px 不吐；锁族后链 = 朝 VP 的 Bresenham 线（8 连通、离射线 ≤ 1px）", () => {
+    const g = R.guideFor({ kind: "persp" }, P1, { box });
+    g.begin(0.5, 0.5);
+    eq(g.projectPath(2, 1).length, 0, "未定向不吐");
+    const seq = g.projectPath(60, 25);
+    assert(seq.length >= 50, "锁族后吐出一串 " + seq.length);
+    assert(conn8(seq), "8 连通");
+    const ux = 1000 / Math.hypot(1000, 500), uy = 500 / Math.hypot(1000, 500);
+    for (const p of seq) assert(Math.abs((p.x - 0.5) * uy - (p.y - 0.5) * ux) <= 1.0, "离 VP 射线 ≤ 1px: " + key(p));
+  });
+  it("矩形尺：轴对齐周界链（角点不重复）；格线尺：多条链，跨链只吐落点", () => {
+    const rect = R.placeFromDrag("rect", { x: 0, y: 0 }, { x: 10, y: 20 }, O);
+    const g = R.guideFor(rect, null, { box });
+    const b = g.begin(5, -2);
+    eq(b.y, 0.5, "起点吸到上边");
+    const seq = g.projectPath(12, 10);
+    assert(seq.length > 0 && conn8([b, ...seq]), "沿周界走到右边");
+    assert(seq.every((p) => p.x === 0.5 || p.x === 10.5 || p.y === 0.5 || p.y === 20.5), "像素全在周界上");
+    const grid = R.placeFromDrag("grid", { x: 0, y: 0 }, { x: 20, y: 60 }, O, { nu: 2, nv: 6 });
+    const gg = R.guideFor(grid, null, { box });
+    const b2 = gg.begin(10.2, 33.5);
+    eq(b2.x, 10.5, "吸到 x=10 竖线");
+    const down = gg.projectPath(10.3, 40.2);
+    eq(down.length, 7, "沿竖线往下 34.5..40.5");
+    const jump = gg.projectPath(3.2, 30.2);
+    eq(jump.length, 1, "跨到 y=30 横线：只吐落点");
+    eq(jump[0].y, 30.5);
+  });
+  it("老档椭圆尺（无 quad）也有像素链（polyline 逐段 Bresenham 退化路径）；连续投影器无 projectPath", () => {
+    const pts = []; for (let i = 0; i <= 40; i++) { const a = (i / 40) * Math.PI * 2; pts.push({ x: 50 + 20 * Math.cos(a), y: 50 + 20 * Math.sin(a) }); }
+    const g = R.guideFor({ kind: "ellipse", pts }, null, { box });
+    assert(g && g.projectPath, "退化链存在");
+    const c = R.guideFor({ kind: "ellipse", pts }, null);
+    assert(c && !c.projectPath, "连续投影器没有 projectPath");
+  });
+  it("placeFromLoop 拟合（rot 0）→ quad 轴对齐；remap / sanitize 带着 quad 走", () => {
+    const pts = []; for (let i = 0; i <= 64; i++) { const a = (i / 64) * Math.PI * 2; pts.push({ x: 100 + 30 * Math.cos(a), y: 50 + 15 * Math.sin(a) }); }
+    const r = R.placeFromLoop(pts, O);
+    assert(r.quad && Math.abs(r.quad[0].y - r.quad[1].y) < 1e-9 && Math.abs(r.quad[0].x - r.quad[3].x) < 1e-9, "quad 轴对齐");
+    const m = R.remapRuler(r, (p) => ({ x: p.x + 1, y: p.y }));
+    assert(m.quad && Math.abs(m.quad[0].x - (r.quad[0].x + 1)) < 1e-9, "remap 带 quad");
+    const s = R.sanitizeRuler(JSON.parse(JSON.stringify(r)));
+    assert(s && s.quad, "sanitize 保留 quad");
+    eq(R.sanitizeRuler({ kind: "ellipse", pts: r.pts, quad: [{ x: 0, y: 0 }] }).quad, undefined, "坏 quad 丢掉、尺还在");
+  });
+});

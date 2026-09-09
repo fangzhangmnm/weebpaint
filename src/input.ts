@@ -382,7 +382,7 @@ export class InputController {
   // ADR-0013 尺子（2026-09-09，形状笔引擎退役）：一笔一个投影器，_beginStroke 从 provider 取（app 接 ruler-ui），
   //   _move 的 doc 坐标经它投影再进引擎——画笔 / 橡皮 / 手指族同一切口（RULER_ROLES）。Shift 按住 = 本笔旁路尺。
   _strokeGuide: StrokeGuide | null = null;
-  _rulerGuideProvider: ((role: string) => StrokeGuide | null) | null = null;
+  _rulerGuideProvider: ((role: string, pixel: boolean) => StrokeGuide | null) | null = null;   // pixel = 当前笔 pixelMode（Q5 整数像素链尺）
   shiftDown = false;
   getTool: () => string;
   editMode: EditMode | null;
@@ -807,11 +807,17 @@ export class InputController {
           psx = sp.x; psy = sp.y;
         }
         let { x: dx, y: dy } = this.board.screenToDoc(psx, psy);
-        if (this._strokeGuide) ({ x: dx, y: dy } = this._strokeGuide.project(dx, dy));   // ADR-0013：过尺（唯一切口）
-        // 活动 engine 统一接口：liquify/filterBrush/像素 忽略多余的 pressure/时间戳参数
-        //   ev.timeStamp 给主笔刷时间常数平滑用（dt 取真实事件间隔，含 coalesced）
         //   e.pressure 当 fallback：coalesced 样本没带 pressure（0/缺失）时退回派发事件的值，不整笔冻住（2026-09-02）。
         const pressure = effectivePressureFor(rec, ev, e.pressure);
+        // ADR-0013：过尺（唯一切口）。像素链尺（像素画模式）= 链上新像素按序 stampPixels，永不走弦；连续尺 = 投影后照常 extend
+        if (this._strokeGuide?.projectPath) {
+          const path = this._strokeGuide.projectPath(dx, dy);
+          if (path.length) this._activeStroke?.stampPixels(path, pressure);
+          continue;
+        }
+        if (this._strokeGuide) ({ x: dx, y: dy } = this._strokeGuide.project(dx, dy));
+        // 活动 engine 统一接口：liquify/filterBrush/像素 忽略多余的 pressure/时间戳参数
+        //   ev.timeStamp 给主笔刷时间常数平滑用（dt 取真实事件间隔，含 coalesced）
         this._activeStroke?.extend(dx, dy, pressure, ev.timeStamp);
       }
       // 把活动 engine 累的 dirty bbox 送进 board
@@ -997,7 +1003,7 @@ export class InputController {
 
     let { x: dx, y: dy } = this.board.screenToDoc(rec.smX!, rec.smY!);
     // ADR-0013 尺子：起点也过尺（曲线尺把起点吸上去）；Shift 按住 = 本笔不吸；谁吸尺 = RULER_ROLES（Q4 讨论中）
-    const guide = (!this.shiftDown && RULER_ROLES.has(rec.role as string)) ? (this._rulerGuideProvider?.(rec.role as string) ?? null) : null;
+    const guide = (!this.shiftDown && RULER_ROLES.has(rec.role as string)) ? (this._rulerGuideProvider?.(rec.role as string, !!settings.pixelMode) ?? null) : null;
     this._strokeGuide = guide;
     if (guide) ({ x: dx, y: dy } = guide.begin(dx, dy));
     const pressure = effectivePressureFor(rec, e);
@@ -1032,7 +1038,7 @@ export class InputController {
     as.cancel();   // 引擎丢状态 + collector 倒序回滚，无痕
   }
   /** ADR-0013：尺子投影器提供方（app 接 ruler-ui.guideForStroke）；返回 null = 本笔不吸。 */
-  setRulerGuideProvider(fn: ((role: string) => StrokeGuide | null) | null) { this._rulerGuideProvider = fn; }
+  setRulerGuideProvider(fn: ((role: string, pixel: boolean) => StrokeGuide | null) | null) { this._rulerGuideProvider = fn; }
   // 任一像素笔画进行中（brush / 像素笔 / liquify / filterBrush 都设 _activeStroke）。
   // board._strokeActiveHint 用它判 livePreview（描边中走直接合成 / GL 门控），含像素笔/liquify/filterBrush。
   isStrokeActive() { return !!this._activeStroke; }

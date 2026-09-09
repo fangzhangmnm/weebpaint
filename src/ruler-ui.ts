@@ -53,11 +53,15 @@ export function rulerPlacing(): boolean { return _placing; }
 /** 吸附是否生效（有尺且开关开）。 */
 export function rulerSnapping(): boolean { return desk.ruler.on && !!currentRuler(); }
 
-/** input 的投影器提供方（app.ts 接 input.setRulerGuideProvider）。放置态 canDraw=false 结构上到不了这。 */
-export function guideForStroke(_role: string): StrokeGuide | null {
-  if (!desk.ruler.on) return null;
+/** input 的投影器提供方（app.ts 接 input.setRulerGuideProvider）。放置态 canDraw=false 结构上到不了这。
+ *  pixel = 当前笔是像素画模式 → 整数像素链投影器（Q5，user「必须用整数的像素算法」）；裁剪盒 = doc + 64px 出血（透视链端点可飞远）。 */
+export function guideForStroke(_role: string, pixel: boolean): StrokeGuide | null {
+  if (!desk.ruler.on || !_ctx) return null;
   const r = currentRuler();
-  return r ? guideFor(r, _frame()) : null;
+  if (!r) return null;
+  const { doc } = _ctx;
+  const PAD = 64;
+  return guideFor(r, _frame(), pixel ? { box: { x0: -PAD, y0: -PAD, x1: doc.width + PAD, y1: doc.height + PAD } } : undefined);
 }
 
 function _canUseRuler(): boolean {
