@@ -7,11 +7,13 @@
 //     工具身份即模式——desk.fillMode 开关已删（工具不 per-doc 持久化，与笔/套索一视同仁）。
 //   · **只 preview 不落文档**：fill 工具 + 有选区 → GPU 预览（board fill provider → 笔刷 overlay 同槽，
 //     journal v0.4 Plan L81「commit 和 live 同一个 shader，ssot」）。
-//   · 出口语义（v0.6.24「彻底不互通」拍板，ADR-0004 修订记录；супersede v0.5.15/v0.6.19）：
-//       **进 fill（从任何工具，含 lasso）= 清选区**（undo 兜底）——fill 从零开始自己点；
-//       切去任何工具（**含回 lasso**）= **commit + 清选区**（对称，无特例）；
+//   · 出口语义（2026-09-09 ADR-0004 修订 6，user「send to fill 的逻辑我需要吃书……切换选区和油漆桶的时候自动 send to fill / send to selection」
+//     → supersede v0.6.24「彻底不互通」）：**选区是文档的，不是工具的**——
+//       进 fill（从任何工具）= **携入**：有选区预览即出，不清；
+//       fill → lasso = **丢预览、留选区**（预览 = 选区 × 颜色的纯函数，回来自动重现；不 commit 故幂等）；
+//       fill → 其他工具（笔/橡皮/手指…）= **commit + 清选区**（不变，填完切笔要画画）；
 //       ✓  = commit + 清选区（留在 fill 连续填下一块）；去选 = 丢弃。
-//     mental model = 两个不能互通的工具（实现共用一条 lasso 管线）。
+//     mental model = 一个选区、两个消费它的工具（lasso 编辑它，fill 预览它）。v0.7.38「送入填色」one-shot 例外随之退役。
 //     文档关闭（autosave/崩溃 flush/beforeunload）= 丢弃（interrupt=cancel 家规不变）；
 //     **显式**换文档（open/new/导入）= 弹窗挽留（gateFillOnDocSwitch；user 2026-08-21「换文档
 //     如果走丢弃，文案里要有提示，而且要弹窗挽留」——supersede 旧「切换=丢弃」的静默半句）。
@@ -30,18 +32,6 @@ import type { ViewLeaf } from "./backend/workpiece/painting-view.ts";
 
 let _ctx: AppContext | null = null;
 let _lastPersistentMode = "";
-// v0.7.38（ADR-0004 修订 5）：「送选区进填色」的 one-shot 例外旗标——显式命令携选区进 fill 时
-// 抑制**下一次**「进 fill = 清选区」。出口语义（切走 = commit + 清）一字不动，对称性只开单向口。
-let _carryIn = false;
-
-// 把当前选区送进 fill（lasso ⋯ 菜单「送入填色」）。无选区 = 静默 no-op（按钮 needs-sel 本就禁用）。
-// 派 wp:settool 走完整 setTool 路径（rack.applyToolState 等），不直调 editMode.setTool。
-export function sendSelectionToFill(): void {
-  if (!_ctx || !_ctx.doc.selection) return;
-  if (_ctx.editMode.current() === "fill") return;
-  _carryIn = true;
-  window.dispatchEvent(new CustomEvent("wp:settool", { detail: "fill" }));
-}
 
 // ---- fill 预览期换色入 undo（v0.7.8 生；T4c 换 PendingFill 组件 + 色板 target 切换）----
 // 预览挂着时改色 = 可撤销（改的是「将要填的东西」= PendingFill.color，**笔刷色不动**）。
@@ -131,32 +121,32 @@ function _doCommit(clearSelection: boolean): boolean {
 }
 
 // fill 边界钩子。只认「持久模式 → 持久模式」的真切换；transient 括号（扩张 modal 等）不算。
-//   出口分叉（v0.5.15）：→lasso = 取消（预览是派生视图，重绘即消）；→其他工具 = commit（选区保留）。
-//   进 fill 也要补一帧（有选区时预览要立即出现——board 只在被请求时出帧）。
+//   出口分叉（2026-09-09 ADR-0004 修订 6）：→lasso = 丢预览留选区（预览是派生视图，重绘即消、回来自动重现）；
+//   →其他工具 = commit + 清选区。进 fill = 携入（不清），补一帧让预览立即出现（board 只在被请求时出帧）。
 function _onModeChange(): void {
   const { editMode, doc, board } = _ctx!;
   const m = editMode.current();
   if (editMode.isTransient()) return;   // 括号里：不更新、不判
   const prev = _lastPersistentMode;
   _lastPersistentMode = m;
-  if (m !== "fill") _carryIn = false;   // 旗标只对「下一次进 fill」有效；走去别处即作废
   if (m === "fill" && prev !== "fill") {
     _ctx!.wp2.pendingFill.begin(_ctx!.state.color);   // 起步 = 当前笔刷色（显示零跳变）
-    // v0.7.38（ADR-0004 修订 5）：sendSelectionToFill 的 one-shot 携入——本次不清选区
-    if (_carryIn) { _carryIn = false; board.requestRender(); return; }
-    // v0.6.24 不互通：进 fill = 清掉带进来的选区（undo 兜底）——fill 从零开始自己点
-    const { input, history, wp2 } = _ctx!;
-    if (doc.selection) {
-      const entry = input.lasso.setSelection(null);
-      if (entry) history.withPoint("selection", {}, () => wp2.selection.commitPreApplied(entry.before ?? null));
-    }
-    board.requestRender();
+    board.requestRender();                              // 携入的选区 → 预览即出
     return;
   }
   if (prev !== "fill" || m === "fill") return;
-  // 真切出 fill（v0.6.24 含回 lasso，无特例）：**先 commit 后清场**（v0.8.29 修——曾先
+  if (m === "lasso") {
+    // → lasso：丢预览、留选区（不 commit：预览 = 选区 × 颜色的纯函数，回 fill 自动重现，往返幂等）。
+    //   预览期改的填色不跨往返（回 fill 从笔刷色重新起步）；pending 色残余防抖作废同下。
+    _colorBase = null; clearTimeout(_colorTimer);
+    _ctx!.wp2.pendingFill.clear();
+    refreshColorDisplay();
+    board.requestRender();
+    return;
+  }
+  // 真切出 fill 到非选区工具：**先 commit 后清场**（v0.8.29 修——曾先
   //   pendingFill.clear() 再 _doCommit，_fillColor 落回笔刷色：预览是绿、落地成红）。
-  //   预览确实挂着才 commit + 清选区（组/隐藏层本就没显示 → 静默跳过，但选区也要清——不互通）。
+  //   预览确实挂着才 commit + 清选区（组/隐藏层本就没显示 → 静默跳过，但选区也要清）。
   if (doc.selection && requireEditableLeaf(doc, null)) {
     if (!_doCommit(true) && doc.selection) {
       // commit 失败（token 已回滚，选区还活着）：「切走 = 清」不变量对失败分支也成立——

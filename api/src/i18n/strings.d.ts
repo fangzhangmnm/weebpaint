@@ -3503,12 +3503,6 @@ export declare const S: {
         readonly ja: "現在のレイヤーは空です。選択できるピクセルがありません";
         readonly tok: "lipu ni li jo e ala. ma wile li ken ala";
     };
-    readonly "la.toFillShort": {
-        readonly zh: "送入填色";
-        readonly en: "Send to fill";
-        readonly ja: "塗りつぶしへ送る";
-        readonly tok: "o pana e ma wile tawa ilo pi kule ma";
-    };
     readonly "la.polygon": {
         readonly zh: "多边形套索（逐点落顶点，点回起点闭合）";
         readonly en: "Polygon lasso (tap to add vertices, tap start to close)";

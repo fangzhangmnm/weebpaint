@@ -19,7 +19,7 @@ import { desk } from "./workbench-state.ts";   // pickMode → desk.colorPicker.
 import { resampleItems } from "./frontend/resample-modes.ts";
 import { mountSelectField, type SelectField } from "./ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
 import { t, tLatin } from "./i18n/index.ts";
-import { fillPreviewActive, commitFillNow, sendSelectionToFill } from "./fill-mode.ts";
+import { fillPreviewActive, commitFillNow } from "./fill-mode.ts";
 import { isPopupOpen, openAdoptedPopup, toggleAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";
 import { registerContextToolbar, mountContextToolbar, type ContextToolbarHandle } from "./ui/context-toolbar.ts";
 import { attachSubToolSlot, type SubToolSlotHandle } from "./ui/subtool-slot.ts";   // 2026-09-06 U3 动词位长按（修订 ③：长按 = 叫出上下文条）
@@ -1174,8 +1174,6 @@ export function initToolbar(ctx: AppContext) {
       updateLassoToolbar();
       closeSelEditUI();
     },
-    // v0.7.38 送选区进填色（ADR-0004 修订 5 的 one-shot 携入；needs-sel 禁用兜底）
-    toFill: () => { sendSelectionToFill(); closeSelEditUI(); },
     // v0.9.22 剪贴板正宫化（spec 20260819）：⋯ 菜单露出——逻辑全在 selection-ops（window 事件）。
     // 都不带 needs-sel：无选区时 copy/cut=整层、copyMerged=整张合成图、paste 恒可用。
     copy: () => { window.dispatchEvent(new CustomEvent("wp:copy")); closeSelEditUI(); },

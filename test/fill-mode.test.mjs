@@ -1,7 +1,7 @@
 // v0.5.12 fill-mode（第一类工具版）：active 谓词真值表 + 切出=commit 钩子（transient 括号不算切出）。
 // 像素正确性不在这里——gl-smoke fillParity（golden/commit≡live/lockAlpha/导出不漏）。
 import { test, eq } from "./runner.mjs";
-import { initFillMode, fillPreviewActive, commitFillNow, sendSelectionToFill, gateFillOnDocSwitch } from "../src/fill-mode.ts";
+import { initFillMode, fillPreviewActive, commitFillNow, gateFillOnDocSwitch } from "../src/fill-mode.ts";
 import { currentPanelColor, setColor, setBrushColor } from "../src/color-panel.ts";
 
 // 最小 fake ctx：fill-mode 只碰这些面。editMode 状态机用字段模拟 + 手动派 wp:modechange。
@@ -122,56 +122,44 @@ test("[fill-mode] 切出时无选区 / 活动层不可编辑 → 静默跳过", 
   eq(calls.commitFill, 0, "活动层是组（预览本没显示）切出不 commit、不炸");
 });
 
-test("[fill-mode] v0.6.24 不互通：带选区进 fill = 清选区（undo 兜底）", () => {
+test("[fill-mode] ADR-0004 修订 6（2026-09-09）：带选区进 fill = 携入，预览即出、不清", () => {
   const { ctx, calls } = makeCtx();
   initFillMode(ctx);
   setMode(ctx, "lasso");
   ctx.doc.selection = {};             // lasso 里圈了个选区
+  const before = calls.requestRender;
   setMode(ctx, "fill");               // 切进 fill
-  eq(calls.setSelectionNull, 1, "进 fill 清掉带进来的选区");
-  eq(ctx.doc.selection, null, "fill 从零开始");
-  eq(calls.commitFill, 0, "只清不 commit（没预览可 commit）");
+  eq(calls.setSelectionNull, 0, "进 fill 不清选区（选区是文档的，不是工具的）");
+  eq(ctx.doc.selection !== null, true, "选区携入 fill");
+  eq(ctx.wp2.pendingFill.view()?.color, "#ff0000", "pending 色从笔刷色起步");
+  eq(calls.requestRender > before, true, "补一帧：预览立即出现");
+  eq(calls.commitFill, 0, "进 fill 不 commit");
+  // 从非选区工具带选区进 fill 同样携入（brush 期间选区只是蒙板）
+  setMode(ctx, "brush");              // fill → brush：commit + 清（下一测钉）
+  ctx.doc.selection = {};
+  setMode(ctx, "fill");
+  eq(ctx.doc.selection !== null, true, "从 brush 进 fill 也携入");
 });
 
-test("[fill-mode] v0.6.24 不互通：fill→lasso 也 commit+清（对称无特例）", () => {
+test("[fill-mode] 修订 6：fill→lasso = 丢预览留选区（不 commit）；往返幂等；fill→brush 仍 commit+清", () => {
   const { ctx, calls } = makeCtx();
   initFillMode(ctx);
   setMode(ctx, "fill");
   ctx.doc.selection = {};             // fill 里自己点出选区
   setMode(ctx, "lasso");              // 回套索
-  eq(calls.commitFill, 1, "回 lasso 也 commit（v0.5.15 '保留' 作废）");
-  eq(calls.setSelectionNull, 1, "commit 后清选区");
-  eq(ctx.doc.selection, null, "选区不跟去 lasso");
-});
-
-test("[fill-mode] v0.7.38 送入填色：one-shot 携入不清选区，只生效一次（ADR-0004 修订 5）", () => {
-  const { ctx, calls } = makeCtx();
-  initFillMode(ctx);
-  // 测试侧接线：wp:settool → 假 editMode 切模式（真 app 是 toolbar.setTool 完整路径）
-  const onSetTool = (e) => setMode(ctx, e.detail);
-  window.addEventListener("wp:settool", onSetTool);
-  try {
-    setMode(ctx, "lasso");
-    ctx.doc.selection = {};             // lasso 里圈好选区
-    sendSelectionToFill();              // 显式命令：携入
-    eq(ctx._mode, "fill", "settool 走通，进了 fill");
-    eq(calls.setSelectionNull, 0, "携入：本次不清选区");
-    eq(ctx.doc.selection !== null, true, "选区保留在 fill 里");
-    // 出口语义不动：切走 = commit + 清
-    setMode(ctx, "brush");
-    eq(calls.commitFill, 1, "切出照旧 commit");
-    eq(calls.setSelectionNull, 1, "切出照旧清选区");
-    // one-shot：再正常进 fill → 照旧清（旗标没黏住）
-    setMode(ctx, "lasso");
-    ctx.doc.selection = {};
-    setMode(ctx, "fill");
-    eq(calls.setSelectionNull, 2, "旗标只生效一次，正常进 fill 照旧清");
-    // 无选区 / 已在 fill：no-op 不派事件
-    ctx.doc.selection = null;
-    setMode(ctx, "lasso");
-    sendSelectionToFill();
-    eq(ctx._mode, "lasso", "无选区：不切换");
-  } finally { window.removeEventListener("wp:settool", onSetTool); }
+  eq(calls.commitFill, 0, "回 lasso 不 commit（半透明色来回不叠层）");
+  eq(calls.setSelectionNull, 0, "回 lasso 不清选区");
+  eq(ctx.doc.selection !== null, true, "选区跟去 lasso");
+  eq(ctx.wp2.pendingFill.view(), null, "预览（pending 色）丢弃");
+  setMode(ctx, "fill");               // 再回 fill：预览从选区重现
+  eq(ctx.wp2.pendingFill.view()?.color, "#ff0000", "回 fill 预览重新起步");
+  eq(calls.commitFill, 0, "往返零 commit（幂等）");
+  setMode(ctx, "lasso"); setMode(ctx, "fill");
+  eq(calls.commitFill + calls.setSelectionNull, 0, "多次往返仍零 commit 零清");
+  setMode(ctx, "brush");              // 真切出到非选区工具：commit + 清（不变）
+  eq(calls.commitFill, 1, "fill → brush commit");
+  eq(calls.setSelectionNull, 1, "fill → brush 清选区");
+  eq(ctx.doc.selection, null, "选区已清");
 });
 
 test("[fill-mode] v0.8.29 commit 步含 PendingFill 清（ADR-0008 §6）；留在 fill 续填 seed 不丢", () => {

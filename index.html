@@ -850,8 +850,7 @@
       <button class="lasso-tool-btn lasso-menu-needs-sel" id="lassoSelResizeBtn" data-sel-act="resize" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#selection-expand"/></svg><span data-i18n="la.resizeShort">扩张 / 收缩…</span></button>
       <button class="lasso-tool-btn lasso-menu-needs-sel" id="lassoDuplicateBtn" data-sel-act="dup" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#copy"/></svg><span data-i18n="la.duplicate">复制选区到新层</span></button>
       <button class="lasso-tool-btn lasso-menu-needs-sel" id="lassoMoveToLayerBtn" data-sel-act="move" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#move-to-file"/></svg><span data-i18n="la.moveToLayer">选区移动到新层</span></button>
-      <!-- v0.7.38 送选区进填色（ADR-0004 修订 5 one-shot 携入；fill 菜单不放——已经在 fill 里） -->
-      <button class="lasso-tool-btn lasso-menu-needs-sel" id="lassoToFillBtn" data-sel-act="toFill" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#paint-bucket"/></svg><span data-i18n="la.toFillShort">送入填色</span></button>
+      <!-- （v0.7.38「送入填色」2026-09-09 退役：ADR-0004 修订 6 起切到油漆桶自动携入选区） -->
       <!-- v0.7.40 蚂蚁线 toggle（selection 侧，管 lassoTool.showAnts；fill 侧那颗管 fillTool——per-tool 分家） -->
       <button class="lasso-tool-btn" id="lassoSelAntsBtn" type="button" role="menuitem" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#select-rectangle"/></svg><span data-i18n="la.antsToggle">蚂蚁线</span></button>
     </div>
@@ -1609,6 +1608,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-e86f38b586f8.mjs"></script>
+    <script type="module" src="./dist/weebpaint-067841642928.mjs"></script>
   </body>
 </html>

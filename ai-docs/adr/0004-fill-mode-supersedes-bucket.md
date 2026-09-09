@@ -63,6 +63,14 @@ commit 时才落图层；阈值/自动扩张回归魔棒属性。
   旗标 one-shot（下次正常进 fill 照旧清）、走去非 fill 工具即作废。注意携入的选区在
   classic+union 下自动成为 flood 的墙（v0.7.23 stopMask，种子豁免救「框内起点」）。
   别把这条扩大成「进 fill 一律保留选区」——那是推翻 v0.6.24，需要 user 重新拍板。
+- **v0.14.6 / 2026-09-09 修订 6「选区是文档的，不是工具的」（user 拍板，supersede v0.6.24「彻底不互通」+ 修订 5）**：
+  user 原话「send to fill 的逻辑我需要吃书，能不能切换选区和油漆桶的时候自动 send to fill or send to selection?」→ AI 提案表
+  → user「油漆桶套索提案同意」。新规则：**进 fill（从任何工具）= 携入**，有选区预览即出、不清；**fill → lasso = 丢预览、留选区**
+  （不 commit：预览 = 选区 × 颜色的纯函数，回 fill 自动重现，往返幂等——若改成 commit 再留，半透明色来回一趟叠两层）；
+  **fill → 其他工具 = commit + 清选区**（不变，填完切笔要画画）；✓ / 去选不变。「进 fill 从任何工具都携入」是 AI 按一致性
+  补的（提案表只写了套索→油漆桶；brush 期间选区只是蒙板，单独清它是 adaptation layer）。「送入填色」菜单项、`sendSelectionToFill`、
+  one-shot 旗标全部退役。已知代价：携入的选区在 classic+union 下仍是 flood 的墙（v0.7.23 stopMask，种子豁免）；预览期改的填色不跨往返。
+  mental model 从「两个不能互通的工具」改为「一个选区、两个消费它的工具（lasso 编辑它、fill 预览它）」。edited by Claude Fable 5.1 2026-09-09
 
 ## 后果
 
