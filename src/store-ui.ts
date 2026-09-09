@@ -24,6 +24,7 @@ const STORE_TEXT_KEYS: Record<StoreTextKey, Key> = {
   "trash.emptyBackups": "st.trashEmptyBackups",
   "file.encrypting": "st.fileEncrypting",
   "file.decrypting": "st.fileDecrypting",
+  "file.rekeying": "st.fileRekeying",
   "file.reuploading": "st.fileReuploading",
   "folder.creating": "st.folderCreating",
   "folder.deleting": "st.folderDeleting",

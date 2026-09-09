@@ -7,8 +7,8 @@ import { appEncryption } from "./encryption.ts";
 import { requireStore } from "./app-store.ts";
 import { sessionFileName } from "./config.ts";   // 边界：裸 item.name → 库全名（薄库身份=X.ora）
 import { SUFFIX_BYTES, THUMB_PATH } from "./gallery/cloud-thumbs.ts";
-import { isUnlocked, getPassword, onPasswordVerified, promptPassword } from "./crypto-state.ts";
-import { hasVerifier, checkVerifier, createVerifier } from "./password-verifier.ts";
+import { isUnlocked, getPassword, onPasswordVerified, promptPassword, setPassword } from "./crypto-state.ts";
+import { hasVerifier, checkVerifier, createVerifier, clearVerifier } from "./password-verifier.ts";
 
 // 边界：app 传裸 session 名，库身份是全名 → sessionFileName 统一转（与 session-state/gallery 一致）。
 const encFile = (name: string) => requireStore().file(sessionFileName(name), { isZip: true, mode: "existing" });
@@ -74,8 +74,11 @@ export async function unlockImportedContainer(blob: Blob): Promise<{ pw: string;
 }
 
 /**
- * 首次加密的密码获取：已解锁 → 复用统一密码（不重复问）；锁定 → 设新密码（输两遍 + 一次性风险提示；
- * 不强制强度）。取消 → null。**不**写入 crypto-state（调用方在 flow.encrypt 成功后才 setPassword）。
+ * 首次加密的密码获取：已解锁 → 复用统一密码（不重复问）；verifier 在 → 输入并校验（绝不进创建流程）；
+ * 都没有 → 设新密码（输两遍，不强制强度），**创建即落 verifier**（v0.4.11，跟账号走）。取消 → null。
+ * 不写内存密码：调用方在 flow.encrypt **之前** setPassword（store 的 crypt.getPassword seam 在 encrypt 里非交互取）；
+ * 「只有加密成功新密码才算数」靠调用方配对 isFreshPasswordSetup() / rollbackFreshPassword()（③，2026-09-09 加密合规审计：
+ * 以前注释写「成功后才 setPassword」与代码相反，且失败时空头新密码 + 空头 verifier 留下来，别的加密件全变「错密码」）。
  */
 export async function ensureNewPassword() {
   if (isUnlocked()) return getPassword(null);
@@ -106,3 +109,10 @@ export async function ensureNewPassword() {
   }
   return null;   // 连错三轮 → 退出，别困住用户
 }
+
+/** 这次 ensureNewPassword 会不会走「创建」：既没解锁也没 verifier。在 ensureNewPassword **之前**取值（它创建后 hasVerifier 就真了）。 */
+export function isFreshPasswordSetup(): boolean { return !isUnlocked() && !hasVerifier(); }
+/** 首次创建的密码没能加密成任何一件 → verifier + 内存密码一起撤销，图库回到「未设密码」；
+ *  别让一把没封过任何东西的钥匙把别的加密件（导入件 / 重置前的旧件）全显示成错密码。只在 isFreshPasswordSetup() 为真时调。 */
+export function rollbackFreshPassword(): void { clearVerifier(); setPassword(null); }
+

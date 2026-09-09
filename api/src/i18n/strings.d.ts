@@ -6241,6 +6241,12 @@ export declare const S: {
         readonly ja: "暗号化解除中 {name}…";
         readonly tok: "mi weka e len pi {name}…";
     };
+    readonly "st.fileRekeying": {
+        readonly zh: "正在换密码重封 {name}…";
+        readonly en: "Re-keying {name}…";
+        readonly ja: "パスワード変更中 {name}…";
+        readonly tok: "mi ante e len pi {name}…";
+    };
     readonly "st.fileReuploading": {
         readonly zh: "重新上传…";
         readonly en: "Re-uploading…";

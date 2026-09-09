@@ -42,7 +42,7 @@ import { note as diagNote } from "../diag-log.ts";                        // 面
 // crypt seam）。图库只做 per-app 的部分：首次设密码双输 UX、活动项预检、明文残留清理、
 // 以及把 peek 字节解释成缩略图（enc-thumbs）。
 import { isUnlocked, onLockChange, setPassword } from "../crypto-state.ts";
-import { localPeekThumb, decryptCloudPeekThumb, ensureNewPassword, ensureUnlocked } from "../enc-thumbs.ts";
+import { localPeekThumb, decryptCloudPeekThumb, ensureNewPassword, ensureUnlocked, isFreshPasswordSetup, rollbackFreshPassword } from "../enc-thumbs.ts";
 import { copyTargetName } from "./gallery-model.ts";
 import { pathFolder, pathBasename, pathJoin } from "./gallery-path.ts";
 import { stripSessionExt, sessionFileName } from "../config.ts";   // 边界：裸 item.name ↔ 库全名（X↔X.ora）
@@ -654,15 +654,20 @@ function makeGallery(host: GalleryHost) {
       async function encryptItem(item: GItem) {
         openMenu.value = null;
         if (!_encPrecheck(item, t("gal.verb.encrypt"))) return;
-        // 首次设密码（已解锁则复用统一密码）——放进 crypto-state，flow.encrypt 经 seam 自取
+        // 首次设密码（已解锁则复用统一密码）——放进 crypto-state，flow.encrypt 经 seam 自取。
+        // ③（2026-09-09 加密合规审计）：首次**创建**的密码只有这次加密成功才算数；失败 → verifier + 内存密码一起撤销。
+        const fresh = isFreshPasswordSetup();
         const pw = await ensureNewPassword();
         if (pw == null) { host.status(t("gal.st.cancelled")); return; }
-        setPassword(pw);
+        setPassword(pw);   // seam 在 encrypt 里非交互取密码，必须先进内存
+        let ok = false;
         try {
           const res = await requireStore().file(sessionFileName(item.name), { isZip: true, mode: "existing" }).encrypt({ isOnline: () => host.signedIn() && host.online() });
           if (res.status === "already") { host.status(t("gal.st.alreadyEnc")); return; }
           if (!(await _afterSwap(item, res, t("gal.st.encryptedOk", { name: item.name })))) return;
+          ok = true;
         } catch (e: unknown) { host.status(t("gal.st.encFail", { e: String((e as { message?: unknown })?.message || e) }), true); }
+        finally { if (fresh && !ok) rollbackFreshPassword(); }
         await reload();
       }
 

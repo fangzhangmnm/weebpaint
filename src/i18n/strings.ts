@@ -1161,6 +1161,7 @@ export const S = {
   "st.trashEmptyBackups":{ zh: "清空备份箱…",         en: "Emptying backup box…",   ja: "バックアップボックスを空にしています…", tok: "mi weka e ale pi poki awen…" },
   "st.fileEncrypting":   { zh: "正在加密 {name}…",    en: "Encrypting {name}…",     ja: "暗号化中 {name}…",        tok: "mi len e {name}…" },
   "st.fileDecrypting":   { zh: "正在解除加密 {name}…", en: "Decrypting {name}…",    ja: "暗号化解除中 {name}…",    tok: "mi weka e len pi {name}…" },
+  "st.fileRekeying":     { zh: "正在换密码重封 {name}…", en: "Re-keying {name}…",   ja: "パスワード変更中 {name}…", tok: "mi ante e len pi {name}…" },
   "st.fileReuploading":  { zh: "重新上传…",           en: "Re-uploading…",          ja: "再アップロード中…",       tok: "mi pana sin…" },
   "st.folderCreating":   { zh: "新建文件夹…",         en: "Creating folder…",       ja: "フォルダ作成中…",         tok: "mi pali e poki sin…" },
   "st.folderDeleting":   { zh: "删除文件夹…",         en: "Deleting folder…",       ja: "フォルダ削除中…",         tok: "mi weka e poki…" },

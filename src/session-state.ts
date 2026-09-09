@@ -37,7 +37,7 @@ import { invalidateCachedThumb } from "./gallery/cloud-thumb-cache.ts";
 import { sessionFileName, sessionBareName, stripSessionExt } from "./config.ts";
 import { serializedToolStatePatch, desk } from "./workbench-state.ts";
 import { getBlenderSyncState, applyBlenderSyncState } from "./blender-sync.ts";
-import { ensureNewPassword, ensureUnlocked, unlockImportedContainer } from "./enc-thumbs.ts";
+import { ensureNewPassword, ensureUnlocked, unlockImportedContainer, isFreshPasswordSetup, rollbackFreshPassword } from "./enc-thumbs.ts";
 import { setPassword, getPassword } from "./crypto-state.ts";
 import { shouldCapture, checkpointKey, planRingEviction, ringBudget, isNewSitting, type CheckpointTrigger, type RingEntryMeta } from "./checkpoint-policy.ts";
 import { getCheckpoint, deleteCheckpoint, ringPut, ringGet, ringAll, ringDelete, ringDeleteByDoc, mintRingId } from "./storage.ts";
@@ -749,15 +749,18 @@ async function _encryptFileHome(): Promise<void> {
   const fh = _fileHome();
   if (!fh) return;
   if (_enc.encrypted) { setStatus(t("ss.alreadyEncrypted")); return; }
+  const fresh = isFreshPasswordSetup();   // ③（2026-09-09）：首次创建的密码只有真封出一份容器才算数
   const pw = await ensureNewPassword();
   if (pw == null) { setStatus(t("ss.cancelled")); return; }
   const suggested = `${stripSessionExt(fh.fileName)}.ora.zip`;
+  let ok = false;
   try {
     if (!supportsSaveFilePicker()) {
       // 下载形态：容器下载=副本，当前打开的仍是明文文件——诚实说清，不装作已加密。
       const { bytes, peek } = await _encodeCurrentOraWithPeek();
       const container = await appEncryption.packContainer({ dataBytes: new Uint8Array(await bytes.arrayBuffer()), fileName: stripSessionExt(fh.fileName), ext: "ora", peek: peek ? new Uint8Array(await peek.arrayBuffer()) : null, password: pw });
       triggerDownload(container, suggested);
+      ok = true;   // 容器副本已封出（用的就是这把密码）
       setStatus(t("lf.encDownloadedCopy", { name: suggested }), true);
       return;
     }
@@ -769,6 +772,7 @@ async function _encryptFileHome(): Promise<void> {
       const container = await appEncryption.packContainer({ dataBytes: new Uint8Array(await bytes.arrayBuffer()), fileName: stripSessionExt(fh.fileName), ext: "ora", peek: peek ? new Uint8Array(await peek.arrayBuffer()) : null, password: pw });
       await writeHandleBlob(h, container);
     });
+    ok = true;
     _enc.encrypted = true;
     _homeAuth.setHome({ kind: "file", handle: h, fileName: h.name, lastSeenMtime: (await handleMtime(h)) ?? Date.now() });
     if (_luggageTag) { crashStore.dropOnCleanClose(_luggageTag).catch(() => {}); _snapSerial = _editSerial; }   // 旧（明文）快照作废：磁盘容器已是最新
@@ -777,7 +781,7 @@ async function _encryptFileHome(): Promise<void> {
   } catch (e) {
     reportError(new Error("[encrypt-file] failed: " + String(e)), "warning");
     setStatus(t("lf.saveFailed", { error: errMsg(e) }), true);
-  }
+  } finally { if (fresh && !ok) rollbackFreshPassword(); }   // 取消 picker / 失败 → 空头新密码 + verifier 撤销
 }
 
 async function encryptCurrent() {
@@ -790,21 +794,25 @@ async function encryptCurrent() {
   if (!name || _isLazyBlankSession) { setStatus(t("ss.openOrSaveBeforeEncrypt"), true); return; }
   const online = () => galleryOnline();   // 库在线 SSoT（folder=权限即在线；0828 修）
   if (await _file(name).isEncrypted()) { setStatus(t("ss.alreadyEncrypted")); return; }
+  const fresh = isFreshPasswordSetup();   // ③（2026-09-09）：首次创建的密码只有这次加密成功才算数
   const pw = await ensureNewPassword();
   if (pw == null) { setStatus(t("ss.cancelled")); return; }
-  setPassword(pw);
+  setPassword(pw);   // seam 在 encrypt 里非交互取，必须先进内存
+  let ok = false;
   await withBusy(t("ss.encryptingBusy", { name }), async () => {
     try {
       await saveNow();   // flush 活 doc 明文 → store 读它打包
       const res = await _file(name).encrypt({ isOnline: online });
       if (res.status === "offline") { setStatus(t("ss.encryptNeedsOnline"), true); return; }
       if (res.status === "already") { setStatus(t("ss.alreadyEncrypted")); return; }
+      ok = true;
       await _refreshEncrypted(); updateSaveStatus();
       setStatus(res.status === "cloud-deferred" ? t("ss.encryptedDeferred", { name }) : t("ss.encrypted", { name }), res.status === "cloud-deferred");
       gallery?.invalidateEncrypted?.(name);   // #11：清图库锁态缓存（refresh 不清，probe 有缓存守卫）
       gallery?.refresh?.();
     } catch (e) { setStatus(t("ss.encryptFailed", { error: errMsg(e) }), true); }
   });
+  if (fresh && !ok) rollbackFreshPassword();   // 一件都没加密成 → 空头新密码 + verifier 撤销
 }
 async function decryptCurrent() {
   const dh = docHome();
