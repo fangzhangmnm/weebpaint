@@ -2,6 +2,7 @@ import { type PopupBand } from "./popup-menu.ts";
 export interface SelectItem {
     value: string;
     label: string;
+    icon?: string;
     group?: string;
     disabled?: boolean;
 }

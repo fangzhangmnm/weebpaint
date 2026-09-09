@@ -17,7 +17,6 @@ import { openAdoptedPopup, closePopupMenuOf, isPopupOpen } from "./ui/popup-menu
 import { mountContextToolbar, type ContextToolbarHandle, type ToolbarItem } from "./ui/context-toolbar.ts";   // 2026-09-02 C4 登记 → 2026-09-06 U1 工厂
 
 import { setTool, setVerb } from "./toolbar.ts";   // 命令 = toolbar 的接口（显式 import）
-import { mountVerbSegment } from "./ui/verb-segment.ts";   // 2026-09-06 晚 ADR-0012 修订 ③：条左段 = 手指位子工具
 import { VERB_SUBTOOLS, DEFAULT_SUBTOOL } from "./common/verbs.ts";
 import { requireEditableLeaf } from "./editable-leaf.ts";
 import { resampleItems } from "./frontend/resample-modes.ts";
@@ -331,13 +330,14 @@ function _fbRows(): ToolbarItem[][] {
   const fb = state.filterBrush;
   if (!fb) return [];
   const Filter = fb.Filter as FilterLike;
-  const items: ToolbarItem[] = [{ kind: "title", text: Filter.title }];
-  // ⓪ 左段 = 手指位子工具（ADR-0012 修订 ③：子工具栈并入上下文条；顶栏手指位只会冒出这一条）
-  items.push({ kind: "custom", id: "filterBrushVerbSeg", mount: (host) => mountVerbSegment(host, {
-    tools: () => VERB_SUBTOOLS.smudge.map((d) => ({ id: d.id, icon: d.icon, title: tLatin(d.titleKey as Parameters<typeof tLatin>[0]) })),
-    current: () => desk.subTool.smudge || DEFAULT_SUBTOOL.smudge,
-    onPick: (id) => setVerb("smudge", id),
-  }).dispose });
+  const items: ToolbarItem[] = [];
+  // ⓪ 手指位子工具 = 带图标的下拉（2026-09-09 user「手指的几种工具用下拉框吧，图标太打哑谜了」→ 修订 ③ 的六颗图标左段退役，
+  //   换 select-field：钮面 = 当前子工具 图标+名字，弹层 = 六项 图标+名字）。仍是「顶栏手指位只会冒出这一条」（ADR-0012 修订 ③/④）。
+  //   条标题一并退役——下拉的 label 已点明是哪个子工具，再写「手指 / 涂抹」是重复。pin：永不进「…」（它是这条的身份）。
+  items.push({ kind: "select", id: "filterBrushSubSel", title: tLatin("flt.smudge.title"),
+    items: () => VERB_SUBTOOLS.smudge.map((d) => ({ value: d.id, label: tLatin(d.titleKey as Parameters<typeof tLatin>[0]), icon: d.icon })),
+    value: () => desk.subTool.smudge || DEFAULT_SUBTOOL.smudge,
+    onChange: (id) => setVerb("smudge", id), pin: true });
   // ① 子算法下拉：只在本滤镜还有**左段没盖住**的 variant 时显（液化 pinch/bloat…）；手指 smear/dull/paint、锐化模糊 blur/sharp 全在左段 → 下拉退役
   const variants = Filter.brushVariants || [];
   const covered = new Set(VERB_SUBTOOLS.smudge.filter((d) => "filter" in d.route && d.route.filter === Filter.id).map((d) => ("filter" in d.route ? d.route.variant : undefined)));

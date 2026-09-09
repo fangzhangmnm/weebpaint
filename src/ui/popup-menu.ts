@@ -114,7 +114,9 @@ export function openPopupMenu<Id extends string>(opts: PopupMenuOpts<Id>): Popup
   el.setAttribute("role", "menu");
   const render = () => {
     const items = opts.items().filter((it) => !it.hidden);
-    const anyIcon = variant === "list" && items.some((it) => !!it.icon);
+    // 2026-09-09：compact 变体也画 icon（原只 list 画——select-field / 上下文条「…」传的图标一直被静默丢掉；
+    //   .lasso-icon-list 的皮本就是「竖排 图标+简短解说」v0.5.17）。有任一项带图标 → 无图标项占 18px 空位对齐。
+    const anyIcon = items.some((it) => !!it.icon);
     let html = "";
     for (const it of items) {
       if (it.separatorBefore) html += `<hr class="popup-menu-sep">`;
@@ -126,7 +128,7 @@ export function openPopupMenu<Id extends string>(opts: PopupMenuOpts<Id>): Popup
       const checkAttr = it.checked != null
         ? (variant === "compact" ? ` aria-pressed="${it.checked}"` : ` aria-checked="${it.checked}"`)
         : "";
-      const icon = variant === "list" && anyIcon
+      const icon = anyIcon
         ? (it.icon ? iconHtml(it.icon) : `<span class="menu-item-icon-blank"></span>`)
         : "";
       html += `<button type="button" class="${cls}" role="${role}" data-id="${escapeHtml(it.id)}"${checkAttr}${it.disabled ? " disabled" : ""}>`

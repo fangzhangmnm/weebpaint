@@ -78,6 +78,8 @@ import "./app-state.test.mjs";            // 2026-07-14 app-state struct 门面�
 import "./editor-state.test.mjs";         // 2026-07-14 desk struct：默认/setDirtyFlag/Serialize 往返/Unserialize 容错/reset
 import "./verbs.test.mjs";                // 2026-09-06 ADR-0012 顶栏动词表：路由自洽/mode 反推/图标与 i18n 齐全
 import "./verb-segment.test.mjs";           // 2026-09-06 晚 ADR-0012 修订 ③：上下文条左段子工具栏
+import "./select-field-icon.test.mjs";   // 2026-09-09 修订 ④：SelectItem.icon → 钮面图标随当前项走（手指位子工具下拉）
+import "./icon-sprite-inline.test.mjs";   // 2026-09-09 index.html 内联 sprite 与 assets/icons.svg 对账（v0.14.1 漏贴 finger-paint 病例）
 import "./gallery-view-model.test.mjs";
 import "./frame-gate.test.ts";        // 图库帧门（防误触）：按压期扣帧只留最新/尾巴/多指/maxHold 保险丝
 import "./first-frame-watchdog.test.ts";   // 2026-08-31 案：首帧看门狗（到点报 stall/来帧销账/别夹不算/cancel/重 arm）

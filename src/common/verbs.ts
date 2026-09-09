@@ -26,13 +26,15 @@ export const VERB_SUBTOOLS: Record<Verb, readonly SubToolDef[]> = {
     { id: "pixel", icon: "eraser", titleKey: "tool.eraser", route: { mode: "eraser" } },
     // 「整笔」智能擦：另案（需每笔归属图）；落地时在此追加一条即可
   ],
+  // 2026-09-09 user：「手指笔的图标应该都是手指」「为什么要角标，你看 adjust filter 都是一样的图标多整洁……就是手指就行啦」
+  //   → 六项同一个 finger（顶栏钮面 / 下拉钮面 / 下拉各项全是手指，名字在下拉里说话；blend/blur/sharpen/finger-paint 图标退出 app 侧引用）。
   smudge: [
     { id: "smear", icon: "finger", titleKey: "flt.smudge.smear", route: { filter: "smudge", variant: "smear" } },
-    { id: "dull", icon: "blend", titleKey: "flt.smudge.dull", route: { filter: "smudge", variant: "dull" } },
-    { id: "paint", icon: "finger-paint", titleKey: "flt.smudge.paint", route: { filter: "smudge", variant: "paint" } },   // 2026-09-06 晚：湿画笔进左段（图标 PENDING 待过目）
-    { id: "blur", icon: "blur", titleKey: "flt.sb.blurBrush", route: { filter: "sharpenBlur", variant: "blur" } },
-    { id: "sharpen", icon: "sharpen", titleKey: "flt.sb.sharpBrush", route: { filter: "sharpenBlur", variant: "sharp" } },
-    { id: "liquify", icon: "liquify", titleKey: "flt.liq.title", route: { filter: "liquify" } },
+    { id: "dull", icon: "finger", titleKey: "flt.smudge.dull", route: { filter: "smudge", variant: "dull" } },
+    { id: "paint", icon: "finger", titleKey: "flt.smudge.paint", route: { filter: "smudge", variant: "paint" } },   // 2026-09-06 晚：湿画笔进手指位
+    { id: "blur", icon: "finger", titleKey: "flt.sb.blurBrush", route: { filter: "sharpenBlur", variant: "blur" } },
+    { id: "sharpen", icon: "finger", titleKey: "flt.sb.sharpBrush", route: { filter: "sharpenBlur", variant: "sharp" } },
+    { id: "liquify", icon: "finger", titleKey: "flt.liq.title", route: { filter: "liquify" } },
     // 克隆（stamp）：引擎另案；落地时追加
   ],
   lasso: [

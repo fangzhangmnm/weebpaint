@@ -296,11 +296,17 @@ body[data-tool="fill"] .board { cursor: crosshair; }
 .ct-sep { color: var(--line); padding: 0 2px; user-select: none; }
 /* 2026-09-06 晚 ADR-0012 修订 ③：上下文条左段（子工具栏）宿主不占 flex 位；工厂 custom 宿主同 */
 .verb-segment-host, .ct-custom { display: contents; }
-.verb-segment { flex: 0 1 auto; min-width: max(84px, 26vw); overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-.verb-segment::-webkit-scrollbar { display: none; }
+/* 2026-09-09 排版修（user「中间空了一大堆……排版算法应该错了」）：左段**永不伸缩**——原 min-width: max(84px, 26vw) 在宽屏把两颗图标
+   撑成三百多 px 的空白，窄屏又让左段先于「…」折叠被裁。放不下 = 工厂「…」折叠 → 行自身横滚兜底（.lasso-toolbar overflow-x）。 */
+.verb-segment { flex: none; }
 .verb-segment > .lasso-tool-btn { flex: none; }
 /* 窄屏（SE2 375）：上下文条标题让位——左段已经点明是哪个工具，顶栏钮面也亮着 */
-@media (max-width: 480px) { .ct-toolbar .ct-title { display: none; } }
+@media (max-width: 480px) {
+  .ct-toolbar .ct-title { display: none; }
+  /* 2026-09-09 SE2 375：子工具下拉（pin，不折）+ 一个旋钮要在 341px 行里放下 → 旋钮轨道 90→64、数值位 36→30；多旋钮（带颜料的手指）行横滚兜底 */
+  .ct-toolbar .fb-inline-slider .ramp-slider { width: 64px; }
+  .ct-toolbar .fb-inline-slider .brush-slider-value { min-width: 30px; }
+}
 .ct-select.select-field { border-radius: 999px; }
 .ct-toolbar .fb-inline-slider { padding: 0 4px; }
 .ct-more svg { width: 18px; height: 18px; }
@@ -373,6 +379,10 @@ body[data-tool="fill"] .board { cursor: crosshair; }
 /* 滤镜笔条内联旋钮（2026-09-05 手指「揉匀」）：复用 lasso 容差滑条样式，但标签要露出来 */
 .fb-inline-slider .brush-slider-label { display: inline; color: var(--ink-soft); font-size: 12px; white-space: nowrap; }
 .fb-inline-slider .ramp-slider { width: 90px; }
+/* 2026-09-09：thumb 半径 8px 会压到左边标签 / 右边数值（真机截图「Dul●」）→ 间距 ≥ 8；数值定宽 + 等宽数字——
+   "0%"→"100%" 不再改条宽（条居中，宽一变整条左右抖）。 */
+.fb-inline-slider .brush-slider-row { gap: 10px; }
+.fb-inline-slider .brush-slider-value { min-width: 36px; font-variant-numeric: tabular-nums; }
 .lasso-popup-val { text-align: right; font-variant-numeric: tabular-nums; }
 .lasso-popup-row input[type="range"] { width: 100%; }
 
@@ -947,6 +957,9 @@ input[type=range] {
 .select-field { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; text-align: left; }
 .select-field .select-field-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .select-field .menu-inline-caret { width: 12px; height: 12px; }
+/* 2026-09-09 带图标的下拉（user「手指的几种工具用下拉框吧，图标太打哑谜了」）：钮面 = 当前项图标 + label + caret；弹层项 icon 归 popup-menu compact */
+.select-field .select-field-icon { display: inline-flex; flex: none; }
+.select-field .select-field-icon svg { width: 18px; height: 18px; }
 .popup-menu-group { font-size: 10px; color: var(--ink-soft); padding: 6px 8px 2px; text-transform: uppercase; letter-spacing: .06em; user-select: none; }
 .menu-item-state { color: var(--ink-soft); font-size: 12px; }
 /* P5 scope 分区（2026-08-27 拍板「人话标题+行尾微章」）：设置项按归属分组，微章答「这设置跟谁走」 */

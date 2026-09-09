@@ -27,6 +27,8 @@ export type ToolbarItem = {
     };
     /** 溢出时的折叠优先级（大 = 先折）；缺省按位置（越靠右越先折）。 */
     foldPriority?: number;
+    /** 钉住：永不折进「…」（这条工具条的身份件，如手指位子工具下拉）。折完所有可折项仍放不下 → 行自身横滚兜底。2026-09-09 */
+    pin?: boolean;
 } | {
     kind: "select";
     id: string;
@@ -35,6 +37,7 @@ export type ToolbarItem = {
     onChange(v: string): void;
     title?: string;
     foldPriority?: number;
+    pin?: boolean;
 } | {
     kind: "slider";
     id: string;

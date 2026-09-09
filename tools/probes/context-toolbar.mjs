@@ -17,6 +17,7 @@ const measure = (page) => page.evaluate(() => {
   return {
     fb: q("#filterBrushToolbar"), row: row ? { scrollW: row.scrollWidth, clientW: row.clientWidth } : null,
     more: !!document.querySelector("#filterBrushToolbar .ct-more"),
+    title: !!document.querySelector("#filterBrushToolbar .ct-title"),
     hiddenItems: [...document.querySelectorAll("#filterBrushToolbar .lasso-toolbar > *")].filter((e) => e.hidden).map((e) => e.id || e.className.split(" ")[0]),
     ids: [...document.querySelectorAll("#filterBrushToolbar [id]")].map((e) => e.id),
     vw: innerWidth,
@@ -38,8 +39,8 @@ const measure = (page) => page.evaluate(() => {
   c.expect("手指条 y 与套索条同位（±2）", m.fb && Math.abs(m.fb.y - lasso.y) <= 2, `fb.y=${m.fb?.y} lasso.y=${lasso.y}`);
   c.expect("手指条高与套索条同高（±4）", m.fb && Math.abs(m.fb.h - lasso.h) <= 4, `fb.h=${m.fb?.h} lasso.h=${lasso.h}`);
   c.expect("桌面无「…」、无折叠项", !m.more && m.hiddenItems.length === 0, JSON.stringify(m));
-  // 2026-09-06 晚 ADR-0012 修订 ③：variant 下拉退役（手指三 variant 全在左段 filterBrushVerbSeg）
-  c.expect("左段 + mix 下拉 + 揉匀旋钮 + 笔架 + ✓ 都在、无 variant 下拉", ["filterBrushVerbSeg", "filterBrushMixSel", "filterBrushSlider-dull", "filterBrushOpenRack", "filterBrushExit"].every((id) => m.ids.includes(id)) && !m.ids.includes("filterBrushVariantSel"), m.ids.join(","));
+  // 2026-09-06 晚 ADR-0012 修订 ③：variant 下拉退役（手指三 variant 全在子工具栏）；2026-09-09 修订 ④：子工具栏 = 带图标下拉 filterBrushSubSel
+  c.expect("子工具下拉 + mix 下拉 + 揉匀旋钮 + 笔架 + ✓ 都在、无 variant 下拉、无条标题", ["filterBrushSubSel", "filterBrushMixSel", "filterBrushSlider-dull", "filterBrushOpenRack", "filterBrushExit"].every((id) => m.ids.includes(id)) && !m.ids.includes("filterBrushVariantSel") && !m.title, m.ids.join(","));
   // ✓ 退出 → 条隐藏、回画笔
   await page.evaluate(() => document.getElementById("filterBrushExit").click());
   await page.waitForTimeout(200);

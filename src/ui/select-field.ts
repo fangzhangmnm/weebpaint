@@ -7,9 +7,11 @@
 // 用法：静态节点 = index.html 里一个 <button class="select-field" id="…">（module 补 label+caret）；动态 = createSelectField。
 
 import { togglePopupMenu, type PopupBand, type PopupMenuItem } from "./popup-menu.ts";
+import { iconHtml } from "./icon.ts";
 import { defineComponent, ref, watch, onMounted, onUnmounted } from "../../vendor/vue/vue.esm-browser.prod.js";
 
-export interface SelectItem { value: string; label: string; group?: string; disabled?: boolean }
+// 2026-09-09 icon（sprite symbol id，可选）：弹层项与钮面都带图标（user「手指的几种工具用下拉框吧，图标太打哑谜了」——图标 + 文字并列才读得懂）。
+export interface SelectItem { value: string; label: string; icon?: string; group?: string; disabled?: boolean }
 export interface SelectFieldOpts {
   items: () => SelectItem[];
   value: () => string;                 // 受控：当前值由消费者持有
@@ -30,7 +32,7 @@ function _itemsToMenu(items: SelectItem[], cur: string): PopupMenuItem[] {
   let group: string | undefined;
   for (const it of items) {
     if (it.group !== group) { group = it.group; if (group) out.push({ id: `__group:${group}`, label: group, header: true }); }
-    out.push({ id: it.value, label: it.label, checked: it.value === cur, disabled: it.disabled });
+    out.push({ id: it.value, label: it.label, icon: it.icon, checked: it.value === cur, disabled: it.disabled });
   }
   return out;
 }
@@ -46,9 +48,16 @@ export function mountSelectField(el: HTMLElement, opts: SelectFieldOpts): Select
     el.appendChild(label);
     el.insertAdjacentHTML("beforeend", '<svg class="menu-inline-caret" viewBox="0 0 24 24" aria-hidden="true"><use href="#chevron-down"/></svg>');
   }
+  let iconEl: HTMLElement | null = null;   // 钮面图标位（闭包跟踪，不 querySelector：mount 时必不存在）
   const refresh = () => {
     const v = opts.value();
-    label!.textContent = opts.items().find((it) => it.value === v)?.label ?? v;
+    const cur = opts.items().find((it) => it.value === v);
+    label!.textContent = cur?.label ?? v;
+    // 钮面图标 = 当前项的 icon（有才画；换成无图标项就摘掉，宽度跟着项走）
+    if (cur?.icon) {
+      if (!iconEl) { iconEl = document.createElement("span"); iconEl.className = "select-field-icon"; el.insertBefore(iconEl, label); }
+      iconEl.innerHTML = iconHtml(cur.icon);
+    } else if (iconEl) { iconEl.remove(); iconEl = null; }
   };
   const onClick = (e: Event) => {
     e.stopPropagation();
