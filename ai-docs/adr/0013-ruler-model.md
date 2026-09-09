@@ -41,14 +41,24 @@
 `desk.ruler = { on, kind, constrain, geo, gridNu, gridNv }`（per-doc `editor-state.json`）；`desk.shapeBrush.*` 删除（老 doc 的 stale 键 mergeInto 静默忽略）。
 doc 裁切 / 翻转 / 旋转 / 缩放 / 偏移经 `remapDeskRuler`（desk 直写，与 persp 同点挂钩）。
 
-## 待讨论（user「45 我需要讨论下」；Q5 已决见下）
+## 待讨论（user「45 我需要讨论下」→ Q4 / Q5 都已决，见下）
 
-- **Q4 谁吸尺**：现 `RULER_ROLES = draw / erase / filterBrush`（画笔 / 橡皮 / 手指族）。选区笔不走 input 的像素笔切口（lasso role 里借 brush 引擎），
-  要吸尺得另开一个钩子。总账 #64。
+- ~~Q4 谁吸尺~~ **已决（v0.14.9）**：user「你之前不是选区笔也想做吗」→ 按原提案全员：`RULER_ROLES = draw / erase / filterBrush / selPen`。
+  选区笔在 input 的选区笔起笔/落点处另有同款钩子（伪 role "selPen"；像素链尺的像素经 extendStroke 直通喂 buffered 笔，抬笔 disc 光栅落在链上）。
 - ~~Q5 像素画模式~~ **已决（v0.14.8）**：user「B 同意，必须用整数的像素算法，不然像素画场景就是废」→ 像素画模式下尺子 = **整数像素链投影器**
   （`ruler.ts pixelGuide`：直线 Bresenham / 轴对齐椭圆 midpoint / 任意四边形内切圆 Zingl conic（`pixel-conic.ts` 继续活着）/ 矩形周界 / 格线逐段），
   投影 = 链上最近像素，上次到这次之间的链像素按序经 `StrokeSession.stampPixels` 落点，每像素恰好一次（本笔 seen-set），永不走弦。
   椭圆尺放置时记外接 quad（透视下 = 平面方框的像）供 conic 用；老档无 quad 退化成 polyline 逐段 Bresenham。
+
+## 修订 2026-09-09 ②：拖画模式（v0.14.9）
+
+user：「像素笔圆和矩形，网格应该是拖动啊，还是你再加一个普通笔也可以用的拖动模式看谁舒服？」→ 加，两者并存，user 上手比。
+- `desk.ruler.use = "trace" | "drag"`（per-doc，默认描尺；条上 `#rulerUseDrag` 一键切，透视尺恒描尺）。
+- 拖画 = 旧形状笔的手势活在尺子模型里：同一套放置几何，拖一下 / 画一圈 → **整形一次落笔、不留尺**，留在放置态继续拖下一个；预览 = 橙色草稿，
+  像素画模式连要落的格都画出来（`GuideOverlay.pixels`）。
+- 落笔走 `input.drawShape`：正常 stroke 事务（当前笔 / 层 / 选区 / 锁α / 橡皮 mode 与手绘同源，一个 undo 整点）。像素画 = `shapePixels` 整数像素集
+  经 `stampPixels` 每像素一次（格线交叉去重）；普通笔 = `shapePolylines` 逐段驱动引擎，**恒压 0.5**（机械绘制，ADR-0005 §3 的拖画语义保留；
+  描尺才是真笔压），多段 StampCollect 合并一次 GPU commit（单令牌墙：一个 session）。只对画笔 / 橡皮工具；手指族在拖画下不落笔（状态行提示）。
 
 ## 已知余量（本 ADR 记着，不是 bug）
 

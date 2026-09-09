@@ -66,6 +66,10 @@ export interface GuideOverlay {
         y: number;
     }]>;
     style: "active" | "dim" | "draft";
+    pixels?: Array<{
+        x: number;
+        y: number;
+    }>;
 }
 import type { Selection } from "./backend/selection.ts";
 interface MeshPt {

@@ -7,7 +7,8 @@
 //   （VP 方向 / 平面四边形 / 平面度量），那两个纯模块原样留。
 // 曲线尺（ellipse）存 doc 系闭合 polyline（放置时由拟合 / 平面 chart / 平面度量圆算出，≤ MAX_ELLIPSE_PTS 点）：
 //   一份表示吃掉全部透视分支，projection = 最近线段；desk JSON 里几 KB，可接受。
-// Q4（谁吸尺）讨论中：RULER_ROLES 一个常量集，翻一下即改。选区笔不走 input 像素笔切口，不在此集。
+// Q4（谁吸尺）已决（user 2026-09-09「你之前不是选区笔也想做吗」→ 按原提案全员）：画笔 / 橡皮 / 手指族 / 选区笔。
+//   选区笔不走 input 像素笔切口（lasso role 借 brush 引擎），input 的选区笔起笔/落点处另有同款钩子，伪 role 名 "selPen"。
 // Q5 像素画（user 2026-09-09「B 同意，必须用整数的像素算法，不然像素画场景就是废」）：像素模式下尺子不给浮点点，而是先把尺算成
 //   **整数像素链**（直线 Bresenham / 轴对齐椭圆 midpoint / 任意四边形内切圆 Zingl conic / 矩形周界 / 格线逐段），投影 = 链上最近像素，
 //   并把上次到这次之间的链像素按序吐给引擎 stampPixels（每像素恰好一次，seen-set），永不走弦。见 pixelGuide / projectPath。
@@ -31,8 +32,8 @@ export const RULER_KINDS: readonly RulerKind[] = ["parallel", "persp", "ellipse"
  *  像素链尺另有 projectPath：返回从上次位置到这次位置沿链吐出的**新**像素中心（seen-set 去重），调用方逐颗 stampPixels、不再 extend。 */
 export interface StrokeGuide { begin(x: number, y: number): Pt; project(x: number, y: number): Pt; projectPath?(x: number, y: number): Pt[] }
 
-/** 谁吸尺（Q4 讨论中，user 2026-09-09「45 我需要讨论下」）：像素笔角色集（input pixel-stroke role）。 */
-export const RULER_ROLES: ReadonlySet<string> = new Set(["draw", "erase", "filterBrush"]);
+/** 谁吸尺（Q4 已决 2026-09-09）：像素笔角色（draw / erase / filterBrush）+ 选区笔伪 role "selPen"。 */
+export const RULER_ROLES: ReadonlySet<string> = new Set(["draw", "erase", "filterBrush", "selPen"]);
 /** 透视尺：首段走够这么远（doc px）才锁 VP 族，之前的点钉在起点。 */
 export const PERSP_LOCK_PX = 6;
 const MAX_ELLIPSE_PTS = 180;
@@ -451,5 +452,34 @@ export function pixelGuide(r: Ruler, frame: PerspConfig | null, box: ClipBox): S
     case "ellipse": { const chs = ellipseChains(r, box); return chs.length ? chainGuide(chs, null) : null; }
     case "rect": { const chs = quadChain(r.corners, box); return chs.length ? chainGuide(chs, null) : null; }
     case "grid": { const chs = gridChains(r, box); return chs.length ? chainGuide(chs, null) : null; }
+  }
+}
+
+// ---- 拖画（user 2026-09-09「像素笔圆和矩形，网格应该是拖动啊……再加一个普通笔也可以用的拖动模式看谁舒服」）----
+// 拖一下 = 整形一次落笔（旧形状笔的手势，活在尺子模型里：同一套放置几何，只是落笔而不留尺）。
+
+/** 像素画拖画：整形的整数像素集（跨链去重——格线交叉不双叠、矩形角点不重复）。parallel 用 seg（起点→终点一段，不是无限线）。 */
+export function shapePixels(r: Ruler, box: ClipBox, seg?: [Pt, Pt]): Pt[] {
+  let chains: PixelChain[] = [];
+  switch (r.kind) {
+    case "parallel": { if (!seg) return []; const ch = lineChain(seg[0], seg[1], box); chains = ch ? [ch] : []; break; }
+    case "persp": return [];
+    case "ellipse": chains = ellipseChains(r, box); break;
+    case "rect": chains = quadChain(r.corners, box); break;
+    case "grid": chains = gridChains(r, box); break;
+  }
+  const seen = new Set<string>();
+  const out: Pt[] = [];
+  for (const ch of chains) for (const p of ch.pts) { const k = keyOf(p); if (!seen.has(k)) { seen.add(k); out.push(p); } }
+  return out;
+}
+/** 普通笔拖画：整形的折线组（喂引擎逐段驱动；格线 = 多段）。 */
+export function shapePolylines(r: Ruler, seg?: [Pt, Pt]): Pt[][] {
+  switch (r.kind) {
+    case "parallel": return seg ? [[seg[0], seg[1]]] : [];
+    case "persp": return [];
+    case "ellipse": return [r.pts];
+    case "rect": return [[...r.corners, r.corners[0]]];
+    case "grid": return gridSegments(r.corners, r.nu, r.nv).map(([a, b]) => [a, b]);
   }
 }

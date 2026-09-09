@@ -186,7 +186,8 @@ function freshGroups() {
     // ADR-0013 尺子（2026-09-09，user「先做」= 持久化同意；ADR-0005 形状笔组 shapeBrush 随引擎退役，老 doc 的 stale 键 mergeInto 静默忽略）：
     //   形状 = 画布上的辅助对象，per-doc 跟画走。on = 吸附开关；kind = 尺种（ruler.ts RulerKind）；constrain = 放置约束（15°/正方/正圆）；
     //   geo = 放好的尺（ruler.ts Ruler，doc 系；persp 尺无 geo）；gridNu/gridNv = 格线尺行列（默认 2×6 = 6 头身 + 中线）。
-    ruler:         { on: false, kind: "parallel" as string, constrain: false, geo: null as unknown, gridNu: 2, gridNv: 6 },
+    //   use = "trace"（放尺后笔沿尺走）| "drag"（拖一下整形落笔，user 2026-09-09「像素笔圆和矩形，网格应该是拖动啊……再加一个普通笔也可以用的拖动模式看谁舒服」）
+    ruler:         { on: false, kind: "parallel" as string, constrain: false, geo: null as unknown, gridNu: 2, gridNv: 6, use: "trace" as string },
     // ADR-0006 透视 frame（形状笔全局、per-ora）：VP 0-3 + 锁地平线（默认开）+ 参考点 + 当前平面。
     //   坐标 doc 空间、snap 像素中线 +0.5。裁剪/旋转/翻转/偏移画布时必须过 remapShapePersp（doc-ops 挂钩）。
     persp: {
@@ -363,6 +364,7 @@ export const desk = {
     get geo(): unknown { return S.g.ruler.geo; }, set geo(v: unknown) { S.g.ruler.geo = v; },
     get gridNu(): number { return S.g.ruler.gridNu; }, set gridNu(v: number) { S.g.ruler.gridNu = v; },
     get gridNv(): number { return S.g.ruler.gridNv; }, set gridNv(v: number) { S.g.ruler.gridNv = v; },
+    get use(): string { return S.g.ruler.use; }, set use(v: string) { S.g.ruler.use = v; },
   },
   persp: {
     get mode(): string { return S.g.persp.mode; }, set mode(v: string) { S.g.persp.mode = v; },

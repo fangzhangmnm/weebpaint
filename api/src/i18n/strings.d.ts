@@ -3293,6 +3293,24 @@ export declare const S: {
         readonly ja: "定規を消す";
         readonly tok: "weka e ilo linja";
     };
+    readonly "rl.useDrag": {
+        readonly zh: "拖画：拖一下整形落笔（关 = 描尺：放尺后笔沿尺走）";
+        readonly en: "Drag-draw: one drag paints the whole shape (off = trace along the ruler)";
+        readonly ja: "ドラッグ描画（オフ = 定規に沿って描く）";
+        readonly tok: "tawa la sitelen";
+    };
+    readonly "rl.dragHint": {
+        readonly zh: "拖画：在画布上拖一下 = 一整个形（椭圆：画一圈）；✓ 收起。按住 Shift 反转约束";
+        readonly en: "Drag-draw: one drag = one whole shape (ellipse: draw a loop); ✓ to finish. Hold Shift to invert constrain";
+        readonly ja: "ドラッグ描画：一回のドラッグで図形一つ。✓ で終了";
+        readonly tok: "tawa wan la selo wan";
+    };
+    readonly "rl.dragNoTool": {
+        readonly zh: "拖画只在画笔 / 橡皮下落笔";
+        readonly en: "Drag-draw paints only with brush / eraser";
+        readonly ja: "ドラッグ描画はブラシ / 消しゴムのみ";
+        readonly tok: "ilo sitelen anon ilo weka taso";
+    };
     readonly "rl.placeHint": {
         readonly zh: "放尺：在画布上拖一下（椭圆尺：画一圈）；再拖 = 换掉；✓ 收起后笔就沿尺走。按住 Shift 画 = 本笔不吸尺";
         readonly en: "Place ruler: drag on canvas (ellipse: draw a loop); drag again to replace; ✓ to finish. Hold Shift while drawing to bypass";

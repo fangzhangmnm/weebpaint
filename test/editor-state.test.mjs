@@ -116,15 +116,16 @@ test("[editor-state] 尺子（ADR-0013）：默认 / 往返 / 老 doc 缺组或�
   eq(desk.ruler.constrain, false, "放置约束默认关");
   eq(desk.ruler.geo, null, "默认没放尺");
   eq(desk.ruler.gridNu, 2, "格线默认 2×6（头身比）"); eq(desk.ruler.gridNv, 6);
+  eq(desk.ruler.use, "trace", "默认描尺（拖画是条上一键切换，per-doc 记住）");
   desk.ruler.on = true; desk.ruler.kind = "rect"; desk.ruler.constrain = true;
   desk.ruler.geo = { kind: "rect", corners: [{ x: 1, y: 2 }, { x: 11, y: 2 }, { x: 11, y: 7 }, { x: 1, y: 7 }] };
-  desk.ruler.gridNv = 8;
+  desk.ruler.gridNv = 8; desk.ruler.use = "drag";
   const ser = desk.Serialize();
   desk.reset();
   desk.Unserialize(ser);
   eq(desk.ruler.on, true, "on 往返"); eq(desk.ruler.kind, "rect", "kind 往返"); eq(desk.ruler.constrain, true);
   eq(JSON.stringify(desk.ruler.geo.corners[2]), JSON.stringify({ x: 11, y: 7 }), "geo 整包往返");
-  eq(desk.ruler.gridNv, 8);
+  eq(desk.ruler.gridNv, 8); eq(desk.ruler.use, "drag", "use 往返");
   desk.reset();
   desk.Unserialize({ magicWand: { threshold: 30 }, shapeBrush: { sub: "circle", constrainCircle: true } });   // v0.14.6 及更早的 doc
   eq(desk.ruler.kind, "parallel", "缺组 → 默认；stale shapeBrush 组静默忽略");

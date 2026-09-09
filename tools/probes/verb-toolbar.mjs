@@ -103,6 +103,26 @@ const clickSeg = (page, barId, sub) => page.evaluate(({ barId, sub }) => {
   await evClick(page, "leftRuler"); await page.waitForTimeout(150);
   const s2c = await state(page);
   c.expect("再 tap → 吸附开", s2c.leftRuler.pressed === "true", JSON.stringify(s2c));
+  // 拖画（v0.14.9）：长按尺钮回放置态 → 切拖画 → 拖一下 = 整形落笔、仍在放置态；✓ 收
+  await longPress(page, "leftRuler");
+  const s2e = await state(page);
+  c.expect("长按尺钮（有尺）→ 回放置态", s2e.rulerBar && s2e.placeLayer && s2e.leftRuler.placing === "true", JSON.stringify(s2e));
+  await evClick(page, "rulerUseDrag"); await page.waitForTimeout(150);
+  const dragOn = await page.evaluate(() => document.getElementById("rulerUseDrag")?.getAttribute("aria-pressed"));
+  c.expect("切拖画 → 钮 pressed", dragOn === "true", String(dragOn));
+  {
+    const box = await page.locator("#board").boundingBox();
+    const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+    await page.mouse.move(cx - 60, cy - 30); await page.mouse.down();
+    await page.mouse.move(cx, cy); await page.mouse.move(cx + 60, cy + 30);
+    await page.mouse.up(); await page.waitForTimeout(250);
+  }
+  const s2f = await state(page);
+  c.expect("拖画一下 → 落笔后仍在放置态（继续拖下一个）、无错", s2f.rulerBar && s2f.placeLayer && s2f.leftRuler.placing === "true", JSON.stringify(s2f));
+  await evClick(page, "rulerUseDrag"); await page.waitForTimeout(100);   // 切回描尺（后续断言基于描尺）
+  await evClick(page, "rulerPlaceDone"); await page.waitForTimeout(200);
+  const s2g = await state(page);
+  c.expect("✓ 收起 → 回 brush、尺钮仍 pressed（尺还在）", !s2g.rulerBar && s2g.tool === "brush" && s2g.leftRuler.pressed === "true", JSON.stringify(s2g));
   await evClick(page, "toolLasso"); await page.waitForTimeout(200);
   const s2d = await state(page);
   c.expect("切套索 → 左栏 dial 件（含尺钮、笔粗滑条）藏（context smart sense）", !s2d.leftRuler.vis && !s2d.sizeSliderVis, JSON.stringify(s2d));

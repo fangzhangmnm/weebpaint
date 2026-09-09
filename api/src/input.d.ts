@@ -94,6 +94,7 @@ export declare class InputController {
     lasso: LassoEngine;
     filterBrush: FilterBrushEngine;
     _strokeGuide: StrokeGuide | null;
+    _selPenGuide: StrokeGuide | null;
     _rulerGuideProvider: ((role: string, pixel: boolean) => StrokeGuide | null) | null;
     shiftDown: boolean;
     getTool: () => string;
@@ -145,6 +146,22 @@ export declare class InputController {
     _abortStroke(): void;
     /** ADR-0013：尺子投影器提供方（app 接 ruler-ui.guideForStroke）；返回 null = 本笔不吸。 */
     setRulerGuideProvider(fn: ((role: string, pixel: boolean) => StrokeGuide | null) | null): void;
+    /** 当前笔是否像素画模式（ruler-ui 拖画选整数像素集还是折线）。 */
+    currentBrushPixelMode(): boolean;
+    /** ADR-0013 拖画（user 2026-09-09「像素笔圆和矩形，网格应该是拖动啊……再加一个普通笔也可以用的拖动模式看谁舒服」）：
+     *  尺子拖出来的整形一次落笔，走**正常 stroke 事务**（当前笔 / 当前层 / 选区 / 锁α / 橡皮 mode 与手绘同源，一个 undo 整点）。
+     *  pixel：整数像素集经 stampPixels 每像素一次（首颗由 beginStroke 落）；buffered：每条折线驱动一次引擎（恒压 0.5——机械绘制，
+     *  ADR-0005 §3 的拖画语义保留；直通），多条 StampCollect 合并一次 GPU commit（单令牌墙：一个 session）。只对画笔 / 橡皮工具。 */
+    drawShape(shape: {
+        pixels?: Array<{
+            x: number;
+            y: number;
+        }>;
+        polylines?: Array<Array<{
+            x: number;
+            y: number;
+        }>>;
+    }): boolean;
     isStrokeActive(): boolean;
     collectActiveStamps(): ReturnType<BrushEngine["collectStamps"]>;
     abortActiveStroke(): void;

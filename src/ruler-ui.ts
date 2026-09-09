@@ -13,7 +13,7 @@
 
 import { desk } from "./workbench-state.ts";
 import { mountContextToolbar, type ContextToolbarHandle, type ToolbarItem } from "./ui/context-toolbar.ts";
-import { guideFor, placeFromDrag, placeFromLoop, rulerSegments, sanitizeRuler, RULER_KINDS, type Ruler, type RulerKind, type StrokeGuide } from "./ruler.ts";
+import { guideFor, placeFromDrag, placeFromLoop, rulerSegments, sanitizeRuler, shapePixels, shapePolylines, RULER_KINDS, type Ruler, type RulerKind, type StrokeGuide } from "./ruler.ts";
 import { configFromModeState, defaultVpsForMode, planesForMode, type PerspMode, type PerspConfig } from "./perspective-frame.ts";
 import { togglePerspEdit, setPerspGizmoLiveGate } from "./persp-edit.ts";
 import { closeExclusive } from "./panel-state.ts";
@@ -27,7 +27,7 @@ let _bar: ContextToolbarHandle | null = null;
 let _layer: HTMLElement | null = null;
 let _placing = false;
 let _draft: Ruler | null = null;
-let _drag: { id: number; p0: Pt; pts: Pt[] } | null = null;
+let _drag: { id: number; p0: Pt; last: Pt; pts: Pt[] } | null = null;
 
 const KIND_ICON: Record<RulerKind, string> = { parallel: "line", persp: "persp-2p", ellipse: "ellipse", rect: "rectangle", grid: "grid" };
 const KIND_KEY = { parallel: "rl.kind.parallel", persp: "rl.kind.persp", ellipse: "rl.kind.ellipse", rect: "rl.kind.rect", grid: "rl.kind.grid" } as const;
@@ -41,6 +41,17 @@ type LatinKey = Parameters<typeof tLatin>[0];
 function _kind(): RulerKind { const k = desk.ruler.kind as RulerKind; return (RULER_KINDS as readonly string[]).includes(k) ? k : "parallel"; }
 function _perspMode(): PerspMode { const m = desk.persp.mode; return (m === "p1" || m === "p2" || m === "p3" || m === "iso") ? m : "off"; }
 function _frame(): PerspConfig | null { return _perspMode() === "off" ? null : configFromModeState(desk.persp); }
+/** 拖画模式（user 2026-09-09「拖动模式看谁舒服」）：拖一下整形落笔、不留尺。透视尺无形可拖 → 恒描尺。 */
+function _useDrag(): boolean { return desk.ruler.use === "drag" && _kind() !== "persp"; }
+const PAD = 64;
+function _clipBox() { const { doc } = _ctx!; return { x0: -PAD, y0: -PAD, x1: doc.width + PAD, y1: doc.height + PAD }; }
+/** 平行线尺在拖画里是一段：起点 → 终点在尺方向上的投影（约束已在放置时吸过）。 */
+function _dragSeg(r: Ruler): [Pt, Pt] | undefined {
+  if (r.kind !== "parallel" || !_drag) return undefined;
+  const dx = Math.cos(r.angle), dy = Math.sin(r.angle);
+  const t = (_drag.last.x - r.anchor.x) * dx + (_drag.last.y - r.anchor.y) * dy;
+  return [r.anchor, { x: r.anchor.x + dx * t, y: r.anchor.y + dy * t }];
+}
 
 /** 当前生效的尺：desk.ruler.geo 经校验且种类与 desk.ruler.kind 一致；透视尺 = 透视开着即有。 */
 export function currentRuler(): Ruler | null {
@@ -59,9 +70,7 @@ export function guideForStroke(_role: string, pixel: boolean): StrokeGuide | nul
   if (!desk.ruler.on || !_ctx) return null;
   const r = currentRuler();
   if (!r) return null;
-  const { doc } = _ctx;
-  const PAD = 64;
-  return guideFor(r, _frame(), pixel ? { box: { x0: -PAD, y0: -PAD, x1: doc.width + PAD, y1: doc.height + PAD } } : undefined);
+  return guideFor(r, _frame(), pixel ? { box: _clipBox() } : undefined);
 }
 
 function _canUseRuler(): boolean {
@@ -79,6 +88,17 @@ function _overlay(): GuideOverlay | null {
   if (!_ctx) return null;
   const { doc } = _ctx;
   if (_placing) {
+    if (_useDrag()) {
+      // 拖画预览 = 这一下要落的形（像素画模式连要落的格都画出来）；不显旧尺
+      if (!_draft) return null;
+      const seg = _dragSeg(_draft);
+      const pixel = _ctx.input.currentBrushPixelMode();
+      return {
+        segments: _draft.kind === "parallel" ? (seg ? [seg] : []) : rulerSegments(_draft, doc.width, doc.height),
+        style: "draft",
+        ...(pixel ? { pixels: shapePixels(_draft, _clipBox(), seg) } : {}),
+      };
+    }
     const r = _draft ?? currentRuler();
     if (!r || r.kind === "persp") return null;
     return { segments: rulerSegments(r, doc.width, doc.height), style: _draft ? "draft" : "active" };
@@ -99,7 +119,7 @@ function _onDown(e: PointerEvent): void {
   if (!_ctx || _drag) return;                                  // 只跟第一根指针
   if (e.pointerType === "mouse" && e.button !== 0) return;
   const p0 = _ctx.board.screenToDoc(e.clientX, e.clientY);
-  _drag = { id: e.pointerId, p0, pts: [p0] };
+  _drag = { id: e.pointerId, p0, last: p0, pts: [p0] };
   _draft = null;
   try { _layer!.setPointerCapture(e.pointerId); } catch { /* 极少数浏览器不支持 */ }
   e.preventDefault();
@@ -107,6 +127,7 @@ function _onDown(e: PointerEvent): void {
 function _onMove(e: PointerEvent): void {
   if (!_ctx || !_drag || e.pointerId !== _drag.id) return;
   const p = _ctx.board.screenToDoc(e.clientX, e.clientY);
+  _drag.last = p;
   const k = _kind();
   if (k === "ellipse") { _drag.pts.push(p); _draft = placeFromLoop(_drag.pts, _placeOpts()); }
   else if (k === "parallel" || k === "rect" || k === "grid") _draft = placeFromDrag(k, _drag.p0, p, _placeOpts(), { nu: desk.ruler.gridNu, nv: desk.ruler.gridNv });
@@ -115,9 +136,20 @@ function _onMove(e: PointerEvent): void {
 function _onUp(e: PointerEvent): void {
   if (!_ctx || !_drag || e.pointerId !== _drag.id) return;
   try { _layer!.releasePointerCapture(e.pointerId); } catch { /* 已释放 */ }
-  if (_draft) desk.ruler.geo = _draft;
+  if (_draft) {
+    if (_useDrag()) _commitShape(_draft);   // 拖画：落笔不留尺，留在放置态继续拖下一个
+    else desk.ruler.geo = _draft;
+  }
   _draft = null; _drag = null;
   _rerender();
+}
+/** 拖画落笔：整形走 input.drawShape（正常 stroke 事务；像素画 = 整数像素集，否则折线组）。 */
+function _commitShape(r: Ruler): void {
+  if (!_ctx) return;
+  const seg = _dragSeg(r);
+  const pixel = _ctx.input.currentBrushPixelMode();
+  const ok = _ctx.input.drawShape(pixel ? { pixels: shapePixels(r, _clipBox(), seg) } : { polylines: shapePolylines(r, seg) });
+  if (!ok) _ctx.setStatus(t("rl.dragNoTool"), true);
 }
 
 export function enterRulerPlace(): void {
@@ -129,7 +161,7 @@ export function enterRulerPlace(): void {
   em.enterTransient("rulerPlace", { apply: () => _finish(), abort: () => _finish() });
   _layer?.classList.remove("hidden");
   _bar?.replaceRows(_rows()); _bar?.show();
-  _ctx.setStatus(t("rl.placeHint"));
+  _ctx.setStatus(t(_useDrag() ? "rl.dragHint" : "rl.placeHint"));
   syncRulerUi();
   _ctx.board.requestRender();
 }
@@ -225,6 +257,9 @@ function _rows(): ToolbarItem[][] {
       if (nk === "persp" && _perspMode() === "off") _setPerspMode("p2"); // 选透视尺而透视关着 → 先给个二点（AI 加的默认，条上可改）
       _rerender();
     } });
+  items.push({ kind: "button", id: "rulerUseDrag", icon: "shapes", title: tLatin("rl.useDrag"), pin: true,
+    pressed: () => desk.ruler.use === "drag", disabled: () => k === "persp",
+    onClick: () => { desk.ruler.use = desk.ruler.use === "drag" ? "trace" : "drag"; _ctx?.setStatus(t(_useDrag() ? "rl.dragHint" : "rl.placeHint")); _rerender(); } });
   if (k !== "persp") {
     items.push({ kind: "button", id: "rulerConstrain", icon: _constrainIcon(k, mode), title: tLatin("rl.constrain"),
       pressed: () => desk.ruler.constrain, disabled: () => k === "grid",

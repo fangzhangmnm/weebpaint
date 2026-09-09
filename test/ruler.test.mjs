@@ -217,3 +217,43 @@ describe("ruler · 像素链（Q5，user 2026-09-09「B 同意，必须用整数
     eq(R.sanitizeRuler({ kind: "ellipse", pts: r.pts, quad: [{ x: 0, y: 0 }] }).quad, undefined, "坏 quad 丢掉、尺还在");
   });
 });
+
+describe("ruler · 拖画（user 2026-09-09「像素笔圆和矩形，网格应该是拖动啊……再加一个普通笔也可以用的拖动模式看谁舒服」）", () => {
+  const box = { x0: -64, y0: -64, x1: 864, y1: 664 };
+  const key = (p) => p.x + "," + p.y;
+  it("shapePixels：矩形周界 60 颗不重复；格线跨链去重（交叉不双叠）；平行线一段 = Bresenham 段；正圆 = midpoint 集；透视尺无形", async () => {
+    const { bresenhamEllipseRect } = await import("../src/shape-geometry.ts");
+    const rect = R.placeFromDrag("rect", { x: 0, y: 0 }, { x: 10, y: 20 }, O);
+    const rp = R.shapePixels(rect, box);
+    eq(rp.length, 60, "0..10 × 0..20 周界 = 2·11 + 2·21 − 4");
+    eq(new Set(rp.map(key)).size, 60, "不重复");
+    const grid = R.placeFromDrag("grid", { x: 0, y: 0 }, { x: 20, y: 60 }, O, { nu: 2, nv: 6 });
+    const gp = R.shapePixels(grid, box);
+    const total = R.gridSegments(grid.corners, 2, 6).reduce((n, [a, b]) => n + Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) + 1, 0);
+    assert(gp.length < total, "交叉点去重后少于逐段之和 " + gp.length + " < " + total);
+    eq(new Set(gp.map(key)).size, gp.length, "不重复");
+    const par = { kind: "parallel", angle: 0, anchor: { x: 0.5, y: 0.5 } };
+    const lp = R.shapePixels(par, box, [{ x: 0.5, y: 0.5 }, { x: 10.5, y: 0.5 }]);
+    eq(lp.length, 11, "一段 11 颗");
+    eq(R.shapePixels(par, box).length, 0, "无 seg 无形");
+    const circle = R.placeFromLoop([{ x: 20.5, y: 20.5 }, { x: 28.5, y: 20.5 }], { ...O, constrain: true });
+    const cp = R.shapePixels(circle, box);
+    const expect = new Set(bresenhamEllipseRect(12, 12, 28, 28).map(key));
+    eq(cp.length, expect.size); for (const p of cp) assert(expect.has(key(p)));
+    eq(R.shapePixels({ kind: "persp" }, box).length, 0);
+  });
+  it("shapePolylines：矩形 1 条闭合折线（5 点）；格线 10 段；平行线一段；椭圆 = 它的 polyline", () => {
+    const rect = R.placeFromDrag("rect", { x: 0, y: 0 }, { x: 10, y: 20 }, O);
+    const pl = R.shapePolylines(rect);
+    eq(pl.length, 1); eq(pl[0].length, 5); eq(key(pl[0][0]), key(pl[0][4]), "首尾相接");
+    const grid = R.placeFromDrag("grid", { x: 0, y: 0 }, { x: 20, y: 60 }, O, { nu: 2, nv: 6 });
+    eq(R.shapePolylines(grid).length, 10);
+    eq(R.shapePolylines({ kind: "parallel", angle: 0, anchor: { x: 0, y: 0 } }, [{ x: 0, y: 0 }, { x: 5, y: 0 }]).length, 1);
+    eq(R.shapePolylines({ kind: "parallel", angle: 0, anchor: { x: 0, y: 0 } }).length, 0);
+    eq(R.shapePolylines({ kind: "persp" }).length, 0);
+  });
+  it("RULER_ROLES：Q4 全员（画笔 / 橡皮 / 手指族 / 选区笔）", () => {
+    for (const r of ["draw", "erase", "filterBrush", "selPen"]) assert(R.RULER_ROLES.has(r), r);
+    assert(!R.RULER_ROLES.has("lasso") && !R.RULER_ROLES.has("pick"));
+  });
+});

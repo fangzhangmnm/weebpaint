@@ -94,6 +94,7 @@ export function rulerOverlay(r: Ruler, frame: PerspConfig | null, view: ViewInfo
 - `LeftDialOpts += getDialVisible / getPickVisible / getRuler / onRulerTap / onRulerLongpress`；`dialReactive += transient / rulerOn / rulerPlacing`。
 - `input.ts`：`setRulerGuideProvider(fn)`、`shiftDown`；S 键派 `wp:ruler-tap`（不 import ruler-ui，防环）。edit-mode `rulerPlace` ctrlZ = abort-transient。
 - 选区笔不在切口内（lasso role 借 brush 引擎）→ Q4 待讨论（总账 #64）。
+- Q4 已决（v0.14.9）：`RULER_ROLES` += `selPen`，input 选区笔起笔/落点同款钩子。拖画模式（v0.14.9，user 追加）：`desk.ruler.use`、`shapePixels / shapePolylines`、`input.drawShape`、`GuideOverlay.pixels`。
 - Q5 已决（v0.14.8）：`StrokeGuide.projectPath?` + `guideFor(r, frame, { box })` 像素分支 = 整数像素链（`pixelGuide`）；`RulerEllipse.quad?` 外接四边形；input 像素笔走 `StrokeSession.stampPixels` 不 extend。
 
 ## 3. 行为

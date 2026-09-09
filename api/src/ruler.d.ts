@@ -33,7 +33,7 @@ export interface StrokeGuide {
     project(x: number, y: number): Pt;
     projectPath?(x: number, y: number): Pt[];
 }
-/** 谁吸尺（Q4 讨论中，user 2026-09-09「45 我需要讨论下」）：像素笔角色集（input pixel-stroke role）。 */
+/** 谁吸尺（Q4 已决 2026-09-09）：像素笔角色（draw / erase / filterBrush）+ 选区笔伪 role "selPen"。 */
 export declare const RULER_ROLES: ReadonlySet<string>;
 /** 透视尺：首段走够这么远（doc px）才锁 VP 族，之前的点钉在起点。 */
 export declare const PERSP_LOCK_PX = 6;
@@ -67,3 +67,7 @@ export declare function remapRuler(r: Ruler, f: (p: Pt) => Pt): Ruler;
 export declare function sanitizeRuler(v: unknown): Ruler | null;
 /** 像素画模式的整数链投影器（guideFor 的 pixel 分支）。 */
 export declare function pixelGuide(r: Ruler, frame: PerspConfig | null, box: ClipBox): StrokeGuide | null;
+/** 像素画拖画：整形的整数像素集（跨链去重——格线交叉不双叠、矩形角点不重复）。parallel 用 seg（起点→终点一段，不是无限线）。 */
+export declare function shapePixels(r: Ruler, box: ClipBox, seg?: [Pt, Pt]): Pt[];
+/** 普通笔拖画：整形的折线组（喂引擎逐段驱动；格线 = 多段）。 */
+export declare function shapePolylines(r: Ruler, seg?: [Pt, Pt]): Pt[][];

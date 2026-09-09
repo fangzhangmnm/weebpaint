@@ -98,6 +98,7 @@ declare function freshGroups(): {
         geo: unknown;
         gridNu: number;
         gridNv: number;
+        use: string;
     };
     persp: {
         mode: string;
@@ -292,6 +293,7 @@ export declare const desk: {
         geo: unknown;
         gridNu: number;
         gridNv: number;
+        use: string;
     };
     persp: {
         mode: string;

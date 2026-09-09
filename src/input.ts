@@ -25,7 +25,7 @@ import { BrushEngine } from "./backend/brush.ts";
 import { reportError } from "./error-badge.ts";
 import { LassoEngine } from "./lasso.ts";
 import { FilterBrushEngine } from "./filter-brush.ts";
-import { RULER_ROLES, type StrokeGuide } from "./ruler.ts";   // ADR-0013 尺子：像素笔点进引擎前的投影切口
+import { RULER_ROLES, type StrokeGuide } from "./ruler.ts";   // ADR-0013 尺子：像素笔点进引擎前的投影切口（选区笔另有同款钩子）
 import { isPixelStroke, pixelStrokeSpec } from "./engine-registry.ts";
 import { computePinchViewport, snapRotation, isTap, isDoubleTap, gestureTapAction } from "./common/pointer-gesture.ts";
 import { assignRole, effectiveTool, toolToRole, strokeMode, eraserTapOnRelease } from "./pointer-route.ts";
@@ -172,6 +172,21 @@ const LONG_PRESS_CANCEL_SQ = 64;          // 8 px²；超出就放弃当 draw �
 
 // v249: 两参 → 引擎平滑参数（时间常数指数追踪 + 死区，详 ai-docs/20260613-brush-procreate-smoothing.md）。
 //   tau = streamline × tauMaxMs（时间，scale 无关）；deadzone = stabilization × stabMaxPx ÷scale（doc px）。
+// 拖画多段（格线）的 StampCollect 合并（一条 undo；shape/layer/mode 同源取首个）——原形状笔 mergeCollects 原样（ADR-0013）
+type _Collect = NonNullable<ReturnType<BrushEngine["collectStamps"]>>;
+function _mergeCollects(lists: _Collect[]): _Collect | null {
+  if (!lists.length) return null;
+  if (lists.length === 1) return lists[0];
+  const base = lists[0];
+  const stamps = lists.flatMap((c) => c.stamps);
+  let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+  for (const c of lists) {
+    bx0 = Math.min(bx0, c.bx); by0 = Math.min(by0, c.by);
+    bx1 = Math.max(bx1, c.bx + c.bw); by1 = Math.max(by1, c.by + c.bh);
+  }
+  return { ...base, stamps, bx: bx0, by: by0, bw: bx1 - bx0, bh: by1 - by0 };
+}
+
 function _resolveSmooth(settings: ResolvedBrush, scale: number) {
   const sc = scale || 1;
   const clamp01 = (v: number | undefined) => Math.max(0, Math.min(1, v || 0));
@@ -382,6 +397,7 @@ export class InputController {
   // ADR-0013 尺子（2026-09-09，形状笔引擎退役）：一笔一个投影器，_beginStroke 从 provider 取（app 接 ruler-ui），
   //   _move 的 doc 坐标经它投影再进引擎——画笔 / 橡皮 / 手指族同一切口（RULER_ROLES）。Shift 按住 = 本笔旁路尺。
   _strokeGuide: StrokeGuide | null = null;
+  _selPenGuide: StrokeGuide | null = null;   // 选区笔那条路的投影器（Q4 全员吸尺）
   _rulerGuideProvider: ((role: string, pixel: boolean) => StrokeGuide | null) | null = null;   // pixel = 当前笔 pixelMode（Q5 整数像素链尺）
   shiftDown = false;
   getTool: () => string;
@@ -861,8 +877,12 @@ export class InputController {
         // v0.7.25 选区笔：吃 coalesced（引擎平滑要密点）；预览=stamp overlay 色带（provider 拉取）
         const evs = (e.getCoalescedEvents?.() ?? [e]);
         for (const ev of evs) {
-          const { x: mx, y: my } = this.board.screenToDoc(ev.clientX, ev.clientY);
-          this.brush.extendStroke(mx, my, effectivePressureFor(rec, ev), ev.timeStamp);
+          let { x: mx, y: my } = this.board.screenToDoc(ev.clientX, ev.clientY);
+          const mp = effectivePressureFor(rec, ev);
+          const g = this._selPenGuide;   // ADR-0013 Q4：过尺（像素链尺 → 链像素逐颗直通；连续尺 → 投影）
+          if (g?.projectPath) { for (const q of g.projectPath(mx, my)) this.brush.extendStroke(q.x, q.y, mp, ev.timeStamp); continue; }
+          if (g) ({ x: mx, y: my } = g.project(mx, my));
+          this.brush.extendStroke(mx, my, mp, ev.timeStamp);
         }
         const bbox = this.brush.flushDirty();
         if (bbox) this.board.markDocDirty(bbox[0], bbox[1], bbox[2], bbox[3]);
@@ -1039,6 +1059,54 @@ export class InputController {
   }
   /** ADR-0013：尺子投影器提供方（app 接 ruler-ui.guideForStroke）；返回 null = 本笔不吸。 */
   setRulerGuideProvider(fn: ((role: string, pixel: boolean) => StrokeGuide | null) | null) { this._rulerGuideProvider = fn; }
+  /** 当前笔是否像素画模式（ruler-ui 拖画选整数像素集还是折线）。 */
+  currentBrushPixelMode(): boolean { return !!this.getResolvedBrush()?.pixelMode; }
+  /** ADR-0013 拖画（user 2026-09-09「像素笔圆和矩形，网格应该是拖动啊……再加一个普通笔也可以用的拖动模式看谁舒服」）：
+   *  尺子拖出来的整形一次落笔，走**正常 stroke 事务**（当前笔 / 当前层 / 选区 / 锁α / 橡皮 mode 与手绘同源，一个 undo 整点）。
+   *  pixel：整数像素集经 stampPixels 每像素一次（首颗由 beginStroke 落）；buffered：每条折线驱动一次引擎（恒压 0.5——机械绘制，
+   *  ADR-0005 §3 的拖画语义保留；直通），多条 StampCollect 合并一次 GPU commit（单令牌墙：一个 session）。只对画笔 / 橡皮工具。 */
+  drawShape(shape: { pixels?: Array<{ x: number; y: number }>; polylines?: Array<Array<{ x: number; y: number }>> }): boolean {
+    if (this._activeStroke || this._selPenLive) return false;
+    const role = toolToRole(effectiveTool(this.getTool(), false));
+    if (role !== "draw" && role !== "erase") return false;
+    const { reason } = this.doc.activeStrokeLeaves({ allowGroup: false });
+    if (reason === "group" || reason === "hidden") { this.status(t(reason === "group" ? "st.groupNoDraw" : "st.hiddenNoDraw")); return false; }
+    const settings = this.getResolvedBrush();
+    if (!settings || !this.doc.activeLayer) return false;
+    const layer = this.doc.activeLayer as ViewLeaf;
+    const spec = pixelStrokeSpec(role)!;
+    const mode = strokeMode(role, false);
+    const P = 0.5;
+    const t0 = performance.now();
+    if (settings.pixelMode) {
+      const pts = shape.pixels ?? [];
+      if (!pts.length) return false;
+      const session = new StrokeSession(this._strokeDeps, this.brush, [layer], spec, "livesync");
+      this.brush.beginStroke(session.targets[0], settings, pts[0].x, pts[0].y, P, mode, {}, t0);
+      session.stampPixels(pts.slice(1), P);
+      session.end();
+    } else {
+      const lists = (shape.polylines ?? []).filter((pl) => pl.length >= 1);
+      if (!lists.length) return false;
+      const session = new StrokeSession(this._strokeDeps, this.brush, [layer], spec, "overlay");
+      const collects: _Collect[] = [];
+      let t = t0;
+      for (const pl of lists) {
+        this.brush.beginStroke(session.targets[0], settings, pl[0].x, pl[0].y, P, mode, { tau: 0, deadzone: 0 }, t);
+        for (let i = 1; i < pl.length; i++) { t += 8; this.brush.extendStroke(pl[i].x, pl[i].y, P, t); }
+        t += 8;
+        const cs = this.brush.endStroke();
+        if (cs && cs.stamps.length) collects.push(cs);
+      }
+      const merged = _mergeCollects(collects);
+      if (merged) this._strokeDeps.commitStamps(merged);
+      session.end();   // 引擎已无活动笔 → 不再 commit；finalize（选区兜底）照跑
+    }
+    const bbox = this.brush.flushDirty();
+    if (bbox) this.board.markDocDirty(bbox[0], bbox[1], bbox[2], bbox[3]);
+    this.board.invalidateAll();
+    return true;
+  }
   // 任一像素笔画进行中（brush / 像素笔 / liquify / filterBrush 都设 _activeStroke）。
   // board._strokeActiveHint 用它判 livePreview（描边中走直接合成 / GL 门控），含像素笔/liquify/filterBrush。
   isStrokeActive() { return !!this._activeStroke; }
@@ -1154,7 +1222,13 @@ export class InputController {
       rec.lastP = null; rec.smP = -1; rec.lastEventTs = -Infinity;
       const scale = this.board.viewport.scale || 1;
       const pressure = e ? effectivePressureFor(rec, e) : 0.5;
-      this.brush.beginStroke(leaf as ViewLeaf, settings, dx, dy, pressure, "brush", _resolveSmooth(settings, scale), e?.timeStamp ?? performance.now());
+      // ADR-0013 Q4：选区笔也吸尺（伪 role "selPen"）。像素链尺的像素经 extendStroke 直通喂进 buffered 笔（选区笔不写层、抬笔才光栅），
+      //   非 stampPixels——直通 + 相邻像素 ≤ √2 → 抬笔 disc 光栅落在链上。Shift = 本笔不吸。
+      const guide = (!this.shiftDown && RULER_ROLES.has("selPen")) ? (this._rulerGuideProvider?.("selPen", !!base.pixelMode) ?? null) : null;
+      this._selPenGuide = guide;
+      let bx = dx, by = dy;
+      if (guide) ({ x: bx, y: by } = guide.begin(dx, dy));
+      this.brush.beginStroke(leaf as ViewLeaf, settings, bx, by, pressure, "brush", guide ? { tau: 0, deadzone: 0 } : _resolveSmooth(settings, scale), e?.timeStamp ?? performance.now());
       this._selPenLive = true;
       const bbox = this.brush.flushDirty();
       if (bbox) this.board.markDocDirty(bbox[0], bbox[1], bbox[2], bbox[3]);
@@ -1281,6 +1355,7 @@ export class InputController {
   _endSelPen() {
     if (!this._selPenLive) return;
     this._selPenLive = false;
+    this._selPenGuide = null;
     const cs = this.brush.endStroke() ?? null;
     if (!cs || !cs.stamps.length) { this.board.requestRender(); return; }
     // 软边笔 → GPU 光栅（阈值化）；pixelMode 笔/GL 不可用 → 引擎 Bresenham disc 同核 CPU 光栅
@@ -1302,6 +1377,7 @@ export class InputController {
   _abortSelPen() {
     if (!this._selPenLive) return;
     this._selPenLive = false;
+    this._selPenGuide = null;
     this.brush.cancelStroke();
     this.board.requestRender();
   }
