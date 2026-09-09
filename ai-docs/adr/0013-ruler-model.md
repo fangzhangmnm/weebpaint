@@ -53,7 +53,7 @@ doc 裁切 / 翻转 / 旋转 / 缩放 / 偏移经 `remapDeskRuler`（desk 直写
 - 放置态捕获层吃掉全部指针：两指缩放 / 平移在放置态暂不透传（放置态短暂；要透传参照 `.crop-overlay` 只捕获 handle 的做法）。
 - 引擎平滑在尺开时直通（tau=0，尺就是平滑器）——曲线尺上的手抖直接可见；user 手感裁决。
 - 图标：库里无「尺子」，左栏尺钮用「尺」字 stopgap（`tools/bake-stopgap-glyphs.py`），已登记 `../20260708 SVG Icons/TODO.md`。
-- 版本号：尺子是新功能纪元，按家规该 bump minor（0.15.0）并先问「要不要把 v0.14.x push prod」；本次先 patch v0.14.7，等 user 一句话。
+- 版本号：user 2026-09-09「不是新功能，只是 ui 整理罢了」→ 走 patch（v0.14.7），不 bump minor。
 
 ## 参考
 
