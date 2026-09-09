@@ -550,12 +550,16 @@ window.addEventListener("offline", () => { updateCloudAuthUI(); });
 //   文档有自己的落盘（editor-session.start 的 visibilitychange/pagehide），这里补的是**设置侧**。
 // 为什么是这两个事件：pagehide 是移动端唯一可靠的"页面要走了"；visibilitychange:hidden 覆盖切后台
 //   被系统回收的情况。beforeunload 在 iOS PWA 上不可靠，故不依赖它（topbar-menu 那个只管挽留对话框）。
-// 不 await：卸载期没有时间预算，写请求发出去就行（IDB 事务已排队，浏览器会让它跑完）。
+// 不 await：卸载期没有时间预算，写请求发出去就行。
+// ⚠ #60-C（2026-09-09）：只在 **persisted=false**（页面真在销毁）时写。persisted=true = 页面要进 bfcache：在 WebKit 上 pagehide 里
+//   起的 IDB 写永远 commit 不了（冻结前没有事件循环轮次），只会把锁冻在旧页里、让 redirect 回来的新页面全挂（案卷
+//   ai-docs/20260909-bfcache-idb-lock-daily-reauth-analysis.md）；store 0.12.1 起也会把这种写直接弃掉。要落盘的东西必须在
+//   导航之前写完——redirect 登录走 gallery-manage-ui.redirectAfterFlush 两步手势。
 const flushSettingsNow = (): void => {
   void flushPreferences();
   void flushAppState();
 };
-window.addEventListener("pagehide", flushSettingsNow);
+window.addEventListener("pagehide", (e: PageTransitionEvent) => { if (!e.persisted) flushSettingsNow(); });
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushSettingsNow(); });
 
 // 前台新鲜度活动监听 + idle tick 接线已切到 cloud-freshness.ts initCloudFreshness。

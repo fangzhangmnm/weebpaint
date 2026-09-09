@@ -40,8 +40,12 @@ import { lang, setLang, LANGS, langDisplayName } from "../i18n/index.ts";
 import { openInputSheet, openConfirmSheet } from "../sheets.ts";
 import { pathJoin } from "./gallery-path.ts";
 import { setAddImportAsNewDoc, importImageAsNewDoc } from "../import-image.ts";
-import { isUnlocked, lock, setPassword, promptPassword } from "../crypto-state.ts";
-import { hasVerifier, checkVerifier, clearVerifier } from "../password-verifier.ts";
+import { isUnlocked, lock, setPassword, promptPassword, setFilePassword, forgetFilePassword } from "../crypto-state.ts";
+import { hasVerifier, checkVerifier, clearVerifier, createVerifier } from "../password-verifier.ts";
+import { runChangePassword, type ChangePasswordReport } from "./change-password.ts";   // 2026-09-09 换密码编排（纯）
+import { invalidateCachedThumb } from "./cloud-thumb-cache.ts";
+import { galleryFlow } from "../gallery-connect.ts";
+import { stripSessionExt } from "../config.ts";
 import { t } from "../i18n/index.ts";
 import { loadCanvasTemplates, templateItems, templateById, templatePx } from "../canvas-templates.ts";
 import { mountSelectField, type SelectField } from "../ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
@@ -208,6 +212,67 @@ export async function uniqueNameFor(stem: string) {
 //   进图库即有库（setGalleryOpen 的 hasGallery 闸 = hasLiveStore），故此路径 requireStore() 合法。
 //   ⚠ 诚实交代一个副作用：store 配了 autoCacheOpenedFile → 备份读纯云端件会顺手把它留成本地副本
 //     （residency 变了，内容/同步态没变）。这是「备份要包含纯云端件」的固有代价——不读就备不到它。
+/** 图库换密码（2026-09-09）：① 旧密码（verifier 便宜验，不碰文件）② 新密码两遍 ③ 确认 ④ 清点本机有字节的加密件 ⑤ 逐件 rekey。
+ *  密码框全在 busy 之外；清点 + 重封在 galleryFlow 单飞道 + withBusy 里。云端未缓存 / 离线 / 失败的仍是旧密码（per-name 钉住，
+ *  打开时会问），状态行如实报数。列举走 walkLibrary（与全库备份同一件：逐夹 watchFolder 一次性快照，非库的 list()）。 */
+async function changePasswordFlow(): Promise<void> {
+  if (!hasVerifier()) { setStatus(t("gs.changePwNoVerifier"), true); return; }
+  let oldPw: string | null = null;
+  for (let attempt = 0; attempt < 3 && oldPw == null; attempt++) {
+    const pw = await promptPassword({ title: t("gs.changePwOldTitle"), message: attempt > 0 ? t("gs.pwWrongRetry") : t("gs.changePwOldMsg") });
+    if (pw == null) return;
+    if ((await checkVerifier(pw)) === "ok") oldPw = pw;
+  }
+  if (oldPw == null) return;
+  let newPw: string | null = null;
+  for (let round = 0; round < 3 && newPw == null; round++) {
+    const p1 = await promptPassword({ title: t("enc.setPwTitle"), message: round > 0 ? t("enc.setPwMismatch") : t("gs.changePwNewMsg") });
+    if (p1 == null) return;
+    const p2 = await promptPassword({ title: t("enc.confirmTitle"), message: t("enc.confirmMsg") });
+    if (p2 == null) return;
+    if (p1 === p2) newPw = p1;
+  }
+  if (newPw == null) return;
+  if (newPw === oldPw) { setStatus(t("gs.changePwSame"), true); return; }
+  if (!(await openConfirmSheet(t("gs.changePwConfirmTitle"), t("gs.changePwConfirmMsg")))) return;
+  const oldP = oldPw, newP = newPw;
+  await galleryFlow(async () => {
+    let report: ChangePasswordReport = { moved: [], kept: [] };
+    let partial = 0;
+    await withBusy(t("gs.changePwScanning"), async () => {
+      const manifest = await walkLibrary(
+        (folder) => snapshotFolderOnce((f, cb) => requireStore().files.watchFolder(f, cb), folder),
+        { onFolder: (_f, n) => showFullscreenBusy(t("bk.scanningFolders", { n })) },
+      );
+      partial = manifest.partialFolders.length;
+      const targets: string[] = [];
+      for (const fr of manifest.files) {
+        if (!(fr.syncState != null && isCachedSyncState(fr.syncState as never))) continue;   // 只重封本机有字节的（云端未缓存的 rekey 也会拒 no-local）
+        try { if (await requireStore().file(fr.path, { isZip: true, mode: "existing" }).isEncrypted()) targets.push(fr.path); }
+        catch (e) { reportError(new Error(`[change-password] isEncrypted probe failed for ${fr.path}: ` + String(e)), "log"); }
+      }
+      report = await runChangePassword({
+        targets, oldPassword: oldP, newPassword: newP,
+        rekey: (name, pw) => requireStore().file(name, { isZip: true, mode: "existing" }).rekey({ newPassword: pw, isOnline: galleryOnline }),
+        rememberFilePassword: setFilePassword,
+        forgetFilePassword,
+        commitNewPassword: async (pw) => { await createVerifier(pw); setPassword(pw); },
+        onProgress: (done, total) => showFullscreenBusy(t("gs.changePwBusy", { n: String(done + 1), total: String(total) })),
+        onError: (name, e) => reportError(new Error(`[change-password] rekey failed for ${name}: ` + String(e)), "log"),
+      });
+      for (const n of report.moved) {   // 字节换了体：云 thumb 缓存条目作废 + 锁态重探（同 gallery.ts _afterSwap）
+        const bare = stripSessionExt(n);
+        try { await invalidateCachedThumb(bare); } catch (e) { reportError(new Error(`[change-password] thumb invalidate failed for ${n}: ` + String(e)), "log"); }
+        gallery.invalidateEncrypted(bare);
+      }
+    });
+    const n = String(report.moved.length), m = String(report.kept.length), k = String(partial);
+    if (report.kept.length > 0 || partial > 0) setStatus(t("gs.changePwDoneKept", { n, m, k }), true);
+    else setStatus(t("gs.changePwDone", { n }));
+    gallery.refresh();
+  });
+}
+
 async function runFullLibraryBackup(): Promise<void> {
   if (!(await openConfirmSheet(t("bk.title"), t("bk.msg", { size: humanSize(BACKUP_BUDGET_BYTES) })))) return;
   const now = new Date();
@@ -357,6 +422,12 @@ export function initGalleryShell(ctx: AppContext) {
     }
     const pw = await promptPassword({ title: t("gs.unlockTitle"), message: t("gs.unlockNoLocalMsg") });
     if (pw != null) { setPassword(pw); setStatus(t("gs.pwRecorded")); gallery.refresh(); }
+  });
+
+  // 换密码（2026-09-09，user「还是加一个换密码ui吧，不然还是容易泄密」）：编排 = ./change-password.ts；store 0.12.0 rekey 密文→密文不经明文。
+  els.galleryMenuChangePw?.addEventListener("click", () => {
+    closePopupMenuOf(els.galleryMenuPopup);
+    void changePasswordFlow();
   });
 
   // #18 全库备份（2026-08-28）：只读，整库打一个 zip；库太大改逐件下载。逻辑 = ./library-backup.ts

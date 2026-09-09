@@ -263,7 +263,8 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
       doc?.addEventListener?.("visibilitychange", () => {
         if ((globalThis as { document?: { visibilityState?: string } }).document?.visibilityState === "hidden") void persist(false);
       });
-      win?.addEventListener?.("pagehide", () => { void persist(false); });
+      // #60-C（2026-09-09）：persisted=true（要进 bfcache）不写——冻结页里的 IDB 写永远 commit 不了，只会持锁（案卷 20260909-bfcache-idb-lock）。
+      win?.addEventListener?.("pagehide", (e: Event) => { if (!(e as { persisted?: boolean }).persisted) void persist(false); });
       // 失焦：按 policy 决定推不推。
       win?.addEventListener?.("blur", () => { void persist(pushOn.has("blur")); });
     },

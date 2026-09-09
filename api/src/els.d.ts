@@ -78,6 +78,7 @@ export declare const els: {
     galleryMenuForceUpdate: HTMLElement;
     menuGenAI: HTMLElement;
     galleryMenuLock: HTMLElement;
+    galleryMenuChangePw: HTMLElement;
     galleryMenuBackup: HTMLElement;
     newDocSheet: HTMLElement;
     newDocName: HTMLInputElement;

@@ -25,7 +25,8 @@ import type { GalleryEntry } from "../gallery-registry.ts";
 import { mintFolderByPicker, mintOneDriveByAccount, mintOneDriveSwitchAccount, oneDriveInteractMode, attachGallery, ensureFolderPermission, canPickFolderGallery, hasFreshPendingOneDriveConnect, clearPendingOneDriveConnect, galleryFlow, type MintResult } from "../gallery-connect.ts";
 import { requireStore, signIn, signOut, isSignedIn, isAuthConfigured, _seedNextRackInitData, _buildStoreForGalleryEntry, brushRackCollection } from "../app-store.ts";
 import { getAllBrushes, getMeta, RACK_META_ID } from "../brushes.ts";
-import { preferences, PREF_REGISTRY, type PrefKey } from "../app-prefs.ts";
+import { preferences, PREF_REGISTRY, flushPreferences, type PrefKey } from "../app-prefs.ts";
+import { flushAppState } from "../app-state.ts";   // #60-C：redirect 前 flush
 import { docHome } from "../doc-home.ts";
 import { session } from "../session-state.ts";   // A1：attach 后 transient 自动安家
 import { triggerDownload } from "../session.ts";
@@ -272,6 +273,25 @@ function renderConnectContent(box: HTMLElement): void {
     }
   }).catch((e) => reportError(new Error("[gallery-manage] history list failed: " + String(e)), "log"));
 }
+/** #60-C（2026-09-09，user「IDB都做」）：redirect 登录前的**两步手势**。先把该落盘的落盘（活 doc 本地保存 + settings/app-state 防抖 flush），
+ *  再弹「去登录」sheet，onPick 里**同步**起跳（iOS 手势纪律：loginRedirect 前不能有 await）。
+ *  为什么：loginRedirect 离场时 pagehide 里再写 IDB 在 WebKit 上永远 commit 不了、只会把锁冻在旧页里、回来的新页面全挂
+ *  （案卷 ai-docs/20260909-bfcache-idb-lock-daily-reauth-analysis.md）；store 0.12.1 起 pagehide persisted=true 把在飞写全弃——
+ *  所以要写的必须在跳之前写完。落盘失败 → 不跳（响亮）。topbar 的登录提示是同一形状（save 后 sheet、onPick 起跳）。 */
+async function redirectAfterFlush(go: () => void): Promise<void> {
+  try {
+    await session.save({ implicit: true });                 // 活 doc 本地落盘（implicit：file/transient 家 no-op；不推云——本就没登录）
+    await Promise.all([flushPreferences(), flushAppState()]);
+  } catch (e) {
+    reportError(new Error("[gallery-manage] flush before sign-in redirect failed — not navigating: " + String(e)), "error");
+    return;
+  }
+  await openChoiceSheet<"go" | "later">(t("save.signInPromptTitle"), t("gc.redirectReadyMsg"), [
+    { label: t("save.signInNow"), value: "go", primary: true, onPick: go },
+    { label: t("save.signInLater"), value: "later" },
+  ]);
+}
+
 async function onOneDrivePick(): Promise<void> {
   _closePopup();
   // 逃生舱 helper（0825 拍板→0828 落地）：file:// 下微软登录无解（redirect 需要 http origin）——
@@ -284,6 +304,10 @@ async function onOneDrivePick(): Promise<void> {
   // 永远弹账号选择页（select_account；点击同步栈起跳保手势）。桌面 = popup：选完账号弹回，
   //   minted 直接续 switchFlow（全程不离页）；移动 = redirect：页面即离开，回程由
   //   resumePendingOneDriveConnect 续办 mint+switchFlow——选了同账号由「已是当前图库」短路。
+  if (oneDriveInteractMode() === "redirect") {   // #60-C：先落盘再跳（onPick 同步起跳；回程由 resumePendingOneDriveConnect 续办）
+    await redirectAfterFlush(() => { mintOneDriveSwitchAccount().catch((e) => reportError(new Error("[gallery-manage] connect redirect failed: " + String(e)), "error")); });
+    return;
+  }
   try {
     const minted = await mintOneDriveSwitchAccount();
     if (minted) await switchFlow(minted.entry);
@@ -387,7 +411,10 @@ async function reconnectFlow(): Promise<void> {
       //   回程由 boot attach 的 online 收口接住。
       if (!isSignedIn()) {
         if (oneDriveInteractMode() === "popup") await signIn({ mode: "popup" });
-        else { await signIn(); return; }   // redirect：页面即离开，后续代码不跑
+        else {   // redirect：#60-C 先落盘再跳（onPick 同步起跳，页面即离开）；回程由 boot attach 的 online 收口接住
+          await redirectAfterFlush(() => { signIn().catch((e) => reportError(new Error("[gallery-manage] reconnect redirect failed: " + String(e)), "error")); });
+          return;
+        }
       }
       galleryAttachment.setOnline(true);
     } else {

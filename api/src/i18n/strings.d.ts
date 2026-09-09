@@ -5953,6 +5953,84 @@ export declare const S: {
         readonly ja: "リセットしました。次回の暗号化時に新パスワードを設定します";
         readonly tok: "open sin li pini. tenpo kama la sina len e sitelen la o pana e nimi len sin.";
     };
+    readonly "gs.changePwLabel": {
+        readonly zh: "更改图库密码…";
+        readonly en: "Change gallery password…";
+        readonly ja: "ギャラリーのパスワードを変更…";
+        readonly tok: "o ante e nimi awen pi poki sitelen…";
+    };
+    readonly "gs.changePwNoVerifier": {
+        readonly zh: "还没设过图库密码；第一次加密作品时会设置。";
+        readonly en: "No gallery password yet — you set it when you first encrypt an artwork.";
+        readonly ja: "まだギャラリーのパスワードがありません。作品を初めて暗号化するときに設定します。";
+        readonly tok: "nimi awen li lon ala. sina len e sitelen nanpa wan la sina pana e ona.";
+    };
+    readonly "gs.changePwOldTitle": {
+        readonly zh: "输入当前密码";
+        readonly en: "Enter current password";
+        readonly ja: "現在のパスワードを入力";
+        readonly tok: "o pana e nimi awen pi tenpo ni";
+    };
+    readonly "gs.changePwOldMsg": {
+        readonly zh: "先验证当前的图库密码。";
+        readonly en: "Verify the current gallery password first.";
+        readonly ja: "まず現在のギャラリーのパスワードを確認します。";
+        readonly tok: "o pana e nimi awen pi tenpo ni.";
+    };
+    readonly "gs.changePwNewMsg": {
+        readonly zh: "输入新密码。本机有字节的加密作品会逐件用新密码重封，不经明文。";
+        readonly en: "Enter the new password. Encrypted artworks cached on this device are re-sealed one by one, never through plaintext.";
+        readonly ja: "新しいパスワードを入力。この端末にある暗号化作品を、平文を経ずに順に再封印します。";
+        readonly tok: "o pana e nimi awen sin. sitelen len lon ilo ni li kama jo e len sin.";
+    };
+    readonly "gs.changePwSame": {
+        readonly zh: "新密码与当前密码相同，没有更改。";
+        readonly en: "Same as the current password — nothing changed.";
+        readonly ja: "現在のパスワードと同じです。変更はありません。";
+        readonly tok: "nimi awen sin li sama nimi awen pi tenpo ni. ala li ante.";
+    };
+    readonly "gs.changePwConfirmTitle": {
+        readonly zh: "更改密码？";
+        readonly en: "Change password?";
+        readonly ja: "パスワードを変更しますか？";
+        readonly tok: "o ante e nimi awen?";
+    };
+    readonly "gs.changePwConfirmMsg": {
+        readonly zh: "本机有字节的加密作品会用新密码重封（云端只见密文）。云端未缓存、离线或失败的作品仍用旧密码，打开时会单独问。";
+        readonly en: "Encrypted artworks cached here are re-sealed with the new password (the cloud only ever sees ciphertext). Artworks not cached, offline, or failing stay on the old password and will ask for it when opened.";
+        readonly ja: "この端末にある暗号化作品を新しいパスワードで再封印します（クラウドには暗号文しか渡りません）。未キャッシュ・オフライン・失敗した作品は旧パスワードのままで、開くときに聞かれます。";
+        readonly tok: "sitelen len lon ilo ni li kama jo e nimi awen sin (poki sewi li lukin e len taso). sitelen ante li awen e nimi awen pi tenpo pini.";
+    };
+    readonly "gs.changePwScanning": {
+        readonly zh: "正在清点加密作品…";
+        readonly en: "Listing encrypted artworks…";
+        readonly ja: "暗号化作品を確認中…";
+        readonly tok: "mi lukin e sitelen len…";
+    };
+    readonly "gs.changePwBusy": {
+        readonly zh: "正在更改密码 {n}/{total}…";
+        readonly en: "Changing password {n}/{total}…";
+        readonly ja: "パスワード変更中 {n}/{total}…";
+        readonly tok: "mi ante e nimi awen {n}/{total}…";
+    };
+    readonly "gs.changePwDone": {
+        readonly zh: "密码已更改：{n} 件已用新密码重封";
+        readonly en: "Password changed: {n} re-sealed";
+        readonly ja: "パスワードを変更しました：{n} 件を再封印";
+        readonly tok: "nimi awen li ante: sitelen {n} li jo e len sin";
+    };
+    readonly "gs.changePwDoneKept": {
+        readonly zh: "密码已更改：{n} 件已重封，{m} 件仍用旧密码（{k} 个文件夹清单不完整）";
+        readonly en: "Password changed: {n} re-sealed, {m} still on the old password ({k} folders listed incompletely)";
+        readonly ja: "パスワードを変更：{n} 件を再封印、{m} 件は旧パスワードのまま（{k} フォルダは一覧が不完全）";
+        readonly tok: "nimi awen li ante: sitelen {n} li jo e len sin, sitelen {m} li awen e nimi awen pi tenpo pini (poki {k} li lukin ala pini)";
+    };
+    readonly "gc.redirectReadyMsg": {
+        readonly zh: "已保存到本机。接下来会跳到微软登录页，登录后自动回来。";
+        readonly en: "Saved on this device. Next you'll go to the Microsoft sign-in page and come back automatically.";
+        readonly ja: "この端末に保存しました。次に Microsoft のサインインページへ移動し、サインイン後に自動で戻ります。";
+        readonly tok: "sitelen li awen lon ilo ni. tenpo kama la sina tawa lipu Microsoft, sina kama lon la sina kama sin.";
+    };
     readonly "gs.clipboardNoImage": {
         readonly zh: "剪贴板里没有图片";
         readonly en: "No image in the clipboard";

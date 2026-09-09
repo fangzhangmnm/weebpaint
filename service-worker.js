@@ -114,8 +114,25 @@ self.addEventListener("fetch", (event) => {
   if (!url.pathname.startsWith(SCOPE_PATH)) return;   // 同源但 scope 外（/pwa-models/ 等）：不接管
   // prod 根 SW(scope=/)不碰 /dev/——留给 /dev/ 作用域的 dev SW 自己处理（dev SW 的 scope 已限在 /dev/，故只 prod 需此跳）。
   if (!SCOPE_IS_DEV && url.pathname.includes("/dev/")) return;
-  event.respondWith(SCOPE_IS_DEV ? networkFirst(req) : cacheFirst(req));
+  const p = SCOPE_IS_DEV ? networkFirst(req) : cacheFirst(req);
+  event.respondWith(req.mode === "navigate" ? withNoStore(p) : p);
 });
+
+// #60-A（2026-09-09，user「IDB都做」）：导航响应加 `Cache-Control: no-store` → WebKit 不把本页放进 bfcache
+//   （WebKit BackForwardCache.cpp canCacheLocalFrame 的明文阻断项「HTTPS + no-store」）。
+//   为什么：重连 loginRedirect 离场时旧页若被冻进 bfcache，会带着 IDB 事务把锁握到死、新页面全挂
+//   （案卷 ai-docs/20260909-bfcache-idb-lock-daily-reauth-analysis.md）。验收 oracle = 黑匣子里重连后 `pagehide persisted=false`。
+//   ⚠ 这只是 Safari 上的**额外一层**，正确性不押在它身上：store 0.12.1 的 pagehide 闸门 + app 的 pagehide 写门控才是承重层
+//   （single-html 没有 SW，全靠那两层；Chrome 对 no-store 页的 bfcache 另有规则，无妨——桌面登录走 popup 不离页）。
+//   只改导航响应的头：子资源照旧；cache.put 的是原响应（clone 在策略函数里已做），这里包的是交给页面的那份。
+async function withNoStore(p) {
+  const r = await p;
+  if (!(r instanceof Response)) return r;
+  const h = new Headers();
+  if (r.headers && typeof r.headers.forEach === "function") r.headers.forEach((v, k) => h.set(k, v));
+  h.set("Cache-Control", "no-store");
+  return new Response(r.body, { status: r.status, statusText: r.statusText, headers: h });
+}
 
 // prod：cache-first + 后台 revalidate（ETag/长度变 → 通知 page 弹更新 toast）。
 async function cacheFirst(req) {

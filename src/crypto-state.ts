@@ -40,6 +40,11 @@ export function getPassword(name: string | null): string | null {
   return _password;
 }
 
+/** 换密码流程用（2026-09-09；编排 = gallery/change-password.ts）：显式登记「这件用 pw」/ 忘掉登记。
+ *  刻意**不**做「等于全局就不记」的短路——换密码时全局马上要换成新钥，旧钥必须先钉在每件上。 */
+export function setFilePassword(name: string, pw: string) { _perName.set(name, pw); }
+export function forgetFilePassword(name: string) { _perName.delete(name); }
+
 export function onPasswordVerified(name: string, pw: string) {
   // 统一密码模型：全局还空着 → 这个验证过的密码上位为全局；
   // 全局已有但这个文件用别的密码（导入件）→ 记 per-name 覆盖，全局不动。

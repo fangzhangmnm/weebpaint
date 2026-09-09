@@ -15,5 +15,9 @@ export declare function onLockChange(cb: LockChangeSub): () => boolean;
 /** 弹一次密码输入（不入库、不验证）。app 没注入 prompt → throw（组装错误，早炸）。 */
 export declare function promptPassword(opts?: PromptOpts): Promise<string | null>;
 export declare function getPassword(name: string | null): string | null;
+/** 换密码流程用（2026-09-09；编排 = gallery/change-password.ts）：显式登记「这件用 pw」/ 忘掉登记。
+ *  刻意**不**做「等于全局就不记」的短路——换密码时全局马上要换成新钥，旧钥必须先钉在每件上。 */
+export declare function setFilePassword(name: string, pw: string): void;
+export declare function forgetFilePassword(name: string): void;
 export declare function onPasswordVerified(name: string, pw: string): void;
 export {};

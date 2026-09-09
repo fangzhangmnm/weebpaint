@@ -90,3 +90,14 @@
 ## 7. 下一步（归 user 一句话）
 
 A / B / C / D 各自要不要。顺序建议 A（一行、oracle 明确）→ C（`reconnectFlow` 两步手势 + 崩溃快照豁免）→ B（store 0.11.7）→ D。
+
+## 8. 落地记（2026-09-09 同日；user「IDB都做，然后让这个比如 single html 多支持平台一点，不要依赖某个浏览器的 niche」）
+
+- **B · store 0.12.1**（`ed99129`，改判 0.11.6）：pagehide **persisted=true**（PageTransitionEvent 标准字段，非某浏览器怪癖）→ abort 全部在飞事务（读写都弃 → `IdbSuspendedError`）、关连接、闸门落下（pageshow 前新事务直接拒，不开连接不排队）；persisted=false 什么都不做；`IdbSuspendedError` 在上报漏斗里一律 log 级。两条面包屑进黑匣子（`[idb] pagehide persisted=true → aborted N…` / `[idb] pageshow → gate lifted`）。**承重层之一，任何浏览器都成立。**
+- **D · store 0.12.1**：同账号 `acquireTokenSilent` 单飞（并发共享一个 promise，一次失败一条日志）；InteractionRequired → 60s 闩（fail-fast 同一个错，不进 MSAL 不开 iframe），显式登录成功 / 后台 silent / signOut 解闩，到期放行一次；网络错不闩；getToken 并发失败只清一次 activeAccount、只广播一次 expired。
+- **C · WeebPaint v0.14.4**：`app.ts` settings flush、`editor-session.ts` 崩溃 flush 只在 pagehide **!persisted** 时跑；redirect 登录改两步手势 `gallery-manage-ui.redirectAfterFlush`（先 `session.save({implicit})` + settings/app-state flush，落盘失败不跳；再弹「去登录」，onPick 同步起跳）——`reconnectFlow` / `onOneDrivePick` 两处；topbar 登录提示顺手 kick settings flush（它本就是「save 后 sheet、onPick 起跳」的形状）。**承重层之二。**
+- **A · WeebPaint v0.14.4**：`service-worker.js` 导航响应加 `Cache-Control: no-store`（缓存命中 / 抓网 / 离线壳三条路都带，子资源不带；`test/sw-strategy` 有断言）。**只是 Safari 上的额外一层**——single-html 没有 SW，全靠 B + C；验收 oracle = 黑匣子里重连后 `pagehide persisted=false`。
+- 顺带：换密码 UI（#61）同版落地——图库菜单「更改图库密码…」，编排 `src/gallery/change-password.ts`（纯，5 测），逐件 `file.rekey` 密文→密文；云端未缓存 / 离线 / 失败的仍旧密码（per-name 钉住），状态行如实报数。
+- 未做：#12 pageshow 复活 reload（B 已让复活页自动重开连接，不必 reload）。**真机未验**（场景：过 24h 后重连；换密码后各件能开、OneDrive 上仍是 .zip）。
+- WXHW：下一轮（user「修完这个开始修 wxhw，多和 weebpaint 对对账，有需要可以抽 gallery 公共库」）。
+

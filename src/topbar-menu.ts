@@ -36,6 +36,8 @@ import { intakeOraDoc } from "./import-image.ts";
 import { openAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";   // 2026-09-02 C1
 import { allows } from "./ui/interaction-lock.ts";   // 2026-09-02 C8
 import { reportError } from "./error-badge.ts";
+import { flushAppState } from "./app-state.ts";   // #60-C
+import { flushPreferences } from "./app-prefs.ts";   // #60-C
 import { decodeOraToPainting } from "./backend/ora.ts";
 import { t } from "./i18n/index.ts";
 import { openConnectMenuFromEditor } from "./gallery/gallery-manage-ui.ts";   // P3 无库单入口（0830：同一个连接菜单）
@@ -75,12 +77,14 @@ function smartSaveAndPush() {
   const _att = galleryAttachment.state();
   if (_att.kind === "attached" && _att.entry.kind === "folder") {
     void session.save({ commitPending: true }).catch(() => {});
+  void flushPreferences(); void flushAppState();   // #60-C（2026-09-09）：settings 也在跳转前落盘（redirect 后 pagehide 里的写在 WebKit 上永远 commit 不了）
     setStatus(t("save.savedLocalGalleryOffline"), true);
     updateSaveStatus();
     return;
   }
   // —— 已配置未登录：本地保存照做（不 await——sheet 弹出与 IDB 事务并行，beforeunload 偷存同款姿态）——
   void session.save({ commitPending: true }).catch(() => {});
+  void flushPreferences(); void flushAppState();   // #60-C（2026-09-09）：settings 也在跳转前落盘（redirect 后 pagehide 里的写在 WebKit 上永远 commit 不了）
   // 离线时登录无意义（与旧 menuSignIn「未登录+已配置+在线才显示」同判据）→ 不弹，只提示。
   if (_cloudSignInPromptDeclined || navigator.onLine === false) {
     setStatus(t("save.savedLocalNotSignedIn"), true);
