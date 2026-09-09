@@ -22,11 +22,10 @@ import { t, tLatin } from "./i18n/index.ts";
 import { fillPreviewActive, commitFillNow } from "./fill-mode.ts";
 import { isPopupOpen, openAdoptedPopup, toggleAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";
 import { registerContextToolbar, mountContextToolbar, type ContextToolbarHandle } from "./ui/context-toolbar.ts";
+import { syncRulerUi } from "./ruler-ui.ts";   // ADR-0013 尺子：模式变了刷左栏尺钮态
 import { attachSubToolSlot, type SubToolSlotHandle } from "./ui/subtool-slot.ts";   // 2026-09-06 U3 动词位长按（修订 ③：长按 = 叫出上下文条）
 import { mountVerbSegment, type VerbSegmentHandle } from "./ui/verb-segment.ts";   // 2026-09-06 晚 ADR-0012 修订 ③：子工具栈并入上下文条左段
 import { VERB_SUBTOOLS, DEFAULT_SUBTOOL, isVerb, subToolDef, verbOfMode, subToolOfMode, type Verb } from "./common/verbs.ts";   // ADR-0012 动词表   // 2026-09-02 C4：顶栏条登记（让位高度由登记表算）   // 2026-09-02 C1：组槽/配置菜单收养（外点关/Escape/栈/定位归 module）
-import { configFromModeState, planesForMode, defaultVpsForMode } from "./perspective-frame.ts";
-import type { PerspMode } from "./perspective-frame.ts";
 import type { AppContext } from "./app-context.ts";
 import type { ViewLeafSnap as LayerSnap } from "./backend/workpiece/painting-view.ts";
 import type { SelectionPreviewTx } from "./backend/workpiece/selection-component.ts";
@@ -91,75 +90,6 @@ function _pushSelToolToEngine(tool: string) {
 // （_transientMenus / closeTransientMenus 2026-09-02 C1 退役：菜单开合归 popup-menu，下笔一把关 = closePopupMenu()）
 const SETOP_ICON: Record<string, string> = { new: "#selection-new", union: "#selection-union", subtract: "#selection-difference", intersect: "#selection-union" };
 const SUBTOOL_ICON: Record<string, string> = { freehand: "#select-freehand", rect: "#select-rectangle", ellipse: "#select-ellipse", polygon: "#select-polygon", magic: "#magic-wand", pen: "#pencil" };
-// 形状笔（ADR-0005/0006）：组槽 + 约束钮（图标按子工具换义）+ grid 配置 + 透视平面槽
-let shapeToolbarStack: HTMLElement, shapeSubBtns: HTMLElement[],
-    shapeGridMenu: HTMLElement,
-    shapeSubLineUse: SVGUseElement, shapeSubRectUse: SVGUseElement, shapeSubCircleUse: SVGUseElement,
-    shapeVarMenus: Record<string, HTMLElement>,
-    shapeGridNuVal: HTMLElement, shapeGridNvVal: HTMLElement, shapeGridBorderBtn: HTMLElement,
-    shapePerspModeSlotUse: SVGUseElement, shapePerspModeMenuBtns: HTMLElement[],
-    shapePlaneCtl: HTMLElement, shapePlaneBtns: HTMLElement[],
-    shapePerspExtraCtl: HTMLElement, shapePerspShowBtn: HTMLElement, shapePerspShowUse: SVGUseElement;
-const PERSP_MODE_ICON: Record<string, string> = { off: "#persp-viewport", p1: "#persp-1p", p2: "#persp-2p", p3: "#persp-3p", iso: "#persp-iso" };
-// v0.6.25 变体化（user：不走 toggle 走小三角；推翻 2026-07-25 constrain-ratio 合并裁定——
-//   变体是并列可选项要成对可辨图标；square/ellipse 走 stopgap 待入库）：钮面 = 当前变体图标
-const CONSTRAIN_KEY: Record<string, "constrainLine" | "constrainRect" | "constrainCircle"> = { line: "constrainLine", rect: "constrainRect", circle: "constrainCircle" };
-
-// 形状笔上下文工具栏派生（对齐 updateLassoToolbar 的「统一同步点」纪律）
-export function updateShapeToolbar() {
-  if (!shapeToolbarStack) return;
-  const active = editMode.current() === "shapeBrush";
-  shapeToolbarStack.classList.toggle("hidden", !active);
-  if (!active) { closePopupMenuOf(shapeGridMenu); return; }
-  const sub = input.shapeBrush.getSubTool();
-  const gPersp = desk.persp;
-  const perspMode = (["p1", "p2", "p3", "iso"].includes(gPersp.mode) ? gPersp.mode : "off") as PerspMode;
-  for (const b of shapeSubBtns) {
-    b.setAttribute("aria-pressed", b.dataset.shapeSub === sub ? "true" : "false");
-  }
-  // v0.6.25 变体钮面：line=自由/15°snap（透视下 snap 换「吸向消失点」义）；rect=长方/正方；circle=椭圆/正圆
-  const es = desk.shapeBrush;
-  const lineSnapIcon = perspMode !== "off" ? "#snap-vanishing-point" : "#line-snap";   // v0.6.27：15° 字样图标退位（user），line-snap stopgap 待真图
-  shapeSubLineUse.setAttribute("href", es.constrainLine ? lineSnapIcon : "#line");
-  shapeSubRectUse.setAttribute("href", es.constrainRect ? "#square" : "#rectangle");
-  shapeSubCircleUse.setAttribute("href", es.constrainCircle ? "#circle" : "#ellipse");
-  (document.getElementById("shapeLineSnapUse") as unknown as SVGUseElement | null)?.setAttribute("href", lineSnapIcon);
-  for (const [s2, menu] of Object.entries(shapeVarMenus)) {
-    if (s2 !== "grid") {
-      const on = !!es[CONSTRAIN_KEY[s2]];
-      for (const mb of menu.querySelectorAll<HTMLElement>("[data-shape-var]")) {
-        mb.setAttribute("aria-pressed", (mb.dataset.shapeVar === "constrain") === on ? "true" : "false");
-      }
-    }
-    if (s2 !== sub) closePopupMenuOf(menu);   // 切子工具收起别家的菜单
-  }
-  if (sub === "grid") {
-    shapeGridNuVal.textContent = String(desk.shapeBrush.gridNu);
-    shapeGridNvVal.textContent = String(desk.shapeBrush.gridNv);
-    shapeGridBorderBtn.setAttribute("aria-pressed", desk.shapeBrush.gridBorder ? "true" : "false");
-  }
-  // 透视模式组槽（UI v2.1）：槽显当前模式；透视开着 → 平面槽（line 智能吸附不吃平面 → 藏）+
-  //   VP 编辑钮 + 绘图 gizmo 显隐钮出现
-  const g = gPersp;
-  const mode = perspMode;
-  shapePerspModeSlotUse.setAttribute("href", PERSP_MODE_ICON[mode]);
-  for (const b of shapePerspModeMenuBtns) {
-    b.setAttribute("aria-pressed", b.dataset.perspMode === mode ? "true" : "false");
-  }
-  shapePlaneCtl.classList.toggle("hidden", mode === "off" || sub === "line");
-  shapePerspExtraCtl.classList.toggle("hidden", mode === "off");
-  if (mode !== "off") {
-    const planes = planesForMode(mode) as string[];
-    const plane = planes.includes(g.plane) ? g.plane : "ground";
-    for (const b of shapePlaneBtns) {
-      const p = b.dataset.shapePlane!;
-      b.classList.toggle("hidden", !planes.includes(p));
-      b.setAttribute("aria-pressed", plane === p ? "true" : "false");
-    }
-    shapePerspShowBtn.setAttribute("aria-pressed", g.showGizmo ? "true" : "false");
-    shapePerspShowUse.setAttribute("href", g.showGizmo ? "#visibility-show" : "#visibility-hide");
-  }
-}
 function closeSubMenu() { closePopupMenuOf(lassoSubMenu); }
 function closeSetOpMenu() { closePopupMenuOf(lassoSetOpMenu); }
 
@@ -179,9 +109,9 @@ export function updateLassoToolbar() {
   const fillActive = m === "fill";
   const selToolActive = lassoActive || fillActive;   // v0.5.12：选区/填充共用同一 Row1（UI 独立≠第二套代码）
   const sub = input.lasso.getSubTool();
-  // 形状笔/VP 编辑与 lasso stack 同位 fixed → 互斥（同 picker 先例）；shape 中去选走 Ctrl+D
-  const shapeActive = m === "shapeBrush" || m === "perspEdit";
-  const showAny = (floating || hasSelection || selToolActive) && !pickerActive && !shapeActive;
+  // VP 编辑 / 尺子放置态与 lasso stack 同位 fixed → 互斥（同 picker 先例）；期间去选走 Ctrl+D
+  const otherStackActive = m === "perspEdit" || m === "rulerPlace";
+  const showAny = (floating || hasSelection || selToolActive) && !pickerActive && !otherStackActive;
   lassoToolbarStack.classList.toggle("hidden", !showAny);
   if (!showAny) { closeSelEditUI(); closeSubMenu(); closeSetOpMenu(); return; }
 
@@ -397,8 +327,7 @@ export function setTool(tool: string) {
   //   v0.6.26：必须先于 editMode.setTool——modechange 里的组槽同步读它，后写会慢一拍（真机：图标反了）
   editMode.setTool(tool);   // emit wp:modechange → _syncEditModeUI 派生按钮高亮 / lasso 工具栏
   // 切工具 → 应用该工具的 per-tool state（size/flow/activeBrushId）+ preset 冻结字段
-  //   shapeBrush alias 到 brush（getRackToolKey）：共享笔架 + 共享当前笔/dial（user：「笔和绘制用的笔刷共享笔架」）
-  if (tool === "brush" || tool === "eraser" || tool === "filterBrush" || tool === "shapeBrush"
+  if (tool === "brush" || tool === "eraser" || tool === "filterBrush"
       || tool === "lasso" || tool === "fill") {   // v0.7.26 选区笔：进 lasso/fill 灌 selPen dial
     rack.applyToolState(tool);
   }
@@ -413,7 +342,6 @@ export function setTool(tool: string) {
 // ---- 动词位（ADR-0012，2026-09-06 U3）：动词 → 记忆的子工具 → 老 EditMode / 滤镜笔 payload ----
 const _slots: SubToolSlotHandle[] = [];
 const _segments: VerbSegmentHandle[] = [];       // 各上下文条左段（套索条 / 形状条 / 笔条；滤镜笔条的左段归 filters-adjust 自管）
-let _brushToolbar: ContextToolbarHandle | null = null;   // 笔·自由手的上下文条：默认藏，长按笔位叫出，✓ 收起
 function _verbTools(verb: Verb) { return VERB_SUBTOOLS[verb].map((d) => ({ id: d.id, icon: d.icon, title: tLatin(d.titleKey as Parameters<typeof tLatin>[0]) })); }
 /** 把某动词的子工具左段插到一条静态上下文条的行首（display:contents 宿主，不扰 flex 行）。 */
 function _mountVerbSegmentInto(row: HTMLElement | null, verb: Verb): void {
@@ -470,10 +398,10 @@ export function _syncEditModeUI() {
   // 依赖 body[data-tool] 的 CSS（且 data-mode 被图库占用）。transient 的 UI 抑制走面板 suppress + 按钮高亮。
   // slider 禁用：size/opacity 仅 canDraw 模式可调 → 反应式镜像，<LeftDial> 绑 :disabled。color 仅 allowsColor 可点。
   dialReactive.canDraw = editMode.canDraw();
+  dialReactive.transient = transient;   // 2026-09-09 左栏 context smart sense（吸管在 transient 藏）
   if (els.activeSwatch) (els.activeSwatch as HTMLButtonElement).disabled = !editMode.allowsColor();
   updateLassoToolbar();             // 选区/变换工具栏跟着重新派生
-  updateShapeToolbar();             // 形状笔工具栏跟着重新派生（与 lasso stack 互斥）
-  if (m !== "brush") _brushToolbar?.hide();   // 笔·自由手的条只在 brush 模式下活（长按叫出）；切走即收
+  syncRulerUi();                    // ADR-0013 尺钮态（有尺 / 吸附 / 放置）跟着重新派生
   board.requestRender();            // overlay chrome（透视 gizmo/蚂蚁线）随工具显隐——不补这刀
                                     //   切工具后 gizmo 残留/不出现，直到下次 pan/落笔（"闪"，2026-07-28 修）
 }
@@ -717,7 +645,6 @@ export const RACK_PANEL_BY_TOOL: Record<string, string> = {
   brush: PANELS.RACK_BRUSH,
   eraser: PANELS.RACK_ERASER,
   filterBrush: PANELS.RACK_FILTER_BRUSH,    // v132
-  shapeBrush: PANELS.RACK_BRUSH,            // ADR-0005：共享 brush 笔架
   // v0.7.26 选区笔走笔架：lasso/fill 二次点工具钮 = 开选区笔笔架（getRackToolKey → "selPen" 列表）
   lasso: PANELS.RACK_SEL_PEN,
   fill: PANELS.RACK_SEL_PEN,
@@ -836,134 +763,7 @@ export function initToolbar(ctx: AppContext) {
   });
   // （v0.7.26：选区笔自有变体/笔径控件退役——配置全归笔架（rack key "selPen"），user：「别造轮子」。
   //   笔选择 = 二次点 lasso/fill 工具钮开笔架 / 左栏 dial 笔名钮；粗细 = 左栏 dial（pen 子工具时放行）。）
-  // ---- 形状笔上下文工具栏（ADR-0005）：组槽 + 约束。状态 per-doc（desk.shapeBrush），UI 改 → 写
-  //   desk + 灌引擎；换文档 wp:applyEditorState 回灌（对齐魔棒阈值样板）。
-  //   画一半切子工具/约束 = cancel 不进 undo（user 拍板，同两指手势接管语义）。
-  shapeToolbarStack = byId("shapeToolbarStack");
-  registerContextToolbar(shapeToolbarStack);
-  _mountVerbSegmentInto(byId("shapeToolbarRow1"), "brush");   // 修订 ③：形状条左段 = [自由手 | 形状]（从形状回自由手就在这）
-  shapeSubBtns = [...byId("shapeSubCtl").querySelectorAll<HTMLElement>("[data-shape-sub]")];
-  shapeSubLineUse = byId("shapeSubLineUse") as unknown as SVGUseElement;
-  shapeSubRectUse = byId("shapeSubRectUse") as unknown as SVGUseElement;
-  shapeSubCircleUse = byId("shapeSubCircleUse") as unknown as SVGUseElement;
-  shapeGridMenu = byId("shapeGridMenu");
-  shapeVarMenus = { line: byId("shapeLineVarMenu"), rect: byId("shapeRectVarMenu"), circle: byId("shapeCircleVarMenu"), grid: shapeGridMenu };
-  // v0.6.25：已选中的子工具再点 = 开变体/配置菜单（grid=行列配置 steppers 连按不关——外点关统一挂这）
-  for (const [s2, menu] of Object.entries(shapeVarMenus)) {
-    if (s2 !== "grid") {
-      for (const mb of [...menu.querySelectorAll<HTMLElement>("[data-shape-var]")]) {
-        mb.addEventListener("click", () => {
-          if (input.isStrokeActive()) input.abortActiveStroke();
-          const v = mb.dataset.shapeVar === "constrain";
-          input.shapeBrush.setConstrainFor(s2 as "line" | "rect" | "circle", v);
-          desk.shapeBrush[CONSTRAIN_KEY[s2]] = v;
-          closePopupMenuOf(menu);
-          updateShapeToolbar();
-        });
-      }
-    }
-  }   // （变体菜单外点关 2026-09-02 C1 归 popup-menu）
-  // v0.6.31：单击=切换子工具；已选中再点=开变体/配置菜单（长按撤，回 v0.6.26 形态）
-  for (const b of shapeSubBtns) {
-    const sub2 = b.dataset.shapeSub as Parameters<typeof input.shapeBrush.setSubTool>[0];
-    const menu2 = shapeVarMenus[sub2];
-    b.addEventListener("click", (e: Event) => {
-      if (input.isStrokeActive()) input.abortActiveStroke();
-      if (input.shapeBrush.getSubTool() === sub2) {
-        e.stopPropagation();
-        if (menu2) toggleAdoptedPopup(menu2, { anchor: b, align: "left", offsetY: 6 });
-        return;
-      }
-      input.shapeBrush.setSubTool(sub2);
-      desk.shapeBrush.sub = sub2;
-      updateShapeToolbar();
-    });
-  }
-  // （v0.6.25：1:1 约束 toggle 钮 shapeConstrainBtn 与 grid ⋯ 钮 shapeGridMoreBtn 退役——
-  //   变体/配置收进各子工具小三角；Shift 临时反转不受影响）
-  shapeGridNuVal = byId("shapeGridNuVal");
-  shapeGridNvVal = byId("shapeGridNvVal");
-  shapeGridBorderBtn = byId("shapeGridBorderBtn");
-  const pushGridToEngine = () => {
-    input.shapeBrush.setGridConfig({
-      nu: desk.shapeBrush.gridNu, nv: desk.shapeBrush.gridNv,
-      border: desk.shapeBrush.gridBorder,
-    });
-  };
-  const stepGrid = (axis: "gridNu" | "gridNv", d: number) => {
-    if (input.isStrokeActive()) input.abortActiveStroke();
-    desk.shapeBrush[axis] = Math.max(1, Math.min(24, desk.shapeBrush[axis] + d));
-    pushGridToEngine();
-    updateShapeToolbar();
-  };
-  byId("shapeGridNuMinus").addEventListener("click", () => stepGrid("gridNu", -1));
-  byId("shapeGridNuPlus").addEventListener("click", () => stepGrid("gridNu", +1));
-  byId("shapeGridNvMinus").addEventListener("click", () => stepGrid("gridNv", -1));
-  byId("shapeGridNvPlus").addEventListener("click", () => stepGrid("gridNv", +1));
-  shapeGridBorderBtn.addEventListener("click", () => {
-    if (input.isStrokeActive()) input.abortActiveStroke();
-    desk.shapeBrush.gridBorder = !desk.shapeBrush.gridBorder;
-    pushGridToEngine();
-    updateShapeToolbar();
-  });
-  // 透视模式组槽 + 平面组槽（ADR-0006 UI v2.1，flyout）：mode 决定 VP 数量（切模式时缺的 VP
-  //   按默认位补齐，已有的保留用户调过的位置；参考点默认开）；引擎在起笔时经 configFromModeState 拉取。
-  const shapePerspModeSlot = byId("shapePerspModeSlot");
-  shapePerspModeSlotUse = byId("shapePerspModeSlotUse") as unknown as SVGUseElement;
-  const shapePerspModeMenu = byId("shapePerspModeMenu");
-  shapePerspModeMenuBtns = [...shapePerspModeMenu.querySelectorAll<HTMLElement>("[data-persp-mode]")];
-  shapePlaneCtl = byId("shapePlaneCtl");
-  shapePlaneBtns = [...shapePlaneCtl.querySelectorAll<HTMLElement>("[data-shape-plane]")];
-  shapePerspExtraCtl = byId("shapePerspExtraCtl");
-  shapePerspShowBtn = byId("shapePerspShowBtn");
-  shapePerspShowUse = byId("shapePerspShowUse") as unknown as SVGUseElement;
-  wireSlotMenu(shapePerspModeSlot, shapePerspModeMenu, (b) => {
-    if (input.isStrokeActive()) input.abortActiveStroke();
-    const mode = b.dataset.perspMode as PerspMode;
-    const g = desk.persp;
-    g.mode = mode;
-    if (mode !== "off") {
-      // per-mode 槽位（一/二/三点分开存）：本模式缺的 VP 按默认位补齐，调过的保留
-      const def = defaultVpsForMode(mode, doc.width, doc.height);
-      if (mode === "p1") {
-        if (!g.p1.vp1 && def.vp1) g.p1.vp1 = def.vp1;
-      } else if (mode === "p2") {
-        if (!g.p2.vp1 && def.vp1) g.p2.vp1 = def.vp1;
-        if (!g.p2.vp2 && def.vp2) g.p2.vp2 = def.vp2;
-      } else {
-        if (!g.p3.vp1 && def.vp1) g.p3.vp1 = def.vp1;
-        if (!g.p3.vp2 && def.vp2) g.p3.vp2 = def.vp2;
-        if (!g.p3.vp3 && def.vp3) g.p3.vp3 = def.vp3;
-      }
-      const planes = planesForMode(mode) as string[];
-      if (!planes.includes(g.plane)) g.plane = "ground";
-    }
-    updateShapeToolbar();
-    board.requestRender();   // 绘图 gizmo 跟着显隐
-  });
-  for (const b of shapePlaneBtns) {
-    b.addEventListener("click", () => {
-      if (input.isStrokeActive()) input.abortActiveStroke();
-      desk.persp.plane = b.dataset.shapePlane!;
-      updateShapeToolbar();
-    });
-  }
-  shapePerspShowBtn.addEventListener("click", () => {
-    desk.persp.showGizmo = !desk.persp.showGizmo;
-    updateShapeToolbar();
-    board.requestRender();
-  });
-  input.shapeBrush.setPerspProvider(() => configFromModeState(desk.persp));
-  const syncShapeFromEditorState = () => {
-    input.shapeBrush.setSubTool(desk.shapeBrush.sub as Parameters<typeof input.shapeBrush.setSubTool>[0]);
-    input.shapeBrush.setConstrainFor("line", desk.shapeBrush.constrainLine);
-    input.shapeBrush.setConstrainFor("rect", desk.shapeBrush.constrainRect);
-    input.shapeBrush.setConstrainFor("circle", desk.shapeBrush.constrainCircle);
-    pushGridToEngine();
-    updateShapeToolbar();
-  };
-  window.addEventListener("wp:applyEditorState", syncShapeFromEditorState);
-  syncShapeFromEditorState();
+  // （形状笔上下文工具栏 2026-09-09 随尺子模型退役——ADR-0013：透视四件搬进 ruler-ui 的尺子条）
   // v242：扩展滑块从魔术棒拆走（改成选区编辑 op，见 initSelEditUI）。魔术棒只剩阈值。
   // v0.5.11：阈值 per-doc 持久化（desk.magicWand.threshold，原 desk.bucket 退役后归魔棒）。
   //   UI 改 → 写 desk + 灌引擎；换文档 → syncMagicThresholdUI 回灌（wp:applyEditorState）。
@@ -1254,17 +1054,9 @@ export function initToolbar(ctx: AppContext) {
 
   // ---- 工具按钮 ----
   // v0.6.31 回滚：四工具并列，单击=切换。长按/Alt/右键/组菜单全撤（真机难受）。
-  // v0.6.55（user 2026-07-30）：恢复「二次点弹笔架」（v79 语义回归）——已激活的画笔/橡皮/形状笔
+  // v0.6.55（user 2026-07-30）：恢复「二次点弹笔架」（v79 语义回归）——已激活的画笔/橡皮
   //   再点 = toggle 该工具的笔架（openExclusive 自带 toggle）；无笔架的工具（lasso/fill）二次点仍无事。
-  // 修订 ③：笔·自由手的上下文条（工厂）——默认藏，长按笔位叫出；左段 [自由手 | 形状] + ✓ 收起。切离 brush 自动收（_syncEditModeUI）。
-  _brushToolbar = mountContextToolbar({ id: "brushToolbar", ariaLabel: tLatin("tool.brush"), rows: [[
-    { kind: "custom", id: "brushVerbSeg", mount: (host) => {
-      const h = mountVerbSegment(host, { tools: () => _verbTools("brush"), current: () => desk.subTool.brush || DEFAULT_SUBTOOL.brush, onPick: (id) => { setVerb("brush", id); closeExclusive(); } });
-      _segments.push(h);
-      return () => { h.dispose(); const i = _segments.indexOf(h); if (i >= 0) _segments.splice(i, 1); };
-    } },
-    { kind: "button", id: "brushToolbarHide", icon: "check", title: tLatin("common.exit"), onClick: () => _brushToolbar?.hide(), foldPriority: -2 },
-  ]] });
+  // （修订 ③ 的笔·自由手条 #brushToolbar 2026-09-09 随形状笔退役——笔位只剩自由手，无子工具、无条、无小三角；ADR-0013）
   for (const b of els.toolBtns) {
     // 2026-09-06 ADR-0012 动词位：单击 = 切动词（子工具走记忆）/ 已激活再点 = 开该动词的笔架（v0.6.55 语义）；
     //   长按 / 右键 = 叫出该动词的上下文条（ui/subtool-slot 接管 click，长按后吞掉那一击；2026-09-06 晚修订 ③，原弹子工具菜单）。
@@ -1274,12 +1066,11 @@ export function initToolbar(ctx: AppContext) {
         el: b as HTMLButtonElement,
         tools: () => VERB_SUBTOOLS[verb].map((d) => ({ id: d.id, icon: d.icon, title: tLatin(d.titleKey as Parameters<typeof tLatin>[0]) })),
         current: () => desk.subTool[verb] || DEFAULT_SUBTOOL[verb],
-        // 修订 ③：长按 = 叫出该动词的上下文条（子工具在条左段）。套索/形状/滤镜笔的条随动词激活已显；
-        //   笔·自由手默认没有条 → 这里显 _brushToolbar；橡皮单子工具无条（tools<2 长按不触发）。
+        // 修订 ③：长按 = 叫出该动词的上下文条（子工具在条左段）。套索/滤镜笔的条随动词激活已显；
+        //   笔 / 橡皮单子工具无条（tools<2 长按不触发）。
         onReveal: () => {
           closeExclusive();
           if (_currentVerb() !== verb) setVerb(verb);
-          if (verb === "brush" && editMode.current() === "brush") _brushToolbar?.show();
         },
         onTap: () => {
           if (_currentVerb() === verb) {

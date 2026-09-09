@@ -57,6 +57,7 @@ import { initSmoothDevPanel } from "./smooth-dev-panel.ts";
 import { selectionToNewLayer, initSelectionOps } from "./selection-ops.ts";
 import { initFillMode } from "./fill-mode.ts";
 import { initPerspEdit } from "./persp-edit.ts";
+import { initRulerUi, guideForStroke, rulerTap, rulerLongpress } from "./ruler-ui.ts";   // ADR-0013 尺子（2026-09-09）
 import { updateSaveStatus, updateNewerBanner } from "./save-status.ts";
 import { initErrorBadge, reportError } from "./error-badge.ts";
 import { initDiagLog, note as diagNote } from "./diag-log.ts";   // 黑匣子（2026-08-31）
@@ -220,6 +221,12 @@ const leftDial = mountLeftDial(els.leftDialMount, {
   getPicking: () => isPicking(dialReactive.tool),
   getPickIcon: () => "eyedropper",
   getPickTitle: () => tLatin("tool.picker"),
+  // 2026-09-09 左栏 context smart sense + ADR-0013 尺钮（语义归 ruler-ui；这里只接线）
+  getDialVisible: () => dialReactive.canDraw || dialReactive.rulerPlacing,
+  getPickVisible: () => !dialReactive.transient,
+  getRuler: () => ({ on: dialReactive.rulerOn, placing: dialReactive.rulerPlacing }),
+  onRulerTap: () => rulerTap(),
+  onRulerLongpress: () => rulerLongpress(),
 });
 // 【sunset 2026-08-28】v0.6.15/v0.6.32 的「禁用笔压」全局 toggle（独立按钮 + per-doc desk.pressureDisabled
 //   + input.ts 恒压 0.5 thunk）整条撤除——user 0823 问「笔刷压感toggle还是是否有压感做成不同的笔刷？」
@@ -275,10 +282,9 @@ const input = new InputController(board, doc, {
 // iPad 系统手势抢断 canvas pointer 后偶尔不发 pointercancel 到 canvas，map 里残留 ghost。
 // pointer 自愈 + iPad/触屏系统手势拦截 = platform-guards.ts initPlatformGuards。
 
-// brush/形状笔 live 预览：GPU stamp overlay（活动引擎 collectStamps→GPU 栅格；选区/lockAlpha 在 shader 内裁）。
+// brush live 预览：GPU stamp overlay（活动引擎 collectStamps→GPU 栅格；选区/lockAlpha 在 shader 内裁）。
 board.setStampProvider(() => input.collectActiveStamps());
-// 形状笔视口相对几何（矩形/圆拟合沿屏幕轴；斜的 = 转视口画）——rot 注入，引擎不认识 Board。
-input.shapeBrush.setViewportRotProvider(() => board.viewport.rot);
+// （形状笔视口旋转注入 2026-09-09 随尺子模型退役——尺子放置时 ruler-ui 自己读 board.viewport.rot，ADR-0013）
 // strokeActiveHint：任一笔画进行中 → board 走 livePreview（直接合成，不用静态缓存）。
 //   含 brush/像素笔/liquify/filterBrush（各自的显示宿见下两条接缝 + StrokeSession 的 shadow 注入）。
 board.setStrokeActiveHint(() => input.isStrokeActive());
@@ -363,7 +369,9 @@ initFiltersAdjust(ctx);
 initToolbar(ctx);
 initSelectionOps(ctx);
 initFillMode(ctx);   // v0.5.11 套索填充模式（原 #22 油漆桶的重生，见 fill-mode.ts 头注释）
-initPerspEdit(ctx);  // ADR-0006 VP 编辑（形状笔透视 frame 的消失点 gizmo，crop 同款 transient）
+initPerspEdit(ctx);  // ADR-0006 VP 编辑（透视框的消失点 gizmo，crop 同款 transient；透视框 = 尺子模型的透视尺）
+initRulerUi(ctx);    // ADR-0013 尺子：放置态 / 尺子条 / overlay / 左栏尺钮语义
+input.setRulerGuideProvider(guideForStroke);   // 像素笔起笔取投影器（唯一切口在 input._move）
 initSmoothDevPanel(ctx);
 initTransientPanels(ctx);
 initSideWindows(ctx);

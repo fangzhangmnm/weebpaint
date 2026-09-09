@@ -10,5 +10,5 @@
      需求登记：全局清单 ../20260708 SVG Icons/TODO.md（美工 agent 的取活处）。
      重新烤制：仓库根跑 python3 tools/bake-stopgap-glyphs.py（SPECS 即声明）。
 -->
-
+  <symbol id="ruler" data-cat="stopgap" data-src="baked:DroidSansFallbackFull(Apache-2.0)/DejaVuSans-Bold(Bitstream-Vera)" data-note="尺子（ADR-0013 尺子模型）：WeebPaint 左栏笔架钮下的尺钮；中文「尺」stopgap 待真图标" viewBox="0 0 24 24"><path d="M7.19 10.53Q7.19 16.5 4.47 20.46L3 19.53Q5.56 15.57 5.64 11.38V3.54H19.22V11.61H17.66V10.53H13.47Q14.87 15.8 21 18.91L19.84 20.38Q13.47 16.73 11.92 10.53ZM17.66 5.02H7.19V9.05H17.66Z" fill="currentColor" stroke="none"/></symbol>
 </svg>

@@ -32,6 +32,12 @@ export interface PerspGizmoData {
   boxEdges?: Array<[{ x: number; y: number }, { x: number; y: number }]>;   // 参考 box 12 棱（编辑模式）
 }
 
+// ADR-0013 尺子 overlay 数据（doc 坐标；ruler-ui 算好线段，board 只画）：active = 吸附开、dim = 关、draft = 放置拖拽中
+export interface GuideOverlay {
+  segments: Array<[{ x: number; y: number }, { x: number; y: number }]>;
+  style: "active" | "dim" | "draft";
+}
+
 // 选区（doc.selection）：gray8 tile mask + 紧 bbox（真类型在 selection.ts；v0.4.6 maskCanvas 死）
 import type { Selection } from "./backend/selection.ts";
 import { antsOutline } from "./marching-ants.ts";
@@ -676,6 +682,7 @@ export class Board {
     const { scale } = this.viewport;
     this._drawLassoOverlay(ctx, scale);
     this._drawPerspGizmo(ctx, scale);
+    this._drawGuides(ctx, scale);
     if (transparentBg) {
       // 框=点色（--void-dot）+ 点的软度：2D 轴对齐细线默认硬边，芯线+低α晕近似点网格的 smoothstep 羽化
       const w = 1.5 / scale;   // 芯线 ≈1.5 CSS px（点直径 2.5 CSS px 的同族粗细）
@@ -696,11 +703,9 @@ export class Board {
   // ADR-0006 VP 编辑模式的 gizmo（淡地平线 + 参考点射线 + VP 圈；只在编辑模式非空，
   //   平时 provider 返 null 零成本）。拖拽手柄是 DOM（persp-edit），这里只画线。
   setPerspGizmoProvider(fn: (() => PerspGizmoData | null) | null) { this._perspGizmoProvider = fn; }
-  _drawPerspGizmo(ctx: Ctx2D, scale: number) {
-    const g = this._perspGizmoProvider?.();
-    if (!g) return;
-    // 线段裁到可见 doc 区（弱 VP 时地平线端点可到 1e5 doc px，高倍 zoom 下 canvas 坐标
-    //   到 1e6+，部分浏览器极端坐标丢线/抖动——gizmo 线没走形状几何的 _clipBox，这里自己裁）
+  // 可见 doc 区（+pad）：线段裁到这里再画——弱 VP 时地平线端点可到 1e5 doc px，高倍 zoom 下 canvas 坐标
+  //   到 1e6+，部分浏览器极端坐标丢线/抖动。gizmo / 尺子 overlay 共用。
+  _visibleDocBox(scale: number) {
     const cw = this.canvas.clientWidth || window.innerWidth;
     const ch = this.canvas.clientHeight || window.innerHeight;
     let vx0 = Infinity, vy0 = Infinity, vx1 = -Infinity, vy1 = -Infinity;
@@ -710,7 +715,30 @@ export class Board {
       if (p.y < vy0) vy0 = p.y; if (p.y > vy1) vy1 = p.y;
     }
     const pad = 16 / scale;
-    const vbox = { x0: vx0 - pad, y0: vy0 - pad, x1: vx1 + pad, y1: vy1 + pad };
+    return { x0: vx0 - pad, y0: vy0 - pad, x1: vx1 + pad, y1: vy1 + pad };
+  }
+  // ADR-0013 尺子 overlay（ruler-ui 提供线段；透视尺走上面的 gizmo）。provider 返 null 零成本。
+  _guideProvider: (() => GuideOverlay | null) | null = null;
+  setGuideProvider(fn: (() => GuideOverlay | null) | null) { this._guideProvider = fn; }
+  _drawGuides(ctx: Ctx2D, scale: number) {
+    const g = this._guideProvider?.();
+    if (!g || !g.segments.length) return;
+    const vbox = this._visibleDocBox(scale);
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.strokeStyle = g.style === "draft" ? "rgba(255,165,0,0.85)" : g.style === "dim" ? "rgba(64,140,255,0.22)" : "rgba(64,140,255,0.6)";
+    ctx.lineWidth = (g.style === "draft" ? 1.6 : 1.2) / scale;
+    for (const [a, b] of g.segments) {
+      const seg = clipSegToBox(a, b, vbox);
+      if (!seg) continue;
+      ctx.beginPath(); ctx.moveTo(seg[0].x, seg[0].y); ctx.lineTo(seg[1].x, seg[1].y); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  _drawPerspGizmo(ctx: Ctx2D, scale: number) {
+    const g = this._perspGizmoProvider?.();
+    if (!g) return;
+    const vbox = this._visibleDocBox(scale);
     ctx.save();
     ctx.lineCap = "round";
     if (g.horizon) {

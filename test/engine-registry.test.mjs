@@ -67,7 +67,7 @@ describe("engine-registry · dispatch 决策", () => {
 
   it("表与谓词不漂移：PIXEL_STROKE_SPECS 的每个 key 都 isPixelStroke", () => {
     const keys = Object.keys(PIXEL_STROKE_SPECS);
-    eq(keys.length, 4, "恰好 4 个 pixel-stroke role（draw/erase/filterBrush/shapeBrush）");
+    eq(keys.length, 3, "恰好 3 个 pixel-stroke role（draw/erase/filterBrush；shapeBrush 2026-09-09 随尺子模型退役）");
     for (const k of keys) assert(isPixelStroke(k), `${k} 应 isPixelStroke`);
   });
 

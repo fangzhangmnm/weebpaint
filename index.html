@@ -107,7 +107,7 @@
     <link rel="icon" href="./icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=abff056b45c7" />
+    <link rel="stylesheet" href="./styles.css?v=6b24a738dfe9" />
     <!-- zip.js UMD bundle：自挂 window.zip。必须在 module bundle 之前。
          defer（v417）：原来是 parser-blocking 的，硬刷新时 SW 被绕过 → 直奔网络 → 网络一卡整个
          文档解析就停住（浏览器标签页转圈）。defer 后它与下面的 type=module bundle 同属延迟脚本、
@@ -460,6 +460,8 @@
   <!-- third-party -->
   <!-- blender — Blender sync:瘦长体 Bl + Adobe 式圆角方框(PT Sans Narrow Bold, l 带钩不与 i/1 混; 宽高比 0.96) -->
   <symbol id="blender" data-cat="third-party" data-src="trademark:Blender" data-note="Blender sync:瘦长体 Bl + Adobe 式圆角方框(PT Sans Narrow Bold, l 带钩不与 i/1 混; 宽高比 0.96)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="2.6" width="18.8" height="18.8" rx="4.2"/><path d="M12.88 9.07Q12.88 9.47 12.8 9.87Q12.71 10.27 12.52 10.62Q12.34 10.97 12.03 11.23Q11.73 11.5 11.31 11.64V11.73Q11.68 11.83 12.02 12.01Q12.35 12.2 12.6 12.52Q12.85 12.84 13 13.3Q13.15 13.76 13.15 14.38Q13.15 15.22 12.86 15.84Q12.57 16.45 12.08 16.84Q11.59 17.23 10.94 17.42Q10.28 17.61 9.55 17.61Q9.33 17.61 8.99 17.61Q8.65 17.61 8.25 17.58Q7.85 17.56 7.43 17.51Q7.01 17.47 6.65 17.37V6.62Q7.17 6.53 7.92 6.46Q8.68 6.39 9.42 6.39Q10.11 6.39 10.74 6.5Q11.37 6.61 11.85 6.9Q12.32 7.2 12.6 7.72Q12.88 8.24 12.88 9.07ZM9.6 15.91Q10.25 15.91 10.67 15.49Q11.09 15.07 11.09 14.26Q11.09 13.74 10.95 13.44Q10.81 13.13 10.58 12.97Q10.34 12.81 10.04 12.76Q9.74 12.71 9.41 12.71H8.61V15.81Q8.74 15.86 9.04 15.88Q9.35 15.91 9.6 15.91ZM9.07 11.17Q9.24 11.17 9.46 11.15Q9.69 11.12 9.83 11.09Q10.28 10.92 10.6 10.53Q10.92 10.14 10.92 9.52Q10.92 9.11 10.81 8.83Q10.7 8.55 10.51 8.39Q10.33 8.23 10.07 8.16Q9.81 8.09 9.52 8.09Q8.88 8.09 8.61 8.15V11.17Z M16.14 14.93Q16.14 15.47 16.25 15.71Q16.36 15.94 16.61 15.94Q16.75 15.94 16.89 15.91Q17.04 15.88 17.23 15.8L17.4 17.29Q17.21 17.42 16.76 17.53Q16.31 17.64 15.84 17.64Q15.06 17.64 14.67 17.25Q14.29 16.86 14.29 15.92V6.54H16.14Z" fill="currentColor" stroke="none"/></symbol>
+<!-- 本地 stopgap 补丁（assets/icons-local.svg，待真图标） -->
+  <symbol id="ruler" data-cat="stopgap" data-src="baked:DroidSansFallbackFull(Apache-2.0)/DejaVuSans-Bold(Bitstream-Vera)" data-note="尺子（ADR-0013 尺子模型）：WeebPaint 左栏笔架钮下的尺钮；中文「尺」stopgap 待真图标" viewBox="0 0 24 24"><path d="M7.19 10.53Q7.19 16.5 4.47 20.46L3 19.53Q5.56 15.57 5.64 11.38V3.54H19.22V11.61H17.66V10.53H13.47Q14.87 15.8 21 18.91L19.84 20.38Q13.47 16.73 11.92 10.53ZM17.66 5.02H7.19V9.05H17.66Z" fill="currentColor" stroke="none"/></symbol>
 </svg>
 <!-- ICON-SPRITE:END -->
 
@@ -700,41 +702,7 @@
          - Row 2: hasSelection + !floating  →  selectionActions
                   floating                    →  transformCtrl
          每行各自横滚兜底，不会撑出 iPad mini 竖屏 -->
-    <!-- 形状笔上下文工具栏（ADR-0005）：与 lasso/picker stack 同位 fixed 互斥，shapeBrush 工具时显示。
-         组槽（直线/矩形/圆·弧）+ 约束切换（图标按子工具换义：15° 吸附 / 正方 / 正圆）。 -->
-    <div class="lasso-toolbar-stack hidden" id="shapeToolbarStack" role="toolbar" data-i18n-aria="sb.stack">
-      <div class="lasso-toolbar" id="shapeToolbarRow1">
-        <div class="lasso-section">
-          <!-- 子工具平铺（user：图形间切换高频，不折叠） -->
-          <!-- v0.6.25 变体组槽（user：正方/正圆不走 toggle 走小三角；每子工具二选一各自持久化不同步；
-               已选中的子工具再点 = 开变体菜单（grid = 开行列配置菜单）；1:1 约束钮/grid ⋯ 钮退役；
-               钮面图标 = 当前变体（constrain* 槽派生），Shift 临时反转照旧 -->
-          <span class="lasso-section" id="shapeSubCtl">
-            <button class="lasso-tool-btn lasso-tool-icon lasso-slot" data-shape-sub="line" type="button" data-i18n-title="sb.line"><svg viewBox="0 0 24 24" aria-hidden="true"><use id="shapeSubLineUse" href="#line"/></svg><svg class="lasso-slot-caret" viewBox="0 0 8 8" aria-hidden="true"><path d="M7.2 2.8 V7.2 H2.8 Z" fill="currentColor" stroke="none"/></svg></button>
-            <button class="lasso-tool-btn lasso-tool-icon lasso-slot" data-shape-sub="rect" type="button" data-i18n-title="sb.rect"><svg viewBox="0 0 24 24" aria-hidden="true"><use id="shapeSubRectUse" href="#rectangle"/></svg><svg class="lasso-slot-caret" viewBox="0 0 8 8" aria-hidden="true"><path d="M7.2 2.8 V7.2 H2.8 Z" fill="currentColor" stroke="none"/></svg></button>
-            <button class="lasso-tool-btn lasso-tool-icon lasso-slot" data-shape-sub="circle" type="button" data-i18n-title="sb.circle"><svg viewBox="0 0 24 24" aria-hidden="true"><use id="shapeSubCircleUse" href="#circle"/></svg><svg class="lasso-slot-caret" viewBox="0 0 8 8" aria-hidden="true"><path d="M7.2 2.8 V7.2 H2.8 Z" fill="currentColor" stroke="none"/></svg></button>
-            <button class="lasso-tool-btn lasso-tool-icon lasso-slot" data-shape-sub="grid" type="button" data-i18n-title="sb.grid"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#grid"/></svg><svg class="lasso-slot-caret" viewBox="0 0 8 8" aria-hidden="true"><path d="M7.2 2.8 V7.2 H2.8 Z" fill="currentColor" stroke="none"/></svg></button>
-          </span>
-          <!-- 透视模式组槽（ADR-0006 UI v2.1，flyout/组槽同 lassoSubSlot）：视口对齐/一点/二点/三点 -->
-          <button class="lasso-tool-btn lasso-tool-icon lasso-slot" id="shapePerspModeSlot" type="button" data-i18n-title="sb.perspModeSlot" aria-haspopup="true">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><use id="shapePerspModeSlotUse" href="#persp-viewport"/></svg>
-            <svg class="lasso-slot-caret" viewBox="0 0 8 8" aria-hidden="true"><path d="M7.2 2.8 V7.2 H2.8 Z" fill="currentColor" stroke="none"/></svg>
-          </button>
-          <!-- 透视开着时：平面组槽（line 子工具智能吸附不吃平面 → 藏）+ VP 编辑 + 绘图 gizmo 显隐 -->
-          <!-- 平面按钮展开常驻（user：画画时高频切换，不收小三角） -->
-          <span class="lasso-section hidden" id="shapePlaneCtl">
-            <button class="lasso-tool-btn lasso-tool-icon" data-shape-plane="ground" type="button" data-i18n-title="sb.planeGround"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#plane-ground"/></svg></button>
-            <button class="lasso-tool-btn lasso-tool-icon" data-shape-plane="wall" type="button" data-i18n-title="sb.planeWall"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#plane-wall"/></svg></button>
-            <button class="lasso-tool-btn lasso-tool-icon" data-shape-plane="wallL" type="button" data-i18n-title="sb.planeWallL"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#plane-wall-left"/></svg></button>
-            <button class="lasso-tool-btn lasso-tool-icon" data-shape-plane="wallR" type="button" data-i18n-title="sb.planeWallR"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#plane-wall-right"/></svg></button>
-          </span>
-          <span class="lasso-section hidden" id="shapePerspExtraCtl">
-            <button class="lasso-tool-btn lasso-tool-icon" id="shapeVpEditBtn" type="button" data-i18n-title="sb.vpEdit"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#vanishing-point-edit"/></svg></button>
-            <button class="lasso-tool-btn lasso-tool-icon" id="shapePerspShowBtn" type="button" data-i18n-title="sb.showGizmo" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><use id="shapePerspShowUse" href="#visibility-show"/></svg></button>
-          </span>
-        </div>
-      </div>
-    </div>
+    <!-- （形状笔上下文工具栏 2026-09-09 随尺子模型退役——ADR-0013：尺子条 #rulerToolbar 由 ruler-ui 工厂生成，只在放置态显示） -->
     <div class="lasso-toolbar-stack hidden" id="lassoToolbarStack" role="toolbar" data-i18n-aria="la.stack">
       <!-- Row 1: 选区方式 -->
       <div class="lasso-toolbar hidden" id="lassoToolbarRow1">
@@ -932,39 +900,6 @@
         <span class="lasso-popup-val" id="lassoGapVal">4</span>
         <button class="lasso-tool-btn" id="lassoGapPlus" type="button" aria-label="＋">＋</button>
       </div>
-    </div>
-    <!-- v0.6.25 形状变体菜单（已选中子工具再点开；二选一） -->
-    <div class="lasso-icon-menu hidden" id="shapeLineVarMenu" role="menu" data-i18n-aria="sb.line">
-      <button class="lasso-tool-btn lasso-tool-icon" data-shape-var="plain" type="button" role="menuitem" data-i18n-title="sb.varLineFree"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#line"/></svg></button>
-      <button class="lasso-tool-btn lasso-tool-icon" data-shape-var="constrain" type="button" role="menuitem" data-i18n-title="sb.varLineSnap"><svg viewBox="0 0 24 24" aria-hidden="true"><use id="shapeLineSnapUse" href="#snap-angle"/></svg></button>
-    </div>
-    <div class="lasso-icon-menu hidden" id="shapeRectVarMenu" role="menu" data-i18n-aria="sb.rect">
-      <button class="lasso-tool-btn lasso-tool-icon" data-shape-var="plain" type="button" role="menuitem" data-i18n-title="sb.varRect"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#rectangle"/></svg></button>
-      <button class="lasso-tool-btn lasso-tool-icon" data-shape-var="constrain" type="button" role="menuitem" data-i18n-title="sb.varSquare"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#square"/></svg></button>
-    </div>
-    <div class="lasso-icon-menu hidden" id="shapeCircleVarMenu" role="menu" data-i18n-aria="sb.circle">
-      <button class="lasso-tool-btn lasso-tool-icon" data-shape-var="plain" type="button" role="menuitem" data-i18n-title="sb.varEllipse"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ellipse"/></svg></button>
-      <button class="lasso-tool-btn lasso-tool-icon" data-shape-var="constrain" type="button" role="menuitem" data-i18n-title="sb.varCircle"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#circle"/></svg></button>
-    </div>
-    <div class="lasso-popup hidden" id="shapeGridMenu" role="menu" data-i18n-aria="sb.gridMore">
-      <div class="lasso-popup-row" style="display:flex; align-items:center; gap:6px;">
-        <span class="lasso-popup-val" data-i18n="sb.rows">行</span>
-        <button class="lasso-tool-btn" id="shapeGridNvMinus" type="button" aria-label="−">−</button>
-        <span class="lasso-popup-val" id="shapeGridNvVal">6</span>
-        <button class="lasso-tool-btn" id="shapeGridNvPlus" type="button" aria-label="＋">＋</button>
-        <span class="lasso-popup-val" data-i18n="sb.cols">列</span>
-        <button class="lasso-tool-btn" id="shapeGridNuMinus" type="button" aria-label="−">−</button>
-        <span class="lasso-popup-val" id="shapeGridNuVal">2</span>
-        <button class="lasso-tool-btn" id="shapeGridNuPlus" type="button" aria-label="＋">＋</button>
-        <button class="lasso-tool-btn lasso-tool-icon" id="shapeGridBorderBtn" type="button" data-i18n-title="sb.border" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#grid-border"/></svg></button>
-      </div>
-    </div>
-    <div class="lasso-icon-menu hidden" id="shapePerspModeMenu" role="menu" data-i18n-aria="sb.perspModeSlot">
-      <button class="lasso-tool-btn lasso-tool-icon" data-persp-mode="off" type="button" role="menuitem" data-i18n-title="sb.modeViewport"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#persp-viewport"/></svg></button>
-      <button class="lasso-tool-btn lasso-tool-icon" data-persp-mode="p1" type="button" role="menuitem" data-i18n-title="sb.mode1p"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#persp-1p"/></svg></button>
-      <button class="lasso-tool-btn lasso-tool-icon" data-persp-mode="p2" type="button" role="menuitem" data-i18n-title="sb.mode2p"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#persp-2p"/></svg></button>
-      <button class="lasso-tool-btn lasso-tool-icon" data-persp-mode="p3" type="button" role="menuitem" data-i18n-title="sb.mode3p"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#persp-3p"/></svg></button>
-      <button class="lasso-tool-btn lasso-tool-icon" data-persp-mode="iso" type="button" role="menuitem" data-i18n-title="sb.modeIso"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#persp-iso"/></svg></button>
     </div>
     <div class="lasso-icon-menu hidden" id="lassoSubMenu" role="menu" data-i18n-aria="la.subSlot">
       <button class="lasso-tool-btn lasso-tool-icon" data-lasso-sub="freehand" type="button" role="menuitem" data-i18n-title="la.freehand"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#select-freehand"/></svg></button>
@@ -1319,6 +1254,8 @@
     </div>
     <!-- VP 拖拽手柄层（screen 坐标 DOM；VP 常在画布外也能拖） -->
     <div class="persp-handles hidden" id="perspHandles"></div>
+    <!-- ADR-0013 尺子放置态捕获层（ruler-ui）：画布拖 = 放尺；只在 rulerPlace 期间可见（手势全吃，两指缩放暂不透传） -->
+    <div class="ruler-place-layer hidden" id="rulerPlaceLayer"></div>
 
     <!-- 滤镜笔上下文工具条：2026-09-06 U1 起由 ui/context-toolbar 工厂在 filters-adjust init 生成（id=filterBrushToolbar），不再是静态 HTML。 -->
 
@@ -1608,6 +1545,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-067841642928.mjs"></script>
+    <script type="module" src="./dist/weebpaint-90037981462d.mjs"></script>
   </body>
 </html>

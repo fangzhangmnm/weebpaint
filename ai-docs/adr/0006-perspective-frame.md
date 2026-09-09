@@ -1,7 +1,7 @@
 # ADR-0006：透视 frame（形状笔全局）+ grid 笔——尺笔透视模式被全局透视吃掉
 
 > created 20260725
-> 状态：**已决定 —— 实现于 worktree-shape-brush（P1-P6）**
+> 状态：**已决定 —— 实现于 worktree-shape-brush（P1-P6）** → **2026-09-09 §5/§6 被 ADR-0013 supersede**（透视框本身即「透视尺」，任何像素笔沿 VP 族走；格线 = overlay 尺不落像素；透视数学 / VP 编辑 / remap 原样留）edited by Claude Fable 5.1
 
 ## 背景
 

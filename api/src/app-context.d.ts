@@ -37,6 +37,9 @@ export interface DialReactive {
     color: string;
     canDraw: boolean;
     payload: string | null;
+    transient: boolean;
+    rulerOn: boolean;
+    rulerPlacing: boolean;
 }
 export interface RackHandle {
     getRackToolKey(tool: string): string;

@@ -38,6 +38,14 @@ export interface LeftDialOpts {
   getPicking(): boolean;           // 取样态是否活着（钮 aria-pressed）
   getPickIcon(): string;           // sprite symbol id（context 派生）
   getPickTitle(): string;
+  // 2026-09-09 左栏 context smart sense（user「左栏应该 context smart sense 不要暴露不必要的东西」）：按当前动词/态显隐，不用 disabled 灰掉。
+  //   dial（笔架钮 + 两滑条 + 标签 + 尺钮）= 能画的工具（画笔/橡皮/手指族/选区笔）或尺子放置态；吸管 = 非 transient。
+  getDialVisible(): boolean;
+  getPickVisible(): boolean;
+  // ADR-0013 尺钮（笔架钮正下方）：tap = 有尺开/关吸附、无尺进放置；长按 = 放置。图标 = 「尺」stopgap（登记 ../20260708 SVG Icons/TODO.md）。
+  getRuler(): { on: boolean; placing: boolean };
+  onRulerTap(): void;
+  onRulerLongpress(): void;
 }
 export interface LeftDialHandle {
   flashSize(): void;              // 外部 [ ] 键盘调粗后闪 popup
@@ -57,6 +65,14 @@ export function mountLeftDial(el: HTMLElement, opts: LeftDialOpts): LeftDialHand
       const picking = computed(() => opts.getPicking());
       const pickIcon = computed(() => opts.getPickIcon());
       const pickTitle = computed(() => opts.getPickTitle());
+      const dialVisible = computed(() => opts.getDialVisible());
+      const pickVisible = computed(() => opts.getPickVisible());
+      const ruler = computed(() => opts.getRuler());
+      // 尺钮：tap / 长按（同笔架钮形制，600ms）
+      let rulerLpTimer: ReturnType<typeof setTimeout> | null = null, rulerLpFired = false;
+      function rulerDown() { rulerLpFired = false; rulerLpTimer = setTimeout(() => { rulerLpTimer = null; rulerLpFired = true; opts.onRulerLongpress(); }, LONGPRESS_MS); }
+      function rulerUp() { if (rulerLpTimer) { clearTimeout(rulerLpTimer); rulerLpTimer = null; } }
+      function rulerClick() { if (rulerLpFired) { rulerLpFired = false; return; } opts.onRulerTap(); }
       const sizePos = computed(() => sizeToSliderPos(size.value, sizeMax.value));
       const sizePosMax = computed(() => sliderMaxPos(sizeMax.value));
       const opaPct = computed(() => Math.round(opacity.value * 100));
@@ -113,27 +129,35 @@ export function mountLeftDial(el: HTMLElement, opts: LeftDialOpts): LeftDialHand
       function pickClick() { if (performance.now() < pickClickMuteUntil) return; opts.onPick(); }
 
       // i18n：t() 在 setup 调（§5a），模板引 L.*。
-      const L = { brush: t("ld.brush"), size: t("ld.size"), opacity: t("ld.opacity") };
+      const L = { brush: t("ld.brush"), size: t("ld.size"), opacity: t("ld.opacity"), ruler: t("ld.ruler") };
       return {
         size, opacity, sizePos, sizePosMax, opaPct, brushName, canDraw, popup,
         sizeSlider, opaSlider, onSizeInput, onOpaInput, brushDown, brushUp, brushClick, L,
         picking, pickIcon, pickTitle, pickDown, pickUp, pickClick,
+        dialVisible, pickVisible, ruler, rulerDown, rulerUp, rulerClick,
       };
     },
     template: `
-      <button class="left-sidebar-brush" type="button" :title="L.brush"
+      <!-- 2026-09-09 context smart sense：dial 件只在能画的工具 / 尺子放置态出现（:class hidden，家规可见性唯一规则） -->
+      <button class="left-sidebar-brush" type="button" :title="L.brush" :class="{ hidden: !dialVisible }"
         @pointerdown="brushDown" @pointerup="brushUp" @pointerleave="brushUp" @pointercancel="brushUp" @click="brushClick">
         <!-- v0.6.24 user：笔架按钮用笔架图标不用笔名（多语言是坑；将来可能放笔形 svg 预览） -->
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><use href="#brush-rack"/></svg>
       </button>
+      <!-- ADR-0013 尺钮（user「用左栏放在笔架按钮下面」）：pressed = 吸附生效；data-placing = 放置态 -->
+      <button class="left-sidebar-brush left-sidebar-ruler" id="leftRuler" type="button" :title="L.ruler" :aria-label="L.ruler"
+        :class="{ hidden: !dialVisible }" :aria-pressed="ruler.on ? 'true' : 'false'" :data-placing="ruler.placing ? 'true' : 'false'"
+        @pointerdown="rulerDown" @pointerup="rulerUp" @pointerleave="rulerUp" @pointercancel="rulerUp" @click="rulerClick">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><use href="#ruler"/></svg>
+      </button>
       <input ref="sizeSlider" id="sizeSlider" class="left-sidebar-slider" type="range" min="0" :max="sizePosMax" step="1"
-        :value="sizePos" :disabled="!canDraw" orient="vertical" :aria-label="L.size" @input="onSizeInput" />
+        :value="sizePos" :disabled="!canDraw" :class="{ hidden: !dialVisible }" orient="vertical" :aria-label="L.size" @input="onSizeInput" />
       <!-- 笔粗图标位 = 纯标签（v0.6.32 迁出的笔压 toggle 已于 2026-08-28 整条 sunset：不要压感 = 选「固定xx」笔） -->
-      <span class="left-sidebar-label" aria-hidden="true">
+      <span class="left-sidebar-label" aria-hidden="true" :class="{ hidden: !dialVisible }">
         <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><use href="#brush-width"/></svg>
       </span>
       <!-- 2026-09-06 一次性取样钮（两滑条之间，Procreate 修饰键的位置，但用我们的吸管而不是方框；图标随 context 变） -->
-      <button class="left-sidebar-brush left-sidebar-pick" id="leftPick" type="button" :title="pickTitle" :aria-label="pickTitle"
+      <button class="left-sidebar-brush left-sidebar-pick" id="leftPick" type="button" :title="pickTitle" :aria-label="pickTitle" :class="{ hidden: !pickVisible }"
         :aria-pressed="picking ? 'true' : 'false'" @pointerdown="pickDown" @pointerup="pickUp" @pointercancel="pickUp" @click="pickClick">
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><use :href="'#' + pickIcon"/></svg>
       </button>
@@ -144,8 +168,8 @@ export function mountLeftDial(el: HTMLElement, opts: LeftDialOpts): LeftDialHand
         <span class="size-popup-text">{{ popup.text }}</span>
       </div>
       <input ref="opaSlider" id="opacitySlider" class="left-sidebar-slider" type="range" min="1" max="100" step="1"
-        :value="opaPct" :disabled="!canDraw" orient="vertical" :aria-label="L.opacity" @input="onOpaInput" />
-      <span class="left-sidebar-label" :title="L.opacity" aria-hidden="true">
+        :value="opaPct" :disabled="!canDraw" :class="{ hidden: !dialVisible }" orient="vertical" :aria-label="L.opacity" @input="onOpaInput" />
+      <span class="left-sidebar-label" :title="L.opacity" aria-hidden="true" :class="{ hidden: !dialVisible }">
         <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><use href="#opacity"/></svg>
       </span>
     `,

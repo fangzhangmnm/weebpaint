@@ -25,8 +25,8 @@ describe("verbs · 表的形状", () => {
 });
 
 describe("verbs · mode ↔ 动词/子工具", () => {
-  it("verbOfMode：brush/shapeBrush→brush，lasso/fill→lasso，filterBrush(有 payload)→smudge，其余 null", () => {
-    eq(verbOfMode("brush"), "brush"); eq(verbOfMode("shapeBrush"), "brush");
+  it("verbOfMode：brush→brush（shapeBrush 2026-09-09 随尺子模型退役 → null），lasso/fill→lasso，filterBrush(有 payload)→smudge，其余 null", () => {
+    eq(verbOfMode("brush"), "brush"); eq(verbOfMode("shapeBrush"), null);
     eq(verbOfMode("eraser"), "eraser");
     eq(verbOfMode("lasso"), "lasso"); eq(verbOfMode("fill"), "lasso");
     eq(verbOfMode("filterBrush", "smudge"), "smudge"); eq(verbOfMode("filterBrush", "liquify"), "smudge");
@@ -34,7 +34,8 @@ describe("verbs · mode ↔ 动词/子工具", () => {
     eq(verbOfMode("picker"), null); eq(verbOfMode("hand"), null); eq(verbOfMode("transform"), null);
   });
   it("subToolOfMode：老模式反推子工具；滤镜笔按 filter+variant；未知 variant 归该 filter 首条", () => {
-    eq(subToolOfMode("shapeBrush").sub, "shape");
+    eq(subToolOfMode("shapeBrush"), null, "形状笔已退役");
+    eq(subToolOfMode("brush").sub, "freehand");
     eq(subToolOfMode("fill").sub, "fill");
     eq(subToolOfMode("lasso").sub, "select");
     eq(subToolOfMode("filterBrush", "smudge", "dull").sub, "dull");

@@ -25,7 +25,7 @@ import { BrushEngine } from "./backend/brush.ts";
 import { reportError } from "./error-badge.ts";
 import { LassoEngine } from "./lasso.ts";
 import { FilterBrushEngine } from "./filter-brush.ts";
-import { ShapeBrushEngine } from "./shape-brush.ts";
+import { RULER_ROLES, type StrokeGuide } from "./ruler.ts";   // ADR-0013 尺子：像素笔点进引擎前的投影切口
 import { isPixelStroke, pixelStrokeSpec } from "./engine-registry.ts";
 import { computePinchViewport, snapRotation, isTap, isDoubleTap, gestureTapAction } from "./common/pointer-gesture.ts";
 import { assignRole, effectiveTool, toolToRole, strokeMode, eraserTapOnRelease } from "./pointer-route.ts";
@@ -242,8 +242,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     when: _floating, run: (i) => i._abortLasso() },
   // 方向键像素微调（user：「变换的时候可以用上下左右键进行像素坐标精调」）：浮层平移 1 doc px，
   //   Shift = 10px。每按一下 = 一个 undo 整点（同 flip/rotate90 节奏，无 coalescing——已知取舍）。
-  //   已知无害副作用：Shift+Arrow 会顺带 shapeBrush.setConstrainInvert(true)（_keydown 无条件设），
-  //   floating 时形状笔不活跃，keyup 会清位。
+  //   已知无害副作用：Shift+Arrow 会顺带置 shiftDown（尺子旁路位，_keydown 无条件设），floating 时不起笔，keyup 会清位。
   { combo: "ArrowLeft",        desc: "sc.nudgeFloat", category: "sc.cat.lasso",
     when: _floating, run: (i) => { i.lasso.nudgeFloat(-1, 0); i.board.invalidateAll(); } },
   { combo: "ArrowRight",       desc: "sc.nudgeFloat", category: "sc.cat.lasso",
@@ -301,8 +300,9 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   // 工具切换（gallery / floating 时跳过）
   { combo: "B",                desc: "sc.brush",     category: "sc.cat.tools",
     when: (i) => _editMode(i) && !_floating(i), run: (i) => i._emitTool("brush") },
-  { combo: "S",                desc: "sc.shapeBrush", category: "sc.cat.tools",
-    when: (i) => _editMode(i) && !_floating(i), run: (i) => i._emitTool("shapeBrush") },
+  // ADR-0013：S = 尺子（原形状笔）——同左栏尺钮 tap 语义（有尺 = 开/关吸附，无尺 = 进放置态）；语义归 ruler-ui，这里只派事件
+  { combo: "S",                desc: "sc.ruler", category: "sc.cat.tools",
+    when: (i) => _editMode(i) && !_floating(i), run: () => window.dispatchEvent(new CustomEvent("wp:ruler-tap")) },
   // spring-loaded E（2026-08-21 拍板）：dispatch 硬编码在 _keydown/_keyup（tap 要 keyup
   //   时机 + hold 状态，registry 的 keydown-run 语义装不下；同 Space hold 先例）。两条 display-only
   //   供快捷键面板渲染（同 Ctrl+V / Ctrl+C ×2 先例）：tap=切橡皮、hold=临时橡皮（松开回原工具）。
@@ -379,7 +379,11 @@ export class InputController {
   brush: BrushEngine;
   lasso: LassoEngine;
   filterBrush: FilterBrushEngine;
-  shapeBrush: ShapeBrushEngine;
+  // ADR-0013 尺子（2026-09-09，形状笔引擎退役）：一笔一个投影器，_beginStroke 从 provider 取（app 接 ruler-ui），
+  //   _move 的 doc 坐标经它投影再进引擎——画笔 / 橡皮 / 手指族同一切口（RULER_ROLES）。Shift 按住 = 本笔旁路尺。
+  _strokeGuide: StrokeGuide | null = null;
+  _rulerGuideProvider: ((role: string) => StrokeGuide | null) | null = null;
+  shiftDown = false;
   getTool: () => string;
   editMode: EditMode | null;
   getResolvedBrush: () => ResolvedBrush | null;
@@ -429,8 +433,6 @@ export class InputController {
     // v132 filter brush（user：「blur/sharpen/液化 走 filter brush engine」）
     //   引擎本身是薄 delegate；filter 自己提供 begin/extend/end brush 方法
     this.filterBrush = new FilterBrushEngine();
-    // 形状笔（ADR-0005）：几何重合成引擎，与 brush 共享 ResolvedBrush + stroke 事务
-    this.shapeBrush = new ShapeBrushEngine();
     this.lasso.onChange = () => {
       this.board.requestRender();
       window.dispatchEvent(new CustomEvent("wp:lassochange"));
@@ -664,8 +666,7 @@ export class InputController {
       if (role === "filterBrush") this._beginFilterBrush(rec);
       else {
         // mode 推断：erase / brush（纯函数 pointer-route.strokeMode）。按住 E = 临时橡皮：
-        //   draw/shapeBrush 都吃（形状笔 erase 链经 _inner.beginStroke 透传 → brush.ts comp="erase"，
-        //   与普通橡皮同一条管线，2026-08-21 核实）。
+        //   draw 吃（brush.ts comp="erase"，与普通橡皮同一条管线，2026-08-21 核实）。
         // mode 在**落笔一刻锁定**（引擎 st.mode 只在 beginStroke 收一次）——描边进行中按/松 E
         //   不影响当前笔。这正是取 hold 而非 mid-stroke 切换语义的原因。
         const mode = strokeMode(role as string, this.eraserHold);
@@ -805,7 +806,8 @@ export class InputController {
           const sp = inputSmooth(rec as unknown as Parameters<typeof inputSmooth>[0], settings, drx, dry);
           psx = sp.x; psy = sp.y;
         }
-        const { x: dx, y: dy } = this.board.screenToDoc(psx, psy);
+        let { x: dx, y: dy } = this.board.screenToDoc(psx, psy);
+        if (this._strokeGuide) ({ x: dx, y: dy } = this._strokeGuide.project(dx, dy));   // ADR-0013：过尺（唯一切口）
         // 活动 engine 统一接口：liquify/filterBrush/像素 忽略多余的 pressure/时间戳参数
         //   ev.timeStamp 给主笔刷时间常数平滑用（dt 取真实事件间隔，含 coalesced）
         //   e.pressure 当 fallback：coalesced 样本没带 pressure（0/缺失）时退回派发事件的值，不整笔冻住（2026-09-02）。
@@ -985,26 +987,28 @@ export class InputController {
     if (!settings || !this.doc.activeLayer) return;
     // activeLayer 是 Node（叶|组）；上游 activeEditableLeaf 已硬拒组 → 此处确为可写叶。
     const layer = this.doc.activeLayer as ViewLeaf;
-    const spec = pixelStrokeSpec(rec.role as string)!;   // draw / erase / shapeBrush → 同 stroke 事务 + finalize
-    // engineKey 查表（registry 注释的本意）：draw/erase → brush；shapeBrush → 形状笔。签名一致。
-    const eng = this[spec.engineKey as "brush" | "shapeBrush"];
+    const spec = pixelStrokeSpec(rec.role as string)!;   // draw / erase → 同 stroke 事务 + finalize
+    // engineKey 查表（registry 注释的本意）：draw/erase → brush。（形状笔引擎 2026-09-09 随尺子模型退役，ADR-0013）
+    const eng = this[spec.engineKey as "brush"];
     // C5：session 构造 = wp2.begin 开令牌（stroke 档口；单令牌墙在 workpiece 侧 fail-loud）。
-    // C6 预览宿三态（census §3.4）：buffered=overlay；draw/erase pixelMode=livesync（stroke 档合法
-    //   就地写）；形状笔 pixelMode=shadow（参数重算——每帧 restore+重画改在替身叶上，真层只在
-    //   收口一刻被令牌写，cancel 丢替身零回滚）。
-    const preview = !settings.pixelMode ? "overlay" : (rec.role === "shapeBrush" ? "shadow" : "livesync");
+    // C6 预览宿二态（census §3.4）：buffered=overlay；draw/erase pixelMode=livesync（stroke 档合法就地写）。
+    const preview = !settings.pixelMode ? "overlay" : "livesync";
     this._activeStroke = new StrokeSession(this._strokeDeps, eng, [layer], spec, preview);
 
-    const { x: dx, y: dy } = this.board.screenToDoc(rec.smX!, rec.smY!);
+    let { x: dx, y: dy } = this.board.screenToDoc(rec.smX!, rec.smY!);
+    // ADR-0013 尺子：起点也过尺（曲线尺把起点吸上去）；Shift 按住 = 本笔不吸；谁吸尺 = RULER_ROLES（Q4 讨论中）
+    const guide = (!this.shiftDown && RULER_ROLES.has(rec.role as string)) ? (this._rulerGuideProvider?.(rec.role as string) ?? null) : null;
+    this._strokeGuide = guide;
+    if (guide) ({ x: dx, y: dy } = guide.begin(dx, dy));
     const pressure = effectivePressureFor(rec, e);
     // v148: buffered（brush/erase 非 pixel）位置平滑由引擎做（lookahead/frozen/tail），
     //   input 直传 raw（见 pointermove 的 rec.rawToEngine 分支）。pixel 仍走四件套。
-    //   形状笔恒吃 raw（几何/拟合要原始点；input 平滑会跟吸附打架），pixelMode 也不例外。
     const buffered = !settings.pixelMode;
-    rec.rawToEngine = buffered || rec.role === "shapeBrush";
+    rec.rawToEngine = buffered;
     const scale = this.board.viewport.scale || 1;
-    // v249：时间常数指数追踪 + 死区。{tau, deadzone}。
-    const smooth = buffered ? _resolveSmooth(settings, scale) : {};
+    // v249：时间常数指数追踪 + 死区。{tau, deadzone}。尺子开着 → 直通（尺就是平滑器：引擎 EMA 会把投影点拉离曲线尺，
+    //   形状笔时代 tau=0 直通的同一条路）。
+    const smooth = buffered ? (guide ? { tau: 0, deadzone: 0 } : _resolveSmooth(settings, scale)) : {};
     eng.beginStroke(this._activeStroke.targets[0], settings, dx, dy, pressure, mode, smooth, e.timeStamp);
     const bbox = eng.flushDirty();
     if (bbox) this.board.markDocDirty(bbox[0], bbox[1], bbox[2], bbox[3]);
@@ -1015,21 +1019,25 @@ export class InputController {
   // 这里只剩「取下活动 session、调收口」的手势侧转发。
   _endStroke() {
     const as = this._activeStroke;
+    this._strokeGuide = null;
     if (!as) return;
     this._activeStroke = null;
     as.end();
   }
   _abortStroke() {
     const as = this._activeStroke;
+    this._strokeGuide = null;
     if (!as) return;
     this._activeStroke = null;
     as.cancel();   // 引擎丢状态 + collector 倒序回滚，无痕
   }
-  // 任一像素笔画进行中（brush / 像素笔 / liquify / filterBrush / 形状笔 都设 _activeStroke）。
+  /** ADR-0013：尺子投影器提供方（app 接 ruler-ui.guideForStroke）；返回 null = 本笔不吸。 */
+  setRulerGuideProvider(fn: ((role: string) => StrokeGuide | null) | null) { this._rulerGuideProvider = fn; }
+  // 任一像素笔画进行中（brush / 像素笔 / liquify / filterBrush 都设 _activeStroke）。
   // board._strokeActiveHint 用它判 livePreview（描边中走直接合成 / GL 门控），含像素笔/liquify/filterBrush。
   isStrokeActive() { return !!this._activeStroke; }
   // GPU stamp overlay 拉取口（app 接给 board.setStampProvider）：当前活动引擎的 stamps。
-  //   brush 与形状笔都有 collectStamps；liquify/filterBrush 无（写替身叶，走 stroke shadow 显示，C6）。
+  //   brush 有 collectStamps；liquify/filterBrush 无（写替身叶，走 stroke shadow 显示，C6）。
   collectActiveStamps(): ReturnType<BrushEngine["collectStamps"]> {
     // v0.7.25 选区笔：同一 overlay 拉取口出色带预览（selPenBand 旗 → board 跳过 selMask/lockAlpha 裁剪）
     if (this._selPenLive) {
@@ -1038,7 +1046,7 @@ export class InputController {
     }
     return this._activeStroke?.collectStamps() ?? null;
   }
-  // 公开取消口（toolbar 描边中切形状笔子工具 = cancel 不进 undo，同画一半被手势接管）
+  // 公开取消口（描边中切子工具 / 换尺 = cancel 不进 undo，同画一半被手势接管）
   abortActiveStroke() { this._abortStroke(); }
 
   // GL live-sync 接缝：描边中原地改真层的笔（draw/erase pixelMode）→ 返回活动叶，board 每帧把它
@@ -1522,8 +1530,8 @@ export class InputController {
     if (e.key === "Alt" || e.code === "AltLeft" || e.code === "AltRight") {
       this.altDown = true;
     }
-    // Shift hold = 形状笔约束临时反转（行业惯例：PS/Figma 画线 Shift 约束、Blender Ctrl 反转 snap）
-    if (e.key === "Shift") this.shapeBrush.setConstrainInvert(true);
+    // Shift hold = 本笔旁路尺子（ADR-0013；行业惯例：Blender Ctrl 反转 snap）——起笔一刻判定，mid-stroke 不变
+    if (e.key === "Shift") this.shiftDown = true;
     for (const sc of KEYBOARD_SHORTCUTS) {
       if (sc.when && !sc.when(this)) continue;
       if (!_matchCombo(e, sc.combo)) continue;
@@ -1541,7 +1549,7 @@ export class InputController {
     if (e.key === "Alt" || e.code === "AltLeft" || e.code === "AltRight") {
       this.altDown = false;
     }
-    if (e.key === "Shift") this.shapeBrush.setConstrainInvert(false);
+    if (e.key === "Shift") this.shiftDown = false;
     // E 松开：清 hold（不看修饰键——按住 E 期间又按了 Ctrl 也必须能清位）。
     //   tap = 短按且没落过笔 → 执行原「切到橡皮」（判定纯函数 eraserTapOnRelease）。
     //   busy 期间不切工具（同 _keydown 的 busy 闸语义；清位本身永远落地，见 _keyup 不拦的注释）。
@@ -1659,6 +1667,7 @@ export class InputController {
   clearKeyHolds() {
     this.eraserHold = false;
     this.altDown = false;
+    this.shiftDown = false;
   }
 }
 

@@ -6,9 +6,9 @@ describe("pointer-route · effectiveTool", () => {
   it("transform → lasso（抢画布路由走 gizmo）", () => eq(effectiveTool("transform", false), "lasso"));
   it("alt + brush → picker（临时取色）", () => eq(effectiveTool("brush", true), "picker"));
   it("alt + fill → picker（v0.7.8 油漆桶吸色，吸预览色）", () => eq(effectiveTool("fill", true), "picker"));
-  it("alt + shapeBrush → picker（user：形状笔也能 alt 取色）", () => eq(effectiveTool("shapeBrush", true), "picker"));
-  it("alt 只对 brush/fill/shapeBrush 生效（eraser/filterBrush 不扩权）", () => {
+  it("alt 只对 brush/fill 生效（eraser/filterBrush 不扩权；shapeBrush 2026-09-09 随尺子模型退役）", () => {
     eq(effectiveTool("eraser", true), "eraser"); eq(effectiveTool("lasso", true), "lasso");
+    eq(effectiveTool("shapeBrush", true), "shapeBrush", "已无此工具：原样透传");
     eq(effectiveTool("filterBrush", true), "filterBrush");
   });
   it("其余原样", () => { eq(effectiveTool("brush", false), "brush"); eq(effectiveTool("crop", false), "crop"); });
@@ -60,10 +60,9 @@ describe("pointer-route · assignRole", () => {
     eq(role({ pointerType: "touch", penEverSeen: false, singleFingerDraw: true, tool: "brush" }), "draw");
   });
 
-  it("transform → lasso；alt+brush / alt+shapeBrush → pick（经 effectiveTool）", () => {
+  it("transform → lasso；alt+brush → pick（经 effectiveTool）", () => {
     eq(role({ tool: "transform", button: 0 }), "lasso");
     eq(role({ tool: "brush", altDown: true, button: 0 }), "pick");
-    eq(role({ tool: "shapeBrush", altDown: true, button: 0 }), "pick");
   });
 
   it("回归锁：三设备分支对同一非特殊工具给同一 role（旧 map 抄 3 份的去重）", () => {
@@ -77,11 +76,9 @@ describe("pointer-route · assignRole", () => {
 });
 
 describe("pointer-route · 按住 E = 临时橡皮（spring-loaded，2026-08-21）", () => {
-  it("strokeMode：hold → draw/shapeBrush 变 erase；松开 → brush", () => {
+  it("strokeMode：hold → draw 变 erase；松开 → brush", () => {
     eq(strokeMode("draw", true), "erase", "hold + 画笔 → 临时橡皮");
-    eq(strokeMode("shapeBrush", true), "erase", "hold + 形状笔 → 临时橡皮（erase 链经 _inner 透传）");
     eq(strokeMode("draw", false), "brush", "松开 → 回画笔");
-    eq(strokeMode("shapeBrush", false), "brush", "松开 → 回形状笔");
   });
   it("strokeMode：橡皮工具恒 erase（hold 无操作）；其它 role 不吃 E", () => {
     eq(strokeMode("erase", false), "erase");

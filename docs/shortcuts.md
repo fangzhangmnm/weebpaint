@@ -2,7 +2,7 @@
 
 # Keyboard shortcuts
 
-> generated from `src/input.ts` (the same table the in-app menu → "Shortcuts" panel renders) · v0.11.44-2026-08-28
+> generated from `src/input.ts` (the same table the in-app menu → "Shortcuts" panel renders) · v0.14.7-2026-09-09
 
 ## Edit
 
@@ -40,7 +40,7 @@
 | Keys | Action |
 |---|---|
 | `B` | Brush |
-| `S` | Shape brush |
+| `S` | Ruler (toggle snapping / place when none) |
 | `E` | Eraser |
 | `E` | Hold = temporary eraser (release to restore tool) |
 | `I` | Eyedropper |

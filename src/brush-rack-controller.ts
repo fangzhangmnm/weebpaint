@@ -246,12 +246,12 @@ export class BrushRackController {
   }
 
   // ---- 活动预设 ↔ tool dial 绑定 ----
-  // shapeBrush alias 到 brush（ADR-0005）：形状笔共享笔架 + 共享当前笔/dial，零自有 toolState 持久化
+  // （shapeBrush alias 2026-09-09 随尺子模型退役——ADR-0013；airbrush alias 留）
   // v0.7.26 选区笔走笔架（user：「笔架不是有滤镜笔画画笔橡皮笔吗，加一个选区笔就行了」）：
   //   lasso/fill 模式的 rack key = "selPen"（第四个 rack 工具类别；子工具 pen 消费 currentBrush，
   //   其余子工具不吃笔——映射无副作用）
   getRackToolKey(tool: string) {
-    if (tool === "airbrush" || tool === "shapeBrush") return "brush";
+    if (tool === "airbrush") return "brush";
     if (tool === "lasso" || tool === "fill") return "selPen";
     // 2026-09-05 手指单独 dial（user 拍板）：filterBrush 模式下 payload = smudge → 自己的 toolStates.smudge
     //   （size/opacity/选笔/variant 与模糊/液化分账）；笔架列表仍共用滤镜笔（brushesByTool 的 smudge 别名）。

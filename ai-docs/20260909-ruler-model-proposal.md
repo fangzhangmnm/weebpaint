@@ -1,6 +1,6 @@
 # 尺子模型策划：形状 = 画布上的辅助对象，不是笔（现状 .h + 提案 .h + 分叉）
 
-> 作者：Claude Fable 5.1（claude-fable-5-1）· created 20260909 · as-of dev v0.14.6 · 状态：**方向已拍板、细节待 user 一句话**（§5 分叉默认已给）。
+> 作者：Claude Fable 5.1（claude-fable-5-1）· created 20260909 · as-of dev v0.14.7 · 状态：**已落地 v0.14.7（user「先做，45 我需要讨论下」）**；ADR = `adr/0013-ruler-model.md`；Q4/Q5 待讨论（总账 #64/#65）。
 > 出处（user 2026-09-09 原话）：「形状笔放的位置 ux 非常不合理，这也是最两难的一个设计问题, think outside the box and propose 5 ideas」→ 五案 →
 > 「形状笔同意 1，用左栏放在笔架按钮下面，左栏应该 context smart sense 不要暴露不必要的东西。同意形状笔不是笔而是辅助」。
 > 家规：重构策划附「现状 .h + 提案 .h」；实现中形状变了回写 §2。本稿是 ADR-0013 的草案底稿（§0）；user 说「没问题」后立 ADR、开工。
@@ -84,6 +84,16 @@ export function rulerOverlay(r: Ruler, frame: PerspConfig | null, view: ViewInfo
 // src/common/verbs.ts：brush: [freehand]（小三角随之消失）；#brushToolbar 删；S 键 = 尺子开/关（原 shapeBrush）
 // persp-edit.ts:431 门：shapeBrush → ruler.on && kind === "persp"（或 showGizmo）
 ```
+
+### 2.5 落地差异（v0.14.7 回写，家规：实现中形状变了回写 §2）
+
+- `Ruler` 的椭圆尺存 **doc 系闭合 polyline `pts`**（不存 cx/cy/rx/ry/rot/onPlane）：一份表示吃掉全部透视分支，projection = 最近线段；`RulerParallel` 多一个 `anchor`（只给 overlay 定位）。
+- `placeFromDrag(kind, p0, p1, o, grid?)` / `placeFromLoop(pts, o)`；`StrokeGuide.begin` 返回吸后的起点；`guideFor(r, frame)` 不收 constrainInvert（Shift 改为「本笔旁路尺」，放置时 Shift = 反转约束）。
+- `rulerOverlay` 改名 `rulerSegments(r, docW, docH)`；board 侧 `GuideOverlay { segments, style: active|dim|draft }` + `setGuideProvider`；透视尺走 persp-edit gizmo（`setPerspGizmoLiveGate` 注入门）。
+- 放置**不进 undo**（§3.3 原写「放置 = 一步 undo」，改：重拖即换，省 RulerComponent；记 ADR-0013 余量）。
+- `LeftDialOpts += getDialVisible / getPickVisible / getRuler / onRulerTap / onRulerLongpress`；`dialReactive += transient / rulerOn / rulerPlacing`。
+- `input.ts`：`setRulerGuideProvider(fn)`、`shiftDown`；S 键派 `wp:ruler-tap`（不 import ruler-ui，防环）。edit-mode `rulerPlace` ctrlZ = abort-transient。
+- 选区笔不在切口内（lasso role 借 brush 引擎）→ Q4 待讨论（总账 #64）；pixel-conic.ts 暂留（Q5，#65）。
 
 ## 3. 行为
 

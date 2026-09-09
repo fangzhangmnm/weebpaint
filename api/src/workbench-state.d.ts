@@ -91,14 +91,13 @@ declare function freshGroups(): {
         smudge: string;
         lasso: string;
     };
-    shapeBrush: {
-        sub: string;
-        constrainLine: boolean;
-        constrainRect: boolean;
-        constrainCircle: boolean;
+    ruler: {
+        on: boolean;
+        kind: string;
+        constrain: boolean;
+        geo: unknown;
         gridNu: number;
         gridNv: number;
-        gridBorder: boolean;
     };
     persp: {
         mode: string;
@@ -285,14 +284,14 @@ export declare const desk: {
         lineartTipSens: number;
         lineartBleed: number;
     };
-    shapeBrush: {
-        sub: string;
-        constrainLine: boolean;
-        constrainRect: boolean;
-        constrainCircle: boolean;
+    ruler: {
+        on: boolean;
+        kind: string;
+        constrain: boolean;
+        /** 放好的尺（ruler.ts Ruler | null）。读方经 sanitizeRuler 校验（文件来的 JSON）。 */
+        geo: unknown;
         gridNu: number;
         gridNv: number;
-        gridBorder: boolean;
     };
     persp: {
         mode: string;
@@ -400,6 +399,13 @@ export declare function remapShapePersp(f: (p: {
     y: number;
 }, opts?: {
     unlockHorizon?: boolean;
+}): void;
+export declare function remapDeskRuler(f: (p: {
+    x: number;
+    y: number;
+}) => {
+    x: number;
+    y: number;
 }): void;
 export declare function snapshotShapePersp(): unknown;
 export declare function restoreShapePersp(snap: unknown): void;

@@ -109,24 +109,26 @@ test("[editor-state] v0.5.11 迁移：stale bucket 键忽略、magicWand.thresho
   eq("bucket" in desk, false, "bucket facade 已删");
 });
 
-test("[editor-state] 形状笔（ADR-0005）：默认 / 往返 / 老 doc 缺组补默认", () => {
+test("[editor-state] 尺子（ADR-0013）：默认 / 往返 / 老 doc 缺组或带 stale shapeBrush 组不崩", () => {
   desk.reset();
-  eq(desk.shapeBrush.sub, "line", "sub 默认 line");
-  eq(desk.shapeBrush.constrainLine, false, "per-图形约束默认全不锁");
-  eq(desk.shapeBrush.constrainRect, false);
-  eq(desk.shapeBrush.constrainCircle, false);
-  desk.shapeBrush.sub = "circle";
-  desk.shapeBrush.constrainCircle = true;
+  eq(desk.ruler.on, false, "吸附默认关");
+  eq(desk.ruler.kind, "parallel", "尺种默认平行线");
+  eq(desk.ruler.constrain, false, "放置约束默认关");
+  eq(desk.ruler.geo, null, "默认没放尺");
+  eq(desk.ruler.gridNu, 2, "格线默认 2×6（头身比）"); eq(desk.ruler.gridNv, 6);
+  desk.ruler.on = true; desk.ruler.kind = "rect"; desk.ruler.constrain = true;
+  desk.ruler.geo = { kind: "rect", corners: [{ x: 1, y: 2 }, { x: 11, y: 2 }, { x: 11, y: 7 }, { x: 1, y: 7 }] };
+  desk.ruler.gridNv = 8;
   const ser = desk.Serialize();
   desk.reset();
   desk.Unserialize(ser);
-  eq(desk.shapeBrush.sub, "circle", "Serialize 往返 sub");
-  eq(desk.shapeBrush.constrainCircle, true, "Serialize 往返 per-图形约束");
-  eq(desk.shapeBrush.constrainRect, false, "别的图形不受影响");
-  // 老 doc 的 editor-state.json 没有 shapeBrush 组 → 留默认不崩
+  eq(desk.ruler.on, true, "on 往返"); eq(desk.ruler.kind, "rect", "kind 往返"); eq(desk.ruler.constrain, true);
+  eq(JSON.stringify(desk.ruler.geo.corners[2]), JSON.stringify({ x: 11, y: 7 }), "geo 整包往返");
+  eq(desk.ruler.gridNv, 8);
   desk.reset();
-  desk.Unserialize({ magicWand: { threshold: 30 } });
-  eq(desk.shapeBrush.sub, "line", "缺组 → 默认");
+  desk.Unserialize({ magicWand: { threshold: 30 }, shapeBrush: { sub: "circle", constrainCircle: true } });   // v0.14.6 及更早的 doc
+  eq(desk.ruler.kind, "parallel", "缺组 → 默认；stale shapeBrush 组静默忽略");
+  eq("shapeBrush" in desk, false, "shapeBrush facade 已删（ADR-0005 引擎随尺子退役）");
 });
 
 test("[editor-state] 透视 frame（ADR-0006）：默认 / 往返 / 老 doc 缺组补默认", () => {
@@ -135,15 +137,11 @@ test("[editor-state] 透视 frame（ADR-0006）：默认 / 往返 / 老 doc 缺�
   eq(desk.persp.lockHorizon, true, "锁地平线默认开");
   eq(desk.persp.mode, "off", "透视模式默认关（UI v2：关在 mode 不在 plane）");
   eq(desk.persp.plane, "ground", "平面默认地板");
-  eq(desk.shapeBrush.gridNu, 2, "grid 默认 2×6（头身比）");
-  eq(desk.shapeBrush.gridNv, 6);
-  eq(desk.shapeBrush.gridBorder, false, "外框默认关");
   desk.persp.p3.vp1 = { x: 100.5, y: 50.5 };
   desk.persp.p3.box = { A: { x: 10.5, y: 20.5 }, t: [0.3, 0.25, 0.2] };
   desk.persp.p3.vp3 = { x: 30.5, y: 900.5 };
   desk.persp.mode = "p3";
   desk.persp.plane = "wallL";
-  desk.shapeBrush.gridNv = 8;
   const ser = desk.Serialize();
   desk.reset();
   desk.Unserialize(ser);
@@ -152,7 +150,6 @@ test("[editor-state] 透视 frame（ADR-0006）：默认 / 往返 / 老 doc 缺�
   eq(desk.persp.mode, "p3", "mode 往返");
   eq(JSON.stringify(desk.persp.p3.box), JSON.stringify({ A: { x: 10.5, y: 20.5 }, t: [0.3, 0.25, 0.2] }), "参考 box 随槽位往返（user：和消失点一起持久化）");
   eq(desk.persp.plane, "wallL", "plane 往返");
-  eq(desk.shapeBrush.gridNv, 8, "gridNv 往返");
   desk.reset();
   desk.Unserialize({ magicWand: { threshold: 30 } });   // 老 doc 无 persp 组
   eq(desk.persp.p1.vp1, null, "缺组 → 默认");

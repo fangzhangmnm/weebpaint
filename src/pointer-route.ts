@@ -3,13 +3,12 @@
 // 且 effectiveTool→role 的映射在 mouse/pen/touch 三处**各抄一份**。抽出 = 决策可单测、改一处。
 // 行为矩阵沿用 ScratchPad（见 input.ts 顶部注释）；live 事件流 / pointers Map / 手势仍在 input.ts。
 
-// 当前工具 → 有效工具：transform 抢画布路由走 gizmo（机械上 role=lasso）；alt+brush/fill/shapeBrush 临时取色。
+// 当前工具 → 有效工具：transform 抢画布路由走 gizmo（机械上 role=lasso）；alt+brush/fill 临时取色。
 export function effectiveTool(tool: string, altDown: boolean): string {
   if (tool === "transform") return "lasso";
-  // alt 吸色白名单：brush（原初）；fill（v0.7.8 吸预览色，WYSIWYG）；shapeBrush（user：「形状笔的
-  //   时候应该也能alt取色」——只加 user 点名的，eraser/filterBrush 不扩权）。已知正确副作用：
-  //   input._paintIntent 同函数判定 → alt+形状笔在组/隐藏层上直接吸色而不是报「组不能画」，与 brush 一致。
-  if (altDown && (tool === "brush" || tool === "fill" || tool === "shapeBrush")) return "picker";
+  // alt 吸色白名单：brush（原初）；fill（v0.7.8 吸预览色，WYSIWYG）——只加 user 点名的，eraser/filterBrush 不扩权。
+  //   （shapeBrush 2026-09-09 随尺子模型退役，ADR-0013）已知正确副作用：input._paintIntent 同函数判定。
+  if (altDown && (tool === "brush" || tool === "fill")) return "picker";
   return tool;   // crop/adjust 等 fall-through，由 input 的 canDraw gate 兜
 }
 
@@ -19,7 +18,6 @@ export function toolToRole(et: string): string {
     case "eraser": return "erase";
     case "picker": return "pick";
     case "filterBrush": return "filterBrush";
-    case "shapeBrush": return "shapeBrush";   // ADR-0005：形状笔 = 第四个 pixel-stroke 引擎
     case "lasso": return "lasso";
     case "fill": return "lasso";      // v0.5.12：fill 第一类工具，指针行为 = 选区机器（零新指针代码）
     default: return "draw";         // brush / 未知 → draw
@@ -62,11 +60,11 @@ export const ERASER_HOLD_TAP_MS = 350;   // keyup 距 keydown < 此值且未落�
 
 // pointerdown 落笔一刻的 stroke mode 判定。mode 进引擎（beginStroke）即锁定在 st.mode，
 //   mid-stroke 按/松 E 不影响当前笔——这正是取 hold 而非 mid-stroke 切换语义的原因。
-// 只对 draw/shapeBrush 生效：erase 恒橡皮（工具已是橡皮时 hold 自然无操作）；
+// 只对 draw 生效：erase 恒橡皮（工具已是橡皮时 hold 自然无操作）；
 //   filterBrush/lasso/fill/pick 等不吃 E（滤镜笔/选区没有「橡皮化」语义）。
 export function strokeMode(role: string, eraserHold: boolean): "erase" | "brush" {
   if (role === "erase") return "erase";
-  if (eraserHold && (role === "draw" || role === "shapeBrush")) return "erase";
+  if (eraserHold && role === "draw") return "erase";
   return "brush";
 }
 

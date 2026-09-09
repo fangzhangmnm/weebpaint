@@ -2778,6 +2778,20 @@ body[data-mode="gallery"] .board { display: none !important; }
   pointer-events: none;
   z-index: calc(var(--z-toolbar) - 1);   /* 同 crop overlay：在画布上、toolbar/弹窗下 */
 }
+/* ADR-0013 尺子放置态捕获层（ruler-ui）：画布拖 = 放尺。与 persp-handles 同 z（画布上、toolbar/弹窗下）；
+   pointer-events 全吃（放置态短暂，两指缩放先不透传——记在 ADR-0013 待办） */
+.ruler-place-layer {
+  position: fixed; inset: 0;
+  z-index: calc(var(--z-toolbar) - 1);
+  touch-action: none;
+  cursor: crosshair;
+}
+/* 左栏尺钮：pressed = 吸附生效（同 .left-sidebar-pick 的 pressed 皮）；放置态用虚线框示意「正在放」 */
+.left-sidebar-ruler[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+.left-sidebar-ruler[data-placing="true"] { outline: 1.5px dashed var(--accent); outline-offset: -2px; }
+/* 尺子条里的格线行列 stepper（ruler-ui _mountGridCtl） */
+.rl-grid-ctl { display: inline-flex; align-items: center; gap: 2px; }
+.rl-grid-ctl .rl-grid-val { min-width: 1.6em; text-align: center; font-variant-numeric: tabular-nums; }
 .persp-handle {
   position: absolute;
   width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px;

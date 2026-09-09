@@ -1,6 +1,6 @@
 // 上下文工具条深模块真浏览器探针（playwright，Chromium；不进 npm test 硬线）。created 2026-09-06 by Claude Fable 5.1（UI 抽象轮 U1）
 // 用法：bash scripts/build.sh && node tools/probes/context-toolbar.mjs
-// 契约：① 手指（filterBrush）条由工厂生成，与套索/形状条同 y/同高（不再是 .crop-toolbar 的 y=56/h=44）；
+// 契约：① 手指（filterBrush）条由工厂生成，与套索条同 y/同高（不再是 .crop-toolbar 的 y=56/h=44；形状条 2026-09-09 退役）；
 //   ② 桌面宽度全项可见、无「…」；③ 375 宽（SE2）时行不横向溢出，尾项折进「…」，点「…」出菜单含被折项；
 //   ④ 变体/mix 下拉与「揉匀」旋钮仍在（折进菜单也算在）；✓ 退出后条隐藏。
 import { chromium } from "playwright";

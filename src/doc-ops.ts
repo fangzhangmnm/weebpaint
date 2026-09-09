@@ -20,6 +20,7 @@ import { mountSelectField, type SelectField } from "./ui/select-field.ts";   // 
 import { resampleItems } from "./frontend/resample-modes.ts";
 import { tLatin } from "./i18n/index.ts";
 import { desk } from "./workbench-state.ts";
+import { remapDeskRuler } from "./workbench-state.ts";   // ADR-0013 尺子随 doc 变换
 import { LayerPixels } from "./backend/tiles/tile-layer.ts";
 import { resampleBytes } from "./backend/algorithms/resample-bytes.ts";
 import type { Selection } from "./backend/selection.ts";
@@ -277,6 +278,7 @@ export function initDocOps(ctx: AppContext) {
       mapSelection: (sel) => sel.croppedTo(x, y, w, h),
       after: () => {
         wp2.persp.remapForDocTransform((p) => ({ x: p.x - x, y: p.y - y }));   // ADR-0006：VP 随裁剪平移
+        remapDeskRuler((p) => ({ x: p.x - x, y: p.y - y }));   // ADR-0013：尺子随 doc 变换（desk 直写）
         _shiftViewportAfterCrop({ x, y });
       },
     });
@@ -311,7 +313,10 @@ export function initDocOps(ctx: AppContext) {
       runDocTransform(t("tm.flippedHorizontal"), {
         applyComputed: () => wp2.layerTiles.flipHorizontalAll(),
         mapSelection: (sel) => sel.flippedHorizontal(W),
-        after: () => wp2.persp.remapForDocTransform((p) => ({ x: W - p.x, y: p.y })),   // ADR-0006：像素中线 W−(i+.5)=(W−i−1)+.5 仍在格上
+        after: () => {
+          wp2.persp.remapForDocTransform((p) => ({ x: W - p.x, y: p.y }));   // ADR-0006：像素中线 W−(i+.5)=(W−i−1)+.5 仍在格上
+          remapDeskRuler((p) => ({ x: W - p.x, y: p.y }));                    // ADR-0013：尺子随 doc 变换（desk 直写）
+        },
       });
     });
   }
@@ -334,6 +339,7 @@ export function initDocOps(ctx: AppContext) {
           // ADR-0006：VP 随转（(x,y)→(y, W−x)，同 doc 像素映射）；VP 对的地平线转成竖直 →
           //   自动解锁 lockHorizon（锁的语义 = doc 水平线，转后无法表示；下次 VP 编辑可重锁）。
           wp2.persp.remapForDocTransform((p) => ({ x: p.y, y: W - p.x }), { unlockHorizon: true });
+          remapDeskRuler((p) => ({ x: p.y, y: W - p.x }));   // ADR-0013：尺子随 doc 变换（desk 直写）
           board.fitToScreen();
         },
       });
@@ -379,6 +385,7 @@ export function initDocOps(ctx: AppContext) {
         },
         after: () => {
           wp2.persp.remapForDocTransform((p) => ({ x: (p.x - fx) * sx, y: (p.y - fy) * sy }));
+          remapDeskRuler((p) => ({ x: (p.x - fx) * sx, y: (p.y - fy) * sy }));   // ADR-0013：尺子随 doc 变换（desk 直写）
           board.fitToScreen();
         },
       });
@@ -394,6 +401,7 @@ export function initDocOps(ctx: AppContext) {
       mapSelection: (sel) => sel.croppedTo(x, y, w, h),
       after: () => {
         wp2.persp.remapForDocTransform((p) => ({ x: p.x - x, y: p.y - y }));   // ADR-0006：VP 随裁剪平移（含负向扩张）
+        remapDeskRuler((p) => ({ x: p.x - x, y: p.y - y }));   // ADR-0013：尺子随 doc 变换（desk 直写）
         _shiftViewportAfterCrop({ x, y });
       },
     });
@@ -533,6 +541,7 @@ export function initDocOps(ctx: AppContext) {
         //   缩放破 +0.5 格系 → 重钉像素中线（水平地平线仍水平，lockHorizon 不动）。
         const c = (v: number) => Math.floor(v) + 0.5;
         wp2.persp.remapForDocTransform((p) => ({ x: c(p.x * sx), y: c(p.y * sy) }));
+        remapDeskRuler((p) => ({ x: c(p.x * sx), y: c(p.y * sy) }));   // ADR-0013：尺子随 doc 变换（desk 直写）
       },
     });
     _closeResampleDialog();
@@ -557,7 +566,10 @@ export function initDocOps(ctx: AppContext) {
     runDocTransform(t("tm.offset", { dx, dy }), {
       applyComputed: () => wp2.layerTiles.offsetWrapAll(dx, dy),
       mapSelection: (sel) => sel.offsetWrapped(ox, oy, W, H),
-      after: () => wp2.persp.remapForDocTransform((p) => ({ x: p.x + ox, y: p.y + oy })),   // ADR-0006：VP 平移不 wrap（VP 本可在画布外）
+      after: () => {
+        wp2.persp.remapForDocTransform((p) => ({ x: p.x + ox, y: p.y + oy }));   // ADR-0006：VP 平移不 wrap（VP 本可在画布外）
+        remapDeskRuler((p) => ({ x: p.x + ox, y: p.y + oy }));                    // ADR-0013：尺子随 doc 变换（desk 直写）
+      },
     });
     _closeOffsetDialog();
   });

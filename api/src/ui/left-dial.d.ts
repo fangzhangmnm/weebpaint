@@ -15,6 +15,14 @@ export interface LeftDialOpts {
     getPicking(): boolean;
     getPickIcon(): string;
     getPickTitle(): string;
+    getDialVisible(): boolean;
+    getPickVisible(): boolean;
+    getRuler(): {
+        on: boolean;
+        placing: boolean;
+    };
+    onRulerTap(): void;
+    onRulerLongpress(): void;
 }
 export interface LeftDialHandle {
     flashSize(): void;

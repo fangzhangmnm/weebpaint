@@ -2,7 +2,7 @@
 // created 2026-09-06 by Claude Fable 5.1。策划 = ai-docs/20260906-ui-abstraction-round-proposal.md §2.3。
 //
 // 动词 = 你的手在做什么（笔 / 橡皮 / 手指 / 套索）；子工具 = 同一动词下的另一种走法，长按顶栏钮切（钮面图标随之换，角上小三角）。
-// 行为语义零变更：子工具只是**入口**，落地仍是老 EditMode（brush / shapeBrush / lasso / fill）或滤镜笔 payload（smudge / sharpenBlur / liquify）。
+// 行为语义零变更：子工具只是**入口**，落地仍是老 EditMode（brush / lasso / fill）或滤镜笔 payload（smudge / sharpenBlur / liquify）。
 // user 2026-09-06 工作流观察（进 ADR 理由栏）：「你要么是形状笔和橡皮，要么是画笔和橡皮。反而不太会在形状笔和画笔之间切」。
 // 记忆：desk.subTool[verb]（per-doc，user 2026-09-06 批准）。
 
@@ -18,9 +18,9 @@ export interface SubToolDef {
 }
 
 export const VERB_SUBTOOLS: Record<Verb, readonly SubToolDef[]> = {
+  // 笔位只剩自由手（形状笔 2026-09-09 随尺子模型退役——ADR-0013：形状 = 左栏尺钮的辅助对象，不是子工具）
   brush: [
     { id: "freehand", icon: "pencil", titleKey: "tool.brush", route: { mode: "brush" } },
-    { id: "shape", icon: "shapes", titleKey: "tool.shapeBrush", route: { mode: "shapeBrush" } },
   ],
   eraser: [
     { id: "pixel", icon: "eraser", titleKey: "tool.eraser", route: { mode: "eraser" } },
@@ -55,7 +55,7 @@ export function subToolDef(verb: Verb, id: string): SubToolDef {
 /** 当前 EditMode（+ 滤镜笔 payload）→ 动词；transient / hand / picker 等非动词模式 → null。 */
 export function verbOfMode(mode: string, filterId?: string | null): Verb | null {
   switch (mode) {
-    case "brush": case "shapeBrush": return "brush";
+    case "brush": return "brush";
     case "eraser": return "eraser";
     case "lasso": case "fill": return "lasso";
     case "filterBrush": return filterId ? "smudge" : null;   // 任何滤镜笔 payload 都归手指位（模糊/锐化/液化已搬家）

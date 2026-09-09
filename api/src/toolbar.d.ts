@@ -1,6 +1,5 @@
 import { type Verb } from "./common/verbs.ts";
 import type { AppContext } from "./app-context.ts";
-export declare function updateShapeToolbar(): void;
 export declare function updateLassoToolbar(): void;
 export declare function isPicking(mode: string): boolean;
 export declare function pickHoldBegin(): void;

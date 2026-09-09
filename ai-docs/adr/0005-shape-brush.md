@@ -1,7 +1,7 @@
 # ADR-0005：形状笔 = 一个 shape 一个 stroke 的笔（supersede v120「shapes 收进笔刷 preset」+ artist-priorities「形状工具=anti-feature」）
 
 > created 20260725
-> 状态：**已决定 —— 实现中（worktree-shape-brush 分支）**
+> 状态：**已决定 —— 实现中（worktree-shape-brush 分支）** → **2026-09-09 §2/§3 被 ADR-0013 尺子模型 supersede**（形状 = 画布辅助对象，引擎 `shape-brush.ts` 已删；§1 否决手势 snap、§4 拟合哲学仍有效）edited by Claude Fable 5.1
 
 ## 背景
 

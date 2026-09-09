@@ -1,7 +1,7 @@
 import { BrushEngine } from "./backend/brush.ts";
 import { LassoEngine } from "./lasso.ts";
 import { FilterBrushEngine } from "./filter-brush.ts";
-import { ShapeBrushEngine } from "./shape-brush.ts";
+import { type StrokeGuide } from "./ruler.ts";
 import { PressureProbe } from "./pressure-probe.ts";
 import type { GestureViewport, TapRef } from "./common/pointer-gesture.ts";
 import type { PaintingView, ViewLeaf } from "./backend/workpiece/painting-view.ts";
@@ -93,7 +93,9 @@ export declare class InputController {
     brush: BrushEngine;
     lasso: LassoEngine;
     filterBrush: FilterBrushEngine;
-    shapeBrush: ShapeBrushEngine;
+    _strokeGuide: StrokeGuide | null;
+    _rulerGuideProvider: ((role: string) => StrokeGuide | null) | null;
+    shiftDown: boolean;
     getTool: () => string;
     editMode: EditMode | null;
     getResolvedBrush: () => ResolvedBrush | null;
@@ -141,6 +143,8 @@ export declare class InputController {
     _beginStroke(e: PointerEvent, rec: PointerRec, mode: string): void;
     _endStroke(): void;
     _abortStroke(): void;
+    /** ADR-0013：尺子投影器提供方（app 接 ruler-ui.guideForStroke）；返回 null = 本笔不吸。 */
+    setRulerGuideProvider(fn: ((role: string) => StrokeGuide | null) | null): void;
     isStrokeActive(): boolean;
     collectActiveStamps(): ReturnType<BrushEngine["collectStamps"]>;
     abortActiveStroke(): void;
