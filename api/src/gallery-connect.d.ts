@@ -1,4 +1,4 @@
-import type { GalleryEntry } from "./gallery-registry.ts";
+import type { GalleryEntry } from "@internal/gallery";
 /** attach/detach 流程单飞道（案卷 20260830 §BUG D）：boot 领养 / redirect 续办 / 切库 / 卸库全走这条，
  *  流程间不再交错（gallery-manage-ui 的 switchFlow/detachFlow 同用）。⚠ 不可重入：锁内别 await 走锁的流程。 */
 export declare const galleryFlow: import("./flow-lock.ts").FlowLock;

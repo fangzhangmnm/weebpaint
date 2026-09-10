@@ -1,6 +1,8 @@
 // WeebPaint 专属测试入口（store/cloud-sync/provider 契约在 lib 的 test/，这里只留 WeebPaint vendored adapter）。
 import "./dom-shim-first.mjs";   // **必须第一**：在任何 import-Vue 之前装 DOM shim（见该文件头注释）。
 import { run } from "./runner.mjs";
+// 2026-09-10 收货 @internal/gallery：resume-slate / gallery-registry / library-backup / gallery-attachment / cloud-image-model / change-password /
+//   gallery-model / boot-restore / gallery-view-model / frame-gate / first-frame-watchdog / diag-log 十二份契约测试随模块搬进包（internal-gallery/test/，153 绿），本仓不再重跑。
 import "./editor-session.test.mjs";   // 家族共享模块 editor-session 生命周期编排（mock store+editor）
 import "./checkpoint-policy.test.mjs";
 import "./clipboard-policy.test.mjs";     // v0.9.22 剪贴板正宫化：双击 Ctrl+C 判窗 + 大图护栏阈值（spec 20260819）
@@ -9,14 +11,9 @@ import "./local-file-session.test.mjs";   // v0.9.24 无地本地文件：WeebPa
 import "./doc-home.test.mjs";             // P1 2026-08-26 一画一家：keeper 单持权 + (家×动作) 保存派发矩阵（verdicts §4-P1）
 import "./naming.test.mjs";               // P1 命名器官：yyyymmdd-hex4 / 下载分钟戳（verdicts §2.1 三粒度）
 import "./crash-store.test.mjs";          // P2 T-crash 库：pending 拒删/原子领养/单帧覆盖（verdicts §2.2 契约钉）
-import "./resume-slate.test.mjs";
 import "./device-rack-slot.test.mjs";         // A2 终案：无库笔架 device 槽（reload 不丢/防抖/降级诚实）
-import "./gallery-registry.test.mjs";     // P3 名册：铸 id/isSameEntry 查重/defaultStore 认领零迁移/播种幂等
-import "./library-backup.test.mjs";       // #18 全库备份内核：订阅→一次性快照/递归清单/字节预算/只读编排回执
-import "./gallery-attachment.test.mjs";   // P3 挂载：五步 detach 契约/绿灯门/逃生 force/手势 persist/锁域
 import "./flow-lock.test.mjs";            // v0.12.0 attach/detach 单飞道（boot 领养×redirect 续办交错根除，案卷 20260830）
 import "./app-prefs.test.mjs";            // P5 preferences 门面：scope 路由（device/gallery/session）+ 播种幂等
-import "./cloud-image-model.test.mjs";    // v0.9.29 云盘图片 picker：扩展名路由/thumb token/白底平铺/jpeg 编码接缝（spec 20260820）
 import "./brush-rack-migrate.test.mjs";
 import "./engine-registry.test.mjs";
 import "./registry.test.mjs";
@@ -40,7 +37,6 @@ import "./soft-gl2-port.test.mjs";   // C8 SoftGl2Port：真消费类（栅格/�
 import "./fill-lockalpha.test.mjs";  // v0.9.12 lockAlpha 真 atop：α 不动/α=0 不写隐形色/erase 不受锁（fill 像素路径首次进 npm test）
 import "./defringe.test.mjs";        // v0.9.13 导出贴图防黑边：α=0 回填边缘色 + PNG 往返保底
 import "./ledger-lint.test.mjs";     // 2026-09-07 待办总账索引 lint：编号唯一 / 格式 / 指针存在 / #n 引用不指空
-import "./change-password.test.mjs";   // 2026-09-09 换密码编排（store 0.12.0 rekey，明文不上云）
 import "./export-bg.test.mjs";       // v0.9.14 导出底色：flattenToBg 数学 + parseExportBg 防御收口
 import "./alpha-audit.test.mjs";     // #7 导出 alpha 护栏：正常/事故两类夹具床（判据与阈值的锚）
 import "./background-sync-jobs.test.mjs";
@@ -69,21 +65,15 @@ import "./png-codec.test.mjs"; // PNG 接缝（UPNG 内脏）：低α无损round
 import "./password-verifier.test.mjs";
 import "./liquify-bilinear.test.mjs";
 import "./liquify-bicubic.test.mjs";
-import "./gallery-model.test.mjs";
 // ── 新引擎红线对抗 battery（2026-07-12 从 JRP 按模块测试移植；旧 store-flow/store-p0-batch 等 import 已删的
 //    monolithic store.ts、早成孤儿不跑 → 这批直接验新模块的红线：If-Match/parentBase/conflict→backup/move-aside/… ）──
 import "./name-normalization.test.ts";   // P4: 身份在赋值处归一化（非单射的 sessionFileName）
-import "./boot-restore.test.ts";        // P5: 冷启动恢复的失败路径（幽灵路径纪律 + 不清 currentFile）
 import "./app-state.test.mjs";            // 2026-07-14 app-state struct 门面：冷字段直读写 collection（不落 RAM）+ push/pull
 import "./editor-state.test.mjs";         // 2026-07-14 desk struct：默认/setDirtyFlag/Serialize 往返/Unserialize 容错/reset
 import "./verbs.test.mjs";                // 2026-09-06 ADR-0012 顶栏动词表：路由自洽/mode 反推/图标与 i18n 齐全
 import "./verb-segment.test.mjs";           // 2026-09-06 晚 ADR-0012 修订 ③：上下文条左段子工具栏
 import "./select-field-icon.test.mjs";   // 2026-09-09 修订 ④：SelectItem.icon → 钮面图标随当前项走（手指位子工具下拉）
 import "./icon-sprite-inline.test.mjs";   // 2026-09-09 index.html 内联 sprite 与 assets/icons.svg 对账（v0.14.1 漏贴 finger-paint 病例）
-import "./gallery-view-model.test.mjs";
-import "./frame-gate.test.ts";        // 图库帧门（防误触）：按压期扣帧只留最新/尾巴/多指/maxHold 保险丝
-import "./first-frame-watchdog.test.ts";   // 2026-08-31 案：首帧看门狗（到点报 stall/来帧销账/别夹不算/cancel/重 arm）
-import "./diag-log.test.mjs";              // 2026-08-31：诊断日志环（容量/截断/顺序/文本头/清空）
 import "./color-model.test.mjs";
 import "./brush-size.test.mjs";
 import "./drag-value.test.mjs";   // 拖动核纯状态机（v0.7.8）：shift 细调相对累积/无缝切换/clamp

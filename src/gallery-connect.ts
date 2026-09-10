@@ -6,8 +6,8 @@
 //   boot 永不弹窗，verdicts §1.7）。
 // 权限掉 = 离线态不算 logoff：attach 照挂（缓存照看照画、dirty 攒着），online 旗子给 UI 画 chip/横幅（Slice D）。
 
-import type { GalleryEntry, DirHandleLike } from "./gallery-registry.ts";
-import { galleryRegistry } from "./gallery-registry.ts";
+import type { GalleryEntry, DirHandleLike } from "@internal/gallery";
+import { galleryRegistry } from "@internal/gallery";
 import { galleryAttachment } from "./gallery-attachment-host.ts";
 import { storeAbsent, _swapStoreForGallery, signIn, getActiveAccount, isSignedIn } from "./app-store.ts";
 import { deviceKvGet, deviceKvSet } from "./device-kv.ts";

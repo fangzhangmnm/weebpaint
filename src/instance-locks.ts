@@ -20,7 +20,7 @@
 //   （reportError "log" + 当作没锁），绝不让锁故障挡住开画。
 
 import { reportError } from "./error-badge.ts";
-import { activeGalleryId } from "./active-gallery.ts";
+import { activeGalleryId } from "@internal/gallery";
 
 const LOCK_PREFIX = "weebpaint-doc:";
 // P3：锁名 = gallery-id:相对path（verdicts §2.5——防跨 gallery 假阳性互锁）。当前 gallery id 的

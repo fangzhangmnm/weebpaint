@@ -20,8 +20,8 @@ import { openAdoptedPopup, closePopupMenuOf } from "../ui/popup-menu.ts";   // 2
 import { showNotice, closeNotice } from "../ui/notice.ts";   // 2026-09-02 C7 通知栈
 import { iconHtml } from "../ui/icon.ts";
 import { galleryAttachment } from "../gallery-attachment-host.ts";
-import { galleryRegistry } from "../gallery-registry.ts";
-import type { GalleryEntry } from "../gallery-registry.ts";
+import { galleryRegistry } from "@internal/gallery";
+import type { GalleryEntry } from "@internal/gallery";
 import { mintFolderByPicker, mintOneDriveByAccount, mintOneDriveSwitchAccount, oneDriveInteractMode, attachGallery, ensureFolderPermission, canPickFolderGallery, hasFreshPendingOneDriveConnect, clearPendingOneDriveConnect, galleryFlow, type MintResult } from "../gallery-connect.ts";
 import { requireStore, signIn, signOut, isSignedIn, isAuthConfigured, _seedNextRackInitData, _buildStoreForGalleryEntry, brushRackCollection } from "../app-store.ts";
 import { getAllBrushes, getMeta, RACK_META_ID } from "../brushes.ts";

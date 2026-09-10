@@ -26,7 +26,7 @@ import { defringeAlphaZero } from "./backend/algorithms/defringe.ts";
 import { auditExportAlpha, type AlphaAudit } from "./backend/algorithms/alpha-audit.ts";
 import { flattenToBg, parseExportBg } from "./backend/algorithms/flatten-bg.ts";
 import { canvasToBlob } from "./shell/image-io.ts";
-import { setOpened } from "./resume-slate.ts";   // active session 持久层（P5：device 回执条，永不同步）
+import { setOpened } from "@internal/gallery";   // active session 持久层（P5：device 回执条，永不同步）
 import type { PaintingView } from "./backend/workpiece/painting-view.ts";
 
 // navigator.canShare/share 的 files 形参在部分 lib.dom 里未覆盖 → 窄化扩展（不引入 any）。

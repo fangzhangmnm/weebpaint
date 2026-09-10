@@ -26,10 +26,10 @@ import { els } from "../els.ts";
 import { readImageFromClipboard, triggerDownload } from "../session.ts";
 import { showFullscreenBusy } from "../fullscreen-busy.ts";   // #18 备份进度：withBusy 期间换文案（leaf singleton）
 import { zipPack } from "../backend/zip.ts";                  // #18 备份包（STORE 不压缩；ora/png 本就是压缩流）
-import { snapshotFolderOnce, walkLibrary, runLibraryBackup, BACKUP_BUDGET_BYTES } from "./library-backup.ts";
-import { uniqueBareName } from "./gallery-model.ts";   // 撞名后缀兜底（纯·已 pin）；占用检查按库身份（全名 X.ora）查
+import { snapshotFolderOnce, walkLibrary, runLibraryBackup, BACKUP_BUDGET_BYTES } from "@internal/gallery";
+import { uniqueBareName } from "@internal/gallery";   // 撞名后缀兜底（纯·已 pin）；占用检查按库身份（全名 X.ora）查
 import { galleryDefaultName } from "../naming.ts";     // P1 命名器官：yyyymmdd-hex4（v217 惯例）+ 禁「未命名」
-import { humanSize } from "./gallery-view-model.ts";   // 展示格式化（纯·KiB/MiB）；此前本模块私有一份逐字节拷贝，2026-08-21 收敛
+import { humanSize } from "@internal/gallery";   // 展示格式化（纯·KiB/MiB）；此前本模块私有一份逐字节拷贝，2026-08-21 收敛
 import { requireStore, galleryBackend, isCachedSyncState } from "../app-store.ts";
 import { galleryOnline } from "../gallery-capability.ts";
 import { toggleAdoptedPopup, closePopupMenuOf, isPopupOpen } from "../ui/popup-menu.ts";   // 2026-09-02 C1：图库四 popup 收养
@@ -38,14 +38,14 @@ import { wireInlineSelect } from "../inline-select.ts";
 import { applyTheme, themeLabel, THEMES, currentTheme } from "../theme.ts";
 import { lang, setLang, LANGS, langDisplayName } from "../i18n/index.ts";
 import { openInputSheet, openConfirmSheet } from "../sheets.ts";
-import { pathJoin } from "./gallery-path.ts";
+import { pathJoin } from "@internal/gallery";
 import { setAddImportAsNewDoc, importImageAsNewDoc } from "../import-image.ts";
 import { isUnlocked, lock, setPassword, promptPassword, setFilePassword, forgetFilePassword } from "../crypto-state.ts";
 import { hasVerifier, checkVerifier, clearVerifier, createVerifier } from "../password-verifier.ts";
-import { runChangePassword, type ChangePasswordReport } from "./change-password.ts";   // 2026-09-09 换密码编排（纯）
+import { runChangePassword, type ChangePasswordReport } from "@internal/gallery";   // 2026-09-09 换密码编排（纯）
 import { invalidateCachedThumb } from "./cloud-thumb-cache.ts";
 import { galleryFlow } from "../gallery-connect.ts";
-import { stripSessionExt } from "../config.ts";
+import { stripSessionExt, sessionBareName, sessionFileName } from "../config.ts";
 import { t } from "../i18n/index.ts";
 import { loadCanvasTemplates, templateItems, templateById, templatePx } from "../canvas-templates.ts";
 import { mountSelectField, type SelectField } from "../ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
@@ -203,7 +203,7 @@ export async function checkQuotaAndWarn() {
 //   归一化必须发生在名字**诞生的地方**，不是比较的地方。
 // 逻辑本体 = gallery-model.uniqueBareName（纯·已 pin）；此处只绑 store 的占用谓词。
 export async function uniqueNameFor(stem: string) {
-  return uniqueBareName(stem, (n) => requireStore().files.nameOccupied(n));   // gallery 命名专用（无库铸户口不可达）
+  return uniqueBareName(stem, (n) => requireStore().files.nameOccupied(n), { bare: sessionBareName, full: sessionFileName });   // 包化：裸名↔全名边界注入   // gallery 命名专用（无库铸户口不可达）
 }
 
 // ---- #18 全库备份（2026-08-28）：逻辑内核 = ./library-backup.ts（纯·可测），这里只装端口 + 说人话。----

@@ -5,12 +5,12 @@
 // 收口开画 gate 晚绑（session/doc 侧 import app-store 会成环，故由 app.ts setAttachmentGate 注入）；
 //   未绑定 = 恒 true = 保守拒卸（宁可卸不掉，不可带着开画拆家）。
 
-import { createGalleryAttachment } from "./gallery-attachment.ts";
-import type { SwappableStore } from "./gallery-attachment.ts";
-import type { GalleryEntry } from "./gallery-registry.ts";
-import { galleryRegistry } from "./gallery-registry.ts";
+import { createGalleryAttachment } from "@internal/gallery";
+import type { SwappableStore } from "@internal/gallery";
+import type { GalleryEntry } from "@internal/gallery";
+import { galleryRegistry } from "@internal/gallery";
 import { storeAbsent, _swapStoreForGallery, _buildStoreForGalleryEntry, requestGalleryPersist } from "./app-store.ts";
-import { setActiveGalleryId } from "./active-gallery.ts";
+import { setActiveGalleryId } from "@internal/gallery";
 import { reportError } from "./error-badge.ts";
 import type { Store } from "@internal/store";
 

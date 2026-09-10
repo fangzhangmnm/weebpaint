@@ -13,6 +13,7 @@
 //   session-state   ← 活动文档生命周期（存/换/退）     Store(app-store) ← 本地+云同步机制
 //   currentBrush    ← 不可变 ResolvedBrush（从 dial+预设纯派生，引擎唯一吃）
 
+import "./gallery-pkg-init.ts";   // 2026-09-10 收货：@internal/gallery 的 device-kv / 文案注入，必须最先
 import { WEEBPAINT_VERSION } from "./version.ts";
 import { initI18n, t, reconcileLangFromPrefs, tLatin } from "./i18n/index.ts";   // 本地化：<html lang> + 静态 HTML data-i18n 填充
 import { Board } from "./board.ts";
@@ -85,7 +86,7 @@ import "./plugins/index.ts";    // 触发 HSB / ColorBalance / Curves / SharpenB
 // candidate 2：导出格式 = 注册表插件（含第一方 ora/psd/png/jpg 自注册）
 import { isAuthConfigured, initAuth, isSignedIn, retrySilentSignIn, getActiveAccount, brushRackCollection, requireStore, galleryBackend } from "./app-store.ts";   // cut-over：cloud/auth/graph 全走 lib
 import { galleryOnline } from "./gallery-capability.ts";   // 库在线 SSoT（0828 folder 无云 bug 修）
-import { galleryRegistry } from "./gallery-registry.ts";     // P3 名册器官（播种接线在 boot 收尾段）
+import { galleryRegistry } from "@internal/gallery";     // P3 名册器官（播种接线在 boot 收尾段）
 import { setAttachmentGate, galleryAttachment } from "./gallery-attachment-host.ts";   // P3 挂载器官（收口开画 gate + 笔架重挂接线在 rack 构造后）
 import { bootAttachFromRegistry } from "./gallery-connect.ts";      // P3 boot 静默重挂（prefsReady 链头）
 import { docHome } from "./doc-home.ts";

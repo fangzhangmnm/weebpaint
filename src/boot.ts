@@ -8,8 +8,8 @@
 import { t } from "./i18n/index.ts";
 import { reportError } from "./error-badge.ts";
 import { session } from "./session-state.ts";
-import { readSlate, setRestoreAttempt } from "./resume-slate.ts";
-import { restoreLastSession } from "./boot-restore.ts";
+import { readSlate, setRestoreAttempt } from "@internal/gallery";
+import { restoreLastSession } from "@internal/gallery";
 import { isDocLockedElsewhere } from "./instance-locks.ts";
 import { hasGallery } from "./gallery-capability.ts";
 import { appState } from "./app-state.ts";   // P5：只读（回执条播种源）

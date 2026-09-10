@@ -22,7 +22,7 @@ import { refEntryName } from "./backend/ora.ts";
 import type { DecodedReference } from "./backend/ora.ts";
 import { planRefImport, flattenWhiteInPlace, REF_JPEG_QUALITY } from "./reference-transcode.ts";
 import { readImageFromClipboard } from "./session.ts";
-import { humanSize } from "./gallery/gallery-view-model.ts";
+import { humanSize } from "@internal/gallery";
 import { setColor } from "./color-panel.ts";
 import { setMenuOpen } from "./settings-menu.ts";
 import { registerFloatingWindow, floatingTopFloor, type FloatingWindowHandle } from "./ui/floating-window.ts";   // 2026-09-02 C2 浮窗深模块

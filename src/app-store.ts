@@ -16,10 +16,10 @@ import { appEncryption } from "./encryption.ts";   // 加密器官（store 收�
 import { getPassword } from "./crypto-state.ts";
 import { wirePreferences, initPreferences, setGalleryLayerLive } from "./app-prefs.ts";
 import { wireAppState, initAppState, appState } from "./app-state.ts";
-import { readSlate } from "./resume-slate.ts";   // activeFileName 守卫输入（P5：本机回执条真相）
+import { readSlate } from "@internal/gallery";   // activeFileName 守卫输入（P5：本机回执条真相）
 import { builtinBrushInitData } from "./brushes.ts";
-import { isDocPath, isImagePath, imageBasename } from "./gallery/cloud-image-model.ts";
-import { naturalCompare } from "./gallery/natural-order.ts";
+import { isDocPath, isImagePath, imageBasename } from "@internal/gallery";
+import { naturalCompare } from "@internal/gallery";
 
 // ============ 显式装配（v0.8.7 · B 骑士；2026-08-27 替身退役）============
 // store = 插件不是地基：按 detectStoreAbsent()（?nostore / 平台探针）选真装配或 kind:"none"。

@@ -3,7 +3,7 @@ import type { EncryptedBlob } from "./app-store.ts";
 import { type LocalFileHandle } from "./local-file-session.ts";
 import { type RingEntryMeta } from "./checkpoint-policy.ts";
 import type { AppContext } from "./app-context.ts";
-import type { GalleryItem } from "./gallery/gallery-model.ts";
+import type { GalleryItem } from "@internal/gallery";
 type LoadedDoc = DecodedPainting;
 declare function beginTransientBlank(): void;
 /** 崩溃快照恢复为 transient（云关语境专用——云开走 adoptAsNew 进图库）：装入字节但**不安家**

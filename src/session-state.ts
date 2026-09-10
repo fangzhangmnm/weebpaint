@@ -28,11 +28,11 @@ import type { EncryptedBlob } from "./app-store.ts";   // 密文 at-rest 字节�
 import { openInputSheet, openConfirmSheet, openChoiceSheet, lockSyncGate, settleSyncGate } from "./sheets.ts";
 import { readHandleFile, writeHandleBlob, handleMtime, hasWeebPaintTraces, supportsSaveFilePicker, pickSaveOraFile, type LocalFileHandle } from "./local-file-session.ts";
 import { claimHomeAuthority, docHome, fileDirty, saveRoute } from "./doc-home.ts";
-import { activeGalleryId } from "./active-gallery.ts";   // P3：安家铸户口用当前挂载库 id（legacy="default" 零迁移）
+import { activeGalleryId } from "@internal/gallery";   // P3：安家铸户口用当前挂载库 id（legacy="default" 零迁移）
 import { galleryDefaultName } from "./naming.ts";
 import { sessionNameConflict } from "./session-name.ts";   // A1 安家铸名预检
 import { crashStore, mintLuggageTag, type LuggageTag } from "./crash-store.ts";
-import { pathFolder } from "./gallery/gallery-path.ts";
+import { pathFolder } from "@internal/gallery";
 import { invalidateCachedThumb } from "./gallery/cloud-thumb-cache.ts";
 import { sessionFileName, sessionBareName, stripSessionExt } from "./config.ts";
 import { serializedToolStatePatch, desk } from "./workbench-state.ts";
@@ -43,7 +43,7 @@ import { shouldCapture, checkpointKey, planRingEviction, ringBudget, isNewSittin
 import { getCheckpoint, deleteCheckpoint, ringPut, ringGet, ringAll, ringDelete, ringDeleteByDoc, mintRingId } from "./storage.ts";
 import { els } from "./els.ts";
 import type { AppContext } from "./app-context.ts";
-import type { GalleryItem } from "./gallery/gallery-model.ts";
+import type { GalleryItem } from "@internal/gallery";
 import { t } from "./i18n/index.ts";
 import { createEditorSession, type EditorSession, type StoreLike } from "./editor-session/index.ts";
 import { timelapseDetach, timelapseAdopt, timelapseForSave } from "./timelapse-session.ts";

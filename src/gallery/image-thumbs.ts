@@ -13,8 +13,8 @@ import { resampleBytes } from "../backend/algorithms/resample-bytes.ts";
 import { encodeJpegFromBytes } from "../backend/jpeg-codec.ts";
 import { getImageThumb, setImageThumb, clearImageThumbs } from "../storage.ts";
 import { openCloudImage } from "../app-store.ts";
-import { activeGalleryId } from "../active-gallery.ts";
-import { thumbTargetSize, flattenOntoWhite } from "./cloud-image-model.ts";
+import { activeGalleryId } from "@internal/gallery";
+import { thumbTargetSize, flattenOntoWhite } from "@internal/gallery";
 import { reportError } from "../error-badge.ts";
 
 export const IMAGE_THUMB_MAX = 128;    // 长边（「Windows 资源管理器-大图标」档，user 拍板）
@@ -23,7 +23,7 @@ export const IMAGE_THUMB_QUALITY = 80; // jpg 高压但不出可见噪点（user
 interface CachedImageThumb { token: string; blob: Blob; at: number; }
 
 // 纯数学（token/目标尺寸/白底平铺）在 cloud-image-model.ts（node 可测）；此处只管 IO 编排。
-export { imageThumbToken } from "./cloud-image-model.ts";
+export { imageThumbToken } from "@internal/gallery";
 
 // 缩略图专用解码（v0.9.31，QA ⑤；v0.9.32 加文件大小门）：createImageBitmap 的 resize 选项让浏览器
 //   在**解码期**降采样，JS 侧峰值从 全图 W*H*4（8k 图 ≈256MB，iPad 可崩 tab）降到 ~128*长宽比 量级。

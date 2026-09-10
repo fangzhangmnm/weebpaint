@@ -9,7 +9,7 @@ import { WpCloudPicker, WP_CLOUD_PICKER_TAG } from "./frontend/cloud-picker.ts";
 import type { CloudPickerImage } from "./frontend/cloud-picker.ts";
 import { watchFolderImages, openCloudImage } from "./app-store.ts";
 import { getOrFetchImageThumb, imageThumbToken } from "./gallery/image-thumbs.ts";
-import { mimeForImageName } from "./gallery/cloud-image-model.ts";
+import { mimeForImageName } from "@internal/gallery";
 import { t } from "./i18n/index.ts";
 import { reportError } from "./error-badge.ts";
 import type { AppContext } from "./app-context.ts";

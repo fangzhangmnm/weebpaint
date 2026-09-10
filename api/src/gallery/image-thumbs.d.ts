@@ -1,6 +1,6 @@
 export declare const IMAGE_THUMB_MAX = 128;
 export declare const IMAGE_THUMB_QUALITY = 80;
-export { imageThumbToken } from "./cloud-image-model.ts";
+export { imageThumbToken } from "@internal/gallery";
 /** 整份图片字节 → 缩略图 jpeg Blob（纯派生，不碰缓存；picker 之外想复用也从这走）。 */
 export declare function makeImageThumb(fileBlob: Blob): Promise<Blob>;
 /**

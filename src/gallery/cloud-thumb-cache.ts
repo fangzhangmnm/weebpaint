@@ -1,126 +1,23 @@
-// 云端 ora thumbnail 的 IDB 缓存（v137；store-cutover 2026-07-12 重锚；v401 专用 store + key 对齐 store 身份）
-//
-// 存法：weebpaint DB 的 **gallery-thumbs 专用 object store**（不挤 meta 大篮子），
-//   key = store 文件身份 = sessionFileName(裸名) = 全名 X.ora（与 cloud-thumbs.ts 传给 store.file 的 key 逐字一致）。
-//   value = { token, blob, at }。
-//   - token = 新鲜度戳（cloud.lastModifiedDateTime 优先，退 size）。token 变 = 文件改了 → 重拉 + 覆盖同 key。
-//   - token 同 = blob 仍有效，直接用。
-//
-// 无 itemId → 改名的作品换 name = 换 store-key = 换 cache key（旧条目成孤儿，随 clearCloudThumbCache 清）。
-//   同名编辑走 token 比对、覆盖同 key，不累积孤儿。失效不需 TTL：下次 list 拿到新 lastModified/size 即重拉。
-//
-// 加密作品：fetchOraThumbnail 返回**密文** blob（type=ENC_PEEK_MIME），缓存原样存密文 → 明文缩略图不落 IDB；
-//   caller（gallery）拿密文当「这是加密项」信号，经 store getPeek 按锁态解。
-//
-// 容量：256×256 PNG ~25KB/张；500 张 ≈ 12MB。本机 IDB 配额 GB 级，可忽略。
-// 真要清：window.WeebPaint.clearCloudThumbCache()
-//
-// 不在这处理：网络拉取本身 / IntersectionObserver / 并发限流（caller 负责）
-
-import { reportError } from "../error-badge.ts";
+// 云端 ora 缩略图缓存 = @internal/gallery createThumbCache（2026-09-10 收货）。存储 = 本仓 storage.ts 的 gallery-thumbs 专用 object store
+//   （key = store 身份 = sessionFileName(裸名)，多库前缀 galleryId，legacy "default" 无前缀 → 存量条目零迁移）；取图 = cloud-thumbs.fetchOraThumbnail。
+//   诚实不变量（QA 2026-08-21「新 token 配旧字节」）在包里。本文件保留旧函数名，4 个消费点零改动。
+import { createThumbCache, thumbKeyFor, activeGalleryId } from "@internal/gallery";
 import { getThumb, setThumb, deleteThumb, clearThumbs } from "../storage.ts";
 import { fetchOraThumbnail } from "./cloud-thumbs.ts";
 import { sessionFileName } from "../config.ts";
-import { activeGalleryId } from "../active-gallery.ts";
-
-// cache key = store 文件身份（sessionFileName(裸名)=全名 X.ora）；caller 仍传裸名。
-// P3 多库：缓存 DB 是 app 级共享 → key 前缀 gallery 域防跨库同名撞（token 自愈只挡「不同 mtime」，
-//   同名同戳的极端撞不住）。legacy 库（id="default"）**不加前缀**——存量缓存条目零迁移直接命中。
-function _key(name: string): string {
-  const g = activeGalleryId();
-  return g === "default" ? sessionFileName(name) : `${g}:${sessionFileName(name)}`;
-}
-
-// IDB 里存的缓存条目形态
-interface CachedThumb {
-  token: string;
-  blob: Blob;
-  at: number;
-}
-
-// cache stats（console 用：WeebPaint.cloudThumbStats()）
-export const stats: { hits: number; misses: number; errors: number } = { hits: 0, misses: 0, errors: 0 };
-export function resetStats() { stats.hits = 0; stats.misses = 0; stats.errors = 0; }
-
-// debug toggle：开了就不读 IDB cache，每次走网络 → 看 telemetry 路径分布
-// 用法：WeebPaint.cloudThumbSkipCache(true)
-export const config: { skipCache: boolean } = { skipCache: false };
-
-/** 读 cache。返回 { token, blob, at } 或 null */
-export async function readCachedThumb(name: string): Promise<CachedThumb | null> {
-  try {
-    const v = await getThumb(_key(name)) as CachedThumb | undefined;
-    if (v && v.blob && v.token) return v;
-    return null;
-  } catch (_) { return null; }
-}
-
-/** 写 cache（fire-and-forget；失败不影响主流程） */
-export async function writeCachedThumb(name: string, token: string, blob: Blob): Promise<void> {
-  try {
-    await setThumb(_key(name), { token, blob, at: Date.now() });
-  } catch (e) {
-    reportError(new Error("[cloud-thumb-cache] write failed: " + String(e)), "log");
-  }
-}
-
-// 失效广播（v0.10.2）：删条目只解决「下次 miss」，救不了**在世的 tile**——gallery 的 ThumbCell 被
-//   keyed v-for 复用、onMounted 一辈子只跑一次；且 token 的 lastModified 云端优先（listing seam），
-//   本机保存后推送未落地期间 token 纹丝不动 → 单靠 token 比对听不到本地保存。所以 invalidate 同时
-//   通知订阅者（gallery 用它 bump per-key rev → tile 原地重取；getPeek 本地优先=刚写的字节）。
-type ThumbInvalidatedListener = (key: string) => void;   // key = _key(name) = 全名 X.ora
-const _invalidated = new Set<ThumbInvalidatedListener>();
-export function onThumbInvalidated(fn: ThumbInvalidatedListener): void { _invalidated.add(fn); }
-
-/** 让一件作品的缩略图缓存立即作废（bytes 变了：保存/加密/解密/revert 后）。删同 key + 广播，在世 tile 重取。 */
-export async function invalidateCachedThumb(name: string): Promise<void> {
-  try { await deleteThumb(_key(name)); } catch (_) { /* best-effort */ }
-  for (const fn of _invalidated) { try { fn(_key(name)); } catch (_) { /* listener 自理 */ } }
-}
-
-/**
- * 拿 thumbnail。优先 cache（token 匹配）；miss 走网络（peekTail）+ 回写 cache。
- * 失败：有旧缓存（token 已过期）→ 退旧图（诚实：token 不动，下次仍会重试）；没有 → 抛（caller 显 placeholder）。
- *
- * ⚠ 缓存诚实不变量（QA 2026-08-21「新 token 配旧字节」根修）：**写进缓存的字节必须与 token 同源**。
- *   - token 走云端戳（cloudNewer）时 source 必须 "cloud"：取到云字节才配得上云 token；
- *     取不到（离线/云端无）→ **绝不写缓存**（fetch 抛 → 只走上面的退旧图/抛错路径，writeCachedThumb 不可达）。
- *     若此时拿本地字节回写，缓存就被盖成「云 token + 旧本地字节」= 永不自愈的陈图（token 已最新，再也不重拉）。
- *   - source="local" 时 token 必须是本地态的戳（拼法自洽性见 gallery.ts ThumbCell thumbToken 注释）。
- *
- * @param {string} name       库的裸 session 名（item.name，无后缀 = store.file 的 key）
- * @param {string} token      新鲜度戳（与 source 同源：cloud → 云 lastModified；local → 本地态戳）；变 = 重拉
- * @param {"local"|"cloud"} source  透传库 getPeek（0.3.0 必填）：cloud = 只看云端绝不落回本地
- * @returns {Promise<{ blob: Blob, fromCache: boolean }>}
- */
-export async function getOrFetchCloudThumb(name: string, token: string, source: "local" | "cloud"): Promise<{ blob: Blob; fromCache: boolean }> {
-  if (!config.skipCache) {
-    const cached = await readCachedThumb(name);
-    if (cached && cached.token === token) {
-      stats.hits++;
-      return { blob: cached.blob, fromCache: true };
-    }
-  }
-  stats.misses++;
-  try {
-    const blob = await fetchOraThumbnail(name, source);
-    if (!config.skipCache) writeCachedThumb(name, token, blob);
-    return { blob, fromCache: false };
-  } catch (e) {
-    stats.errors++;
-    // 取不到（典型：cloudNewer 但离线）→ 退**旧缓存**顶位（stale token 原样留着 = 之后回线会重拉），
-    //   胜过 placeholder；但**不写缓存**（见头注不变量）。没有旧图才抛。
-    if (!config.skipCache) {
-      const stale = await readCachedThumb(name);
-      if (stale) return { blob: stale.blob, fromCache: true };
-    }
-    throw e;
-  }
-}
-
-/** 调试：清空全部缩略图 cache（清空 gallery-thumbs store，返删除数） */
-export async function clearCloudThumbCache(): Promise<number> {
-  const n = await clearThumbs();
-  resetStats();
-  return n;
-}
+import { reportError } from "../error-badge.ts";
+export const thumbCache = createThumbCache({
+  store: { get: getThumb, set: setThumb, delete: deleteThumb, clear: clearThumbs },
+  fetch: fetchOraThumbnail,
+  keyOf: (name) => thumbKeyFor(activeGalleryId(), sessionFileName(name)),
+  report: (e) => reportError(e instanceof Error ? e : new Error(String(e)), "log"),
+});
+export const stats = thumbCache.stats;
+export const config = thumbCache.config;
+export function resetStats(): void { stats.hits = 0; stats.misses = 0; stats.errors = 0; }
+export const readCachedThumb = (name: string) => thumbCache.read(name);
+export const writeCachedThumb = (name: string, token: string, blob: Blob) => thumbCache.write(name, token, blob);
+export const onThumbInvalidated = (fn: (key: string) => void): void => { thumbCache.onInvalidated(fn); };
+export const invalidateCachedThumb = (name: string) => thumbCache.invalidate(name);
+export const getOrFetchCloudThumb = (name: string, token: string, source: "local" | "cloud") => thumbCache.getOrFetch(name, token, source);
+export const clearCloudThumbCache = () => thumbCache.clear();

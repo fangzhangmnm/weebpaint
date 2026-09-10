@@ -32,7 +32,7 @@ import { desk } from "./workbench-state.ts";
 import { preferences } from "./app-prefs.ts";
 import { reportError } from "./error-badge.ts";
 import { galleryBackend, requireStore } from "./app-store.ts";
-import { nextFreeExportName } from "./gallery/cloud-image-model.ts";
+import { nextFreeExportName } from "@internal/gallery";
 import { withBusy } from "./fullscreen-busy.ts";
 
 import type { AppContext } from "./app-context.ts";
