@@ -8,6 +8,9 @@
 // 钮面三档（2026-09-11，user「工具条上的自定义下拉框应该定宽，不然遇到英文会被撑的很宽」「加入定宽的缩写用来显示」「手指的第一个下拉框只显示图标」）：
 //   face = "label"（默认；sheet 里有地方，全名）/ "short"（**定宽**钮面画 SelectItem.short 缩写，没缩写退回 label 省略号；工具条、图层模式）
 //        / "icon"（只画当前项图标；该项没图标就退回缩写——钮面永不空白）。弹层永远画全名（+图标）。
+//   定宽的「宽」= **本下拉自己量**：所有项缩写里最宽的一条 + 自己的左右 padding/border（+ 图标位）——换项不抖，也不为别的下拉的长标签留空
+//   （user 2026-09-11「推 / Twirl L 这里还可以再窄一点，其他的也是……怀疑多算了一个常数」：此前是全家统一 84px 常量，按日文 5 字标签定的）。
+//   量不到（未入树 / 无布局环境）就留 CSS 兜底宽 --select-fixed-w。
 //   角标 = 右下角小三角（ui/icon slotCaretHtml；下箭头 chevron 退役）：与工具条变体槽同一颗，「有三角 = 有菜单」。
 
 import { togglePopupMenu, type PopupBand, type PopupMenuItem } from "./popup-menu.ts";
@@ -44,6 +47,18 @@ function _itemsToMenu(items: SelectItem[], cur: string): PopupMenuItem[] {
   return out;
 }
 
+// 文字量宽用的隐藏 span（全库一只，挂 body；只量缩写宽度，字节/像素不经它）
+let _measurerEl: HTMLElement | null = null;
+function _measurer(): HTMLElement {
+  if (!_measurerEl || !_measurerEl.isConnected) {
+    _measurerEl = document.createElement("span");
+    _measurerEl.setAttribute("aria-hidden", "true");
+    _measurerEl.style.cssText = "position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;pointer-events:none;";
+    document.body.appendChild(_measurerEl);
+  }
+  return _measurerEl;
+}
+
 export function mountSelectField(el: HTMLElement, opts: SelectFieldOpts): SelectField {
   const face: SelectFace = opts.face ?? "label";
   el.classList.add("select-field");
@@ -64,9 +79,28 @@ export function mountSelectField(el: HTMLElement, opts: SelectFieldOpts): Select
     el.appendChild(caret);
   }
   let iconEl: HTMLElement | null = null;   // 钮面图标位（闭包跟踪，不 querySelector：mount 时必不存在）
+  let sizedKey = "";                        // 上次定宽量的是哪组缩写（项没变就不重量）
+  const sizeFixed = (items: SelectItem[]) => {
+    if (face !== "short" || !el.isConnected) return;
+    const anyIcon = items.some((it) => !!it.icon);
+    const key = items.map((it) => it.short ?? it.label).join("\u0001") + (anyIcon ? "\u0002" : "");
+    if (key === sizedKey) return;
+    const cs = getComputedStyle(el);
+    const m = _measurer();
+    m.style.fontFamily = cs.fontFamily; m.style.fontSize = cs.fontSize; m.style.fontWeight = cs.fontWeight; m.style.fontStyle = cs.fontStyle; m.style.letterSpacing = cs.letterSpacing;
+    let maxW = 0;
+    for (const it of items) { m.textContent = it.short ?? it.label; maxW = Math.max(maxW, m.getBoundingClientRect().width); }
+    if (!(maxW > 0)) return;   // 量不到 → 留 CSS 兜底宽
+    sizedKey = key;
+    const px = (v: string) => parseFloat(v) || 0;
+    const chrome = px(cs.paddingLeft) + px(cs.paddingRight) + px(cs.borderLeftWidth) + px(cs.borderRightWidth);
+    const iconW = anyIcon ? (iconEl?.getBoundingClientRect().width || 18) + px(cs.columnGap || cs.gap) : 0;
+    el.style.width = `${Math.ceil(maxW + chrome + iconW)}px`;
+  };
   const refresh = () => {
     const v = opts.value();
-    const cur = opts.items().find((it) => it.value === v);
+    const items = opts.items();
+    const cur = items.find((it) => it.value === v);
     const full = cur?.label ?? v;
     const brief = cur?.short ?? full;
     el.dataset.value = v;   // 当前值落 DOM（探针 / 测试读；只图标档没文字可读）
@@ -79,6 +113,7 @@ export function mountSelectField(el: HTMLElement, opts: SelectFieldOpts): Select
     const text = face === "label" ? full : (face === "short" || !cur?.icon) ? brief : "";
     label!.textContent = text;
     label!.hidden = text === "";
+    sizeFixed(items);
   };
   const onClick = (e: Event) => {
     e.stopPropagation();

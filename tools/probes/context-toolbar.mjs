@@ -1,7 +1,7 @@
 // 上下文工具条深模块真浏览器探针（playwright，Chromium；不进 npm test 硬线）。created 2026-09-06 by Claude Fable 5.1（UI 抽象轮 U1）
 // 用法：bash scripts/build.sh && node tools/probes/context-toolbar.mjs
 // 契约：① 手指（filterBrush）条由工厂生成，与套索条同 y/同高（不再是 .crop-toolbar 的 y=56/h=44；形状条 2026-09-09 退役）；
-//   ② 桌面宽度全项可见、无「…」；③ 375 宽（SE2）时行不横向溢出，尾项折进「…」，点「…」出菜单含被折项；
+//   ② 桌面宽度全项可见、无「…」；③ 375 宽（SE2）手指条放得下（2026-09-11 下拉自量定宽后）；逐级压窄（320→200）+ 液化到放不下时尾项折进「…」、行不横向溢出，点「…」出菜单含被折项；
 //   ④ 变体/mix 下拉与「揉匀」旋钮仍在（折进菜单也算在）；✓ 退出后条隐藏。
 //   2026-09-11（user 真机反馈批）：⑤ 子工具下拉只画图标（face=icon）、mix 下拉定宽 84 画缩写、角标 = 角落小三角（无 chevron）；
 //   ⑥ en 语言下 mix 下拉仍 84 宽（英文不撑条）、行不溢出；⑦ 换 context 扫（笔/手指/套索/橡皮来回）：任何可见条无空行、
@@ -57,7 +57,25 @@ const measure = (page) => page.evaluate(() => {
     };
   });
   c.expect("子工具下拉只画图标（face=icon、label 空、有图标、角落小三角、无 chevron）", faces.subFace === "icon" && faces.subLabel === "" && faces.subIcon && faces.subCaret && !faces.chevron, JSON.stringify(faces));
-  c.expect("mix 下拉定宽 = --select-fixed-w、钮面画缩写「直接」", faces.mixFace === "short" && faces.fixedW && Math.abs(faces.mixW - faces.fixedW) <= 1 && faces.mixLabel === "直接", JSON.stringify(faces));
+  // 定宽 = 本下拉最宽缩写 + 自身 padding（2026-09-11 晚 user「还可以再窄一点……怀疑多算了一个常数」）：探针独立量一遍对账；换项不抖
+  const expectW = (id) => page.evaluate((id) => {   // 钮面的 padding/border + 字体（缩写集合由探针给：弹层画的是全名，缩写不在 DOM 里）
+    const el = document.getElementById(id); if (!el) return null;
+    const cs = getComputedStyle(el);
+    return { pad: parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth), font: [cs.fontFamily, cs.fontSize, cs.fontWeight] };
+  }, id);
+  const textW = (texts, font) => page.evaluate(({ texts, font }) => {
+    const m = document.createElement("span"); m.style.cssText = "position:absolute;left:-9999px;visibility:hidden;white-space:nowrap";
+    [m.style.fontFamily, m.style.fontSize, m.style.fontWeight] = font; document.body.appendChild(m);
+    const ws = texts.map((t) => { m.textContent = t; return m.getBoundingClientRect().width; }); m.remove(); return ws;
+  }, { texts, font });
+  const mixMeta = await expectW("filterBrushMixSel");
+  const mixShorts = ["直接", "饱和", "颜料"];
+  const mixExpect = Math.ceil(Math.max(...(await textW(mixShorts, mixMeta.font))) + mixMeta.pad);
+  c.expect("mix 下拉定宽 = 三项缩写最宽 + 自身 padding（不再是统一 84 常量）、钮面画「直接」", faces.mixFace === "short" && Math.abs(faces.mixW - mixExpect) <= 1 && faces.mixW < 84 && faces.mixLabel === "直接", JSON.stringify({ ...faces, mixExpect, mixMeta }));
+  await page.evaluate(() => document.getElementById("filterBrushMixSel").click()); await page.waitForTimeout(120);
+  await page.evaluate(() => { const b = [...document.querySelectorAll('.popup-menu--compact [data-id]')].find((x) => x.dataset.id === "spectral"); if (!b) throw new Error("no spectral"); b.click(); }); await page.waitForTimeout(200);
+  const mixAfter = await page.evaluate(() => { const el = document.getElementById("filterBrushMixSel"); return { w: Math.round(el.getBoundingClientRect().width), label: el.querySelector(".select-field-label").textContent }; });
+  c.expect("换项（颜料谱）后宽度不变、钮面「颜料」", mixAfter.w === faces.mixW && mixAfter.label === "颜料", JSON.stringify(mixAfter));
   // ✓ 退出 → 条隐藏、回画笔
   await page.evaluate(() => document.getElementById("filterBrushExit").click());
   await page.waitForTimeout(200);
@@ -99,7 +117,7 @@ const measure = (page) => page.evaluate(() => {
   });
   await clickBadge(); await page.waitForTimeout(300);
   const a1 = await adj();
-  c.expect("点 badge → 调整弹层开：混合模式钮面有字「正常」、定宽、有透明度滑条", a1.open && a1.modeText === "正常" && a1.face === "short" && a1.modeW && Math.abs(a1.modeW - faces.fixedW) <= 1 && a1.hasRange, JSON.stringify(a1));
+  c.expect("点 badge → 调整弹层开：混合模式钮面有字「正常」、定宽（≤ 兜底 72）、有透明度滑条", a1.open && a1.modeText === "正常" && a1.face === "short" && a1.modeW && a1.modeW <= 72 && a1.hasRange, JSON.stringify(a1));
   await page.evaluate(() => document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true }))); await page.waitForTimeout(200);
   const a2 = await adj();
   c.expect("外点 → 弹层关", !a2.open, JSON.stringify(a2));
@@ -151,7 +169,7 @@ const measure = (page) => page.evaluate(() => {
       fixedW: parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--select-fixed-w")) || null,
       fits: row ? row.scrollWidth <= row.clientWidth + 1 : null, more: !!document.querySelector("#filterBrushToolbar .ct-more") };
   });
-  c.expect("en：mix 下拉仍定宽、钮面缩写「Plain」、行不溢出无「…」", en.fixedW && en.mixW != null && Math.abs(en.mixW - en.fixedW) <= 1 && en.mixLabel === "Plain" && en.fits && !en.more, JSON.stringify(en));
+  c.expect("en：mix 下拉仍定宽（< 84）、钮面缩写「Plain」、行不溢出无「…」", en.mixW != null && en.mixW < 84 && en.mixLabel === "Plain" && en.fits && !en.more, JSON.stringify(en));
   await ctx.close();
 }
 // ---- SE2 375 ----
@@ -163,13 +181,25 @@ const measure = (page) => page.evaluate(() => {
   await evClick(page, "toolSmudge"); await page.waitForTimeout(400);
   const m = await measure(page);
   c.expect("375 宽：行不横向溢出（scrollW ≤ clientW+1）", m.row && m.row.scrollW <= m.row.clientW + 1, JSON.stringify(m.row));
-  c.expect("375 宽：出现「…」且有折叠项", m.more && m.hiddenItems.length >= 1, JSON.stringify(m));
+  // 2026-09-11 晚：下拉按自己最宽缩写定宽后，手指条在 375 放得下、不再折「…」（变窄的正面结果）；折叠契约改在 320 + 液化（多两个下拉）上验
+  c.expect("375 宽：手指条放得下，无「…」", !m.more && m.hiddenItems.length === 0, JSON.stringify(m));
   c.expect("条仍在视口内", m.fb && m.fb.x >= 0 && m.fb.x + m.fb.w <= m.vw, JSON.stringify(m.fb));
+  await page.evaluate(() => document.getElementById("filterBrushSubSel").click()); await page.waitForTimeout(150);
+  await page.evaluate(() => { const b = [...document.querySelectorAll('.popup-menu--compact [data-id]')].find((x) => x.dataset.id === "liquify"); if (!b) throw new Error("no liquify"); b.click(); }); await page.waitForTimeout(300);
+  // 逐级压窄视口直到折出「…」（下拉变窄后 320 也放得下；折叠契约只关心「放不下时折、折后不溢出、菜单含被折项」）
+  let m2 = null, foldW = 0;
+  for (const w of [320, 280, 240, 200]) {
+    await page.setViewportSize({ width: w, height: 667 }); await page.waitForTimeout(250);
+    m2 = await measure(page); foldW = w;
+    if (m2.more) break;
+  }
+  c.expect(`压到 ${foldW} 宽 + 液化：出现「…」且有折叠项、行不横向溢出`, m2 && m2.more && m2.hiddenItems.length >= 1 && m2.row.scrollW <= m2.row.clientW + 1, JSON.stringify(m2));
+  c.expect(`${foldW}：条仍在视口内`, m2 && m2.fb && m2.fb.x >= 0 && m2.fb.x + m2.fb.w <= m2.vw, JSON.stringify(m2 && m2.fb));
   // 点「…」→ 菜单含被折项（按 label 计数 ≥ 折叠项数）
   await page.evaluate(() => document.querySelector("#filterBrushToolbar .ct-more").click());
   await page.waitForTimeout(200);
   const menuCount = await page.evaluate(() => document.querySelectorAll(".popup-menu-item, [role=menuitem]").length);
-  c.expect("「…」菜单出项", menuCount >= m.hiddenItems.length, `menu=${menuCount} folded=${m.hiddenItems.length}`);
+  c.expect("「…」菜单出项", menuCount >= m2.hiddenItems.length, `menu=${menuCount} folded=${m2.hiddenItems.length}`);
   await ctx.close();
 }
 await browser.close(); await srv.close();

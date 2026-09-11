@@ -310,9 +310,9 @@ body[data-tool="fill"] .board { cursor: crosshair; }
   .ct-toolbar .fb-inline-slider .brush-slider-value { min-width: 30px; }
 }
 .ct-select.select-field { border-radius: 999px; }
-/* 2026-09-11 工具条下拉定宽（user「工具条上的自定义下拉框应该定宽，不然遇到英文会被撑的很宽」）：宽度只此一处，
-   钮面画缩写（SelectItem.short）省略号兜底；只图标档（手指位子工具）按内容宽。 */
-:root { --select-fixed-w: 84px; }
+/* 2026-09-11 工具条下拉定宽（user「工具条上的自定义下拉框应该定宽，不然遇到英文会被撑的很宽」「还可以再窄一点」）：
+   宽 = 该下拉自己量的「最宽缩写 + 自身 padding」（ui/select-field sizeFixed 写 style.width）；这里只是量不到时的兜底。只图标档按内容宽。 */
+:root { --select-fixed-w: 72px; }
 .select-field--fixed { width: var(--select-fixed-w); flex: none; box-sizing: border-box; }
 .ct-toolbar .fb-inline-slider { padding: 0 4px; }
 .ct-more svg { width: 18px; height: 18px; }

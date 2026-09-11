@@ -54,7 +54,8 @@ user 原话（2026-09-11，真机反馈批）：「layer 的混合模式下拉�
 「layer 的调整下拉抽屉，能不能换 layer 的时候就自动关掉。不过其实我是更喜欢 context 菜单的，就是和菜单一样会自动关」
 「空一长条 → 工具条。之前被禁用的形状对齐功能这个问题非常严重。现在只是 unplug 了，但是应该走的是同一套代码」「当时几何对齐还会不小心变成右对齐，然后换 context 的时候会突然空出来一大堆白」。
 
-落地：① `ui/select-field` 钮面三档 `face = label | short | icon`：short = **定宽**（`--select-fixed-w: 84px`，styles.css 只此一处）画 `SelectItem.short` 缩写、
+落地：① `ui/select-field` 钮面三档 `face = label | short | icon`：short = **定宽**画 `SelectItem.short` 缩写——宽 = **该下拉自己量**的「最宽缩写 + 自身 padding」
+（v0.14.14；v0.14.13 曾是全家统一 84px 常量，user 同晚「推 / Twirl L 还可以再窄一点……怀疑多算了一个常数」；`--select-fixed-w: 72px` 只是量不到时的兜底）、
 没缩写退回全名省略号；icon = 只画图标、该项没图标退回缩写（钮面永不空白）；弹层永远全名 + 图标。角标 = 右下角小三角（`ui/icon slotCaretHtml`，与变体槽 / index.html
 静态槽同一颗；chevron-down 退役）。工厂条的 select 缺省 short；手指位子工具下拉 `face: "icon"`；套索采样 / 吸色取样 / 手指 mix / 液化 sample·bleed·variant /
 图层混合模式全部有缩写（i18n `*Short` 键，四语同居；sheet 里的下拉仍 label 档）。
