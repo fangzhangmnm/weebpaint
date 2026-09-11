@@ -14,7 +14,8 @@ describe("context-toolbar · 登记表 = index.html 顶栏条全集", () => {
     const missing = inHtml.filter((id) => !registered.has(id));
     eq(missing.length, 0, "未登记的顶栏条：" + missing.join(",") + "（已登记：" + [...registered].join(",") + "）");
     eq(typeof contextToolbarBottom(), "number");
-    assert(registered.has("filterBrushToolbar") && registered.has("pickerToolbar") && registered.has("rulerToolbar"), "工厂 mount 的滤镜笔条/吸色条/尺子条也在登记表（init 即 mount）：" + [...registered].join(","));
+    // 几何条 rulerToolbar 2026-09-10 晚插头已拔（app.ts 不再 initRulerUi）→ 不在登记表；插回时把它加回这条断言
+    assert(registered.has("filterBrushToolbar") && registered.has("pickerToolbar") && !registered.has("rulerToolbar"), "工厂 mount 的滤镜笔条/吸色条在登记表（init 即 mount）；几何条插头已拔：" + [...registered].join(","));
   });
   it("anchored-popup 源码不再持顶栏 id 数组", () => {
     const src = readFileSync(new URL("../src/anchored-popup.ts", import.meta.url), "utf-8");

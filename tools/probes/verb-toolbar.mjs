@@ -2,10 +2,8 @@
 // 2026-09-06 晚重写（ADR-0012 修订 ③，user「子工具栈并入上下文条，成为它的左段；长按不再弹菜单，只是把这条上下文条叫出来」）。
 // 用法：bash scripts/build.sh && node tools/probes/verb-toolbar.mjs
 // 契约：① 顶栏没有形状笔/油漆桶独立钮；笔位/橡皮位都无小三角（2026-09-09 ADR-0013：形状笔退役，笔位单子工具）；初始 brush、笔位 #pencil；
-//   ② 几何（ADR-0013 修订 ③，2026-09-10 入口 A）：左栏无尺钮/笔架钮（#leftRuler 不存在），滑条在任何工具下都可见；几何条 #rulerToolbar 在 brush 下
-//      可见且只有一颗 chip #rulerShapeToggle（未 pressed、无 #rulerKindSel）；无 #rulerPlaceLayer；点 chip → pressed、种类下拉出现、仍是 brush（非 transient）；
-//      画布拖一下 = 一笔落笔（撤销钮从 disabled 变可用）；点「留尺」#rulerUseTrace → 拖一下 → 尺放好（#rulerSnap pressed）；关 chip → 条只剩
-//      [chip][吸尺][清]；切套索 → 几何条挂到套索条下面（top 更大）且仍可见；S 键 = 开关；
+//   ② 几何 extension **插头已拔**（2026-09-10 晚 user「ui 问题非常大，先把几何尺拔了，代码留着」）：无 #rulerToolbar / #leftRuler / 笔架钮 / #rulerPlaceLayer；
+//      左栏滑条任何工具下都可见；S 键无事。插回后把 v0.14.11 的 ② 段契约（git 64bcb71 本文件）恢复；
 //   ③ B → brush、笔位图标 #pencil；④ 点套索位 → 套索条显、左段 [选区] pressed；点左段「油漆桶」→ fill、顶栏图标 #paint-bucket；
 //   ⑤ 点手指位 → filterBrush、滤镜笔条第一件 = 子工具下拉 #filterBrushSubSel（2026-09-09 修订 ④：六颗图标左段 → 带图标下拉），弹层 6 项各带图标；
 //      选「模糊」→ sharpenBlur/blur、手指位图标仍 #finger（六项同图标，user 2026-09-09）、adjust 不亮、**无 variant 下拉**（子工具下拉盖住了）；
@@ -30,7 +28,7 @@ const state = (page) => page.evaluate((visSrc) => {
     adjustPressed: document.getElementById("topAdjustBtn").getAttribute("aria-pressed"),
     lassoBar: vis("lassoToolbarStack"), fbBar: vis("filterBrushToolbar"),
     lassoSeg: pressedIn("lassoToolbarStack"), fbSeg: pressedIn("filterBrushToolbar"),
-    rulerBar: vis("rulerToolbar"), placeLayer: !!document.getElementById("rulerPlaceLayer"),
+    rulerBar: vis("rulerToolbar"), hasRulerBar: !!document.getElementById("rulerToolbar"), placeLayer: !!document.getElementById("rulerPlaceLayer"),
     hasLeftRuler: !!document.getElementById("leftRuler"), hasLeftRackBtn: !!document.querySelector("#leftSidebar .left-sidebar-brush:not(.left-sidebar-pick)"),
     shapeOn: document.getElementById("rulerShapeToggle")?.getAttribute("aria-pressed"), hasKindSel: !!document.getElementById("rulerKindSel"),
     traceOn: document.getElementById("rulerUseTrace")?.getAttribute("aria-pressed"), snapOn: document.getElementById("rulerSnap")?.getAttribute("aria-pressed"),
@@ -87,54 +85,20 @@ const clickSeg = (page, barId, sub) => page.evaluate(({ barId, sub }) => {
   // 长按笔位（单子工具）不叫出任何条、不弹菜单
   await longPress(page, "toolPen");
   const s0b = await state(page);
-  c.expect("长按笔位 → 无事（无子工具）：无 popup、几何仍关、仍 brush", s0b.popupMenus === 0 && s0b.shapeOn === "false" && s0b.tool === "brush", JSON.stringify(s0b));
+  c.expect("长按笔位 → 无事（无子工具）：无 popup、无几何条、仍 brush", s0b.popupMenus === 0 && !s0b.hasRulerBar && s0b.tool === "brush", JSON.stringify(s0b));
 
-  // ② 几何（ADR-0013 修订 ③，入口 A）
-  c.expect("左栏无尺钮/笔架钮、无捕获层；几何条在 brush 下可见、只有 chip（未 pressed、无种类下拉）", !s0.hasLeftRuler && !s0.hasLeftRackBtn && !s0.placeLayer && s0.rulerBar && s0.shapeOn === "false" && !s0.hasKindSel && s0.sizeSliderVis, JSON.stringify(s0));
-  await evClick(page, "rulerShapeToggle"); await page.waitForTimeout(200);
+  // ② 几何 extension 插头已拔（user 2026-09-10 晚「先把几何尺拔了，代码留着」）：无几何条、无左栏尺钮 / 笔架钮、无捕获层；左栏滑条任何工具下都在
+  c.expect("插头已拔：无 #rulerToolbar / #leftRuler / 笔架钮 / #rulerPlaceLayer；左栏滑条可见", !s0.rulerBar && !s0.hasRulerBar && !s0.hasLeftRuler && !s0.hasLeftRackBtn && !s0.placeLayer && s0.sizeSliderVis, JSON.stringify(s0));
+  await page.keyboard.press("s"); await page.waitForTimeout(150);
   const s1 = await state(page);
-  c.expect("点 chip → 几何开：pressed、种类下拉出现、仍 brush（非 transient，笔位仍亮）", s1.shapeOn === "true" && s1.hasKindSel && s1.tool === "brush" && s1.anyToolPressed === 1 && s1.traceOn === "false", JSON.stringify(s1));
-  {
-    const box = await page.locator("#board").boundingBox();
-    const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
-    await page.mouse.move(cx - 80, cy); await page.mouse.down();
-    await page.mouse.move(cx, cy + 5); await page.mouse.move(cx + 80, cy + 10);
-    await page.mouse.up(); await page.waitForTimeout(250);
-  }
-  const s2 = await state(page);
-  c.expect("几何开着拖一下 = 一笔落笔（撤销钮可用）、无尺（无 #rulerSnap）、无错", !s2.undoDisabled && s2.snapOn === undefined, JSON.stringify(s2));
-  // 留尺：拖一下 → 尺放好、吸尺 pressed
-  await evClick(page, "rulerUseTrace"); await page.waitForTimeout(150);
-  {
-    const box = await page.locator("#board").boundingBox();
-    const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
-    await page.mouse.move(cx - 60, cy - 30); await page.mouse.down();
-    await page.mouse.move(cx, cy); await page.mouse.move(cx + 60, cy + 30);
-    await page.mouse.up(); await page.waitForTimeout(250);
-  }
-  const s3t = await state(page);
-  c.expect("留尺开 → 拖一下 = 放尺：#rulerSnap pressed、[清] 出现、仍 brush", s3t.traceOn === "true" && s3t.snapOn === "true" && s3t.hasClear && s3t.tool === "brush", JSON.stringify(s3t));
-  await evClick(page, "rulerShapeToggle"); await page.waitForTimeout(150);
-  const s4a = await state(page);
-  c.expect("关 chip → 条只剩 [chip][吸尺][清]（种类下拉没了，尺还在）", s4a.shapeOn === "false" && !s4a.hasKindSel && s4a.snapOn === "true" && s4a.hasClear, JSON.stringify(s4a));
-  await drawStroke(page);   // 沿尺起笔：无错即可（投影数学归 test/ruler.test.mjs）
-  await evClick(page, "rulerSnap"); await page.waitForTimeout(100);
-  const s4b = await state(page);
-  c.expect("点 [吸尺] → 吸附关（尺还在）", s4b.snapOn === "false" && s4b.hasClear, JSON.stringify(s4b));
-  await page.keyboard.press("s"); await page.waitForTimeout(150);
-  const s4c = await state(page);
-  c.expect("S 键 → 几何又开（回到上次的留尺）", s4c.shapeOn === "true" && s4c.traceOn === "true", JSON.stringify(s4c));
-  await page.keyboard.press("s"); await page.waitForTimeout(150);
-  await evClick(page, "rulerClear"); await page.waitForTimeout(150);
-  const s4d = await state(page);
-  c.expect("[清] → 尺没了：条回到只有 chip", s4d.shapeOn === "false" && s4d.snapOn === undefined && !s4d.hasClear, JSON.stringify(s4d));
+  c.expect("S 键无事（没人听 wp:ruler-tap）、仍 brush", s1.tool === "brush" && !s1.rulerBar, JSON.stringify(s1));
   await evClick(page, "toolLasso"); await page.waitForTimeout(250);
   const s2d = await state(page);
-  c.expect("切套索 → 左栏滑条仍可见（不再玩消失）；几何条仍在且挂到套索条下面", s2d.sizeSliderVis && s2d.rulerBar && s2d.lassoBarBottom > 0 && s2d.rulerBarTop >= s2d.lassoBarBottom - 1, JSON.stringify(s2d));
+  c.expect("切套索 → 左栏滑条仍可见（不再玩消失）", s2d.sizeSliderVis && !s2d.rulerBar, JSON.stringify(s2d));
   // ③ B → brush
   await page.keyboard.press("b"); await page.waitForTimeout(200);
   const s3 = await state(page);
-  c.expect("B → brush、笔位 #pencil、几何条回到顶行", s3.tool === "brush" && s3.pen === "#pencil" && s3.rulerBar && s3.rulerBarTop < 100, JSON.stringify(s3));
+  c.expect("B → brush、笔位 #pencil", s3.tool === "brush" && s3.pen === "#pencil", JSON.stringify(s3));
   // ④ 套索位
   await evClick(page, "toolLasso"); await page.waitForTimeout(200);
   const s4 = await state(page);

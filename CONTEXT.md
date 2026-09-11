@@ -30,6 +30,7 @@ _Avoid_: rt（旧全局占位）, DI container / service locator（这只是显�
 _Avoid_: ShapesEngine（旧名——v257 删掉的 ctx.fillRect 直填旧实现）, ShapeBrushEngine（ADR-0005 形状笔引擎，2026-09-09 随尺子模型删——形状是尺不是引擎）
 
 **尺子（Ruler / ruler-ui）**:
+（**2026-09-10 晚插头已拔**：user「ui 问题非常大，先把几何尺拔了，代码留着」——`src/app.ts` 一行 import + 三行 init/set 注释掉，下面描述的是代码现状、不是线上行为；下礼拜研究。）
 几何 = 与动词正交的**修饰模式**，任何在册工具（画笔/橡皮/手指族/选区笔，`RULER_ROLES`）都能开（ADR-0013 修订 ③，2026-09-10；supersede ADR-0005 §2/§3 与 09-09 的左栏尺钮版）。状态 `desk.ruler`（per-doc，doc 变换 remap）：`use = off|drag|trace`，`on` = 吸尺。**拖画**（默认）= 旧形状笔手势活在任何工具上：`src/shape-stroke.ts` 的 decorator 把内引擎（BrushEngine / FilterBrushEngine / 选区笔借的 brush）包成「拖一下 = 整形」，每个输入事件批从头重驱，笔触本身就是预览；**留尺** = 拖出来的形留在画布当尺（五种：`src/ruler.ts` 平行线 / 透视 / 椭圆 / 矩形 / 格线，透视尺 = 透视框本身），关几何后各工具的徒手点在 `input.ts _move` 唯一切口过尺投影再进引擎，笔压/taper/间距归笔。input 只有两个可选 provider（`setRulerGuideProvider` / `setStrokeShaper`），不 import 任何几何脚本——几何脚本删掉程序最小修复照跑。入口 A = 几何条 `#rulerToolbar`（`src/ruler-ui.ts`，上下文条区固定尾位：右对齐 chip，有别的条挂它下面一行；关 = 一颗 chip）；S 键开关；overlay 走 `board._drawGuides`。左栏 = 两滑条 + 吸管，永远在。
 _Avoid_: 手势识别自动 snap（ADR-0005 §1，仍被否）, 尺子手柄/gizmo 编辑（Q2 默认无手柄）, 尺落像素（要参考线 = 用它当尺画一笔）, 第四个 stroke 引擎（形状笔引擎已删；decorator 不是引擎，它包引擎）, 旧 src/shapes.js 的直填路线, 左栏放工具钮 / 左栏按 context 显隐（2026-09-10 user 打回）, 放置态 transient + DOM 捕获层（吃手势、掌触能放尺，2026-09-10 撤）, 抬手才落 + 草稿预览（user「旧版本的是用不着预览」）
 

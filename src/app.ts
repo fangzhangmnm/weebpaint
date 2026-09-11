@@ -58,7 +58,9 @@ import { initSmoothDevPanel } from "./smooth-dev-panel.ts";
 import { selectionToNewLayer, initSelectionOps } from "./selection-ops.ts";
 import { initFillMode } from "./fill-mode.ts";
 import { initPerspEdit } from "./persp-edit.ts";
-import { initRulerUi, guideForStroke, strokeShaper } from "./ruler-ui.ts";   // ADR-0013 几何 extension（可拔：删本行 + 下面 3 行，程序照跑）
+// ADR-0013 几何 extension —— **插头已拔**（user 2026-09-10 晚「ui 问题非常大，先把几何尺拔了，代码留着，就是插头拔了，然后下礼拜有空再研究」）。
+//   代码原样留在 src/ruler.ts / src/shape-stroke.ts / src/ruler-ui.ts；插回 = 恢复本行 import + 下面三行 init/set（搜 "插头已拔"）。
+// import { initRulerUi, guideForStroke, strokeShaper } from "./ruler-ui.ts";
 import { updateSaveStatus, updateNewerBanner } from "./save-status.ts";
 import { initErrorBadge, reportError } from "./error-badge.ts";
 import { initDiagLog, note as diagNote } from "./diag-log.ts";   // 黑匣子（2026-08-31）
@@ -362,9 +364,10 @@ initToolbar(ctx);
 initSelectionOps(ctx);
 initFillMode(ctx);   // v0.5.11 套索填充模式（原 #22 油漆桶的重生，见 fill-mode.ts 头注释）
 initPerspEdit(ctx);  // ADR-0006 VP 编辑（透视框的消失点 gizmo，crop 同款 transient；透视框 = 尺子模型的透视尺）
-initRulerUi(ctx);    // ADR-0013 几何 extension：几何条（上下文条区尾位）/ 已放尺 overlay / 透视 gizmo 门
-input.setRulerGuideProvider(guideForStroke);   // 描尺：像素笔 / 选区笔起笔取投影器（唯一切口在 input._move）
-input.setStrokeShaper(strokeShaper);           // 拖画 / 留尺：起笔把内引擎包成「拖一下 = 整形」（shape-stroke.ts）
+// （ADR-0013 几何 extension 插头已拔，2026-09-10 晚；插回 = 取消下面三行注释 + 顶部 import）
+// initRulerUi(ctx);    // 几何条（上下文条区尾位）/ 已放尺 overlay / 透视 gizmo 门
+// input.setRulerGuideProvider(guideForStroke);   // 描尺：像素笔 / 选区笔起笔取投影器（唯一切口在 input._move）
+// input.setStrokeShaper(strokeShaper);           // 拖画 / 留尺：起笔把内引擎包成「拖一下 = 整形」（shape-stroke.ts）
 initSmoothDevPanel(ctx);
 initTransientPanels(ctx);
 initSideWindows(ctx);
