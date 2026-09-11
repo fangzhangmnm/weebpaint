@@ -58,7 +58,7 @@ import { initSmoothDevPanel } from "./smooth-dev-panel.ts";
 import { selectionToNewLayer, initSelectionOps } from "./selection-ops.ts";
 import { initFillMode } from "./fill-mode.ts";
 import { initPerspEdit } from "./persp-edit.ts";
-import { initRulerUi, guideForStroke, rulerTap, rulerLongpress } from "./ruler-ui.ts";   // ADR-0013 尺子（2026-09-09）
+import { initRulerUi, guideForStroke, strokeShaper } from "./ruler-ui.ts";   // ADR-0013 几何 extension（可拔：删本行 + 下面 3 行，程序照跑）
 import { updateSaveStatus, updateNewerBanner } from "./save-status.ts";
 import { initErrorBadge, reportError } from "./error-badge.ts";
 import { initDiagLog, note as diagNote } from "./diag-log.ts";   // 黑匣子（2026-08-31）
@@ -178,7 +178,7 @@ if (els.galleryMenuVersion) els.galleryMenuVersion.textContent = t("menu.version
 // 当前笔（currentBrush computed）从这束 dial + 笔架预设纯派生（见下，组合接线留 app）。
 const { state, dialReactive } = useDials();
 
-// 左栏 dial = <LeftDial> Vue 组件（src/ui/left-dial.ts）：笔指示按钮(tap=rack/长按=设置) + size/opacity 竖滑块 + size popup。
+// 左栏 dial = <LeftDial> Vue 组件（src/ui/left-dial.ts）：size/opacity 竖滑块 + 取样钮 + size popup（笔架钮 / 尺钮 2026-09-10 撤）。
 // 全绑定反应式 dial SSoT（getter 读 state.toolStates/dialReactive → 组件 computed 自动追踪）。
 // 取代旧的 updateSidebarBrushIndicator / _sidebarBrushBtn 手势 / showSizePopup / 两个 slider 监听 / applyToolState 的 slider-DOM-push。
 // 笔架深模块（src/brush-rack-controller.ts）。持久化/云同步走 brushRackCollection（红线在库内）。
@@ -208,13 +208,10 @@ const leftDial = mountLeftDial(els.leftDialMount, {
   getOpacity: () => _leftDial().opacity ?? 1.0,
   // v0.6.14 缺笔自愈：resolveActiveBrushPure 与 currentBrush 同一套兜底（缺笔退默认笔），显示与手感一致
   getSizeMax: () => rack.resolveActiveBrushPure(_leftDial(), dialReactive.tool)?.size?.max || 200,
-  getBrushName: () => rack.resolveActiveBrushPure(_leftDial(), dialReactive.tool)?.name || "—",
   getCanDraw: () => dialReactive.canDraw,
   getZoom: () => board?.viewport?.scale ?? 1,
   onSize: (px) => setSize(px),
   onOpacity: (frac) => setOpacity(frac),
-  onBrushTap: () => { const id = RACK_PANEL_BY_TOOL[editMode.current()]; if (id) openExclusive(id); },
-  onBrushLongpress: () => { const b = rack.findToolBrush(_leftDial()); if (b) { closeExclusive(); rack.openBrushSettings(b.id); } },
   // 2026-09-06 一次性取样钮（ADR-0012 §6）：context 派生图标——现在只有吸色；克隆子工具落地后 = 定源点（user「仿制图章的时候就是需要变语义吧」）
   onPick: () => pickOnce(),
   onPickHoldStart: () => pickHoldBegin(),
@@ -222,12 +219,6 @@ const leftDial = mountLeftDial(els.leftDialMount, {
   getPicking: () => isPicking(dialReactive.tool),
   getPickIcon: () => "eyedropper",
   getPickTitle: () => tLatin("tool.picker"),
-  // 2026-09-09 左栏 context smart sense + ADR-0013 尺钮（语义归 ruler-ui；这里只接线）
-  getDialVisible: () => dialReactive.canDraw || dialReactive.rulerPlacing,
-  getPickVisible: () => !dialReactive.transient,
-  getRuler: () => ({ on: dialReactive.rulerOn, placing: dialReactive.rulerPlacing }),
-  onRulerTap: () => rulerTap(),
-  onRulerLongpress: () => rulerLongpress(),
 });
 // 【sunset 2026-08-28】v0.6.15/v0.6.32 的「禁用笔压」全局 toggle（独立按钮 + per-doc desk.pressureDisabled
 //   + input.ts 恒压 0.5 thunk）整条撤除——user 0823 问「笔刷压感toggle还是是否有压感做成不同的笔刷？」
@@ -371,8 +362,9 @@ initToolbar(ctx);
 initSelectionOps(ctx);
 initFillMode(ctx);   // v0.5.11 套索填充模式（原 #22 油漆桶的重生，见 fill-mode.ts 头注释）
 initPerspEdit(ctx);  // ADR-0006 VP 编辑（透视框的消失点 gizmo，crop 同款 transient；透视框 = 尺子模型的透视尺）
-initRulerUi(ctx);    // ADR-0013 尺子：放置态 / 尺子条 / overlay / 左栏尺钮语义
-input.setRulerGuideProvider(guideForStroke);   // 像素笔起笔取投影器（唯一切口在 input._move）
+initRulerUi(ctx);    // ADR-0013 几何 extension：几何条（上下文条区尾位）/ 已放尺 overlay / 透视 gizmo 门
+input.setRulerGuideProvider(guideForStroke);   // 描尺：像素笔 / 选区笔起笔取投影器（唯一切口在 input._move）
+input.setStrokeShaper(strokeShaper);           // 拖画 / 留尺：起笔把内引擎包成「拖一下 = 整形」（shape-stroke.ts）
 initSmoothDevPanel(ctx);
 initTransientPanels(ctx);
 initSideWindows(ctx);

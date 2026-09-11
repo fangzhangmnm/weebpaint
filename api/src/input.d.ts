@@ -1,7 +1,56 @@
 import { BrushEngine } from "./backend/brush.ts";
 import { LassoEngine } from "./lasso.ts";
 import { FilterBrushEngine } from "./filter-brush.ts";
-import { type StrokeGuide } from "./ruler.ts";
+import type { StrokeEngine } from "./backend/stroke-session.ts";
+/** 一笔一个投影器：begin 给起点（曲线尺把起点也吸上去，返回吸后的点）；project 逐点投影；像素链尺另有 projectPath（返回沿链新吐的像素，调用方逐颗 stampPixels）。 */
+export interface StrokeGuide {
+    begin(x: number, y: number): {
+        x: number;
+        y: number;
+    };
+    project(x: number, y: number): {
+        x: number;
+        y: number;
+    };
+    projectPath?(x: number, y: number): Array<{
+        x: number;
+        y: number;
+    }>;
+}
+/** 被包的内引擎 + 调用方给的闭包（各引擎 begin 签名不同，调用方最清楚）。 */
+export interface ShapedInner {
+    inner: StrokeEngine & {
+        stampPixels?(pts: Array<{
+            x: number;
+            y: number;
+        }>, pressure: number): void;
+    };
+    /** 在 (x,y) 给内引擎起一笔（settings / mode / 写靶全由闭包捕获）。 */
+    beginInner(x: number, y: number): void;
+    /** 把写靶退回笔前：buffered 笔只需 inner.cancelStroke；就地写（shadow）要 restore 替身。每次重驱前调一次。 */
+    reset(): void;
+    /** 引擎就地写靶（像素笔 / 滤镜笔）= 每帧必须 reset 后重画；buffered 笔（StampCollect）= 纯收集，不写靶。 */
+    inPlace: boolean;
+    /** 像素画模式：整数像素集经 stampPixels 每像素一次（ADR-0013 Q5）。 */
+    pixel: boolean;
+    /** 像素链裁剪盒（doc + 出血）。 */
+    box: {
+        x0: number;
+        y0: number;
+        x1: number;
+        y1: number;
+    };
+}
+/** 包好的引擎：满足 StrokeEngine 面 + begin(x,y)，StrokeSession 当它是引擎。 */
+export interface ShapedStroke extends StrokeEngine {
+    begin(x: number, y: number): void;
+    collectStamps(): ReturnType<BrushEngine["collectStamps"]>;
+}
+/** 每笔起笔问一次 mode：null = 本笔不整形；"drag" = 拖画（重驱内引擎）；"trace" = 留尺（只记手势，引擎不动）。 */
+export interface StrokeShaper {
+    mode(role: string): "drag" | "trace" | null;
+    wrap(io: ShapedInner | null): ShapedStroke;
+}
 import { PressureProbe } from "./pressure-probe.ts";
 import type { GestureViewport, TapRef } from "./common/pointer-gesture.ts";
 import type { PaintingView, ViewLeaf } from "./backend/workpiece/painting-view.ts";
@@ -97,6 +146,11 @@ export declare class InputController {
     _selPenGuide: StrokeGuide | null;
     _rulerGuideProvider: ((role: string, pixel: boolean) => StrokeGuide | null) | null;
     shiftDown: boolean;
+    _strokeShaper: StrokeShaper | null;
+    _shapeCleanup: (() => void) | null;
+    _selPenEng: StrokeEngine & {
+        collectStamps(): ReturnType<BrushEngine["collectStamps"]>;
+    };
     getTool: () => string;
     editMode: EditMode | null;
     getResolvedBrush: () => ResolvedBrush | null;
@@ -142,26 +196,19 @@ export declare class InputController {
     _move(e: PointerEvent): void;
     _up(e: PointerEvent, cancelled?: boolean): void;
     _beginStroke(e: PointerEvent, rec: PointerRec, mode: string): void;
+    /** 像素链 / 拖画像素集的裁剪盒 = doc + 64px 出血（透视链端点可飞远）。 */
+    _shapeClipBox(): {
+        x0: number;
+        y0: number;
+        x1: number;
+        y1: number;
+    };
     _endStroke(): void;
     _abortStroke(): void;
     /** ADR-0013：尺子投影器提供方（app 接 ruler-ui.guideForStroke）；返回 null = 本笔不吸。 */
     setRulerGuideProvider(fn: ((role: string, pixel: boolean) => StrokeGuide | null) | null): void;
-    /** 当前笔是否像素画模式（ruler-ui 拖画选整数像素集还是折线）。 */
-    currentBrushPixelMode(): boolean;
-    /** ADR-0013 拖画（user 2026-09-09「像素笔圆和矩形，网格应该是拖动啊……再加一个普通笔也可以用的拖动模式看谁舒服」）：
-     *  尺子拖出来的整形一次落笔，走**正常 stroke 事务**（当前笔 / 当前层 / 选区 / 锁α / 橡皮 mode 与手绘同源，一个 undo 整点）。
-     *  pixel：整数像素集经 stampPixels 每像素一次（首颗由 beginStroke 落）；buffered：每条折线驱动一次引擎（恒压 0.5——机械绘制，
-     *  ADR-0005 §3 的拖画语义保留；直通），多条 StampCollect 合并一次 GPU commit（单令牌墙：一个 session）。只对画笔 / 橡皮工具。 */
-    drawShape(shape: {
-        pixels?: Array<{
-            x: number;
-            y: number;
-        }>;
-        polylines?: Array<Array<{
-            x: number;
-            y: number;
-        }>>;
-    }): boolean;
+    /** 「几何」拖画 / 留尺的接线口（app 接 ruler-ui.strokeShaper；null = 拔掉 extension）。 */
+    setStrokeShaper(fn: StrokeShaper | null): void;
     isStrokeActive(): boolean;
     collectActiveStamps(): ReturnType<BrushEngine["collectStamps"]>;
     abortActiveStroke(): void;

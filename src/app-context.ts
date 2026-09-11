@@ -49,9 +49,7 @@ export interface DialReactive {
   color: string;
   canDraw: boolean;
   payload: string | null;   // 2026-09-05 filterBrush 模式的 payload id（filters-adjust 写；currentBrush 订阅它切手指 dial）
-  transient: boolean;       // 镜像 editMode.isTransient()（左栏 context smart sense：变换/裁切/调整期间吸管也藏）
-  rulerOn: boolean;         // ADR-0013 尺子吸附生效（有尺且开）→ 左栏尺钮 pressed
-  rulerPlacing: boolean;    // 放置态（左栏保持可见、尺钮显放置态）
+  // （2026-09-09 的 transient / rulerOn / rulerPlacing 三轴 2026-09-10 撤：左栏不再按 context 显隐、尺钮 / 笔架钮已撤——user「左边栏太拥挤了」「ui 还玩消失」）
   // （pressureOff 已 sunset 2026-08-28：不要压感 = 选「固定xx」笔，总账 §3 #12）
 }
 

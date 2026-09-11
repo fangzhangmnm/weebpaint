@@ -22,7 +22,6 @@ import { t, tLatin } from "./i18n/index.ts";
 import { fillPreviewActive, commitFillNow } from "./fill-mode.ts";
 import { isPopupOpen, openAdoptedPopup, toggleAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";
 import { registerContextToolbar, mountContextToolbar, type ContextToolbarHandle } from "./ui/context-toolbar.ts";
-import { syncRulerUi } from "./ruler-ui.ts";   // ADR-0013 尺子：模式变了刷左栏尺钮态
 import { attachSubToolSlot, type SubToolSlotHandle } from "./ui/subtool-slot.ts";   // 2026-09-06 U3 动词位长按（修订 ③：长按 = 叫出上下文条）
 import { mountVerbSegment, type VerbSegmentHandle } from "./ui/verb-segment.ts";   // 2026-09-06 晚 ADR-0012 修订 ③：子工具栈并入上下文条左段
 import { VERB_SUBTOOLS, DEFAULT_SUBTOOL, isVerb, subToolDef, verbOfMode, subToolOfMode, type Verb } from "./common/verbs.ts";   // ADR-0012 动词表   // 2026-09-02 C4：顶栏条登记（让位高度由登记表算）   // 2026-09-02 C1：组槽/配置菜单收养（外点关/Escape/栈/定位归 module）
@@ -109,8 +108,8 @@ export function updateLassoToolbar() {
   const fillActive = m === "fill";
   const selToolActive = lassoActive || fillActive;   // v0.5.12：选区/填充共用同一 Row1（UI 独立≠第二套代码）
   const sub = input.lasso.getSubTool();
-  // VP 编辑 / 尺子放置态与 lasso stack 同位 fixed → 互斥（同 picker 先例）；期间去选走 Ctrl+D
-  const otherStackActive = m === "perspEdit" || m === "rulerPlace";
+  // VP 编辑与 lasso stack 同位 fixed → 互斥（同 picker 先例）；期间去选走 Ctrl+D。（几何条 2026-09-10 起是右对齐的尾位条，自己挂到别的条下面，不互斥）
+  const otherStackActive = m === "perspEdit";
   const showAny = (floating || hasSelection || selToolActive) && !pickerActive && !otherStackActive;
   lassoToolbarStack.classList.toggle("hidden", !showAny);
   if (!showAny) { closeSelEditUI(); closeSubMenu(); closeSetOpMenu(); return; }
@@ -398,10 +397,8 @@ export function _syncEditModeUI() {
   // 依赖 body[data-tool] 的 CSS（且 data-mode 被图库占用）。transient 的 UI 抑制走面板 suppress + 按钮高亮。
   // slider 禁用：size/opacity 仅 canDraw 模式可调 → 反应式镜像，<LeftDial> 绑 :disabled。color 仅 allowsColor 可点。
   dialReactive.canDraw = editMode.canDraw();
-  dialReactive.transient = transient;   // 2026-09-09 左栏 context smart sense（吸管在 transient 藏）
   if (els.activeSwatch) (els.activeSwatch as HTMLButtonElement).disabled = !editMode.allowsColor();
-  updateLassoToolbar();             // 选区/变换工具栏跟着重新派生
-  syncRulerUi();                    // ADR-0013 尺钮态（有尺 / 吸附 / 放置）跟着重新派生
+  updateLassoToolbar();             // 选区/变换工具栏跟着重新派生（几何条自己听 wp:modechange 重定位——toolbar 不认识 ruler-ui）
   board.requestRender();            // overlay chrome（透视 gizmo/蚂蚁线）随工具显隐——不补这刀
                                     //   切工具后 gizmo 残留/不出现，直到下次 pan/落笔（"闪"，2026-07-28 修）
 }

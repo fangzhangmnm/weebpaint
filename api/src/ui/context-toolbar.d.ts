@@ -7,6 +7,8 @@ export declare function registerContextToolbar(el: HTMLElement | null): void;
 export declare function contextToolbarIds(): string[];
 /** 可见顶栏条的最大 bottom（anchored-popup belowToolbars 用）；无可见 = 0。 */
 export declare function contextToolbarBottom(): number;
+/** 同上，但不算 exceptId 那条（一条「挂在别的条下面」的尾位条给自己定位用，2026-09-10 几何条）。 */
+export declare function contextToolbarBottomExcept(exceptId: string | null): number;
 export type ToolbarItem = {
     kind: "title";
     text: string;

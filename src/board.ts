@@ -36,7 +36,6 @@ export interface PerspGizmoData {
 export interface GuideOverlay {
   segments: Array<[{ x: number; y: number }, { x: number; y: number }]>;
   style: "active" | "dim" | "draft";
-  pixels?: Array<{ x: number; y: number }>;   // 像素画拖画预览：整数像素中心，画成 1×1 doc 格（所见即落笔的那些格）
 }
 
 // 选区（doc.selection）：gray8 tile mask + 紧 bbox（真类型在 selection.ts；v0.4.6 maskCanvas 死）
@@ -733,13 +732,6 @@ export class Board {
       const seg = clipSegToBox(a, b, vbox);
       if (!seg) continue;
       ctx.beginPath(); ctx.moveTo(seg[0].x, seg[0].y); ctx.lineTo(seg[1].x, seg[1].y); ctx.stroke();
-    }
-    if (g.pixels) {
-      ctx.fillStyle = "rgba(255,140,0,0.7)";
-      for (const p of g.pixels) {
-        if (p.x < vbox.x0 || p.x > vbox.x1 || p.y < vbox.y0 || p.y > vbox.y1) continue;
-        ctx.fillRect(p.x - 0.5, p.y - 0.5, 1, 1);
-      }
     }
     ctx.restore();
   }

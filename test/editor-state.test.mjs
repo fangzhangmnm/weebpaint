@@ -116,7 +116,7 @@ test("[editor-state] 尺子（ADR-0013）：默认 / 往返 / 老 doc 缺组或�
   eq(desk.ruler.constrain, false, "放置约束默认关");
   eq(desk.ruler.geo, null, "默认没放尺");
   eq(desk.ruler.gridNu, 2, "格线默认 2×6（头身比）"); eq(desk.ruler.gridNv, 6);
-  eq(desk.ruler.use, "trace", "默认描尺（拖画是条上一键切换，per-doc 记住）");
+  eq(desk.ruler.use, "off", "几何默认关（2026-09-10 修订 ③：use = off | drag | trace，per-doc 记住）");
   desk.ruler.on = true; desk.ruler.kind = "rect"; desk.ruler.constrain = true;
   desk.ruler.geo = { kind: "rect", corners: [{ x: 1, y: 2 }, { x: 11, y: 2 }, { x: 11, y: 7 }, { x: 1, y: 7 }] };
   desk.ruler.gridNv = 8; desk.ruler.use = "drag";

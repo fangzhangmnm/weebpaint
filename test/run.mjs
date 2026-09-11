@@ -24,6 +24,7 @@ import "./canvas-templates.test.ts";  // 画布尺寸模板 json SSoT：契约 +
 import "./deploy-assets.test.mjs";    // runtime fetch 的根 asset 必须同时进 SW 预缓存和 deploy.yml 白名单
 import "./shape-geometry.test.mjs";   // 形状笔几何层（ADR-0005）：吸附/视口相对矩形/圆弧拟合(max范数+winding)/采样
 import "./ruler.test.mjs";            // 尺子模型（ADR-0013，2026-09-09）：五种尺投影 / 放置 / remap / 校验（形状笔引擎测试随引擎删）
+import "./shape-stroke.test.mjs";     // 几何拖画 decorator（ADR-0013 修订 ③，2026-09-10）：手势→几何 / 重驱内引擎 / 留尺不碰引擎 / cancel 无痕
 import "./perspective-frame.test.mjs"; // 透视 frame（ADR-0006）：两角定形/homography/chart ε 护栏/snap 方向
 import "./pixel-conic.test.mjs";       // 像素透视圆：Zingl 有理二次 Bézier conic（双向 Hausdorff 验证）
 import "./polygon-lasso.test.mjs";     // 多边形套索：整数扫描线栅格器 + 会话两级 abort

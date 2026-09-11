@@ -67,9 +67,6 @@ export function useDials(): { state: EditorRuntimeState; dialReactive: DialReact
     color: state.color,
     canDraw: true,                 // 镜像 editMode.canDraw()；_syncEditModeUI 同步 → <LeftDial> 滑块 disabled
     payload: null,                 // 2026-09-05 filterBrush 的 payload id（"smudge"/"liquify"/…）——手指单独 dial 的反应式开关
-    transient: false,              // 镜像 editMode.isTransient()；_syncEditModeUI 同步 → 左栏 context smart sense
-    rulerOn: false,                // ADR-0013 尺子：吸附生效 / 放置态（ruler-ui.syncRulerUi 同步 → 左栏尺钮）
-    rulerPlacing: false,
   });
   // color 读写代理回 dialReactive（app 里 state.color 零改动，背后反应式）。
   Object.defineProperty(state, "color", {
@@ -183,11 +180,12 @@ function freshGroups() {
     subTool:       { brush: "freehand" as string, eraser: "pixel" as string, smudge: "smear" as string, lasso: "select" as string },
     // （v0.7.25 曾有 desk.selPen 变体/笔径组，v0.7.26 笔架化后退役——配置归 toolStates.selPen
     //   + 笔架 collection；老 doc 里的 stale 键被 mergeInto 静默忽略）
-    // ADR-0013 尺子（2026-09-09，user「先做」= 持久化同意；ADR-0005 形状笔组 shapeBrush 随引擎退役，老 doc 的 stale 键 mergeInto 静默忽略）：
-    //   形状 = 画布上的辅助对象，per-doc 跟画走。on = 吸附开关；kind = 尺种（ruler.ts RulerKind）；constrain = 放置约束（15°/正方/正圆）；
-    //   geo = 放好的尺（ruler.ts Ruler，doc 系；persp 尺无 geo）；gridNu/gridNv = 格线尺行列（默认 2×6 = 6 头身 + 中线）。
-    //   use = "trace"（放尺后笔沿尺走）| "drag"（拖一下整形落笔，user 2026-09-09「像素笔圆和矩形，网格应该是拖动啊……再加一个普通笔也可以用的拖动模式看谁舒服」）
-    ruler:         { on: false, kind: "parallel" as string, constrain: false, geo: null as unknown, gridNu: 2, gridNv: 6, use: "trace" as string },
+    // ADR-0013 几何 / 尺子（2026-09-09，user「先做」= 持久化同意；ADR-0005 形状笔组 shapeBrush 随引擎退役，老 doc 的 stale 键 mergeInto 静默忽略）：
+    //   per-doc 跟画走。use = 几何修饰模式（2026-09-10 修订 ③）："off" 关 | "drag" 拖画（任何工具拖一下 = 整形，旧形状笔手势）| "trace" 留尺
+    //   （拖出来的形留在画布当尺）。on = 吸尺开关（画笔/橡皮/手指/选区笔沿已放的尺走）；kind = 尺种（ruler.ts RulerKind）；constrain = 约束
+    //   （15°/正方/正圆）；geo = 放好的尺（ruler.ts Ruler，doc 系；persp 尺无 geo）；gridNu/gridNv = 格线行列（默认 2×6 = 6 头身 + 中线）。
+    //   （09-09 的 use 只有 drag|trace 且默认 trace；09-10 起 off 是默认——老 dev doc 里存的 drag/trace 会以「几何开着」打开，条上一键关。）
+    ruler:         { on: false, kind: "parallel" as string, constrain: false, geo: null as unknown, gridNu: 2, gridNv: 6, use: "off" as string },
     // ADR-0006 透视 frame（形状笔全局、per-ora）：VP 0-3 + 锁地平线（默认开）+ 参考点 + 当前平面。
     //   坐标 doc 空间、snap 像素中线 +0.5。裁剪/旋转/翻转/偏移画布时必须过 remapShapePersp（doc-ops 挂钩）。
     persp: {

@@ -51,8 +51,10 @@ SPECS = [
     # （device 已 2026-08-28 收货真图标——甲方 0827 拍板候选 1 号「显示器·T 座」，stopgap 条目退役。）
     # 2026-09-06 收货：chevron-left/right、one-to-one、help、blend/blur/sharpen/liquify 八枚已由图标库「待过目层」（fable 自画，
     #   data-review="pending"）提供 → 全部 stopgap 退役，SPECS 清零。新缺图标照旧在这里烤字顶位 + 登记 ../20260708 SVG Icons/TODO.md。
-    # 2026-09-09 ADR-0013 尺子：左栏笔架钮下的尺钮（tap 开关吸附 / 长按放置）。库里无 ruler → 烤「尺」顶位，已登记 TODO.md。
-    ("ruler", "尺", (3, 3, 18, 18), "尺子（ADR-0013 尺子模型）：WeebPaint 左栏笔架钮下的尺钮；中文「尺」stopgap 待真图标"),
+    # 2026-09-09 ADR-0013 尺子；2026-09-10 修订 ③ 搬家：几何条的「留尺」钮（拖出来的形留在画布当尺）。库里无 ruler → 烤「尺」顶位，已登记 TODO.md。
+    ("ruler", "尺", (3, 3, 18, 18), "留尺（ADR-0013 几何 extension）：WeebPaint 几何条「留尺」开关；中文「尺」stopgap 待真图标"),
+    # 2026-09-10 几何条的「沿尺走」吸附开关（有尺时露出）。库里无磁铁/吸附类图标 → 烤「吸」顶位，已登记 TODO.md。
+    ("ruler-snap", "吸", (3, 3, 18, 18), "沿尺走（ADR-0013 几何 extension）：WeebPaint 几何条「吸尺」开关；中文「吸」stopgap 待真图标"),
 ]
 syms = []
 for sid, text, box, note in SPECS:

@@ -96,6 +96,10 @@ export function rulerOverlay(r: Ruler, frame: PerspConfig | null, view: ViewInfo
 - 选区笔不在切口内（lasso role 借 brush 引擎）→ Q4 待讨论（总账 #64）。
 - Q4 已决（v0.14.9）：`RULER_ROLES` += `selPen`，input 选区笔起笔/落点同款钩子。拖画模式（v0.14.9，user 追加）：`desk.ruler.use`、`shapePixels / shapePolylines`、`input.drawShape`、`GuideOverlay.pixels`。
 - Q5 已决（v0.14.8）：`StrokeGuide.projectPath?` + `guideFor(r, frame, { box })` 像素分支 = 整数像素链（`pixelGuide`）；`RulerEllipse.quad?` 外接四边形；input 像素笔走 `StrokeSession.stampPixels` 不 extend。
+- **2026-09-10 修订 ③（v0.14.11，user 真机打回后重落）**：本稿 §2 的「左栏尺钮 / LeftDialOpts.getRuler / rulerPlace transient / dialReactive 三轴 / 尺子条只在放置态」**全部推翻**——
+  几何 = 任何工具都能开的修饰模式（`desk.ruler.use = off|drag|trace`），入口 A = 上下文条区尾位 chip；拖画 = `src/shape-stroke.ts` decorator（`ShapeGesture` + `shapedStroke(g, io, hooks)`）
+  每个输入事件批重驱内引擎；input 接线口 = `StrokeShaper { mode(role); wrap(io) }` + 既有 `setRulerGuideProvider`，类型归 input 自己（不 import 几何脚本）。
+  `input.drawShape` / `GuideOverlay.pixels` / `#rulerPlaceLayer` 删。对比表与原话见 ADR-0013 §修订 ③。
 
 ## 3. 行为
 

@@ -1,7 +1,8 @@
 # ADR-0013：尺子模型——形状 = 画布上的辅助对象，不是笔（supersede ADR-0005 §2/§3、ADR-0006 §5/§6）
 
 > created 20260909 · 作者 Claude Fable 5.1（claude-fable-5-1）
-> 状态：**已决定 · v0.14.7 落地（真机未验）**；两个分叉待 user 讨论（§待讨论）。策划稿（现状 .h + 提案 .h）= `ai-docs/20260909-ruler-model-proposal.md`。
+> 状态：**已决定 · v0.14.7 落地 → 2026-09-10 真机打回 → 修订 ③ v0.14.11 重落（真机未验）**。策划稿（现状 .h + 提案 .h）= `ai-docs/20260909-ruler-model-proposal.md`。
+> ⚠ 读法：§决定 3/4/6 的「左栏尺钮 / 放置态 rulerPlace / 捕获层 / 左栏 context smart sense」已被 **§修订 ③** 整体推翻，以修订 ③ 为准。
 
 ## 背景
 
@@ -60,7 +61,49 @@ user：「像素笔圆和矩形，网格应该是拖动啊，还是你再加一�
   经 `stampPixels` 每像素一次（格线交叉去重）；普通笔 = `shapePolylines` 逐段驱动引擎，**恒压 0.5**（机械绘制，ADR-0005 §3 的拖画语义保留；
   描尺才是真笔压），多段 StampCollect 合并一次 GPU commit（单令牌墙：一个 session）。只对画笔 / 橡皮工具；手指族在拖画下不落笔（状态行提示）。
 
-## 已知余量（本 ADR 记着，不是 bug）
+## 修订 2026-09-10 ③：几何 = 任何工具都能开的修饰模式；入口 A；拖画默认；放置态 / 捕获层 / 左栏钮全撤（v0.14.11，Claude Fable 5.1）
+
+user 真机打回 09-09 版（原话，2026-09-10）：「几何笔移到左栏之后退化严重。其实只是一个 ui refactor，交互逻辑不应该大变的。好好的比一下之前的行为，现在是各种 bug，ui 还玩消失」
+「左边栏太拥挤了。不应该有那个尺按钮。笔架按钮也撤了吧」「上次重构确实是变成一个模式而不是一个动词，但是其实行为应该和之前差不多。因为之前的行为也就是复制了一份画笔，
+然后加上了这个 extension。现在是要把这个 extension 抽出来，然后我希望画笔，橡皮，套索，选区笔，甚至手指，都能享受得到」「没有预览，我们旧版本的是用不着预览」
+「如果 geometry engine related 脚本突然不见了，其他地方只要最小的修复程序也能跑」「入口候选：先试试 A 吧，用几天看看」。
+
+与 09-09 版逐条对比（退化点 → 修法）：
+
+| 09-09 版（v0.14.7–9） | 退化 | 修订 ③ |
+|---|---|---|
+| 入口 = 左栏尺钮（tap 语义随状态变 / 长按放置） | 左栏 5 件太挤；tap 语义看不见 | **入口 A**：几何条 = 上下文条区的固定尾位（右对齐 chip，有别的动词条就挂它下面一行）；关 = 一颗 chip，开 = 全条；S 键开关 |
+| 左栏 context smart sense（不能画就藏笔架钮 / 滑条 / 尺钮） | 「ui 玩消失」 | 撤：左栏 = 两滑条 + 吸管，永远在；笔架钮 / 尺钮撤（笔架 = 再点当前动词；笔刷设置 = 笔架表编辑钮） |
+| 默认描尺（放尺 → ✓ → 之后每笔都吸尺） | 「交互逻辑大变」：画笔莫名只画直线 | 默认**拖画**（旧形状笔手势）；留尺是条上的第二用法 |
+| 放置态 = transient + DOM 捕获层吃全部指针 | 双指缩放 / 两指 undo 失效；见过笔的设备**手掌也能放尺**；Ctrl+Z 退放置态而不是撤销 | 撤：放尺 = 几何修饰模式下的一笔正常手势（正常指针管线：手势接管 = cancel、掌触 / 单指规则 / pointercancel 自愈同其他工具） |
+| 拖画 = 抬手 `input.drawShape` 一次落笔 + 橙色草稿预览 | 与旧形状笔「真笔触实时重合成」不同；草稿是发明 | 撤 drawShape / 草稿：**decorator 每个输入事件批从头重驱内引擎**，笔触本身就是预览（旧 ShapeBrushEngine 的本质，内引擎从私有改注入） |
+| 只有画笔 / 橡皮能拖画 | 手指 / 选区笔享受不到 | 画笔 / 橡皮（BrushEngine）/ 手指族（FilterBrushEngine，shadow 每帧 restore 重揉）/ 选区笔（借 brush，形的色带进选区）全部能拖画；套索自由手 = 二期（另一节律，见总账 #68） |
+| 选透视尺自动开二点透视 + ✓ 强制吸附开 | 之后每笔吸 VP | 吸尺开关显式（[吸尺] 钮，有尺才露）；切到拖画 = 吸尺关 |
+| 换文档时放置态半模态残留 | 卡在 transient | 无 transient，无此问题 |
+
+**窄接口（user「怎么样抽象出窄接口」）**：`input.ts` 只多两个可选 provider，**不 import 任何几何脚本**——
+① `setRulerGuideProvider`（09-09 已有）= 描尺逐点投影；② `setStrokeShaper`（新）= `{ mode(role): "drag"|"trace"|null; wrap(io): ShapedStroke }`，
+起笔在三处（像素笔 / 滤镜笔 / 选区笔）各问一次，拖画时把内引擎包成满足 `StrokeEngine` 事务面的 decorator（`src/shape-stroke.ts`，纯、node 直测），
+StrokeSession 当它是引擎；`io` = 调用方给的 `beginInner(x,y)` / `reset()`（buffered 只需 cancel；shadow 要 restore 替身）/ `inPlace` / `pixel` / `box`。
+可拔性：删 `ruler.ts` / `shape-stroke.ts` / `ruler-ui.ts` → 只需去掉 `app.ts` 三行 + `workbench-state.remapDeskRuler` 一行改 no-op，程序照跑。
+
+**状态**：`desk.ruler.use = "off" | "drag" | "trace"`（几何修饰模式；per-doc；默认 off——09-09 只有 drag|trace 默认 trace，老 dev doc 会以「几何开着」打开，条上一键关）；
+`on` = 吸尺开关（有尺才有意义）。几何条显隐借套索条先例：几何开 → 全条；几何关但有尺 → [chip][吸尺][清]；都无 → 只一颗 chip。
+
+**留尺流程**：几何开 + 留尺开 → 拖一下 = 放尺（overlay 立刻显示，就是尺本身，不是预览）、吸尺自动开 → 关几何 → 任何在册工具沿尺走（Shift = 本笔旁路）。
+透视尺（kind=persp）无形可放：留尺下 = 透视框本身当尺（选中即吸）；拖画下 = 直线吸向最近 VP（旧「直线 + 吸向消失点」）。
+
+**删**：`rulerPlace` transient、`#rulerPlaceLayer`、左栏 `#leftRuler` / 笔架钮、`dialReactive.transient/rulerOn/rulerPlacing`、`rulerTap/rulerLongpress/enterRulerPlace/exitRulerPlace/syncRulerUi`、
+`input.drawShape/currentBrushPixelMode`、`GuideOverlay.pixels`；toolbar 不再 import ruler-ui（几何条自己听 `wp:modechange` 重定位）。
+**图标**：`shapes`（chip）；`ruler`「尺」stopgap 改义 = 留尺钮；新烤 `ruler-snap`「吸」stopgap = 吸尺钮（TODO.md 已登记）。
+
+## 已知余量（修订 ③ 后仍记着，不是 bug）
+
+- 手指族拖画 = 每个输入事件批 restore 替身 + 沿形重揉：大形 / 大笔会慢（旧像素形状笔同款成本模型），真机不行再上 rAF 节流。
+- 套索自由手不拖画（二期，#68）：矩形 / 椭圆子工具本来就是几何，差的只是透视四边形 / 格线 / 直线。
+- 09-09 的余量里「放置态捕获层吃两指缩放」「Ctrl+Z 退放置态」随 transient 一起消失；「放置不进 undo」「尺开时引擎平滑直通」仍在。
+
+## 已知余量（09-09 原文，本 ADR 记着，不是 bug）
 
 - 放置不进 undo（重拖即换；doc 变换 undo 后尺不随同回退——与 persp T4d 之前同款；要的话仿 PerspComponent 加 RulerComponent ≈ 60 行）。
 - 放置态捕获层吃掉全部指针：两指缩放 / 平移在放置态暂不透传（放置态短暂；要透传参照 `.crop-overlay` 只捕获 handle 的做法）。
