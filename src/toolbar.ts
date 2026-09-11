@@ -1022,6 +1022,7 @@ export function initToolbar(ctx: AppContext) {
   //   2026-09-02 C6：标准件 select-field（原生 <select> 退役）；值的 SSoT = 引擎 getSampleMode。
   const lassoSampleEl = document.getElementById("lassoSampleSel");
   if (lassoSampleEl) mountSelectField(lassoSampleEl, {
+    face: "short",   // 工具条下拉 = 定宽缩写档（2026-09-11）
     items: () => resampleItems("transform", tLatin as (key: string) => string),
     value: () => input.lasso.getSampleMode(),
     onChange: (v) => { input.lasso.setSampleMode(v); board.invalidateAll(); updateLassoToolbar(); },
@@ -1033,7 +1034,7 @@ export function initToolbar(ctx: AppContext) {
   pickerToolbar = mountContextToolbar({ id: "pickerToolbar", ariaLabel: tLatin("pick.toolbar"), rows: [[
     { kind: "title", text: tLatin("pick.sampleLabel") },
     { kind: "select", id: "pickModeSel", title: tLatin("pick.sampleTip"),
-      items: () => [{ value: "composite", label: tLatin("pick.composite") }, { value: "layer", label: tLatin("pick.active") }],
+      items: () => [{ value: "composite", label: tLatin("pick.composite"), short: tLatin("pick.compositeShort") }, { value: "layer", label: tLatin("pick.active"), short: tLatin("pick.activeShort") }],
       value: () => desk.colorPicker.layerMode,
       onChange: (v) => { desk.colorPicker.layerMode = v; } },   // binding → state.pickMode（引擎 input._doPick 经 getPickMode 读）
   ]] });

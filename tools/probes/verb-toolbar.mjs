@@ -5,7 +5,7 @@
 //   ② 几何 extension **插头已拔**（2026-09-10 晚 user「ui 问题非常大，先把几何尺拔了，代码留着」）：无 #rulerToolbar / #leftRuler / 笔架钮 / #rulerPlaceLayer；
 //      左栏滑条任何工具下都可见；S 键无事。插回后把 v0.14.11 的 ② 段契约（git 64bcb71 本文件）恢复；
 //   ③ B → brush、笔位图标 #pencil；④ 点套索位 → 套索条显、左段 [选区] pressed；点左段「油漆桶」→ fill、顶栏图标 #paint-bucket；
-//   ⑤ 点手指位 → filterBrush、滤镜笔条第一件 = 子工具下拉 #filterBrushSubSel（2026-09-09 修订 ④：六颗图标左段 → 带图标下拉），弹层 6 项各带图标；
+//   ⑤ 点手指位 → filterBrush、滤镜笔条第一件 = 子工具下拉 #filterBrushSubSel（2026-09-09 修订 ④：六颗图标左段 → 带图标下拉；2026-09-11 钮面只图标 face=icon，值读 data-value），弹层 6 项各带图标；
 //      选「模糊」→ sharpenBlur/blur、手指位图标仍 #finger（六项同图标，user 2026-09-09）、adjust 不亮、**无 variant 下拉**（子工具下拉盖住了）；
 //   点「液化」→ 有 variant 下拉（pinch/bloat 左段没盖）；⑥ fx 菜单不再列滤镜笔；⑦ 375 宽顶栏与滤镜笔条不横向溢出。
 import { chromium } from "playwright";
@@ -39,7 +39,8 @@ const state = (page) => page.evaluate((visSrc) => {
     sizeSliderVis: vis("sizeSlider"),
     anyToolPressed: [...document.querySelectorAll("#topBar .tool[aria-pressed='true']")].length,
     fbSubSel: !!document.getElementById("filterBrushSubSel"), fbSubIcon: document.querySelector("#filterBrushSubSel .select-field-icon use")?.getAttribute("href"),
-    fbSubLabel: document.querySelector("#filterBrushSubSel .select-field-label")?.textContent,
+    fbSubLabel: document.querySelector("#filterBrushSubSel .select-field-label")?.textContent,   // 2026-09-11 只图标档 → 空串（值读 data-value）
+    fbSubValue: document.getElementById("filterBrushSubSel")?.dataset.value, fbSubFace: document.getElementById("filterBrushSubSel")?.dataset.face,
     fbTitle: !!document.querySelector("#filterBrushToolbar .ct-title"),
     fbRowFits: (() => { const r = document.querySelector("#filterBrushToolbar .lasso-toolbar"); return r ? r.scrollWidth <= r.clientWidth + 1 : null; })(),
     fbVariantSel: !!document.getElementById("filterBrushVariantSel"),
@@ -109,17 +110,17 @@ const clickSeg = (page, barId, sub) => page.evaluate(({ barId, sub }) => {
   // ⑤ 手指位
   await evClick(page, "toolSmudge"); await page.waitForTimeout(300);
   const s6 = await state(page);
-  c.expect("点手指位 → filterBrush、滤镜笔条显、第一件 = 子工具下拉（钮面 #finger + 名字）、无条标题、无 variant 下拉、行不溢出", s6.tool === "filterBrush" && s6.fbBar && s6.fbSubSel && s6.fbSubIcon === "#finger" && !!s6.fbSubLabel && !s6.fbTitle && !s6.fbVariantSel && s6.fbRowFits === true, JSON.stringify(s6));
+  c.expect("点手指位 → filterBrush、滤镜笔条显、第一件 = 子工具下拉（钮面只图标 #finger，2026-09-11 face=icon）、无条标题、无 variant 下拉、行不溢出", s6.tool === "filterBrush" && s6.fbBar && s6.fbSubSel && s6.fbSubIcon === "#finger" && s6.fbSubFace === "icon" && s6.fbSubLabel === "" && !s6.fbTitle && !s6.fbVariantSel && s6.fbRowFits === true, JSON.stringify(s6));
   const dd = await pickSub(page, "blur");
   const s7 = await state(page);
   // 2026-09-09 user「就是手指就行啦」：六项同一个 #finger（像 fx 菜单同图标那样整齐）——钮面/顶栏永远 #finger，名字在下拉 label
-  c.expect("下拉 6 项全带（同一个手指）图标；选「模糊」→ 手指位仍 #finger、钮面 #finger、label=模糊、adjust 不亮、无 variant 下拉", dd.total === 6 && dd.withIcon === 6 && s7.tool === "filterBrush" && s7.smudge === "#finger" && s7.fbSubIcon === "#finger" && /模糊/.test(s7.fbSubLabel || "") && s7.adjustPressed === "false" && !s7.fbVariantSel, JSON.stringify({ dd, s7 }));
+  c.expect("下拉 6 项全带（同一个手指）图标；选「模糊」→ 手指位仍 #finger、钮面 #finger、值=blur（钮面无字）、adjust 不亮、无 variant 下拉", dd.total === 6 && dd.withIcon === 6 && s7.tool === "filterBrush" && s7.smudge === "#finger" && s7.fbSubIcon === "#finger" && s7.fbSubValue === "blur" && s7.fbSubLabel === "" && s7.adjustPressed === "false" && !s7.fbVariantSel, JSON.stringify({ dd, s7 }));
   await pickSub(page, "liquify");
   const s8 = await state(page);
-  c.expect("选「液化」→ label=液化、有 variant 下拉（pinch/bloat 子工具下拉没盖）", s8.smudge === "#finger" && /液化/.test(s8.fbSubLabel || "") && s8.fbVariantSel, JSON.stringify(s8));
+  c.expect("选「液化」→ 值=liquify（钮面无字）、有 variant 下拉（pinch/bloat 子工具下拉没盖）", s8.smudge === "#finger" && s8.fbSubValue === "liquify" && s8.fbSubLabel === "" && s8.fbVariantSel, JSON.stringify(s8));
   await pickSub(page, "paint");
   const s9 = await state(page);
-  c.expect("选「带颜料的手指」→ label=带颜料的手指、钮面 #finger", /带颜料/.test(s9.fbSubLabel || "") && s9.fbSubIcon === "#finger", JSON.stringify(s9));
+  c.expect("选「带颜料的手指」→ 值=paint（钮面无字）、钮面 #finger", s9.fbSubValue === "paint" && s9.fbSubLabel === "" && s9.fbSubIcon === "#finger", JSON.stringify(s9));
   // 2026-09-09 排版：宽屏（1200）套索条左段与后续项之间不许有 26vw 级空白——左段 flex:none，量左段右缘到下一件左缘的间距
   await evClick(page, "toolLasso"); await page.waitForTimeout(200);
   const gap = await page.evaluate(() => {

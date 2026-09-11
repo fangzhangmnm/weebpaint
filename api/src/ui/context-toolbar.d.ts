@@ -1,14 +1,15 @@
-import { type SelectItem } from "./select-field.ts";
+import { type SelectItem, type SelectFace } from "./select-field.ts";
 import { type PopupMenuItem } from "./popup-menu.ts";
 import { type IconName } from "./icon.ts";
-/** owner 在 init 时登记（幂等）。静态条用；工厂 mount 自动登记。 */
+/** owner 在 init 时登记（幂等）。静态条用；工厂 mount 自动登记。
+ *  2026-09-11：静态条的显隐（owner 自己 toggle .hidden）用 MutationObserver 接进叠放重排——不靠 owner 记得通知、不吃事件监听顺序。 */
 export declare function registerContextToolbar(el: HTMLElement | null): void;
 /** 已登记 id（测试/诊断）。 */
 export declare function contextToolbarIds(): string[];
 /** 可见顶栏条的最大 bottom（anchored-popup belowToolbars 用）；无可见 = 0。 */
 export declare function contextToolbarBottom(): number;
-/** 同上，但不算 exceptId 那条（一条「挂在别的条下面」的尾位条给自己定位用，2026-09-10 几何条）。 */
-export declare function contextToolbarBottomExcept(exceptId: string | null): number;
+/** 立即重排一次（测试/探针用；运行时走 scheduleRelayout 合帧）。 */
+export declare function relayoutContextToolbars(): void;
 export type ToolbarItem = {
     kind: "title";
     text: string;
@@ -40,6 +41,8 @@ export type ToolbarItem = {
     title?: string;
     foldPriority?: number;
     pin?: boolean;
+    /** 钮面档（ui/select-field）：工具条缺省 "short"（定宽缩写，英文不撑条）；"icon" = 只图标（手指位子工具，六项同一只手指）。2026-09-11 */
+    face?: SelectFace;
 } | {
     kind: "slider";
     id: string;

@@ -8,13 +8,15 @@
 //   drag（拖画，默认）= 旧形状笔手势活在任何工具上：拖一下 / 画一圈 → 抬手用**当前工具**一次落整形（画笔 / 橡皮 = 一笔 stroke；手指 = 沿形揉一遍；
 //       选区笔 = 形的色带进选区）。笔触本身就是预览（内引擎每个输入事件批从头重驱，shape-stroke.ts），没有草稿层。
 //   trace（留尺）= 拖出来的形留在画布当尺（desk.ruler.geo），吸尺开；关掉几何后画笔 / 橡皮 / 手指 / 选区笔沿尺走（input 的 StrokeGuide 切口）。
-// 入口 A：几何条 #rulerToolbar 是上下文条区的**固定尾位**（右对齐；有别的动词条时挂到它下面一行）——关着 = 一颗「几何」chip；开着 = 全条
+// 入口 A：几何条 #rulerToolbar 是上下文条区的**固定尾位**——关着 = 一颗「几何」chip；开着 = 全条
 //   （种类 ▾ · 约束 · 格线行列 · 留尺 · 透视四件）；有尺时另露 [吸尺][清]。任何工具下都在同一位置，不随工具消失。S 键 = 开关。
+//   位置与其他上下文条**同皮同位同一套代码**：与动词条同时可见时由工厂叠放（ui/context-toolbar relayoutContextToolbars）；本模块不算 top、
+//   不右对齐（2026-09-11 撤 .ct-tail + 私有 top：user「几何对齐还会不小心变成右对齐，然后换 context 的时候会突然空出来一大堆白」「应该走的是同一套代码」）。
 // 职责：① 几何条；② input 的两个 provider（guideForStroke 描尺 / strokeShaper 拖画·留尺）；③ 已放尺 overlay；④ 透视 gizmo 显示门。
 // 可拔：本文件 + shape-stroke.ts + ruler.ts 删掉，app.ts 三行、workbench-state remapDeskRuler 一行改 no-op，程序照跑。
 
 import { desk } from "./workbench-state.ts";
-import { mountContextToolbar, contextToolbarBottomExcept, type ContextToolbarHandle, type ToolbarItem } from "./ui/context-toolbar.ts";
+import { mountContextToolbar, type ContextToolbarHandle, type ToolbarItem } from "./ui/context-toolbar.ts";
 import { guideFor, rulerSegments, sanitizeRuler, RULER_KINDS, RULER_ROLES, type Ruler, type RulerKind, type StrokeGuide, type PlaceOpts } from "./ruler.ts";
 import { ShapeGesture, shapedStroke } from "./shape-stroke.ts";
 import { configFromModeState, defaultVpsForMode, planesForMode, type PerspMode, type PerspConfig } from "./perspective-frame.ts";
@@ -242,21 +244,18 @@ function _rerender(): void {
   syncShapeToolbar();
   _ctx?.board.requestRender();
 }
-/** 显隐 + 位置：编辑态（非 transient、非吸色 / 抓手）常显；有别的上下文条可见就挂到它下面一行（入口 A：固定尾位）。
+/** 显隐：编辑态（非 transient、非吸色 / 抓手）常显。位置不在这里算——多条同时可见的叠放归工厂（2026-09-11）。
  *  wp:modechange / lassochange / histchange / resize 都调（本模块自己听，toolbar 不认识本模块）。 */
 export function syncShapeToolbar(): void {
   if (!_ctx || !_bar) return;
   if (!_barApplies()) { _bar.hide(); return; }
   _bar.show();
-  const others = contextToolbarBottomExcept("rulerToolbar");
-  _bar.el.style.top = others > 0 ? `${others + 4}px` : "";
 }
 
 export function initRulerUi(ctx: AppContext): void {
   _ctx = ctx;
   _lastUse = _use() === "trace" ? "trace" : "drag";
   _bar = mountContextToolbar({ id: "rulerToolbar", rows: _rows(), ariaLabel: tLatin("rl.bar") });
-  _bar.el.classList.add("ct-tail");   // 上下文条区的固定尾位（右对齐；styles.css）
   ctx.board.setGuideProvider(_overlay);
   setPerspGizmoLiveGate(_gizmoLive);
   window.addEventListener("wp:ruler-tap", () => toggleShape());                 // input.ts S 键

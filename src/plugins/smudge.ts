@@ -91,10 +91,10 @@ export class SmudgeFilter {
       fmt: (v: number) => (v >= 1 ? `${v.toFixed(1)}D` : `${v.toFixed(2)}D`) },
   ];
   // 混色空间（filters-adjust 通用渲染第 2 个下拉；值经 params.mix 透传，持久化 preferences "smudge-mix"）
-  static mixModes = [
-    { id: "srgb",     title: tLatin("flt.smudge.mix.srgb") },
-    { id: "oklab",    title: tLatin("flt.smudge.mix.oklab") },
-    { id: "spectral", title: tLatin("flt.smudge.mix.spectral") },
+  static mixModes = [   // short = 定宽钮面缩写（2026-09-11；弹层画 title 全名）
+    { id: "srgb",     title: tLatin("flt.smudge.mix.srgb"),     short: tLatin("flt.smudge.mix.srgbShort") },
+    { id: "oklab",    title: tLatin("flt.smudge.mix.oklab"),    short: tLatin("flt.smudge.mix.oklabShort") },
+    { id: "spectral", title: tLatin("flt.smudge.mix.spectral"), short: tLatin("flt.smudge.mix.spectralShort") },
   ];
 
   static beginBrushStroke(layers: readonly BrushLayer[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, pressure: number): SmudgeBrushState {

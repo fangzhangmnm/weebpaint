@@ -47,6 +47,25 @@ Krita 的 paintop preset × tool 两轴只作参考，不照搬。
 - ADR-0004（填色 = 选区消费视图）、ADR-0005（形状笔）
 - user 原话出处：`journal/20260905 v0.13 feedbacks.md`（2026-09-05 晚至 09-06）
 
+## 修订 2026-09-11 ⑥：下拉标准件钮面三档 + 角落小三角；图层调整抽屉 → 弹层；多条叠放归工厂（v0.14.13，Claude Fable 5.1）
+
+user 原话（2026-09-11，真机反馈批）：「layer 的混合模式下拉框文字不显示」「工具条上的自定义下拉框应该定宽，不然遇到英文会被撑的很宽」「比起用下箭头不如复用小三角」
+「手指的 context bar 的第一个下拉框只显示图标，我知道都是一样的手指。没关系」「其他的下拉框我的思路是加入定宽的缩写用来显示。图层的混合模式也是」
+「layer 的调整下拉抽屉，能不能换 layer 的时候就自动关掉。不过其实我是更喜欢 context 菜单的，就是和菜单一样会自动关」
+「空一长条 → 工具条。之前被禁用的形状对齐功能这个问题非常严重。现在只是 unplug 了，但是应该走的是同一套代码」「当时几何对齐还会不小心变成右对齐，然后换 context 的时候会突然空出来一大堆白」。
+
+落地：① `ui/select-field` 钮面三档 `face = label | short | icon`：short = **定宽**（`--select-fixed-w: 84px`，styles.css 只此一处）画 `SelectItem.short` 缩写、
+没缩写退回全名省略号；icon = 只画图标、该项没图标退回缩写（钮面永不空白）；弹层永远全名 + 图标。角标 = 右下角小三角（`ui/icon slotCaretHtml`，与变体槽 / index.html
+静态槽同一颗；chevron-down 退役）。工厂条的 select 缺省 short；手指位子工具下拉 `face: "icon"`；套索采样 / 吸色取样 / 手指 mix / 液化 sample·bleed·variant /
+图层混合模式全部有缩写（i18n `*Short` 键，四语同居；sheet 里的下拉仍 label 档）。
+② 图层调整抽屉退役 → **弹层**：Teleport 到 body、锚 badge、`ui/popup-menu openAdoptedPopup` 收养（外点关 / Escape / 栈）、换活动层自动关（`_syncChrome`）。
+根因修：混合模式 select-field 原在 `onMounted` 挂一次而按钮在 `v-if` 里 → 首次 mount 时 ref 为 null 早退 → 之后展开的按钮永远没 label（「文字不显示」）；现改为开弹层时挂。
+popup-menu 补一条栈纪律：落在**子弹层**（锚在本弹层里）上的那一击不关父弹层（弹层里选混合模式不许把弹层关掉）。
+③ 上下文条多条叠放归工厂 `relayoutContextToolbars`（下一帧统一重排：静态条钉 CSS 位当锚、工厂条按登记顺序挂下缘；静态条显隐经 MutationObserver 接进来，不吃监听顺序）；
+`ruler-ui` 的私有 `style.top` 与 `.ct-tail` 右对齐撤（插头仍拔着，插回时只 mount + show/hide）；`contextToolbarBottomExcept` 退役；空行不画药丸、没内容 show() 也不露条。
+④ 参考窗「关闭」从 ＋ 菜单提出成窗右上角 ×（＋ 左移）；主菜单「参考小窗」= toggle 项（开/关态同步）；所有开窗入口（主菜单 / 图层面板 PiP / 快捷键 / ×）都是 toggle，
+导入参考图仍是「开」。探针 `tools/probes/context-toolbar.mjs` ⑤–⑨ 钉住全部；`test/select-field-face.test.mjs` 钉钮面三档；`test/context-toolbar.test.mjs` 钉「叠放只在工厂」。
+
 ## 修订 2026-09-09 ⑤：笔位只剩自由手——形状笔退役为尺子（v0.14.7，ADR-0013）
 
 user 2026-09-09「形状笔放的位置 ux 非常不合理……同意形状笔不是笔而是辅助」。§2 决定 1「笔 = paint 族，子工具 freehand / shape」改为**笔位单子工具**（无小三角、`#brushToolbar` 删）；形状 = 左栏尺钮的辅助对象（ADR-0013）。修订 ③ 关于笔条的段落随之作废；套索 / 手指位不变。

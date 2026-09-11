@@ -98,6 +98,14 @@ StrokeSession 当它是引擎；`io` = 调用方给的 `beginInner(x,y)` / `rese
 `input.drawShape/currentBrushPixelMode`、`GuideOverlay.pixels`；toolbar 不再 import ruler-ui（几何条自己听 `wp:modechange` 重定位）。
 **图标**：`shapes`（chip）；`ruler`「尺」stopgap 改义 = 留尺钮；新烤 `ruler-snap`「吸」stopgap = 吸尺钮（TODO.md 已登记）。
 
+## 修订 2026-09-11 ④：几何条不再右对齐、不再自己算 top（插头仍拔着；Claude Fable 5.1）
+
+user 2026-09-11：「空一长条 → 工具条。之前被禁用的形状对齐功能这个问题非常严重。现在只是 unplug 了，但是应该走的是同一套代码」「当时几何对齐还会不小心变成右对齐，
+然后换 context 的时候会突然空出来一大堆白」。根因 = 修订 ③ 入口 A 的「固定尾位（右对齐 chip，有别的动词条就挂它下面一行）」两条私有定位：`.ct-tail` 右对齐特例 +
+ruler-ui 在自己的 `wp:modechange` 监听里量别人的 bottom 写 `style.top`——量的时刻别的条还没切完，几何条就挂在了一个即将消失的条下面（顶栏与几何条之间空出一片画布白）。
+决定：几何条与其他上下文条**同皮同位同一套代码**——多条同时可见的叠放归 `ui/context-toolbar` 工厂（ADR-0012 修订 ⑥ ③），本模块只 mount + show/hide。
+入口 A 的「固定尾位」语义保留为「关着 = 一颗 chip、任何工具下都在」，不再含「右对齐」。插回时无需再改定位代码。
+
 ## 已知余量（修订 ③ 后仍记着，不是 bug）
 
 - 手指族拖画 = 每个输入事件批 restore 替身 + 沿形重揉：大形 / 大笔会慢（旧像素形状笔同款成本模型），真机不行再上 rAF 节流。

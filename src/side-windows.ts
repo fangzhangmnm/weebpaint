@@ -24,7 +24,7 @@ import { planRefImport, flattenWhiteInPlace, REF_JPEG_QUALITY } from "./referenc
 import { readImageFromClipboard } from "./session.ts";
 import { humanSize } from "@internal/gallery";
 import { setColor } from "./color-panel.ts";
-import { setMenuOpen } from "./settings-menu.ts";
+import { setMenuOpen, setMenuItem } from "./settings-menu.ts";
 import { registerFloatingWindow, floatingTopFloor, type FloatingWindowHandle } from "./ui/floating-window.ts";   // 2026-09-02 C2 浮窗深模块
 import { togglePopupMenu } from "./ui/popup-menu.ts";   // 参考窗 ＋ 菜单端口（挂 body；组件 frontend/ 不得 import ui/）
 import { desk } from "./workbench-state.ts";
@@ -48,12 +48,15 @@ const _refWin: FloatingWindowHandle = registerFloatingWindow(referenceWindow, {
 });
 referenceWindow.topFloor = floatingTopFloor();
 
-// 开/关的**用户路径**（menu/快捷键/菜单关闭项）写 desk（per-doc 标脏）；程序性回灌不经这里。
+// 开/关的**用户路径**（menu/快捷键/窗上 ×）写 desk（per-doc 标脏）；程序性回灌不经这里。
 function refSetOpen(open: boolean) {
   referenceWindow.open = open;
   if (open) _refWin.raise();   // v232：开窗即置顶（window band）
   desk.refPanel.enabled = open;
+  _syncRefMenuState();
 }
+// 主菜单「参考小窗」= toggle 项（2026-09-11 user「主菜单里面的参考窗选项只能开不能关」）：开/关态与窗同步（用户路径 / 窗上 × / 载入回灌都经这里）
+function _syncRefMenuState() { if (els.menuReference) setMenuItem(els.menuReference, referenceWindow.open); }
 
 // live 镜像合成（S9：走 GL doc-render，respect clip/mode/组）。白纸显示常量（doc 无纸色，
 // 同 board docBg）。组件只吃这个 provider；返回 null = GL 不可用 → 组件保留上帧。
@@ -159,6 +162,7 @@ export function initSideWindows(ctx: AppContext) {
   });
   ref.addEventListener("openchange", (e) => {
     desk.refPanel.enabled = !!((e as CustomEvent).detail as { open: boolean }).open;
+    _syncRefMenuState();
   });
 
   // ---- ＋ 菜单意图（组件只发意图；文件对话框/剪贴板/picker 都是宿主知识）----
@@ -205,6 +209,7 @@ export function initSideWindows(ctx: AppContext) {
     ref.rect = desk.refPanel.position;
     ref.open = desk.refPanel.enabled;
     if (desk.refPanel.enabled) _refWin.raise();
+    _syncRefMenuState();
   });
   window.addEventListener("wp:toggleReference", () => refSetOpen(!ref.open));
 
@@ -224,8 +229,9 @@ export function initSideWindows(ctx: AppContext) {
 
   els.menuReference.addEventListener("click", () => {
     setMenuOpen(false);
-    refSetOpen(true);
+    refSetOpen(!ref.open);   // toggle（2026-09-11；此前只能开不能关）
   });
+  _syncRefMenuState();
   // 图层面板头 PiP shortcut（user 0830「同意图层加一个 pip」；心理学讨论落地：肌肉记忆落点接住）
   document.getElementById("layersPanelRefBtn")?.addEventListener("click", () => refSetOpen(!ref.open));
   els.referenceFileInput.addEventListener("change", async (e: Event) => {

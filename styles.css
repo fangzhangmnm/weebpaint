@@ -290,7 +290,9 @@ body[data-tool="fill"] .board { cursor: crosshair; }
 .lasso-section { display: flex; align-items: center; gap: 4px; }
 /* v0.5.14 工具组槽：右下角小三角=「这是组 toggle 不是指令」；紧凑图标下拉（JS 锚定槽下方） */
 .lasso-slot { position: relative; }
-.lasso-slot .lasso-slot-caret { position: absolute; right: 1px; bottom: 1px; width: 8px; height: 8px; opacity: .55; pointer-events: none; }
+/* 2026-09-11：select-field 钮面的角标也是这一颗（.select-field-caret span 包着同一枚 svg；user「比起用下箭头不如复用小三角」） */
+.lasso-slot .lasso-slot-caret, .select-field .select-field-caret { position: absolute; right: 1px; bottom: 1px; width: 8px; height: 8px; opacity: .55; pointer-events: none; }
+.select-field .select-field-caret > svg { display: block; width: 100%; height: 100%; }
 /* ui/context-toolbar 工厂件（2026-09-06 U1）：chrome 复用 .lasso-toolbar-stack/.lasso-toolbar，这里只补工厂特有小件 */
 .ct-title { color: var(--ink-soft); font-size: 13px; padding: 0 6px 0 8px; white-space: nowrap; }
 .ct-sep { color: var(--line); padding: 0 2px; user-select: none; }
@@ -308,6 +310,10 @@ body[data-tool="fill"] .board { cursor: crosshair; }
   .ct-toolbar .fb-inline-slider .brush-slider-value { min-width: 30px; }
 }
 .ct-select.select-field { border-radius: 999px; }
+/* 2026-09-11 工具条下拉定宽（user「工具条上的自定义下拉框应该定宽，不然遇到英文会被撑的很宽」）：宽度只此一处，
+   钮面画缩写（SelectItem.short）省略号兜底；只图标档（手指位子工具）按内容宽。 */
+:root { --select-fixed-w: 84px; }
+.select-field--fixed { width: var(--select-fixed-w); flex: none; box-sizing: border-box; }
 .ct-toolbar .fb-inline-slider { padding: 0 4px; }
 .ct-more svg { width: 18px; height: 18px; }
 .lasso-icon-menu {
@@ -954,9 +960,10 @@ input[type=range] {
 .menu-inline-caret { width: 8px; height: 8px; opacity: .6; flex: 0 0 auto; }
 /* 2026-09-02 C6 下拉标准件（src/ui/select-field.ts）：原生 <select> 退役。按钮沿用各处既有 class 的皮（.lasso-tool-select /
    .generic-sheet-input / .crop-toolbar-btn），这里只补 label+caret 排版与分组标题。 */
-.select-field { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; text-align: left; }
-.select-field .select-field-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.select-field .menu-inline-caret { width: 12px; height: 12px; }
+.select-field { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; text-align: left; position: relative; }
+.select-field .select-field-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+/* 角标 = 右下角小三角（.select-field-caret，几何见 .lasso-slot-caret 共享规则）；文字给它让 12px */
+button.select-field { padding-right: 12px; }
 /* 2026-09-09 带图标的下拉（user「手指的几种工具用下拉框吧，图标太打哑谜了」）：钮面 = 当前项图标 + label + caret；弹层项 icon 归 popup-menu compact */
 .select-field .select-field-icon { display: inline-flex; flex: none; }
 .select-field .select-field-icon svg { width: 18px; height: 18px; }
@@ -1324,17 +1331,9 @@ input[type="range"].color-ramp::-moz-range-thumb {
 .layer-mode-badge:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
 .layer-mode-badge.active { color: var(--accent); border-color: var(--accent); }
 
-/* 折叠：每个 layer 行下方的 opacity / mode 编辑区，点 badge 才展开 */
-.layer-row-expand {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px 10px;
-  margin: 2px 4px 4px;
-  background: color-mix(in srgb, var(--ink) 4%, transparent);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-}
+/* 2026-09-11 图层调整弹层（user「layer 的调整下拉抽屉，换 layer 的时候就自动关掉……更喜欢 context 菜单的，和菜单一样会自动关」）：
+   点 badge 弹出、挂 body 走 ui/popup-menu 收养（外点关 / Escape / 栈）、换活动层自动关；行内抽屉 .layer-row-expand 退役。 */
+.layer-adjust-popup { min-width: auto; width: 232px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
 .layer-slider-row {
   display: grid;
   grid-template-columns: 36px 1fr 30px;
@@ -1344,14 +1343,8 @@ input[type="range"].color-ramp::-moz-range-thumb {
   color: var(--ink);
 }
 .layer-slider-row > span:first-child { color: var(--ink-soft); }
-.layer-slider-row select {
-  font: inherit;
-  background: var(--bg-soft);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 2px 4px;
-}
+/* 混合模式下拉：定宽缩写档（.select-field--fixed），皮同 lasso-tool-select */
+.layer-mode-select { justify-self: start; font: inherit; font-size: 12px; padding: 3px 12px 3px 6px; border-radius: 4px; border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent); background: transparent; color: var(--ink); }
 .layer-slider-val { text-align: right; font-variant-numeric: tabular-nums; }
 /* Clipping mask 视觉：剪裁层缩进一点 + 加 chip。基底层无样式。 */
 .layer-row.clipping { padding-left: 18px; }
@@ -2778,8 +2771,8 @@ body[data-mode="gallery"] .board { display: none !important; }
   pointer-events: none;
   z-index: calc(var(--z-toolbar) - 1);   /* 同 crop overlay：在画布上、toolbar/弹窗下 */
 }
-/* 几何条（ADR-0013 修订 ③，2026-09-10 入口 A）：上下文条区的固定尾位——右对齐、不参与居中栈；有别的条可见时 ruler-ui 把 top 挂到它下面一行 */
-.ct-tail { left: auto; right: max(env(safe-area-inset-right, 0px), 12px); transform: none; align-items: flex-end; }
+/* （几何条 .ct-tail 右对齐 + ruler-ui 私有 top 2026-09-11 退役：user「几何对齐还会不小心变成右对齐，然后换 context 的时候会突然空出来一大堆白」——
+   多条同时可见的叠放归 ui/context-toolbar 工厂 relayoutContextToolbars，owner 不再自己算 top） */
 /* 尺子条里的格线行列 stepper（ruler-ui _mountGridCtl） */
 .rl-grid-ctl { display: inline-flex; align-items: center; gap: 2px; }
 .rl-grid-ctl .rl-grid-val { min-width: 1.6em; text-align: center; font-variant-numeric: tabular-nums; }

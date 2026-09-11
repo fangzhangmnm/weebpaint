@@ -5,23 +5,24 @@
 //   scale = 轴对齐缩放（resample-bytes）；liquify = 液化重建核。
 // 排序 = 推荐度（user 2026-07-29 真机裁决：加反振铃限幅后 spline 多次插值比双三次无显著提高、
 // 还有一点点卡 → 双三次回默认第一、像素完美第二，spline 降为吃灰档保留）。
+// shortKey（2026-09-11）= 工具条定宽下拉钮面的缩写文案 key；sheet 里的下拉仍画 labelKey 全名（face 由消费者定）。
 export const RESAMPLE_MODES = [
-  { id: "bicubic",   labelKey: "rsm.bicubic",     contexts: ["transform", "scale", "liquify"] },   // v0.6.61 液化补第四核并设默认（对齐 07-29 裁决）
-  { id: "rotsprite", labelKey: "rsm.rotsprite",   contexts: ["transform"] },              // RotSprite（backend/algorithms/rotsprite.ts）：EPX 放大+nearest，零糊；摆正态=逐字节置换
-  { id: "spline",    labelKey: "rsm.spline",     contexts: ["transform", "liquify"] },   // 预滤波三次 B 样条（backend/algorithms/bspline.ts）；真机裁决无显著优势，保留自选
-  { id: "sharper",   labelKey: "rsm.sharper",     contexts: ["scale"] },         // 面积平均（area kernel，适合缩小）；放大退回 bicubic
-  { id: "bilinear",  labelKey: "rsm.bilinear",         contexts: ["transform", "scale", "liquify"] },
-  { id: "nearest",   labelKey: "rsm.nearest",     contexts: ["transform", "scale", "liquify"] },
+  { id: "bicubic",   labelKey: "rsm.bicubic",   shortKey: "rsm.bicubicShort",   contexts: ["transform", "scale", "liquify"] },   // v0.6.61 液化补第四核并设默认（对齐 07-29 裁决）
+  { id: "rotsprite", labelKey: "rsm.rotsprite", shortKey: "rsm.rotspriteShort", contexts: ["transform"] },              // RotSprite（backend/algorithms/rotsprite.ts）：EPX 放大+nearest，零糊；摆正态=逐字节置换
+  { id: "spline",    labelKey: "rsm.spline",    shortKey: "rsm.splineShort",    contexts: ["transform", "liquify"] },   // 预滤波三次 B 样条（backend/algorithms/bspline.ts）；真机裁决无显著优势，保留自选
+  { id: "sharper",   labelKey: "rsm.sharper",   shortKey: "rsm.sharperShort",   contexts: ["scale"] },         // 面积平均（area kernel，适合缩小）；放大退回 bicubic
+  { id: "bilinear",  labelKey: "rsm.bilinear",  shortKey: "rsm.bilinearShort",  contexts: ["transform", "scale", "liquify"] },
+  { id: "nearest",   labelKey: "rsm.nearest",   shortKey: "rsm.nearestShort",   contexts: ["transform", "scale", "liquify"] },
   // 以后：{ id: "ai", labelKey: "rsm.ai", contexts: ["scale"] }
 ];
 
 // 按 context 过滤出下拉项（2026-09-02 C6：原生 <select> 投影 fillResampleSelect 退役——下拉一律 ui/select-field 标准件）。
 // label：C2 分层——frontend/ 不得引 i18n，文案由 app 层注入（key=labelKey，通常传 tLatin；不传则裸 key 兜底）。
-export function resampleItems(context: string | null, label?: (key: string) => string): { value: string; label: string }[] {
-  const out: { value: string; label: string }[] = [];
+export function resampleItems(context: string | null, label?: (key: string) => string): { value: string; label: string; short: string }[] {
+  const out: { value: string; label: string; short: string }[] = [];
   for (const m of RESAMPLE_MODES) {
     if (context && m.contexts && !m.contexts.includes(context)) continue;
-    out.push({ value: m.id, label: label ? label(m.labelKey) : m.labelKey });
+    out.push({ value: m.id, label: label ? label(m.labelKey) : m.labelKey, short: label ? label(m.shortKey) : m.shortKey });
   }
   return out;
 }

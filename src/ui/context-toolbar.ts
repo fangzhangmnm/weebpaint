@@ -9,32 +9,62 @@
 //   只登记不生成；内容迁 spec 另批）。让位高度查询 contextToolbarBottom() 语义不变。
 // 显隐仍由各 owner 按 EditMode 派生（本模块只给 show/hide），不做互斥策略。
 
-import { createSelectField, type SelectField, type SelectItem } from "./select-field.ts";
+import { createSelectField, type SelectField, type SelectItem, type SelectFace } from "./select-field.ts";
 import { makeRampSlider, type RampSliderHandle } from "./ramp-slider.ts";
 import { togglePopupMenu, type PopupMenuItem } from "./popup-menu.ts";
-import { iconHtml, type IconName } from "./icon.ts";
+import { iconHtml, slotCaretHtml, type IconName } from "./icon.ts";
 
 // ---- 登记表（C4 原样）----
 const _registry = new Map<string, HTMLElement>();
+const _factory = new Set<string>();   // 工厂 mount 的条（叠放时由工厂写 top）；静态条只登记、位置归 CSS
 
-/** owner 在 init 时登记（幂等）。静态条用；工厂 mount 自动登记。 */
+/** owner 在 init 时登记（幂等）。静态条用；工厂 mount 自动登记。
+ *  2026-09-11：静态条的显隐（owner 自己 toggle .hidden）用 MutationObserver 接进叠放重排——不靠 owner 记得通知、不吃事件监听顺序。 */
 export function registerContextToolbar(el: HTMLElement | null): void {
   if (!el) return;
-  _registry.set(el.id || `anon-${_registry.size}`, el);
+  const id = el.id || `anon-${_registry.size}`;
+  if (_registry.has(id)) return;
+  _registry.set(id, el);
+  if (typeof MutationObserver === "function") new MutationObserver(scheduleRelayout).observe(el, { attributes: true, attributeFilter: ["class"] });
 }
 /** 已登记 id（测试/诊断）。 */
 export function contextToolbarIds(): string[] { return [..._registry.keys()]; }
 /** 可见顶栏条的最大 bottom（anchored-popup belowToolbars 用）；无可见 = 0。 */
-export function contextToolbarBottom(): number { return contextToolbarBottomExcept(null); }
-/** 同上，但不算 exceptId 那条（一条「挂在别的条下面」的尾位条给自己定位用，2026-09-10 几何条）。 */
-export function contextToolbarBottomExcept(exceptId: string | null): number {
+export function contextToolbarBottom(): number {
   let bottom = 0;
-  for (const [id, el] of _registry) {
-    if (id === exceptId || el.classList.contains("hidden")) continue;
+  for (const el of _registry.values()) {
+    if (el.classList.contains("hidden")) continue;
     const r = el.getBoundingClientRect();
     if (r.height > 0) bottom = Math.max(bottom, r.bottom);
   }
   return bottom;
+}
+
+// ---- 叠放（2026-09-11）----
+// 多条同时可见（几何条 + 动词条）时谁挂谁下面，以前是 owner 自己量别人的 bottom 写 top（ruler-ui contextToolbarBottomExcept）——
+//   量的时刻在别人的 modechange 监听之前就成了「空出来一大堆白」（user 2026-09-11：「几何对齐还会不小心变成右对齐，然后换 context 的时候
+//   会突然空出来一大堆白」）。改成工厂统一在下一帧重排：静态条钉 CSS 位当锚，工厂条按登记顺序挂到「之前所有可见条」的下缘（gap 4）；
+//   只有一条可见时 top 归 CSS（居中同位，无右对齐特例）。任何一条 show/hide/换内容/resize 都触发；一个 owner 都不再算 top。
+let _relayoutRaf = 0;
+function scheduleRelayout(): void {
+  if (_relayoutRaf || typeof requestAnimationFrame !== "function") return;
+  _relayoutRaf = requestAnimationFrame(() => { _relayoutRaf = 0; relayoutContextToolbars(); });
+}
+/** 立即重排一次（测试/探针用；运行时走 scheduleRelayout 合帧）。 */
+export function relayoutContextToolbars(): void {
+  const visible = (el: HTMLElement) => !el.classList.contains("hidden");
+  let bottom = 0;
+  for (const [id, el] of _registry) {
+    if (_factory.has(id) || !visible(el)) continue;
+    const r = el.getBoundingClientRect();
+    if (r.height > 0) bottom = Math.max(bottom, r.bottom);
+  }
+  for (const [id, el] of _registry) {
+    if (!_factory.has(id) || !visible(el)) continue;
+    el.style.top = bottom > 0 ? `${Math.round(bottom) + 4}px` : "";
+    const r = el.getBoundingClientRect();
+    if (r.height > 0) bottom = Math.max(bottom, r.bottom);
+  }
 }
 
 // ---- 工厂 ----
@@ -49,7 +79,9 @@ export type ToolbarItem =
       foldPriority?: number;
       /** 钉住：永不折进「…」（这条工具条的身份件，如手指位子工具下拉）。折完所有可折项仍放不下 → 行自身横滚兜底。2026-09-09 */
       pin?: boolean }
-  | { kind: "select"; id: string; items: () => SelectItem[]; value: () => string; onChange(v: string): void; title?: string; foldPriority?: number; pin?: boolean }
+  | { kind: "select"; id: string; items: () => SelectItem[]; value: () => string; onChange(v: string): void; title?: string; foldPriority?: number; pin?: boolean;
+      /** 钮面档（ui/select-field）：工具条缺省 "short"（定宽缩写，英文不撑条）；"icon" = 只图标（手指位子工具，六项同一只手指）。2026-09-11 */
+      face?: SelectFace }
   | { kind: "slider"; id: string; label: string; min: number; max: number; step: number; value: () => number; fmt?: (v: number) => string; onInput(v: number): void }
   | { kind: "custom"; id: string; mount(host: HTMLElement): () => void };
 
@@ -95,6 +127,7 @@ export function mountContextToolbar(spec: ContextToolbarSpec): ContextToolbarHan
   if (spec.ariaLabel) el.setAttribute("aria-label", spec.ariaLabel);
   document.body.appendChild(el);
   _registry.set(spec.id, el);
+  _factory.add(spec.id);
 
   let rendered: Rendered[] = [];
   let rows = spec.rows;
@@ -121,7 +154,7 @@ export function mountContextToolbar(spec: ContextToolbarSpec): ContextToolbarHan
         b.className = "lasso-tool-btn lasso-tool-icon" + (it.variants ? " lasso-slot" : "");
         b.title = it.title;
         b.setAttribute("aria-label", it.title);
-        b.innerHTML = iconHtml(it.icon) + (it.variants ? '<svg class="lasso-slot-caret" viewBox="0 0 8 8" aria-hidden="true"><path d="M7.2 2.8 V7.2 H2.8 Z" fill="currentColor" stroke="none"/></svg>' : "");
+        b.innerHTML = iconHtml(it.icon) + (it.variants ? slotCaretHtml() : "");
         const openVariants = () => {
           if (!it.variants) return;
           togglePopupMenu<string>({ anchor: b, variant: "compact", band: "menu", align: "left", offsetY: 6, items: it.variants.items, onPick: (id) => { it.variants!.onPick(id); refresh(); } });
@@ -144,7 +177,7 @@ export function mountContextToolbar(spec: ContextToolbarSpec): ContextToolbarHan
         return b;
       }
       case "select": {
-        const f = createSelectField({ id: it.id, className: "lasso-tool-btn ct-select", items: it.items, value: it.value, onChange: (v) => { it.onChange(v); refresh(); } });
+        const f = createSelectField({ id: it.id, className: "lasso-tool-btn ct-select", face: it.face ?? "short", items: it.items, value: it.value, onChange: (v) => { it.onChange(v); refresh(); } });
         if (it.title) f.el.title = it.title;
         r.selects.set(it, f);
         r.disposers.push(() => f.dispose());
@@ -174,6 +207,7 @@ export function mountContextToolbar(spec: ContextToolbarSpec): ContextToolbarHan
   function buildRow(items: ToolbarItem[]): Rendered {
     const row = document.createElement("div");
     row.className = "lasso-toolbar";
+    row.hidden = items.length === 0;   // 空行不画药丸（空一长条守卫，2026-09-11）
     const r: Rendered = { row, items, els: new Map(), folded: [], moreBtn: null, selects: new Map(), sliders: new Map(), disposers: [] };
     for (const it of items) {
       const node = buildItem(r, it);
@@ -235,11 +269,14 @@ export function mountContextToolbar(spec: ContextToolbarSpec): ContextToolbarHan
   }
   function foldAll(): void { for (const r of rendered) fold(r); }
 
+  const hasContent = () => rows.some((r) => r.length > 0);
   function render(): void {
     for (const r of rendered) { r.disposers.forEach((d) => d()); r.row.remove(); }
     rendered = rows.map(buildRow);
     for (const r of rendered) el.appendChild(r.row);
+    if (!hasContent()) el.classList.add("hidden");   // 没内容 = 没这条（show() 也不露空条）
     refresh();
+    scheduleRelayout();
   }
 
   function refresh(): void {
@@ -257,15 +294,15 @@ export function mountContextToolbar(spec: ContextToolbarSpec): ContextToolbarHan
     if (!el.classList.contains("hidden")) requestAnimationFrame(foldAll);
   }
 
-  const onResize = () => { if (!el.classList.contains("hidden")) foldAll(); };
+  const onResize = () => { if (!el.classList.contains("hidden")) { foldAll(); scheduleRelayout(); } };
   window.addEventListener("resize", onResize);
 
   render();
 
   return {
     el,
-    show() { el.classList.remove("hidden"); refresh(); },
-    hide() { el.classList.add("hidden"); },
+    show() { if (!hasContent()) { el.classList.add("hidden"); return; } el.classList.remove("hidden"); refresh(); scheduleRelayout(); },
+    hide() { el.classList.add("hidden"); scheduleRelayout(); },
     isVisible: () => !el.classList.contains("hidden"),
     refresh,
     replaceRows(next) { rows = next; render(); },
@@ -274,6 +311,8 @@ export function mountContextToolbar(spec: ContextToolbarSpec): ContextToolbarHan
       for (const r of rendered) r.disposers.forEach((d) => d());
       el.remove();
       _registry.delete(spec.id);
+      _factory.delete(spec.id);
+      scheduleRelayout();
     },
   };
 }

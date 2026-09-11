@@ -240,7 +240,21 @@ export const S = {
   "mode.softLight":  { zh: "柔光",     en: "Soft Light",   ja: "ソフトライト", tok: "suno ko" }, 
   "mode.difference": { zh: "差值",     en: "Difference",   ja: "差の絶対値", tok: "ante" }, 
   "mode.exclusion":  { zh: "排除",     en: "Exclusion",    ja: "除外", tok: "ante lili" }, 
-  "mode.passThrough":{ zh: "穿透",     en: "Pass Through", ja: "パススルー", tok: "lupa" }, // ── 图层面板（layers-panel.ts）切片 3a ──
+  "mode.passThrough":{ zh: "穿透",     en: "Pass Through", ja: "パススルー", tok: "lupa" },
+  // 2026-09-11 混合模式缩写（图层调整弹层的定宽下拉钮面；弹层项仍是全名；user「加入定宽的缩写用来显示。图层的混合模式也是」）
+  "mode.normalShort":     { zh: "正常", en: "Normal",  ja: "通常" },
+  "mode.multiplyShort":   { zh: "正片", en: "Mult",    ja: "乗算" },
+  "mode.screenShort":     { zh: "滤色", en: "Screen",  ja: "スクリーン" },
+  "mode.overlayShort":    { zh: "叠加", en: "Overlay", ja: "オーバレイ" },
+  "mode.darkenShort":     { zh: "变暗", en: "Darken",  ja: "比較暗" },
+  "mode.lightenShort":    { zh: "变亮", en: "Lighten", ja: "比較明" },
+  "mode.colorDodgeShort": { zh: "减淡", en: "Dodge",   ja: "覆い焼き" },
+  "mode.colorBurnShort":  { zh: "加深", en: "Burn",    ja: "焼き込み" },
+  "mode.hardLightShort":  { zh: "强光", en: "Hard",    ja: "ハード" },
+  "mode.softLightShort":  { zh: "柔光", en: "Soft",    ja: "ソフト" },
+  "mode.differenceShort": { zh: "差值", en: "Diff",    ja: "差分" },
+  "mode.exclusionShort":  { zh: "排除", en: "Excl",    ja: "除外" },
+  "mode.passThroughShort":{ zh: "穿透", en: "Pass",    ja: "パス" }, // ── 图层面板（layers-panel.ts）切片 3a ──
   "lp.badge":        { zh: "不透明度 {o}% · 模式 {m}", en: "Opacity {o}% · Mode {m}", ja: "不透明度 {o}% · モード {m}", tok: "wawa kule {o}% · nasin {m}" }, 
   "lp.visible":      { zh: "可见",     en: "Visible",      ja: "表示", tok: "lukin" }, 
   "lp.hidden":       { zh: "已隐藏",   en: "Hidden",       ja: "非表示", tok: "lukin ala" }, 
@@ -696,6 +710,8 @@ export const S = {
   "pick.sampleTip":  { zh: "吸色取样：合并最终颜色 / 当前图层原色", en: "Eyedropper: merged final color / active layer color", ja: "スポイト：合成後の色 / アクティブ層の色", tok: "kama kule: kule pini pi lipu ale / kule pi lipu ni" },
   "pick.composite":  { zh: "合并颜色", en: "Merged", ja: "合成", tok: "kule pi lipu ale" },
   "pick.active":     { zh: "当前图层", en: "Active layer", ja: "アクティブ層", tok: "lipu ni" },
+  "pick.compositeShort": { zh: "合并", en: "Merged", ja: "合成" },   // 2026-09-11 吸色条定宽下拉缩写
+  "pick.activeShort":    { zh: "当前层", en: "Layer", ja: "現在層" },
   // 调色板面板标题
   "palette.title":   { zh: "调色板", en: "Palette", ja: "パレット", tok: "poki kule" },
   // 笔架 sheet
@@ -755,6 +771,10 @@ export const S = {
   "flt.smudge.mix.srgb":     { zh: "直接混合", en: "Plain mix", ja: "そのまま混色" },
   "flt.smudge.mix.oklab":    { zh: "保饱和度", en: "Vivid mix", ja: "鮮やか混色" },
   "flt.smudge.mix.spectral": { zh: "颜料谱", en: "Pigment mix", ja: "顔料混色" },
+  // 2026-09-11 手指条定宽下拉缩写（钮面；弹层全名）
+  "flt.smudge.mix.srgbShort":     { zh: "直接", en: "Plain",   ja: "そのまま" },
+  "flt.smudge.mix.oklabShort":    { zh: "饱和", en: "Vivid",   ja: "鮮やか" },
+  "flt.smudge.mix.spectralShort": { zh: "颜料", en: "Pigment", ja: "顔料" },
   // 颜色浮窗
   "color.title":     { zh: "颜色", en: "Color", ja: "カラー", tok: "kule" },
   // 清空确认 sheet
@@ -1344,6 +1364,12 @@ export const S = {
   "flt.liq.bleedEdge":  { zh: "边缘拉伸", en: "Stretch edge", ja: "境界を伸ばす" },
   "flt.liq.bleedClip":  { zh: "不拉边界外", en: "Wall at boundary", ja: "境界の外を使わない" },
   "flt.liq.bleedImport":{ zh: "拉边界外", en: "Pull from outside", ja: "境界の外から引き込む" },
+  // 2026-09-11 液化条定宽下拉缩写（钮面；弹层全名）
+  "flt.liq.twirlLShort":     { zh: "左旋", en: "Twirl L", ja: "左回転" },
+  "flt.liq.twirlRShort":     { zh: "右旋", en: "Twirl R", ja: "右回転" },
+  "flt.liq.bleedEdgeShort":  { zh: "拉伸", en: "Stretch", ja: "伸ばす" },
+  "flt.liq.bleedClipShort":  { zh: "设墙", en: "Wall",    ja: "壁" },
+  "flt.liq.bleedImportShort":{ zh: "拉入", en: "Pull",    ja: "引込" },
   "flt.sb.title":       { zh: "锐化 / 模糊", en: "Sharpen / Blur", ja: "シャープ / ぼかし" },
   "flt.sb.blurBrush":   { zh: "模糊（笔刷）", en: "Blur (brush)", ja: "ぼかし（ブラシ）" },
   "flt.sb.sharpBrush":  { zh: "锐化（笔刷）", en: "Sharpen (brush)", ja: "シャープ（ブラシ）" },
@@ -1366,6 +1392,13 @@ export const S = {
   "rsm.sharper":   { zh: "缩小优化（清晰）", en: "Downscale-optimized (crisp)", ja: "縮小最適化（くっきり）" },
   "rsm.bilinear":  { zh: "双线性（软）", en: "Bilinear (soft)", ja: "バイリニア（ソフト）" },
   "rsm.nearest":   { zh: "最近邻（像素画）", en: "Nearest (pixel art)", ja: "ニアレスト（ドット絵）" },
+  // 2026-09-11 采样方法缩写（套索变换条 / 液化条的定宽下拉钮面；sheet 里仍画全名）
+  "rsm.bicubicShort":   { zh: "双三次", en: "Bicubic",  ja: "3次" },
+  "rsm.rotspriteShort": { zh: "像素完美", en: "Pixel",  ja: "ドット絵" },
+  "rsm.splineShort":    { zh: "样条", en: "Spline",     ja: "スプライン" },
+  "rsm.sharperShort":   { zh: "缩小优化", en: "Crisp",  ja: "縮小用" },
+  "rsm.bilinearShort":  { zh: "双线性", en: "Bilinear", ja: "線形" },
+  "rsm.nearestShort":   { zh: "最近邻", en: "Nearest",  ja: "最近傍" },
   // 图库徽章 / 时间 / 来源（gallery-view-model.ts）
   "gv.badge.ghost":       { zh: "云端副本已被移动或删除，本地有未推送的修改 —— 可「重命名留存」或「丢弃」", en: "Cloud copy was moved or deleted while local has unpushed edits — “rename & keep” or “discard”", ja: "クラウド側が移動/削除され、ローカルに未プッシュの変更があります——「改名して保持」か「破棄」を" },
   "gv.badge.pendingGone": { zh: "云端副本已消失，本地干净副本待处理 —— 可「重新上传」推回云端，或「删除」；宽限期后自动移入回收站", en: "Cloud copy is gone; clean local copy pending — “re-upload” to push it back, or “delete”; auto-trashed after the grace period", ja: "クラウド側が消失、ローカルのクリーンな複製が保留中——「再アップロード」か「削除」を。猶予期間後は自動でゴミ箱へ" },

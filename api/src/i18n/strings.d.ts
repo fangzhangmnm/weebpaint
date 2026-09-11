@@ -1105,6 +1105,71 @@ export declare const S: {
         readonly ja: "パススルー";
         readonly tok: "lupa";
     };
+    readonly "mode.normalShort": {
+        readonly zh: "正常";
+        readonly en: "Normal";
+        readonly ja: "通常";
+    };
+    readonly "mode.multiplyShort": {
+        readonly zh: "正片";
+        readonly en: "Mult";
+        readonly ja: "乗算";
+    };
+    readonly "mode.screenShort": {
+        readonly zh: "滤色";
+        readonly en: "Screen";
+        readonly ja: "スクリーン";
+    };
+    readonly "mode.overlayShort": {
+        readonly zh: "叠加";
+        readonly en: "Overlay";
+        readonly ja: "オーバレイ";
+    };
+    readonly "mode.darkenShort": {
+        readonly zh: "变暗";
+        readonly en: "Darken";
+        readonly ja: "比較暗";
+    };
+    readonly "mode.lightenShort": {
+        readonly zh: "变亮";
+        readonly en: "Lighten";
+        readonly ja: "比較明";
+    };
+    readonly "mode.colorDodgeShort": {
+        readonly zh: "减淡";
+        readonly en: "Dodge";
+        readonly ja: "覆い焼き";
+    };
+    readonly "mode.colorBurnShort": {
+        readonly zh: "加深";
+        readonly en: "Burn";
+        readonly ja: "焼き込み";
+    };
+    readonly "mode.hardLightShort": {
+        readonly zh: "强光";
+        readonly en: "Hard";
+        readonly ja: "ハード";
+    };
+    readonly "mode.softLightShort": {
+        readonly zh: "柔光";
+        readonly en: "Soft";
+        readonly ja: "ソフト";
+    };
+    readonly "mode.differenceShort": {
+        readonly zh: "差值";
+        readonly en: "Diff";
+        readonly ja: "差分";
+    };
+    readonly "mode.exclusionShort": {
+        readonly zh: "排除";
+        readonly en: "Excl";
+        readonly ja: "除外";
+    };
+    readonly "mode.passThroughShort": {
+        readonly zh: "穿透";
+        readonly en: "Pass";
+        readonly ja: "パス";
+    };
     readonly "lp.badge": {
         readonly zh: "不透明度 {o}% · 模式 {m}";
         readonly en: "Opacity {o}% · Mode {m}";
@@ -3659,6 +3724,16 @@ export declare const S: {
         readonly ja: "アクティブ層";
         readonly tok: "lipu ni";
     };
+    readonly "pick.compositeShort": {
+        readonly zh: "合并";
+        readonly en: "Merged";
+        readonly ja: "合成";
+    };
+    readonly "pick.activeShort": {
+        readonly zh: "当前层";
+        readonly en: "Layer";
+        readonly ja: "現在層";
+    };
     readonly "palette.title": {
         readonly zh: "调色板";
         readonly en: "Palette";
@@ -3932,6 +4007,21 @@ export declare const S: {
         readonly zh: "颜料谱";
         readonly en: "Pigment mix";
         readonly ja: "顔料混色";
+    };
+    readonly "flt.smudge.mix.srgbShort": {
+        readonly zh: "直接";
+        readonly en: "Plain";
+        readonly ja: "そのまま";
+    };
+    readonly "flt.smudge.mix.oklabShort": {
+        readonly zh: "饱和";
+        readonly en: "Vivid";
+        readonly ja: "鮮やか";
+    };
+    readonly "flt.smudge.mix.spectralShort": {
+        readonly zh: "颜料";
+        readonly en: "Pigment";
+        readonly ja: "顔料";
     };
     readonly "color.title": {
         readonly zh: "颜色";
@@ -7231,6 +7321,31 @@ export declare const S: {
         readonly en: "Pull from outside";
         readonly ja: "境界の外から引き込む";
     };
+    readonly "flt.liq.twirlLShort": {
+        readonly zh: "左旋";
+        readonly en: "Twirl L";
+        readonly ja: "左回転";
+    };
+    readonly "flt.liq.twirlRShort": {
+        readonly zh: "右旋";
+        readonly en: "Twirl R";
+        readonly ja: "右回転";
+    };
+    readonly "flt.liq.bleedEdgeShort": {
+        readonly zh: "拉伸";
+        readonly en: "Stretch";
+        readonly ja: "伸ばす";
+    };
+    readonly "flt.liq.bleedClipShort": {
+        readonly zh: "设墙";
+        readonly en: "Wall";
+        readonly ja: "壁";
+    };
+    readonly "flt.liq.bleedImportShort": {
+        readonly zh: "拉入";
+        readonly en: "Pull";
+        readonly ja: "引込";
+    };
     readonly "flt.sb.title": {
         readonly zh: "锐化 / 模糊";
         readonly en: "Sharpen / Blur";
@@ -7335,6 +7450,36 @@ export declare const S: {
         readonly zh: "最近邻（像素画）";
         readonly en: "Nearest (pixel art)";
         readonly ja: "ニアレスト（ドット絵）";
+    };
+    readonly "rsm.bicubicShort": {
+        readonly zh: "双三次";
+        readonly en: "Bicubic";
+        readonly ja: "3次";
+    };
+    readonly "rsm.rotspriteShort": {
+        readonly zh: "像素完美";
+        readonly en: "Pixel";
+        readonly ja: "ドット絵";
+    };
+    readonly "rsm.splineShort": {
+        readonly zh: "样条";
+        readonly en: "Spline";
+        readonly ja: "スプライン";
+    };
+    readonly "rsm.sharperShort": {
+        readonly zh: "缩小优化";
+        readonly en: "Crisp";
+        readonly ja: "縮小用";
+    };
+    readonly "rsm.bilinearShort": {
+        readonly zh: "双线性";
+        readonly en: "Bilinear";
+        readonly ja: "線形";
+    };
+    readonly "rsm.nearestShort": {
+        readonly zh: "最近邻";
+        readonly en: "Nearest";
+        readonly ja: "最近傍";
     };
     readonly "gv.badge.ghost": {
         readonly zh: "云端副本已被移动或删除，本地有未推送的修改 —— 可「重命名留存」或「丢弃」";

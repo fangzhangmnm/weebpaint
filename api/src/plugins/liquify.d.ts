@@ -13,17 +13,27 @@ export declare class LiquifyFilter {
         mode: string;
     };
     static supportsLayerGroup: boolean;
-    static brushVariants: {
+    static brushVariants: ({
         id: string;
         title: string;
         params: {
             mode: string;
             strengthScale: number;
         };
-    }[];
+        short?: undefined;
+    } | {
+        id: string;
+        title: string;
+        short: string;
+        params: {
+            mode: string;
+            strengthScale: number;
+        };
+    })[];
     static boundaryModes: {
         id: string;
         title: string;
+        short: string;
     }[];
     static sampleModes: boolean;
     static beginBrushStroke(layers: readonly BrushLayer[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, pressure: number): LiquifyBrushState;

@@ -17,6 +17,18 @@ describe("context-toolbar · 登记表 = index.html 顶栏条全集", () => {
     // 几何条 rulerToolbar 2026-09-10 晚插头已拔（app.ts 不再 initRulerUi）→ 不在登记表；插回时把它加回这条断言
     assert(registered.has("filterBrushToolbar") && registered.has("pickerToolbar") && !registered.has("rulerToolbar"), "工厂 mount 的滤镜笔条/吸色条在登记表（init 即 mount）；几何条插头已拔：" + [...registered].join(","));
   });
+  // 2026-09-11 叠放归工厂（user「几何对齐还会不小心变成右对齐，然后换 context 的时候会突然空出来一大堆白」「应该走的是同一套代码」）：
+  //   owner 不许再自己量别人的 bottom 写 top、不许右对齐特例——几何条插回时也只 mountContextToolbar + show/hide。
+  it("多条叠放只在工厂：ruler-ui 不算 top / 不 ct-tail；styles 无 .ct-tail；工厂导出 relayoutContextToolbars", async () => {
+    const ruler = readFileSync(new URL("../src/ruler-ui.ts", import.meta.url), "utf-8");
+    assert(!/style\.top\s*=/.test(ruler), "ruler-ui 不该再写 el.style.top");
+    assert(!/classList\.add\("ct-tail"\)|contextToolbarBottomExcept\(/.test(ruler), "ruler-ui 不该再挂 ct-tail / 调 contextToolbarBottomExcept（注释里提到不算）");
+    const css = readFileSync(new URL("../styles.css", import.meta.url), "utf-8");
+    assert(!/\.ct-tail\s*\{/.test(css), "styles.css 不该再有 .ct-tail 规则");
+    const mod = await import("../src/ui/context-toolbar.ts");
+    eq(typeof mod.relayoutContextToolbars, "function");
+    eq(typeof mod.contextToolbarBottomExcept, "undefined", "contextToolbarBottomExcept 退役");
+  });
   it("anchored-popup 源码不再持顶栏 id 数组", () => {
     const src = readFileSync(new URL("../src/anchored-popup.ts", import.meta.url), "utf-8");
     assert(!/_TOP_TOOLBAR_IDS\s*=/.test(src), "anchored-popup 不该再有 _TOP_TOOLBAR_IDS 数组");

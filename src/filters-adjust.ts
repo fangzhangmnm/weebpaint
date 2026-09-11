@@ -37,10 +37,10 @@ interface FilterLike {
   disposeBody?(state: unknown): void;   // 2026-09-05：关面板 / 重置重建前收口（渐变映射注销 color target）
   onBodyResize?(state: unknown, avail: { w: number; h: number }): void;   // 2026-09-06：声明 = 调整浮窗露右下角 grip；整窗拖大时收 body 可用尺寸（曲线滤镜贴满绘图区）
   bake(src: Uint8ClampedArray, out: Uint8ClampedArray, params: unknown, mask: Uint8Array | null, w: number, h: number): void;
-  brushVariants?: { id: string; title: string; params: Record<string, unknown> }[];
-  boundaryModes?: { id: string; title: string }[];
+  brushVariants?: { id: string; title: string; short?: string; params: Record<string, unknown> }[];   // short = 定宽下拉钮面缩写（2026-09-11，可选）
+  boundaryModes?: { id: string; title: string; short?: string }[];
   sampleModes?: boolean;   // v0.6.36：声明即渲染采样核下拉（液化；选项 = RESAMPLE_MODES 的 liquify context）
-  mixModes?: { id: string; title: string }[];   // 2026-09-05：混色空间下拉（手指 smudge 声明；值经 params.mix，持久化 preferences "smudge-mix"）
+  mixModes?: { id: string; title: string; short?: string }[];   // 2026-09-05：混色空间下拉（手指 smudge 声明；值经 params.mix，持久化 preferences "smudge-mix"）
   brushSliders?: { key: string; title: string; min: number; max: number; step: number; fmt?: (v: number) => string; variants?: string[]; map?: { toParam(v: number): number; fromParam(p: number): number } }[];   // 2026-09-05：连续旋钮（手指 smear↔dull「揉匀」；值经 params[key]，session 态）；2026-09-06 variants 白名单 + map（对数刻度等）
 }
 // adjust panel 操作的 doc 活层（doc.js 未类型化 → 只描述用到的）。
@@ -334,7 +334,8 @@ function _fbRows(): ToolbarItem[][] {
   // ⓪ 手指位子工具 = 带图标的下拉（2026-09-09 user「手指的几种工具用下拉框吧，图标太打哑谜了」→ 修订 ③ 的六颗图标左段退役，
   //   换 select-field：钮面 = 当前子工具 图标+名字，弹层 = 六项 图标+名字）。仍是「顶栏手指位只会冒出这一条」（ADR-0012 修订 ③/④）。
   //   条标题一并退役——下拉的 label 已点明是哪个子工具，再写「手指 / 涂抹」是重复。pin：永不进「…」（它是这条的身份）。
-  items.push({ kind: "select", id: "filterBrushSubSel", title: tLatin("flt.smudge.title"),
+  //   2026-09-11 钮面只画图标（face: icon；user「手指的 context bar 的第一个下拉框只显示图标，我知道都是一样的手指。没关系」）；弹层仍 图标+名字。
+  items.push({ kind: "select", id: "filterBrushSubSel", title: tLatin("flt.smudge.title"), face: "icon",
     items: () => VERB_SUBTOOLS.smudge.map((d) => ({ value: d.id, label: tLatin(d.titleKey as Parameters<typeof tLatin>[0]), icon: d.icon })),
     value: () => desk.subTool.smudge || DEFAULT_SUBTOOL.smudge,
     onChange: (id) => setVerb("smudge", id), pin: true });
@@ -342,7 +343,7 @@ function _fbRows(): ToolbarItem[][] {
   const variants = Filter.brushVariants || [];
   const covered = new Set(VERB_SUBTOOLS.smudge.filter((d) => "filter" in d.route && d.route.filter === Filter.id).map((d) => ("filter" in d.route ? d.route.variant : undefined)));
   if (variants.length > 1 && variants.some((v) => !covered.has(v.id))) {
-    items.push({ kind: "select", id: "filterBrushVariantSel", title: tLatin("fb.variant"), items: () => variants.map((v) => ({ value: v.id, label: v.title })), value: () => fb.variantId || "", onChange: (id) => {
+    items.push({ kind: "select", id: "filterBrushVariantSel", title: tLatin("fb.variant"), items: () => variants.map((v) => ({ value: v.id, label: v.title, short: v.short })), value: () => fb.variantId || "", onChange: (id) => {
       const v = variants.find((x) => x.id === id);
       if (!v) return;
       // 切 variant 别丢 bleed/sample/mix（声明了对应能力的 filter 才有这些 key）
@@ -366,7 +367,7 @@ function _fbRows(): ToolbarItem[][] {
   }
   // ②b 混色空间（手指）：值 → params.mix，持久化 preferences "smudge-mix"（gallery scope）
   if (Filter.mixModes) {
-    items.push({ kind: "select", id: "filterBrushMixSel", title: tLatin("fb.mix"), items: () => Filter.mixModes!.map((m) => ({ value: m.id, label: m.title })), value: () => (fb.params.mix as string) || "srgb",
+    items.push({ kind: "select", id: "filterBrushMixSel", title: tLatin("fb.mix"), items: () => Filter.mixModes!.map((m) => ({ value: m.id, label: m.title, short: m.short })), value: () => (fb.params.mix as string) || "srgb",
       onChange: (v) => {
         fb.params = { ...fb.params, mix: v };
         preferences.set("smudge-mix", v);
@@ -389,7 +390,7 @@ function _fbRows(): ToolbarItem[][] {
   }
   // ③ 边界取样（液化且有选区）
   if (Filter.boundaryModes && doc.selection) {
-    items.push({ kind: "select", id: "filterBrushBleedSel", title: tLatin("fb.bleed"), items: () => Filter.boundaryModes!.map((b) => ({ value: b.id, label: b.title })), value: () => (fb.params.bleed as string) || "edge",
+    items.push({ kind: "select", id: "filterBrushBleedSel", title: tLatin("fb.bleed"), items: () => Filter.boundaryModes!.map((b) => ({ value: b.id, label: b.title, short: b.short })), value: () => (fb.params.bleed as string) || "edge",
       onChange: (v) => {
         fb.params = { ...fb.params, bleed: v };
         desk.liquify.bleed = v;

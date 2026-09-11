@@ -2,10 +2,12 @@ import { type PopupBand } from "./popup-menu.ts";
 export interface SelectItem {
     value: string;
     label: string;
+    short?: string;
     icon?: string;
     group?: string;
     disabled?: boolean;
 }
+export type SelectFace = "label" | "short" | "icon";
 export interface SelectFieldOpts {
     items: () => SelectItem[];
     value: () => string;
@@ -13,6 +15,7 @@ export interface SelectFieldOpts {
     band?: PopupBand;
     align?: "left" | "right";
     ariaLabel?: string;
+    face?: SelectFace;
 }
 export interface SelectField {
     readonly el: HTMLElement;

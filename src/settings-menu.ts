@@ -34,7 +34,7 @@ let state: AppContext["state"], board: AppContext["board"], setStatus: AppContex
 
 // （openSheet/closeSheet 拷贝 2026-09-02 C3 退役：走 ui/sheet）
 
-function setMenuItem(btn: HTMLElement, on: boolean, stateLabel = on ? t("common.on") : t("common.off")) {
+export function setMenuItem(btn: HTMLElement, on: boolean, stateLabel = on ? t("common.on") : t("common.off")) {   // export 2026-09-11：参考窗主菜单 toggle 项同款开/关态
   btn.setAttribute("aria-pressed", on ? "true" : "false");
   const st = btn.querySelector('.menu-item-state');
   if (st) st.textContent = stateLabel;

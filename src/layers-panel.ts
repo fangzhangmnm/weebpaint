@@ -21,11 +21,11 @@
 // 仍留 app.js 的协作件经 ctx 绑入：doc / board / history / layers / setStatus（核心单例）
 // + _afterDocChange（lasso / history handler 也调）。
 
-import { createApp, defineComponent, reactive, computed, watch, nextTick, ref, onMounted, onUnmounted } from "../vendor/vue/vue.esm-browser.prod.js";
+import { createApp, defineComponent, reactive, computed, watch, nextTick, ref, onUnmounted } from "../vendor/vue/vue.esm-browser.prod.js";
 import { positionPopup } from "./anchored-popup.ts";
 import { registerFloatingWindow, type FloatingWindowHandle } from "./ui/floating-window.ts";
-import { toggleAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";   // 2026-09-02 C1：＋ 菜单收养（搬 body，锚到 ＋ 钮）
-import { mountSelectField, type SelectField } from "./ui/select-field.ts";   // 2026-09-02 C6：混合模式下拉标准件（Vue 行内原生 select 退役）   // 2026-09-02 C2 浮窗深模块（z/拖缩/钳制/出血区/transient 一处）
+import { toggleAdoptedPopup, closePopupMenuOf, openAdoptedPopup, type PopupMenuHandle } from "./ui/popup-menu.ts";   // 2026-09-02 C1：＋ 菜单收养（搬 body，锚到 ＋ 钮）；2026-09-11 图层调整弹层同款收养
+import { mountSelectField, type SelectField, type SelectItem } from "./ui/select-field.ts";   // 2026-09-02 C6：混合模式下拉标准件（Vue 行内原生 select 退役）   // 2026-09-02 C2 浮窗深模块（z/拖缩/钳制/出血区/transient 一处）
 
 // （出血区地板常数 PANEL_MIN_TOP=60 退役 2026-09-02：iPadOS 顶部死区没有 API 可查，地板由 ui/floating-window 运行时量顶栏下缘）
 import { countViewLeaves, findViewNodeById, flattenViewLeaves, type ViewNode, type ViewLeaf, type ViewGroup } from "./backend/workpiece/painting-view.ts";
@@ -62,7 +62,7 @@ interface LayerRowData {
   hasPx: boolean; childLeafCount?: number;
 }
 // <LayerRow> setup 里读到的 props（其余 props 只在 template 用）。
-interface LayerRowProps { layer: LayerLeafSnap; depth: number; isGroup: boolean; menuOpen: boolean; moveTargets: MoveTarget[]; }
+interface LayerRowProps { layer: LayerLeafSnap; depth: number; isGroup: boolean; expanded: boolean; menuOpen: boolean; moveTargets: MoveTarget[]; }
 
 let doc: AppContext["doc"], board: AppContext["board"], history: AppContext["history"], setStatus: AppContext["setStatus"];
 let layers: AppContext["layers"];
@@ -85,6 +85,13 @@ export const LAYER_MODE_LABEL: Record<string, string> = {
 // 组的模式下拉：穿透（默认/非隔离）置顶，其余 = 正常(隔离) + 各混合模式。对齐 PS 组下拉。
 export const GROUP_MODE_LABEL: Record<string, string> = {
   "pass-through": t("mode.passThrough"), ...LAYER_MODE_LABEL,
+};
+// 2026-09-11 定宽下拉钮面的缩写（弹层项仍 "[N] 全名"；user「加入定宽的缩写用来显示。图层的混合模式也是」）
+const LAYER_MODE_SHORT: Record<string, string> = {
+  "source-over": t("mode.normalShort"), "multiply": t("mode.multiplyShort"), "screen": t("mode.screenShort"), "overlay": t("mode.overlayShort"),
+  "darken": t("mode.darkenShort"), "lighten": t("mode.lightenShort"), "color-dodge": t("mode.colorDodgeShort"), "color-burn": t("mode.colorBurnShort"),
+  "hard-light": t("mode.hardLightShort"), "soft-light": t("mode.softLightShort"), "difference": t("mode.differenceShort"), "exclusion": t("mode.exclusionShort"),
+  "pass-through": t("mode.passThroughShort"),
 };
 function modeInitial(m: string) { return LAYER_MODE_INITIAL[m] || "?"; }
 
@@ -463,18 +470,32 @@ const LayerRow = defineComponent({
       }
       opaOld = null;
     }
-    // 混合模式下拉（2026-09-02 C6）：select-field 标准件挂在行内按钮上——items/value 从 Vue 态派生，改了 refresh。
+    // 调整弹层（2026-09-11；user「layer 的调整下拉抽屉，能不能换 layer 的时候就自动关掉。不过其实我是更喜欢 context 菜单的，就是和菜单一样会自动关」）：
+    //   透明度 + 混合模式从行内抽屉搬进 Teleport 到 body 的弹层，锚在 badge 下，走 ui/popup-menu 收养——外点关 / Escape / 栈 / 换活动层关（_syncChrome）。
+    //   混合模式下拉（C6 select-field）**开弹层时才挂**（2026-09-11 根因修：此前 onMounted 挂一次，而 modeBtn 在 v-if 里——组件首次 mount 时抽屉没开、
+    //   ref 为 null 就早退，之后展开的按钮永远没 label → 「混合模式下拉框文字不显示」）。钮面 = 定宽缩写档。
     const modeBtn = ref<HTMLElement | null>(null);
+    const badgeBtn = ref<HTMLElement | null>(null);
+    const adjEl = ref<HTMLElement | null>(null);
     let _modeField: SelectField | null = null;
-    onMounted(() => {
-      if (!modeBtn.value) return;
+    let _adjPopup: PopupMenuHandle | null = null;
+    watch(() => props.expanded, async (open: boolean) => {
+      _modeField?.dispose(); _modeField = null;
+      if (!open) { const h = _adjPopup; _adjPopup = null; h?.close(); return; }
+      await nextTick();
+      if (!adjEl.value || !badgeBtn.value || !modeBtn.value) return;
       _modeField = mountSelectField(modeBtn.value, {
-        items: () => Object.entries(modeOptions.value as Record<string, string>).map(([value, label]) => ({ value, label })),
+        items: () => modeOptions.value as SelectItem[],
         value: () => props.layer.mode,
         onChange: (v) => _setMode(live(), v),
+        face: "short", band: "popover",   // 弹层里再弹 = popover band
+      });
+      _adjPopup = openAdoptedPopup(adjEl.value, {
+        anchor: badgeBtn.value, align: "right", band: "menu",
+        onClose: () => { _adjPopup = null; if (layersUi.expandedId === snap().id) layersUi.expandedId = null; },
       });
     });
-    onUnmounted(() => { _modeField?.dispose(); _modeField = null; });
+    onUnmounted(() => { _modeField?.dispose(); _modeField = null; const h = _adjPopup; _adjPopup = null; h?.close(); });
     watch(() => [props.layer.mode, props.isGroup], () => _modeField?.refresh());
 
     // 组折叠三角（仅组行）。折叠态在 layersUi.collapsedIds（不影响合成，纯 UI）。
@@ -537,11 +558,9 @@ const LayerRow = defineComponent({
     const railPad = computed(() => 6 + props.depth * 9);    // px：rail 自身宽，非传统缩进
     // v0.5.8（user）：下拉项带拉丁字母前缀「[N] 普通」——与 badge 单字符对得上号。
     //   **现场合成**（INITIAL 表 + i18n label 拼接），不写死进 localization。
-    const modeOptions = computed(() => {
+    const modeOptions = computed((): SelectItem[] => {
       const src = props.isGroup ? GROUP_MODE_LABEL : LAYER_MODE_LABEL;
-      const out: Record<string, string> = {};
-      for (const [val, lbl] of Object.entries(src)) out[val] = `[${LAYER_MODE_INITIAL[val] || "?"}] ${lbl}`;
-      return out;
+      return Object.entries(src).map(([value, lbl]) => ({ value, label: `[${LAYER_MODE_INITIAL[value] || "?"}] ${lbl}`, short: LAYER_MODE_SHORT[value] || lbl }));
     });
 
     // i18n 模板标签清单：t() 在 setup 调（§5a 纪律，key 受 tsc 检查），模板只引 L.*。
@@ -562,7 +581,7 @@ const LayerRow = defineComponent({
       EYE_OPEN, EYE_OFF, FOLDER_OPEN, FOLDER_CLOSED, LAYER_MODE_LABEL,
       onRowClick, onNameClick, onRenameCommit, onRenameKey,
       toggleBadge, toggleMenu, vis, toggleCollapse, menuBtn, menuEl,
-      opaInput, opaCommit, modeBtn, act, moveBtn,
+      opaInput, opaCommit, modeBtn, badgeBtn, adjEl, act, moveBtn,
       toggleClip, toggleRef, toggleLock,
     };
   },
@@ -598,7 +617,7 @@ const LayerRow = defineComponent({
 
       <button type="button" ref="menuBtn" class="layer-tools-btn" :title="L.layerMenu" @click="toggleMenu"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#more"/></svg></button>
 
-      <button type="button" class="layer-mode-badge" :class="{ active: expanded }"
+      <button type="button" ref="badgeBtn" class="layer-mode-badge" :class="{ active: expanded }"
         :title="badgeTitle" @click="toggleBadge">{{ modeBadge }}</button>
 
       <Teleport to="body"><div v-if="menuOpen" ref="menuEl" class="menu-panel layer-tools-popup" @click.stop>
@@ -630,7 +649,8 @@ const LayerRow = defineComponent({
       </div></Teleport>
     </div>
 
-    <div v-if="expanded" class="layer-row-expand" :style="{ marginLeft: railPad + 'px' }" @click.stop>
+    <!-- 调整弹层（2026-09-11）：Teleport 到 body（逃出面板 backdrop-filter 包含块，与 ⋯ 菜单同理），popup-menu 收养定位/关闭纪律 -->
+    <Teleport to="body"><div v-if="expanded" ref="adjEl" class="menu-panel layer-adjust-popup hidden" @click.stop>
       <label class="layer-slider-row">
         <span class="layer-slider-icon" :title="L.opa"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#opacity"/></svg></span>
         <input type="range" min="0" max="100" :value="opacityPct"
@@ -641,8 +661,8 @@ const LayerRow = defineComponent({
         <span>{{ L.mode }}</span>
         <button ref="modeBtn" type="button" class="select-field layer-mode-select" style="grid-column: span 2;" @click.stop></button>
       </label>
-      <!-- v267 (user)：剪裁 / 锁α / 参考 toggle 已收进 ⋯ 菜单，折叠区只留 透明度 + 模式 -->
-    </div>
+      <!-- v267 (user)：剪裁 / 锁α / 参考 toggle 已收进 ⋯ 菜单，这里只留 透明度 + 模式 -->
+    </div></Teleport>
   `,
 });
 
@@ -771,7 +791,9 @@ function _clampListHeight() {
 
 // 面板外 chrome 同步（计数标签 / 加按钮禁用 / 删按钮禁用 / 滚到活动层）—— 这些 DOM 不在 mount
 // 容器内，由 docVersion watch 驱动（取代旧 renderLayersPanel 末尾的命令式赋值）。
+let _lastActiveForAdjust: number | null = null;   // 换活动层 → 调整弹层自动关（2026-09-11 user）
 function _syncChrome() {
+  if (doc.activeId !== _lastActiveForAdjust) { _lastActiveForAdjust = doc.activeId; if (layersUi.expandedId != null) layersUi.expandedId = null; }
   const max = doc.maxLayers;
   const leaves = countViewLeaves(doc.layers);
   els.layersCountLabel.textContent = `${leaves} / ${max}`;

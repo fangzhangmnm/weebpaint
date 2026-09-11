@@ -48,16 +48,16 @@ export class LiquifyFilter {
     { id: "push",    title: tLatin("flt.liq.push"),   params: { mode: "push",    strengthScale: 1.0 } },
     { id: "pinch",   title: tLatin("flt.liq.pinch"),   params: { mode: "pinch",   strengthScale: 0.1 } },
     { id: "bloat",   title: tLatin("flt.liq.bloat"),   params: { mode: "bloat",   strengthScale: 0.1 } },
-    { id: "twirlL",  title: tLatin("flt.liq.twirlL"), params: { mode: "twirl",   strengthScale: 0.1 } },
-    { id: "twirlR",  title: tLatin("flt.liq.twirlR"), params: { mode: "twirlCW", strengthScale: 0.1 } },
+    { id: "twirlL",  title: tLatin("flt.liq.twirlL"), short: tLatin("flt.liq.twirlLShort"), params: { mode: "twirl",   strengthScale: 0.1 } },   // short = 定宽钮面缩写（2026-09-11）
+    { id: "twirlR",  title: tLatin("flt.liq.twirlR"), short: tLatin("flt.liq.twirlRShort"), params: { mode: "twirlCW", strengthScale: 0.1 } },
   ];
 
   // v147 选区边界取样模式（仅有选区时有意义）。feature 自己声明，toolbar 通用渲染第 2 个下拉，
   // 值经 params.bleed 透传到 LiquifyEngine.settings.bleed（见 src/liquify.js 注释）。
-  static boundaryModes = [
-    { id: "edge",   title: tLatin("flt.liq.bleedEdge") },   // 默认：边界像素沿拉拽方向无限拉长
-    { id: "clip",   title: tLatin("flt.liq.bleedClip") }, // 设墙：外部什么都不进
-    { id: "import", title: tLatin("flt.liq.bleedImport") },   // 旧行为：把外部内容拉进选区
+  static boundaryModes = [   // short = 定宽钮面缩写（2026-09-11；弹层画 title 全名）
+    { id: "edge",   title: tLatin("flt.liq.bleedEdge"),   short: tLatin("flt.liq.bleedEdgeShort") },   // 默认：边界像素沿拉拽方向无限拉长
+    { id: "clip",   title: tLatin("flt.liq.bleedClip"),   short: tLatin("flt.liq.bleedClipShort") }, // 设墙：外部什么都不进
+    { id: "import", title: tLatin("flt.liq.bleedImport"), short: tLatin("flt.liq.bleedImportShort") },   // 旧行为：把外部内容拉进选区
   ];
 
   // v0.6.36 采样核（保锐模式）：声明存在即渲染下拉（选项从 RESAMPLE_MODES 的 liquify context 拉），

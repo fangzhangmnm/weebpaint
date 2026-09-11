@@ -84,6 +84,7 @@ export declare class SmudgeFilter {
     static mixModes: {
         id: string;
         title: string;
+        short: string;
     }[];
     static beginBrushStroke(layers: readonly BrushLayer[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, pressure: number): SmudgeBrushState;
     static extendBrushStamp(state: SmudgeBrushState, x: number, y: number, pressure: number): void;

@@ -127,8 +127,9 @@ canvas:active { cursor: grabbing; }
 :host([pick]) canvas, :host([pick]) canvas:active { cursor: crosshair; }
 /* gizmo 尺寸 = 家族浮窗标准件（user 0830「按 Layers 的大小来」）：把手 22×22 满铺（同 styles.css
    .float-panel-resize 的双斜纹渐变），＋ 28，chips 14px 图标。 */
-.plus {
-  position: absolute; top: 4px; right: 4px; z-index: 3;
+/* 右上角两颗圆钮：＋（菜单）在左、×（关窗）在最右——关闭从菜单里提出来（2026-09-11 user「参考窗的关闭按钮提出来放在…右边。不然找不到」） */
+.plus, .close {
+  position: absolute; top: 4px; z-index: 3;
   width: 28px; height: 28px; padding: 0; border: none; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: color-mix(in srgb, var(--bg, #202124) 72%, transparent);
@@ -136,8 +137,10 @@ canvas:active { cursor: grabbing; }
   user-select: none; -webkit-user-select: none;
   transition: opacity 0.35s;
 }
-.plus svg { width: 16px; height: 16px; pointer-events: none; }
-.plus:hover { background: color-mix(in srgb, var(--bg, #202124) 90%, transparent); }
+.close { right: 4px; }
+.plus { right: 36px; }
+.plus svg, .close svg { width: 16px; height: 16px; pointer-events: none; }
+.plus:hover, .close:hover { background: color-mix(in srgb, var(--bg, #202124) 90%, transparent); }
 /* 拖动把手（user 0830「左上角加一点小点一样的拖动区域…三角形布局，没有按钮式高亮，参考 resize」）：
    与右下 resize 把手同形制同尺寸——点阵裁成左上三角、无底无框，只靠 opacity 呼吸。gizmo 纹理非 icon。 */
 /* 两把手在暗图（三次元相片）上看不清（user 0830）→ 与 ＋ 同款「半透明主题底 + 主色 gizmo」：
@@ -198,8 +201,8 @@ canvas:active { cursor: grabbing; }
 /* gizmo 显隐两档（user 0830「鼠标移走时 gizmos 都隐藏」；「12.12 iPad 看起来还行不干扰」→ 触屏档维持）：
    .away = 能悬停的设备指针离窗 → 全隐（进窗即现）；.idle = 闲置 2.5s 淡至 .35（触屏无悬停只有这档，
    全隐会让 chips 变盲操作）。菜单弹层不在其列。 */
-:host(.idle) .plus, :host(.idle) .grip, :host(.idle) .chips, :host(.idle) .move { opacity: 0.35; }
-:host(.away) .plus, :host(.away) .grip, :host(.away) .chips, :host(.away) .move { opacity: 0; }
+:host(.idle) .plus, :host(.idle) .close, :host(.idle) .grip, :host(.idle) .chips, :host(.idle) .move { opacity: 0.35; }
+:host(.away) .plus, :host(.away) .close, :host(.away) .grip, :host(.away) .chips, :host(.away) .move { opacity: 0; }
 /* 菜单不在 shadow 里（2026-09-02）：挂 body 走 ui/popup-menu——absolute 子节点会被 :host overflow:hidden 裁、
    也困在 :host 的 stacking context 里被别的浮窗盖（老错误复发根因）。 */
 .empty {
@@ -215,6 +218,7 @@ canvas:active { cursor: grabbing; }
 <div class="empty"><slot name="empty"><p>＋ 导入参考图</p></slot></div>
 <div class="move" part="move"></div>
 <button class="plus" part="plus" type="button" aria-haspopup="true">${iconMarkup(REF_ICON_IDS.plus)}</button>
+<button class="close" part="close" type="button">${iconMarkup(REF_ICON_IDS.x)}</button>
 <div class="grip" part="grip"></div>
 <div class="chips hidden">
   <button class="chip" data-page="-1" type="button">${iconMarkup(REF_ICON_IDS.prev)}</button>
@@ -339,6 +343,7 @@ export class WpReferenceWindow extends HTMLElement {
       if (aria || title) b.setAttribute("aria-label", aria || title!);
     };
     setTitle(".plus", l.menu);
+    setTitle(".close", l.closeWin);
     setTitle(".move", l.move);
     setTitle('[data-page="-1"]', l.prev);
     setTitle('[data-page="1"]', l.next);
@@ -549,6 +554,8 @@ export class WpReferenceWindow extends HTMLElement {
   private _bind(root: ShadowRoot) {
     // ＋ = 纯菜单钮（0830：兼拖把「很奇怪」→ 拖归左上角点阵把手 .move）
     this._plusEl.addEventListener("click", () => this._toggleMenu());
+    // ×（2026-09-11 从菜单提出来）：用户交互关窗 → 发 openchange（宿主写 desk + 同步主菜单 toggle 态）
+    root.querySelector(".close")!.addEventListener("click", () => { this.open = false; this._emit("openchange", { open: false }); });
     // 拖动把手（左上角点阵）：拖整窗，钳在视口内
     const move = root.querySelector(".move") as HTMLElement;
     move.addEventListener("pointerdown", (e) => {
@@ -655,7 +662,7 @@ export class WpReferenceWindow extends HTMLElement {
       // 删除 = 二段确认（防误碰，user 0830）：第一下 arm（文案换 delConfirm 变红），第二下才删；没有可删的页时藏。
       { id: "delete",   label: this._delArmed ? (l.delConfirm ?? l.del ?? "Delete") : (l.del ?? "Delete"),
         icon: REF_ICON_IDS.trash, danger: this._delArmed, hidden: this._items.length === 0, separatorBefore: true },
-      { id: "close",    label: l.closeWin ?? "Close",    icon: REF_ICON_IDS.x },
+      // 「关闭」2026-09-11 从菜单提出成窗右上角 × 钮（user「不然找不到」）
     ];
   }
   private _toggleMenu() {
@@ -679,7 +686,6 @@ export class WpReferenceWindow extends HTMLElement {
         else if (id === "cloud") this._emit("requestcloudload");
         else if (id === "live") { this.showLive(); this._emitItems(); }
         else if (id === "onetoone") this.oneToOne();
-        else if (id === "close") { this.open = false; this._emit("openchange", { open: false }); }
       },
     });
   }

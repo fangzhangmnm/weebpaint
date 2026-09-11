@@ -74,6 +74,7 @@ import "./editor-state.test.mjs";         // 2026-07-14 desk struct：默认/set
 import "./verbs.test.mjs";                // 2026-09-06 ADR-0012 顶栏动词表：路由自洽/mode 反推/图标与 i18n 齐全
 import "./verb-segment.test.mjs";           // 2026-09-06 晚 ADR-0012 修订 ③：上下文条左段子工具栏
 import "./select-field-icon.test.mjs";   // 2026-09-09 修订 ④：SelectItem.icon → 钮面图标随当前项走（手指位子工具下拉）
+import "./select-field-face.test.mjs";   // 2026-09-11 钮面三档（label/short 定宽缩写/icon）+ 角落小三角
 import "./icon-sprite-inline.test.mjs";   // 2026-09-09 index.html 内联 sprite 与 assets/icons.svg 对账（v0.14.1 漏贴 finger-paint 病例）
 import "./color-model.test.mjs";
 import "./brush-size.test.mjs";
