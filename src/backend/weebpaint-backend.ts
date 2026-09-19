@@ -369,7 +369,7 @@ export class WeebPaintBackend implements WeebPaintBackendInterface {
       setShadows: () => {},
       // 2026-09-18 区域程序（手指 / 模糊 / 锐化）：headless 也真做——栅格域同一个 GlRoom（缺省 SoftGl2Port 的 CPU 孪生跑）。
       openRegion: (leaf, opts) => this._openRegion(leaf, opts),
-      setRegion: () => {},   // 无屏：不挂 overlay
+      setRegions: () => {},   // 无屏：不挂 overlay
       commitRegion: (region) => this._commitRegion(region),
     };
   }

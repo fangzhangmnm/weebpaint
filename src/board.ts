@@ -856,7 +856,6 @@ export class Board {
     this._regionLayers.set(region, layer);
     return region;
   }
-  setStrokeRegion(region: RegionStroke | null) { this.setStrokeRegions(region ? [region] : []); }
   setStrokeRegions(regions: readonly RegionStroke[]) {
     this._strokeRegions = regions.slice();
     this.requestRender();

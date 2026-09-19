@@ -419,7 +419,7 @@ export class InputController {
     invalidate: () => this.board.invalidateAll(),
     setShadows: (entries) => this.board.setStrokeShadows(entries),
     openRegion: (leaf, opts) => this.board.openRegionStroke(leaf, opts),
-    setRegion: (region) => this.board.setStrokeRegion(region),
+    setRegions: (regions) => this.board.setStrokeRegions(regions),
     commitRegion: (region) => this.board.commitRegionStroke(region),
   };
 

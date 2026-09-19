@@ -69,8 +69,8 @@ export interface StrokeSessionDeps {
   setShadows(entries: readonly { layerId: number; pixels: LayerPixels }[]): void;
   /** 2026-09-18 区域程序（GPU 驻留写靶）：board.openRegionStroke —— 造一笔的 RegionStroke（caps 守卫 / 显存不够 / 无 GL → throw） */
   openRegion(leaf: ViewLeaf, opts: { snapshot: boolean }): RegionStroke;
-  /** board.setStrokeRegion —— 描边期每帧 W 当 overlay（replace）；null = 关 */
-  setRegion(region: RegionStroke | null): void;
+  /** board.setStrokeRegions —— 描边期每帧各 W 当 overlay（replace；组液化 N 叶 N 张）；[] = 关 */
+  setRegions(regions: readonly RegionStroke[]): void;
   /** board.commitRegionStroke —— = bakeStamps 写回链（GPU merge→readPixels→applyRegionDiff→收养），在令牌内；false = 没落层 */
   commitRegion(region: RegionStroke): boolean;
 }
@@ -186,7 +186,7 @@ export class StrokeSession {
   private readonly token: WriteToken;
   private readonly deps: StrokeSessionDeps;
   private _shadows: StrokeShadow[] = [];
-  private _region: RegionStroke | null = null;   // preview="region"：GPU 驻留写靶（2026-09-18）
+  private _regions: RegionStroke[] = [];   // preview="region"：GPU 驻留写靶（单叶 1 个；组液化 N 个，2026-09-19）
   private _open = true;
 
   constructor(deps: StrokeSessionDeps, engine: StrokeEngine, layers: readonly ViewLeaf[], spec: StrokeSessionSpec, preview: StrokePreview) {
@@ -198,12 +198,17 @@ export class StrokeSession {
     this.inPlace = preview === "livesync";
     this.token = deps.begin(spec.historyType);
     if (preview === "region") {
-      // GPU 驻留写靶（2026-09-18 区域程序）：单叶；W 就是预览 overlay（replace）；收口走 bakeStamps 写回链；cancel = dispose 零回滚。
-      if (layers.length !== 1) { this.token.cancel(); throw new Error("StrokeSession: region preview is single-leaf"); }
-      try { this._region = deps.openRegion(layers[0], { snapshot: !!spec.regionSnapshot }); }
-      catch (e) { this.token.cancel(); throw e; }   // caps 守卫 / 显存不够 / GL 丢失：令牌收口再冒错（input 报状态栏 + 黑匣子）
-      deps.setRegion(this._region);
-      this.targets = [this._region] as unknown as ViewLeaf[];   // 引擎面 = StrokeTarget（RegionStroke 实现）
+      // GPU 驻留写靶（2026-09-18 区域程序；2026-09-19 多叶）：每叶一个 RegionStroke，各自的 W 就是预览 overlay（replace）；
+      //   收口逐叶走 bakeStamps 写回链（同一令牌 = 一步 undo）；cancel = 全部 dispose 零回滚。
+      try { for (const l of layers) this._regions.push(deps.openRegion(l, { snapshot: !!spec.regionSnapshot })); }
+      catch (e) {   // caps 守卫 / 显存不够 / GL 丢失：已开的先 dispose，令牌收口再冒错（input 报状态栏 + 黑匣子）
+        for (const r of this._regions) r.dispose();
+        this._regions = [];
+        this.token.cancel();
+        throw e;
+      }
+      deps.setRegions(this._regions);
+      this.targets = this._regions as unknown as ViewLeaf[];   // 引擎面 = StrokeTarget（RegionStroke 实现）
     } else if (preview === "shadow") {
       this._shadows = layers.map((l) => new StrokeShadow(l));
       deps.setShadows(this._shadows.map((s) => ({ layerId: s.id, pixels: s.pixels })));
@@ -247,17 +252,17 @@ export class StrokeSession {
     const cs = (this.engine.endStroke() ?? null) as StampCollect | null;
     let gpuCommitted = false;
     if (cs && cs.stamps.length) gpuCommitted = this.deps.commitStamps(cs);
-    if (this._region) {
-      const region = this._region;
-      this._region = null;
-      let ok = false;
-      try { ok = this.deps.commitRegion(region); }
-      finally { this.deps.setRegion(null); region.dispose(); }
-      if (!ok) {
-        // bakeStamps 返 false = 什么都没写（GL 丢失 / 驻留不齐）：令牌取消、响亮——不静默丢一笔（家规：错误路径不许吞掉照报成功）
+    if (this._regions.length) {
+      const regions = this._regions;
+      this._regions = [];
+      let failed = 0;
+      try { for (const r of regions) if (!this.deps.commitRegion(r)) failed++; }
+      finally { this.deps.setRegions([]); for (const r of regions) r.dispose(); }
+      if (failed) {
+        // bakeStamps 返 false = 该叶什么都没写（GL 丢失 / 驻留不齐）：整笔令牌取消、响亮——不静默丢一笔 / 不落半组（家规：错误路径不许吞）
         this.token.cancel();
         this.deps.invalidate();
-        throw new Error("REGION_COMMIT_FAILED (GPU merge/readback did not land; stroke dropped, token cancelled)");
+        throw new Error(`REGION_COMMIT_FAILED (${failed}/${regions.length} leaves did not land; stroke dropped, token cancelled)`);
       }
       gpuCommitted = true;
     }
@@ -291,7 +296,7 @@ export class StrokeSession {
     if (!this._open) return;
     this._open = false;
     this.engine.cancelStroke();   // shape pixelMode 会 preSnap-restore 到替身——无害（替身随即丢弃）
-    if (this._region) { const r = this._region; this._region = null; this.deps.setRegion(null); r.dispose(); }   // 真层从未被写 → 零回滚
+    if (this._regions.length) { const rs = this._regions; this._regions = []; this.deps.setRegions([]); for (const r of rs) r.dispose(); }   // 真层从未被写 → 零回滚
     if (this._shadows.length) this.deps.setShadows([]);
     this.token.cancel();
     this._disposeShadows();
