@@ -21,7 +21,7 @@ export function runGoldenSuite(label, makeEngine, makeTargets, tol) {
     for (const c of CASES) {
       it(c.name, () => {
         const g = GOLDEN.cases[c.name];
-        const rig = makeTargets(leafSpecs(c));
+        const rig = makeTargets(leafSpecs(c), c);
         const dirty = runCase(makeEngine(), rig.targets, c);
         const got = rig.readAll();
         rig.dispose?.();
@@ -36,19 +36,21 @@ export function runGoldenSuite(label, makeEngine, makeTargets, tol) {
   });
 }
 
-// ---- 当前引擎（录锚时 = CPU；GPU 版落地后换成 RegionStroke 写靶 + tol 2）----
+// ---- GPU 引擎（区域程序，SoftGl2Port 孪生跑）vs CPU 锚 ±2/255：组液化多叶共享一个 GlRoom（场纹理挂第一叶）----
 const { LiquifyEngine } = await import("../src/plugins/liquify-engine.ts");
-function cpuTargets(specs) {
-  const layers = specs.map((spec) => {
-    const buf = new Uint8ClampedArray(DOC_W * DOC_H * 4);
-    layerFill(buf, DOC_W, spec.rect, spec.seed, spec.tint);
-    const { x, y, w, h } = spec.rect;
-    return {
-      docW: DOC_W, docH: DOC_H, bboxX: x, bboxY: y, bboxW: w, bboxH: h, buf,
-      snapshotImageData() { const data = new Uint8ClampedArray(w * h * 4); for (let yy = 0; yy < h; yy++) data.set(buf.subarray(((y + yy) * DOC_W + x) * 4, ((y + yy) * DOC_W + x + w) * 4), yy * w * 4); return { bboxX: x, bboxY: y, bboxW: w, bboxH: h, imageData: { data, width: w, height: h } }; },
-      putImageData(x0, y0, img) { for (let yy = 0; yy < img.height; yy++) { const dy = y0 + yy; if (dy < 0 || dy >= DOC_H) continue; buf.set(img.data.subarray(yy * img.width * 4, (yy + 1) * img.width * 4), (dy * DOC_W + x0) * 4); } },
-    };
-  });
-  return { targets: layers, readAll: () => layers.map((L) => L.buf) };
+const { SoftGl2Port } = await import("../src/backend/soft-gl2-port.ts");
+const { GlRoom } = await import("../src/backend/gl/gl-room.ts");
+const { gpuLayer } = await import("./region-target.mjs");
+const { makeSelection } = await import("./liquify-golden-cases.mjs");
+function gpuTargets(specs, c) {
+  const room = new GlRoom(new SoftGl2Port(), 64);
+  const Ls = specs.map((spec, i) => { const L = gpuLayer(DOC_W, DOC_H, { room, leafId: i + 1, snapshot: true }); layerFill(L.buf, DOC_W, spec.rect, spec.seed, spec.tint); return L; });
+  const sel = c.sel ? makeSelection() : null;
+  const rss = Ls.map((L) => L.open(sel));
+  return {
+    targets: rss,
+    readAll: () => { Ls.forEach((L, i) => L.close(rss[i])); return Ls.map((L) => L.buf); },
+    dispose: () => { Ls.forEach((L) => L.dispose()); room.dispose(); },
+  };
 }
-runGoldenSuite("CPU LiquifyEngine 自证", () => new LiquifyEngine(), cpuTargets, 0);
+runGoldenSuite("GPU LiquifyEngine · SoftGl2Port", () => new LiquifyEngine(), gpuTargets, 2);

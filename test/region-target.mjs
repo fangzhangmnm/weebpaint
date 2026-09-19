@@ -8,8 +8,10 @@ import { RegionStroke } from "../src/backend/gl/region-stroke.ts";
 
 export function gpuLayer(docW, docH, opts = {}) {
   const buf = new Uint8ClampedArray(docW * docH * 4);
-  const port = opts.port ?? new SoftGl2Port();          // 传真 GL port（gl-smoke harness）→ 同一套驱动跑真 WebGL2
-  const room = new GlRoom(port, opts.slices ?? 64);   // 64 tile 够测试 doc；真 GL 下 arena 是预分配的，别开大
+  const port = opts.room ? opts.room.glctx : (opts.port ?? new SoftGl2Port());   // 传真 GL port（gl-smoke harness）→ 同一套驱动跑真 WebGL2
+  const room = opts.room ?? new GlRoom(port, opts.slices ?? 64);   // 64 tile 够测试 doc；真 GL 下 arena 是预分配的，别开大；组液化多叶传同一个 room
+  const leafId = opts.leafId ?? 1;
+  const ownRoom = !opts.room;
   let pixels = null;
   const L = {
     docW, docH, buf, port, room,
@@ -27,7 +29,7 @@ export function gpuLayer(docW, docH, opts = {}) {
       pixels = new LayerPixels(docW, docH);
       pixels.putRegion(0, 0, docW, docH, buf);
       const sel = selection ? { data: selection.materializeMaskRegion(0, 0, docW, docH), ox: 0, oy: 0, ow: docW, oh: docH } : null;
-      return new RegionStroke(room, 1, pixels, docW, docH, sel, { lockAlpha: L.lockAlpha, ...(opts.snapshot ? { snapshot: true } : {}) });
+      return new RegionStroke(room, leafId, pixels, docW, docH, sel, { lockAlpha: L.lockAlpha, ...(opts.snapshot ? { snapshot: true } : {}) });
     },
     /** 收口：W → buf，dispose。 */
     close(rs) {
@@ -45,7 +47,7 @@ export function gpuLayer(docW, docH, opts = {}) {
       L.close(rs);
       return dirty;
     },
-    dispose() { pixels?.dispose(); pixels = null; room.dispose(); },
+    dispose() { pixels?.dispose(); pixels = null; if (ownRoom) room.dispose(); },
   };
   return L;
 }

@@ -15,8 +15,7 @@ import { registerFilter } from "../filters.ts";
 import { t, tLatin } from "../i18n/index.ts";
 import type { Filter, FilterParams, StrokeTarget, BrushSettings, BrushSelection, DirtyRect } from "../filters.ts";
 import { LiquifyEngine } from "./liquify-engine.ts";
-import type { ViewLeaf } from "../backend/workpiece/painting-view.ts";
-import type { Selection } from "../backend/selection.ts";
+import { RegionStroke } from "../backend/gl/region-stroke.ts";
 
 // liquify 把 stroke 委托给 LiquifyEngine；单 stroke 的可变状态只持一个 engine 引用。
 interface LiquifyBrushState {
@@ -66,8 +65,12 @@ export class LiquifyFilter {
 
   // region 模式没意义（液化天生是 stroke-based），所以不提供 bake / buildBody
 
+  // 预览宿 = GPU 区域（2026-09-19 第三批）：targets 全是 RegionStroke（组液化 N 个，供 supportsLayerGroup）；W₀ 快照 = 起笔只读源。
+  static strokePreview = "region" as const;
+  static strokeSnapshot = true;
   // Filter brush 契约：begin / extend / end / cancel / flushDirty
-  static beginBrushStroke(targets: readonly StrokeTarget[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, pressure: number): LiquifyBrushState {
+  static beginBrushStroke(targets: readonly StrokeTarget[], params: FilterParams, brushSettings: BrushSettings, _selection: BrushSelection | null, x: number, y: number, _pressure: number): LiquifyBrushState {
+    for (const t of targets) if (!(t instanceof RegionStroke)) throw new Error("Filter liquify: targets must be RegionStroke (strokePreview=\"region\")");
     const engine = new LiquifyEngine();
     const scale = (params.strengthScale as number) ?? 1;
     const settings = {
@@ -77,7 +80,7 @@ export class LiquifyFilter {
       bleed: (params.bleed as string) || "edge",          // v147 选区边界取样模式
       sample: (params.sample as string) || "bilinear",    // 采样核（v0.6.45 默认回 bilinear，真机裁决）
     };
-    engine.beginStroke(targets as unknown as readonly ViewLeaf[], settings, x, y, selection as unknown as Selection | null);
+    engine.beginStroke(targets as readonly RegionStroke[], settings, x, y);
     return { engine };
   }
 

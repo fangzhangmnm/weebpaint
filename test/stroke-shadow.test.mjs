@@ -1,4 +1,4 @@
-// C6 · StrokeShadow（stroke 档替身叶——液化/filterBrush/形状笔 pixelMode 的预览宿）行为锚。
+// C6 · StrokeShadow（stroke 档替身叶——形状笔 pixelMode 等的预览宿；液化/手指族 2026-09-18/19 起改住 region 预览）行为锚。
 // 问题陈述（census §6.1 施工单第一户）：
 //   - 描边期引擎写靶 = 替身叶，**真层零写**（「预览是引擎自持物」成立）；
 //   - End = 句柄 diff 落账真层（唯一真层写，在令牌内）→ 一步 undo，字节与 in-place 路径一致；
@@ -16,6 +16,14 @@ const { BrushEngine } = await import("../src/backend/brush.ts");
 const { resolveBrush } = await import("../src/resolved-brush.ts");
 const { Selection } = await import("../src/backend/selection.ts");
 const { LiquifyEngine } = await import("../src/plugins/liquify-engine.ts");
+// 2026-09-19 液化搬 GPU 区域程序（第三批）：液化不再是替身叶的住户，改住 preview="region"（RegionStroke W + bakeStamps 写回链）。
+//   下面「液化引擎全程」一节保留为第一户集成锚，但写靶换 RegionStroke、session 换 "region"（真 deps：GlRoom(SoftGl2Port) + RasterService）。
+import { SoftGl2Port } from "../src/backend/soft-gl2-port.ts";
+import { GlRoom } from "../src/backend/gl/gl-room.ts";
+import { RasterService } from "../src/backend/gl/raster-service.ts";
+import { RegionStroke } from "../src/backend/gl/region-stroke.ts";
+const ROOM = new GlRoom(new SoftGl2Port(), 64);
+const RASTER = new RasterService(ROOM);
 
 const _rigs = [];
 function rig() {
@@ -31,7 +39,22 @@ function rig() {
     commitStamps: (cs) => { r.committed.push(cs); return r.gpuCommit; },
     invalidate: () => {},
     setShadows: (entries) => { r.shadows = entries.slice(); r.shadow = entries.length ? entries[0] : null; },
+    // region 预览宿（液化）：真 RegionStroke + bakeStamps 写回
+    openRegion: (leaf, opts) => {
+      const m = r.selection ? r.selection.bboxMask() : null;
+      const rs = new RegionStroke(ROOM, leaf.id, leaf.pixels, 64, 64, m ? { data: m.data, ox: m.x, oy: m.y, ow: m.w, oh: m.h } : null, { lockAlpha: !!leaf.lockAlpha, snapshot: !!opts?.snapshot });
+      r.regionLeaf.set(rs, leaf);
+      return rs;
+    },
+    setRegions: (regs) => { r.regions = regs.slice(); },
+    commitRegion: (rs) => {
+      const leaf = r.regionLeaf.get(rs); r.regionLeaf.delete(rs);
+      const ov = rs.overlay();
+      if (ov.bw <= 0 || ov.bh <= 0) return true;
+      return RASTER.bakeStamps(leaf.id, leaf.pixels, ov, 64, 64, (px, x, y, w, h) => leaf.applyRegionDiff(x, y, w, h, px));
+    },
   };
+  r.regions = []; r.regionLeaf = new Map();
   _rigs.push(r);
   return r;
 }
@@ -132,17 +155,19 @@ describe("stroke-shadow · 替身叶生命周期（真层描边期零写）", ()
   });
 });
 
-describe("stroke-shadow · 液化引擎全程替身（第一户集成锚）", () => {
+const SPEC_LQ = { historyType: "stroke", finalize: false, regionSnapshot: true };   // 液化：W₀ 起笔快照
+describe("stroke-shadow · 液化引擎全程 region 预览（第一户集成锚；2026-09-19 起写靶 = RegionStroke）", () => {
   it("液化 push：描边期真层不动，收口像素=替身、一步 undo 可还原", () => {
     const r = rig();
     fill(r.layer, 20, 20, 12, 12, [0, 0, 255, 255]);   // 蓝块
     const before = r.layer.pixels.getRegion(0, 0, 64, 64);
     const eng = new LiquifyEngine();
-    const s = new StrokeSession(r.deps, eng, [r.layer], SPEC_FB, "shadow");
+    const s = new StrokeSession(r.deps, eng, [r.layer], SPEC_LQ, "region");
+    eq(r.regions.length, 1, "begin 即挂 board region");
     eng.beginStroke([s.targets[0]], { size: 16, strength: 2, mode: "push", bleed: "edge", sample: "bilinear" }, 22, 26, null);
     eng.extendStroke(30, 26);
     eng.extendStroke(38, 26);
-    const shadowBytes = s.targets[0].pixels.getRegion(0, 0, 64, 64);
+    const shadowBytes = s.targets[0].readPixels(0, 0, 64, 64);   // W（doc 尺寸 straight u8）
     let moved = false;
     for (let i = 0; i < shadowBytes.length && !moved; i++) if (shadowBytes[i] !== before[i]) moved = true;
     assert(moved, "液化确实改了替身像素");
@@ -155,12 +180,13 @@ describe("stroke-shadow · 液化引擎全程替身（第一户集成锚）", ()
       if (after[i] !== shadowBytes[i]) { assert(false, `收口后真层 ≠ 替身（i=${i}）`); break; }
     }
     eq(r.undo.depth(), d0 + 1, "一笔一步");
+    eq(r.regions.length, 0, "收口 region 撤下");
     r.undo.undo();
     const undone = r.layer.pixels.getRegion(0, 0, 64, 64);
     for (let i = 0; i < undone.length; i++) {
       if (undone[i] !== before[i]) { assert(false, `undo 未还原（i=${i}）`); break; }
     }
-    assert(true, "液化全程替身：字节与 in-place 语义一致");
+    assert(true, "液化全程 region：真层字节 = W，一步 undo 还原");
   });
 
   it("液化 cancel：真层字节逐位不变（丢替身即无痕）", () => {
@@ -168,11 +194,12 @@ describe("stroke-shadow · 液化引擎全程替身（第一户集成锚）", ()
     fill(r.layer, 20, 20, 12, 12, [0, 0, 255, 255]);
     const before = r.layer.pixels.getRegion(0, 0, 64, 64);
     const eng = new LiquifyEngine();
-    const s = new StrokeSession(r.deps, eng, [r.layer], SPEC_FB, "shadow");
+    const s = new StrokeSession(r.deps, eng, [r.layer], SPEC_LQ, "region");
     eng.beginStroke([s.targets[0]], { size: 16, strength: 2, mode: "push", bleed: "edge", sample: "bilinear" }, 22, 26, null);
     eng.extendStroke(34, 26);
     const d0 = r.undo.depth();
     s.cancel();
+    eq(r.regions.length, 0, "cancel region 撤下");
     const after = r.layer.pixels.getRegion(0, 0, 64, 64);
     for (let i = 0; i < after.length; i++) if (after[i] !== before[i]) { assert(false, "cancel 后真层变了"); break; }
     eq(r.undo.depth(), d0, "不占步");
@@ -184,6 +211,7 @@ describe("stroke-shadow · 液化引擎全程替身（第一户集成锚）", ()
       wp2.load({ width: 4, height: 4, nodes: [{ name: "空", visible: true, opacity: 1, mode: "source-over", clippingMask: false, lockAlpha: false, pixels: null }] });
     }
     _rigs.length = 0;
+    ROOM.dispose();
     assert(true, "disposed");
   });
 });

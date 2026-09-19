@@ -26,41 +26,20 @@ import { LayersFace } from "../src/backend/layers-face.ts";
 import { StrokeSession } from "../src/backend/stroke-session.ts";
 import { FilterBrushEngine } from "../src/filter-brush.ts";
 const { LiquifyEngine } = await import("../src/plugins/liquify-engine.ts");
+// 2026-09-19 液化搬 GPU 区域程序：写靶 = RegionStroke。A 面 mock → gpuLayer（共享一个 GlRoom：组液化的场纹理挂第一叶，其余叶只采样）；
+//   B/D 面 StrokeSession 走 preview="region"（真 deps：RegionStroke + RasterService.bakeStamps 写回链）。
+import { SoftGl2Port } from "../src/backend/soft-gl2-port.ts";
+import { GlRoom } from "../src/backend/gl/gl-room.ts";
+import { RasterService } from "../src/backend/gl/raster-service.ts";
+import { RegionStroke } from "../src/backend/gl/region-stroke.ts";
+import { gpuLayer } from "./region-target.mjs";
+const ROOM = new GlRoom(new SoftGl2Port(), 512);
+let _nextLeafId = 1;
 
-// ---- A 面用的 mock layer（liquify-docspace-mask.test.mjs 同款：整 doc RGBA 缓冲）----
+// ---- A 面写靶：gpuLayer（snapshot = W₀；共享 ROOM；bytes() = buf 供几何比对）----
 function mockLayer(docW, docH) {
-  const buf = new Uint8ClampedArray(docW * docH * 4);
-  const L = {
-    docW, docH, bboxX: 0, bboxY: 0, bboxW: 0, bboxH: 0, puts: 0,
-    fill(x, y, w, h, [r, g, b, a]) {
-      for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) {
-        const i = (yy * docW + xx) * 4; buf[i] = r; buf[i + 1] = g; buf[i + 2] = b; buf[i + 3] = a;
-      }
-      if (!L.bboxW) { L.bboxX = x; L.bboxY = y; L.bboxW = w; L.bboxH = h; }
-      else {
-        const x1 = Math.max(L.bboxX + L.bboxW, x + w), y1 = Math.max(L.bboxY + L.bboxH, y + h);
-        L.bboxX = Math.min(L.bboxX, x); L.bboxY = Math.min(L.bboxY, y);
-        L.bboxW = x1 - L.bboxX; L.bboxH = y1 - L.bboxY;
-      }
-    },
-    bytes() { return buf; },
-    px(x, y) { const i = (y * docW + x) * 4; return [buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]; },
-    snapshotImageData() {
-      const { bboxX: x, bboxY: y, bboxW: w, bboxH: h } = L;
-      if (!w || !h) return { bboxX: 0, bboxY: 0, bboxW: 0, bboxH: 0, imageData: null };
-      const data = new Uint8ClampedArray(w * h * 4);
-      for (let yy = 0; yy < h; yy++) data.set(buf.subarray(((y + yy) * docW + x) * 4, ((y + yy) * docW + x + w) * 4), yy * w * 4);
-      return { bboxX: x, bboxY: y, bboxW: w, bboxH: h, imageData: { data, width: w, height: h } };
-    },
-    putImageData(x0, y0, img) {
-      L.puts++;
-      for (let yy = 0; yy < img.height; yy++) {
-        const dy = y0 + yy;
-        if (dy < 0 || dy >= docH) continue;
-        buf.set(img.data.subarray(yy * img.width * 4, (yy + 1) * img.width * 4), (dy * docW + x0) * 4);
-      }
-    },
-  };
+  const L = gpuLayer(docW, docH, { room: ROOM, leafId: _nextLeafId++, snapshot: true });
+  L.bytes = () => L.buf;
   return L;
 }
 
@@ -68,10 +47,12 @@ function mockLayer(docW, docH) {
 const STROKE = [[70, 40], [86, 46], [100, 44]];
 const SETTINGS = { size: 26, strength: 1, mode: "push", bleed: "edge", sample: "bilinear" };
 function runStroke(layers, settings = SETTINGS) {
+  const rss = layers.map((L) => L.open());
   const eng = new LiquifyEngine();
-  eng.beginStroke(layers, settings, STROKE[0][0], STROKE[0][1], null);
+  eng.beginStroke(rss, settings, STROKE[0][0], STROKE[0][1], null);
   for (let i = 1; i < STROKE.length; i++) eng.extendStroke(STROKE[i][0], STROKE[i][1]);
   eng.endStroke();
+  layers.forEach((L, i) => L.close(rss[i]));
 }
 // alpha 平面（几何比对用：颜色不同、几何必须一样）
 function alphaPlane(L, docW, docH) {
@@ -127,10 +108,10 @@ describe("液化 · 组 = 一个位移场逐叶重采样（A 引擎面）", () =
     const W = 128, H = 96;
     const A = mockLayer(W, H); A.fill(40, 20, 40, 40, [220, 30, 30, 255]);
     const empty = mockLayer(W, H);
+    const beforeA = Uint8ClampedArray.from(A.bytes());
     runStroke([A, empty]);
-    eq(empty.puts, 0, "空叶一次 putImageData 都不该发生");
-    assert(empty.bytes().every((v) => v === 0), "空叶仍然全空");
-    assert(A.puts > 0, "有内容的叶照常写");
+    assert(empty.bytes().every((v) => v === 0), "空叶仍然全空（GPU：源框空 → 写回全透明 = 提交 diff 零 tile）");
+    assert(!beforeA.every((v, i) => v === A.bytes()[i]), "有内容的叶照常写");
   });
 
   it("spline 采样核：逐叶各自预滤波（组内每叶一份 splinePlane，不共用错源）", () => {
@@ -161,7 +142,20 @@ function rig() {
   const doc = new PaintingView(wp2);
   h.attach(wp2);
   const lt = new LayersFace({ history: h, tree: wp2.layerTree, tiles: wp2.layerTiles, port: doc, status: () => {} });
-  const r = { h, wp2, doc, lt, shadows: [] };
+  const r = { h, wp2, doc, lt, shadows: [], regions: [], regionLayers: new Map(), raster: new RasterService(ROOM) };
+  const openRegion = (leaf, opts) => {
+    const sel = doc.selection; const m = sel ? sel.bboxMask() : null;
+    const rs = new RegionStroke(ROOM, leaf.id, leaf.pixels, 128, 128, m ? { data: m.data, ox: m.x, oy: m.y, ow: m.w, oh: m.h } : null, { lockAlpha: !!leaf.lockAlpha, snapshot: !!opts?.snapshot });
+    r.regionLayers.set(rs, leaf);
+    return rs;
+  };
+  const commitRegion = (rs) => {
+    const leaf = r.regionLayers.get(rs); r.regionLayers.delete(rs);
+    const ov = rs.overlay();
+    if (ov.bw <= 0 || ov.bh <= 0) return true;
+    return r.raster.bakeStamps(leaf.id, leaf.pixels, ov, 128, 128, (px, x, y, w, hh) => leaf.applyRegionDiff(x, y, w, hh, px));
+  };
+  r.openRegion = openRegion; r.commitRegion = commitRegion;
   r.deps = {
     begin: (label) => wp2.begin(label),
     tokenChanged: (id) => wp2.layerTiles.tokenChanged(id),
@@ -170,11 +164,12 @@ function rig() {
     commitStamps: () => false,
     invalidate: () => {},
     setShadows: (entries) => { r.shadows = entries.slice(); },
+    openRegion, setRegions: (regs) => { r.regions = regs.slice(); }, commitRegion,
   };
   _ctxs.push(r);
   return r;
 }
-const SPEC_FB = { historyType: "stroke", finalize: false };   // filterBrush：begin 已吃 selection
+const SPEC_FB = { historyType: "stroke", finalize: false, regionSnapshot: true };   // filterBrush：begin 已吃 selection；液化要 W₀
 function paintRect(L, x0, y0, w, h, rgba) {
   const buf = new Uint8ClampedArray(w * h * 4);
   for (let i = 0; i < w * h; i++) buf.set(rgba, i * 4);
@@ -216,9 +211,9 @@ describe("液化 · 组 = 一个令牌一步 undo（B 事务面）", () => {
     eq(targetsIn.length, 3, "组内 3 叶全进写靶（含隐藏叶）");
 
     const eng = new LiquifyEngine();
-    const s = new StrokeSession(r.deps, eng, targetsIn, SPEC_FB, "shadow");
-    eq(r.shadows.length, 3, "一叶一个替身叶挂上 board");
-    eq(new Set(r.shadows.map((e) => e.layerId)).size, 3, "替身按叶 id 各一份");
+    const s = new StrokeSession(r.deps, eng, targetsIn, SPEC_FB, "region");
+    eq(r.regions.length, 3, "一叶一个 RegionStroke 挂上 board");
+    eq(new Set(r.regions.map((e) => e.leafId)).size, 3, "按叶 id 各一份");
     // 描边期真叶零写（替身承载预览）
     eng.beginStroke(s.targets, { size: 24, strength: 1.5, mode: "push", bleed: "edge", sample: "bilinear" }, 30, 40, null);
     s.extend(70, 40, 1, null);
@@ -227,7 +222,7 @@ describe("液化 · 组 = 一个令牌一步 undo（B 事务面）", () => {
     }
     const d0 = r.h.stack.depth();
     s.end();
-    eq(r.shadows.length, 0, "收口后替身撤下");
+    eq(r.regions.length, 0, "收口后 region 撤下");
     eq(r.h.stack.depth(), d0 + 1, "整组一步 undo（一个令牌）");
     const after = ids.map((id) => regionOf(leafOf(doc, id)));
     for (let i = 0; i < ids.length; i++) {
@@ -249,13 +244,13 @@ describe("液化 · 组 = 一个令牌一步 undo（B 事务面）", () => {
     const before = ids.map((id) => regionOf(leafOf(doc, id)));
     const targets = doc.activeStrokeLeaves({ allowGroup: true }).leaves;
     const eng = new LiquifyEngine();
-    const s = new StrokeSession(r.deps, eng, targets, SPEC_FB, "shadow");
+    const s = new StrokeSession(r.deps, eng, targets, SPEC_FB, "region");
     eng.beginStroke(s.targets, { size: 24, strength: 1.5, mode: "push", bleed: "edge", sample: "bilinear" }, 30, 40, null);
     s.extend(70, 40, 1, null);
     const d0 = r.h.stack.depth();
     s.cancel();
     eq(r.h.stack.depth(), d0, "cancel 不占步");
-    eq(r.shadows.length, 0, "替身撤下");
+    eq(r.regions.length, 0, "region 撤下");
     for (let i = 0; i < ids.length; i++) {
       assert(sameBytes(regionOf(leafOf(doc, ids[i])), before[i]), `cancel 后叶 ${i} 无痕`);
     }
@@ -266,7 +261,7 @@ describe("液化 · 组 = 一个令牌一步 undo（B 事务面）", () => {
     const { doc, ids, gid } = r;
     const targets = doc.activeStrokeLeaves({ allowGroup: true }).leaves;
     const eng = new LiquifyEngine();
-    const s = new StrokeSession(r.deps, eng, targets, SPEC_FB, "shadow");
+    const s = new StrokeSession(r.deps, eng, targets, SPEC_FB, "region");
     eng.beginStroke(s.targets, { size: 24, strength: 1.5, mode: "push", bleed: "edge", sample: "bilinear" }, 30, 40, null);
     s.extend(70, 40, 1, null);
     s.end();
@@ -391,12 +386,15 @@ describe("液化 · 组能力门（C 路由面）", () => {
     const r = groupRig();
     const editMode = new EditMode({ initialTool: "brush" });
     const statuses = [];
-    let shadows = [];
+    let regions = [];
     const board = {
       canvas: document.createElement("canvas"),
       requestRender: () => {}, setCursor: () => {}, markDocDirty: () => {}, invalidateAll: () => {},
       commitBrushStroke: () => false,
-      setStrokeShadows: (entries) => { shadows = entries.slice(); },
+      setStrokeShadows: () => {},
+      openRegionStroke: (leaf, opts) => r.openRegion(leaf, opts),
+      setStrokeRegions: (regs) => { regions = regs.slice(); },
+      commitRegionStroke: (rs) => r.commitRegion(rs),
       screenToDoc: (x, y) => ({ x, y }), viewport: { scale: 1 },
     };
     const input = new InputController(board, r.doc, {
@@ -414,7 +412,7 @@ describe("液化 · 组能力门（C 路由面）", () => {
     input._down(ev("pointerdown", 30, 40));
     assert(input._activeStroke, `组上落笔应起笔成功；status=${JSON.stringify(statuses)}`);
     eq(input._activeStroke.targets.length, 3, "写靶 = 组内 3 叶");
-    eq(shadows.length, 3, "board 收到 3 个替身叶");
+    eq(regions.length, 3, "board 收到 3 个 RegionStroke（region 预览宿）");
     eq(statuses.filter((m) => /图层组/.test(m)).length, 0, "不再弹「请选择一个图层」");
     input._activeStroke.cancel();
     input._activeStroke = null;
