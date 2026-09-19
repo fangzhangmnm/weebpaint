@@ -368,19 +368,19 @@ export class WeebPaintBackend implements WeebPaintBackendInterface {
       invalidate: () => {},
       setShadows: () => {},
       // 2026-09-18 区域程序（手指 / 模糊 / 锐化）：headless 也真做——栅格域同一个 GlRoom（缺省 SoftGl2Port 的 CPU 孪生跑）。
-      openRegion: (leaf) => this._openRegion(leaf),
+      openRegion: (leaf, opts) => this._openRegion(leaf, opts),
       setRegion: () => {},   // 无屏：不挂 overlay
       commitRegion: (region) => this._commitRegion(region),
     };
   }
 
   private _regionLayers = new Map<RegionStroke, { id: number; pixels: LayerPixels; applyRegionDiff: (x: number, y: number, w: number, h: number, px: Uint8ClampedArray) => { tx: number; ty: number }[] }>();
-  private _openRegion(leaf: { id: number; pixels: LayerPixels; lockAlpha?: boolean; applyRegionDiff: (x: number, y: number, w: number, h: number, px: Uint8ClampedArray) => { tx: number; ty: number }[] }): RegionStroke {
+  private _openRegion(leaf: { id: number; pixels: LayerPixels; lockAlpha?: boolean; applyRegionDiff: (x: number, y: number, w: number, h: number, px: Uint8ClampedArray) => { tx: number; ty: number }[] }, opts: { snapshot: boolean }): RegionStroke {
     this._ensureRaster();
     const sel = this._view.selection;
     const m = sel ? sel.bboxMask() : null;
     const region = new RegionStroke(this._room!, leaf.id, leaf.pixels, this._view.width, this._view.height,
-      m ? { data: m.data, ox: m.x, oy: m.y, ow: m.w, oh: m.h } : null, { lockAlpha: !!leaf.lockAlpha });
+      m ? { data: m.data, ox: m.x, oy: m.y, ow: m.w, oh: m.h } : null, { lockAlpha: !!leaf.lockAlpha, snapshot: !!opts.snapshot });
     this._regionLayers.set(region, leaf);
     return region;
   }

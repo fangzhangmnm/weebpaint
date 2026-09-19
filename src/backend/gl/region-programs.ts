@@ -29,6 +29,8 @@ import { COMPOSITE_VERT } from "./blend-glsl.ts";
 export const REGION_PROGRAM_IDS = [
   "region-load", "region-window", "smudge-mask", "smudge-absorb",
   "reduce-weighted", "reduce-sum", "divide", "box3", "upsample-bilinear", "smudge-deposit",
+  // 第二批（模糊 / 锐化 wash，2026-09-18 同轮；镜像 filters.ts 旧 attachColorBrushBehavior + sharpen-blur.ts bake）
+  "wash-coverage", "wash-premult", "wash-box3", "wash-unpremult", "wash-sharpen", "wash-lerp",
 ] as const;
 export type RegionProgramId = typeof REGION_PROGRAM_IDS[number];
 
@@ -340,6 +342,137 @@ void main(){
   o = (na <= 1e-6) ? vec4(0.0) : vec4(nrgb / na, na);
 }`;
 
+// ============================================================================
+// 第二批：模糊 / 锐化 wash（镜像 filters.ts 旧 _cbComposite ①②③ + plugins/sharpen-blur.ts bake / _boxBlur3Premul / _gaussianBlur3）
+//   数值单位跟 CPU 走：字节域（texel×255），premult = byte·(a/255)，alpha 通道 0..255；clamp8 = 截断（v|0），GLSL 用 floor。
+//   coverage 存 doc 尺寸 u8 的 alpha（CPU 是 f32；量化到 1/255 是有意的偏差，行为契约测试仍成立）。
+// ============================================================================
+
+// ---- wash-coverage：cov = max(cov, stampA·flow·sel)（blend max-alpha；scissor = dab bbox；dist > R → discard）----
+const WASH_COVERAGE_FRAG = HEAD + `
+uniform vec2 u_docSize;
+uniform vec2 u_center;
+uniform float u_R;
+uniform float u_innerR;
+uniform float u_flow;
+uniform int u_hasSel;
+uniform sampler2D u_sel;
+uniform vec2 u_selOrigin;
+uniform vec2 u_selSize;
+void main(){
+  ivec2 p = ivec2(floor(v_uv * u_docSize));
+  float ddx = float(p.x) + 0.5 - u_center.x, ddy = float(p.y) + 0.5 - u_center.y;
+  float dist = sqrt(ddx * ddx + ddy * ddy);
+  if (dist > u_R) discard;
+  float stampA = 1.0;
+  if (dist > u_innerR) { float u = (dist - u_innerR) / (u_R - u_innerR); stampA = 1.0 - u * u * (3.0 - 2.0 * u); }
+  float a = stampA * u_flow;
+  if (u_hasSel == 1) {
+    ivec2 sp = p - ivec2(u_selOrigin);
+    if (sp.x < 0 || sp.y < 0 || sp.x >= int(u_selSize.x) || sp.y >= int(u_selSize.y)) a = 0.0;
+    else a *= texelFetch(u_sel, sp, 0).r;
+  }
+  o = vec4(0.0, 0.0, 0.0, a);
+}`;
+
+// ---- wash-premult：W0 区域 → premult f32（字节单位：rgb·(a/255)，alpha 0..255）----
+const WASH_PREMULT_FRAG = HEAD + `
+uniform vec2 u_size;
+uniform vec2 u_origin;
+uniform sampler2D u_W0;
+void main(){
+  ivec2 q = ivec2(floor(v_uv * u_size));
+  vec4 s = texelFetch(u_W0, ivec2(u_origin) + q, 0) * 255.0;
+  float a = s.a / 255.0;
+  o = vec4(s.rgb * a, s.a);
+}`;
+
+// ---- wash-box3：premult 3×3 盒（区域边缘 clamp；镜像 _boxBlur3Premul，mask=null）----
+const WASH_BOX3_FRAG = HEAD + `
+uniform vec2 u_size;
+uniform sampler2D u_src;
+void main(){
+  ivec2 q = ivec2(floor(v_uv * u_size));
+  int w = int(u_size.x), h = int(u_size.y);
+  vec4 acc = vec4(0.0);
+  for (int dy = -1; dy <= 1; dy++) {
+    int sy = q.y + dy < 0 ? 0 : (q.y + dy >= h ? h - 1 : q.y + dy);
+    for (int dx = -1; dx <= 1; dx++) {
+      int sx = q.x + dx < 0 ? 0 : (q.x + dx >= w ? w - 1 : q.x + dx);
+      acc += texelFetch(u_src, ivec2(sx, sy), 0);
+    }
+  }
+  o = acc / 9.0;
+}`;
+
+// ---- wash-unpremult：premult f32 区域 → straight u8（a≤0：保原字节、alpha 0；clamp8 = 截断）----
+const WASH_UNPREMULT_FRAG = HEAD + `
+uniform vec2 u_size;
+uniform vec2 u_origin;
+uniform sampler2D u_src;
+uniform sampler2D u_W0;
+float clamp8(float v){ return v < 0.0 ? 0.0 : (v > 255.0 ? 255.0 : floor(v)); }
+void main(){
+  ivec2 q = ivec2(floor(v_uv * u_size));
+  vec4 s = texelFetch(u_src, q, 0);
+  vec4 orig = texelFetch(u_W0, ivec2(u_origin) + q, 0) * 255.0;
+  float a = s.a;
+  if (a <= 0.0) { o = vec4(orig.rgb / 255.0, 0.0); return; }
+  float inv = 255.0 / a;
+  o = vec4(clamp8(s.r * inv), clamp8(s.g * inv), clamp8(s.b * inv), clamp8(a)) / 255.0;
+}`;
+
+// ---- wash-sharpen：luma-only USM（高斯 3×3 字节截断 + 阈值 4 + 同 delta 三通道；k=0 = 原样）；区域边缘 clamp ----
+const WASH_SHARPEN_FRAG = HEAD + `
+uniform vec2 u_size;
+uniform vec2 u_origin;
+uniform float u_k;
+uniform sampler2D u_W0;
+float clamp8(float v){ return v < 0.0 ? 0.0 : (v > 255.0 ? 255.0 : floor(v)); }
+void main(){
+  ivec2 q = ivec2(floor(v_uv * u_size));
+  int w = int(u_size.x), h = int(u_size.y);
+  ivec2 org = ivec2(u_origin);
+  vec4 s = texelFetch(u_W0, org + q, 0) * 255.0;
+  vec4 acc = vec4(0.0);
+  for (int dy = -1; dy <= 1; dy++) {
+    int sy = q.y + dy < 0 ? 0 : (q.y + dy >= h ? h - 1 : q.y + dy);
+    for (int dx = -1; dx <= 1; dx++) {
+      int sx = q.x + dx < 0 ? 0 : (q.x + dx >= w ? w - 1 : q.x + dx);
+      float kw = (dx == 0 ? 2.0 : 1.0) * (dy == 0 ? 2.0 : 1.0);
+      acc += texelFetch(u_W0, org + ivec2(sx, sy), 0) * 255.0 * kw;
+    }
+  }
+  vec3 bl = floor(acc.rgb / 16.0);
+  float luma = 0.2126 * s.r + 0.7152 * s.g + 0.0722 * s.b;
+  float lumaB = 0.2126 * bl.r + 0.7152 * bl.g + 0.0722 * bl.b;
+  float diff = luma - lumaB;
+  vec3 rgb;
+  if (abs(diff) < 4.0) rgb = s.rgb;
+  else { float delta = u_k * diff; rgb = vec3(clamp8(s.r + delta), clamp8(s.g + delta), clamp8(s.b + delta)); }
+  o = vec4(rgb, s.a) / 255.0;
+}`;
+
+// ---- wash-lerp：W = lerp(W0, baked, cov)（premult 权重；镜像 _cbComposite ③；scissor = dab 覆盖 bbox）----
+const WASH_LERP_FRAG = HEAD + `
+uniform vec2 u_docSize;
+uniform vec2 u_origin;      // baked 区域原点（ex0, ey0）
+uniform sampler2D u_W0;
+uniform sampler2D u_dst;
+uniform sampler2D u_cov;
+void main(){
+  ivec2 p = ivec2(floor(v_uv * u_docSize));
+  float a = texelFetch(u_cov, p, 0).a;
+  vec4 src = texelFetch(u_W0, p, 0) * 255.0;
+  if (a <= 0.0) { o = src / 255.0; return; }
+  vec4 d = texelFetch(u_dst, p - ivec2(u_origin), 0) * 255.0;
+  float la = src.a / 255.0, fa = d.a / 255.0;
+  float na = la * (1.0 - a) + fa * a;
+  if (na <= 0.0) { o = vec4(0.0); return; }
+  float wl = (la * (1.0 - a)) / na, wf = (fa * a) / na;
+  o = vec4(src.rgb * wl + d.rgb * wf, na * 255.0) / 255.0;
+}`;
+
 const FRAGS: Record<RegionProgramId, string> = {
   "region-load": REGION_LOAD_FRAG,
   "region-window": REGION_WINDOW_FRAG,
@@ -351,6 +484,12 @@ const FRAGS: Record<RegionProgramId, string> = {
   "box3": BOX3_FRAG,
   "upsample-bilinear": UPSAMPLE_BILINEAR_FRAG,
   "smudge-deposit": SMUDGE_DEPOSIT_FRAG,
+  "wash-coverage": WASH_COVERAGE_FRAG,
+  "wash-premult": WASH_PREMULT_FRAG,
+  "wash-box3": WASH_BOX3_FRAG,
+  "wash-unpremult": WASH_UNPREMULT_FRAG,
+  "wash-sharpen": WASH_SHARPEN_FRAG,
+  "wash-lerp": WASH_LERP_FRAG,
 };
 
 /** 确保 id 已在 port 注册（幂等；SoftGl2Port 在此核对 CPU 孪生，缺 = throw）。 */

@@ -2,7 +2,7 @@
 import { describe, it, assert, eq } from "./runner.mjs";
 import { SmudgeFilter, smudgeSettingsFrom, parseHexColor } from "../src/plugins/smudge.ts";
 import { getFilter } from "../src/filters.ts";
-import { gpuLayer } from "./smudge-gpu-target.mjs";   // 2026-09-18 GPU 写靶（RegionStroke）
+import { gpuLayer } from "./region-target.mjs";   // 2026-09-18 GPU 写靶（RegionStroke）
 
 const mockLayer = (w, h) => gpuLayer(w, h);
 

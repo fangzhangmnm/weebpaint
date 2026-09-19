@@ -6,24 +6,19 @@
 import { describe, it, assert } from "./runner.mjs";
 import { SharpenBlurFilter } from "../src/plugins/sharpen-blur.ts";
 
-function mockLayer(docW, docH) {
-  const buf = new Uint8ClampedArray(docW * docH * 4);
-  return {
-    docW, docH, buf, bboxX: 0, bboxY: 0, bboxW: docW, bboxH: docH,
-    fill(x, y, w, h, [r, g, b, a]) { for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) { const i = (yy * docW + xx) * 4; buf[i] = r; buf[i + 1] = g; buf[i + 2] = b; buf[i + 3] = a; } },
-    getImageData(x0, y0, w, h) { const data = new Uint8ClampedArray(w * h * 4); for (let yy = 0; yy < h; yy++) data.set(buf.subarray(((y0 + yy) * docW + x0) * 4, ((y0 + yy) * docW + x0 + w) * 4), yy * w * 4); return new ImageData(data, w, h); },
-    putImageData(x0, y0, img) { for (let yy = 0; yy < img.height; yy++) buf.set(img.data.subarray(yy * img.width * 4, (yy + 1) * img.width * 4), ((y0 + yy) * docW + x0) * 4); },
-  };
-}
+import { gpuLayer } from "./region-target.mjs";   // 2026-09-18 GPU 写靶（RegionStroke，snapshot=W₀）
+const mockLayer = (w, h) => gpuLayer(w, h, { snapshot: true });
 
 describe("color-brush 末步预乘（模糊笔黑边残留）", () => {
   it("纯红块 + 透明邻域，模糊笔软边刷过 → a>0 像素仍纯红", () => {
     const L = mockLayer(48, 24);
     L.fill(0, 0, 20, 24, [255, 0, 0, 255]);
     const bs = { size: 12, hardness: 0.3, flow: 0.6, spacingValue: 0.2 };
-    const st = SharpenBlurFilter.beginBrushStroke([L], { amount: -60 }, bs, null, 14, 12, 1);
+    const rs = L.open();
+    const st = SharpenBlurFilter.beginBrushStroke([rs], { amount: -60 }, bs, null, 14, 12, 1);
     for (let x = 15; x <= 30; x++) SharpenBlurFilter.extendBrushStamp(st, x, 12, 1);
     SharpenBlurFilter.endBrushStroke(st);
+    L.close(rs);
     let checked = 0, spread = 0;
     for (let y = 0; y < 24; y++) for (let x = 0; x < 48; x++) {
       const i = (y * 48 + x) * 4;
@@ -43,9 +38,11 @@ describe("滤镜笔间距沿笔（2026-09-05 user「模糊也改，都统一」�
     // 2026-09-06 wash 幂等后 bake 按 flush 只算一次（不再逐 dab）→ dab 数改读 state.dabs
     const count = (bs) => {
       const L = mockLayer(80, 24); L.fill(0, 0, 80, 24, [200, 100, 50, 255]);
-      const st = SharpenBlurFilter.beginBrushStroke([L], { amount: -20 }, bs, null, 10, 12, 1);
+      const rs = L.open();
+      const st = SharpenBlurFilter.beginBrushStroke([rs], { amount: -20 }, bs, null, 10, 12, 1);
       for (let x = 11; x <= 60; x++) SharpenBlurFilter.extendBrushStamp(st, x, 12, 1);
       SharpenBlurFilter.endBrushStroke(st);
+      L.close(rs);
       return st.dabs;
     };
     const coarse = count({ size: 10, hardness: 0.5, flow: 1, spacing: 0.5 });

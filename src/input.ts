@@ -418,7 +418,7 @@ export class InputController {
     commitStamps: (cs) => this.board.commitBrushStroke(cs),
     invalidate: () => this.board.invalidateAll(),
     setShadows: (entries) => this.board.setStrokeShadows(entries),
-    openRegion: (leaf) => this.board.openRegionStroke(leaf),
+    openRegion: (leaf, opts) => this.board.openRegionStroke(leaf, opts),
     setRegion: (region) => this.board.setStrokeRegion(region),
     commitRegion: (region) => this.board.commitRegionStroke(region),
   };
@@ -1086,11 +1086,12 @@ export class InputController {
     // C6：预览宿=shadow——液化/滤镜笔改写替身叶（census §6.1 第一户），真层只在收口一刻被令牌写。
     // 预览宿由 filter 声明（2026-09-18 区域程序）：region = GPU 驻留 RegionStroke（手指 / 模糊 / 锐化）；缺省 shadow = CPU 替身（液化）。
     const preview = (fbState.Filter as { strokePreview?: "shadow" | "region" }).strokePreview === "region" ? "region" : "shadow";
+    const specR = { ...spec, regionSnapshot: !!(fbState.Filter as { strokeSnapshot?: boolean }).strokeSnapshot };
     const { x: dx, y: dy } = this.board.screenToDoc(rec.smX!, rec.smY!);
     const pressure = effectivePressureFor(rec, { pressure: rec.lastP ?? 1 });
     try {
       // region 预览在 StrokeSession 构造里开 RegionStroke（caps 守卫 / 显存不够 / GL 丢失 → 这里响亮 throw，令牌已在 session 内收口）
-      this._activeStroke = new StrokeSession(this._strokeDeps, this.filterBrush, layers, spec, preview);
+      this._activeStroke = new StrokeSession(this._strokeDeps, this.filterBrush, layers, specR, preview);
       // fbState.Filter 对 input 不透明（BrushFilter 未 export）→ 在引擎接缝处断言到 beginStroke 入参类型。
       this.filterBrush.beginStroke(this._activeStroke.targets, fbState.Filter as Parameters<FilterBrushEngine["beginStroke"]>[1], fbState.params, brushSettings, this.doc.selection, dx, dy, pressure);
     } catch (e) {

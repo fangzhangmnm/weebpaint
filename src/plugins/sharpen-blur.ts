@@ -4,7 +4,9 @@
 // brush 模式（bakeBrush 由 FilterBrushEngine 调）：局部小 stamp 不卡（旧 region 大图全烤模式已删）。
 // 论证：模糊本质 non-local 卷积，大图慢；brush 模式天然限定 bbox 不卡
 
-import { registerFilter, clamp8, makeSliderRow, attachColorBrushBehavior } from "../filters.ts";
+import { registerFilter, clamp8, makeSliderRow } from "../filters.ts";
+import { attachWashBrushBehavior } from "./wash-brush.ts";
+import type { RegionStroke, RegionTex } from "../backend/gl/region-stroke.ts";
 import { t, tLatin } from "../i18n/index.ts";
 import type { FilterParams } from "../filters.ts";
 
@@ -161,5 +163,25 @@ export class SharpenBlurFilter {
   }
 }
 
-attachColorBrushBehavior(SharpenBlurFilter);
+// 2026-09-18 wash 搬 GPU 区域程序（plugins/wash-brush.ts）：kernel 只提供 bleed + bakeRegion；bake()（CPU 原式）留作 region 模式契约 + 测试参照。
+//   blur：wash-premult → N × wash-box3 → wash-unpremult（镜像 bake 的 premult box N 迭代 + clamp8 截断）；sharpen：wash-sharpen（镜像 luma USM）。
+attachWashBrushBehavior(SharpenBlurFilter, {
+  bleed: (p) => SharpenBlurFilter.bleedRadius(p),
+  bakeRegion: (rs: RegionStroke, ex0: number, ey0: number, ew: number, eh: number, p: FilterParams): RegionTex => {
+    const amt = (p.amount as number) | 0;
+    const out = rs.alloc(ew, eh, "rgba-u8");
+    const size = [ew, eh], origin = [ex0, ey0];
+    if (amt < 0) {
+      const N = Math.max(1, Math.min(10, Math.round(-amt / 10)));
+      let a = rs.alloc(ew, eh, "rgba-f32"), b = rs.alloc(ew, eh, "rgba-f32");
+      rs.run("wash-premult", a, { u_W0: "W0" }, { u_size: size, u_origin: origin });
+      for (let it = 0; it < N; it++) { rs.run("wash-box3", b, { u_src: a }, { u_size: size }); const t = a; a = b; b = t; }
+      rs.run("wash-unpremult", out, { u_src: a, u_W0: "W0" }, { u_size: size, u_origin: origin });
+      rs.free(a); rs.free(b);
+    } else {
+      rs.run("wash-sharpen", out, { u_W0: "W0" }, { u_size: size, u_origin: origin, u_k: amt / 100 });   // amt=0 → k=0 = 原样
+    }
+    return out;
+  },
+});
 registerFilter(SharpenBlurFilter);

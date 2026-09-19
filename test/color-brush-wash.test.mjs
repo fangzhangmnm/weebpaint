@@ -5,23 +5,23 @@
 import { describe, it, eq, assert } from "./runner.mjs";
 import { SharpenBlurFilter } from "../src/plugins/sharpen-blur.ts";
 
+import { gpuLayer } from "./region-target.mjs";   // 2026-09-18 GPU 写靶（RegionStroke，snapshot=W₀）
 function mockLayer(docW, docH) {
-  const buf = new Uint8ClampedArray(docW * docH * 4);
+  const L = gpuLayer(docW, docH, { snapshot: true });
+  const buf = L.buf;
   for (let y = 0; y < docH; y++) for (let x = 0; x < docW; x++) { const i = (y * docW + x) * 4; buf[i] = (x * 7) & 255; buf[i + 1] = (y * 13) & 255; buf[i + 2] = ((x ^ y) * 5) & 255; buf[i + 3] = 255; }
-  return {
-    docW, docH, buf, bboxX: 0, bboxY: 0, bboxW: docW, bboxH: docH,
-    getImageData(x0, y0, w, h) { const data = new Uint8ClampedArray(w * h * 4); for (let yy = 0; yy < h; yy++) data.set(buf.subarray(((y0 + yy) * docW + x0) * 4, ((y0 + yy) * docW + x0 + w) * 4), yy * w * 4); return new ImageData(data, w, h); },
-    putImageData(x0, y0, img) { for (let yy = 0; yy < img.height; yy++) buf.set(img.data.subarray(yy * img.width * 4, (yy + 1) * img.width * 4), ((y0 + yy) * docW + x0) * 4); },
-  };
+  return L;
 }
 const same = (a, b) => { if (a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; };
 function stroke(L, passes, spacing = 0.1, flow = 1) {
-  const st = SharpenBlurFilter.beginBrushStroke([L], { amount: -60 }, { size: 24, hardness: 0.5, flow, spacing }, null, 30, 30, 1);
+  const rs = L.open();
+  const st = SharpenBlurFilter.beginBrushStroke([rs], { amount: -60 }, { size: 24, hardness: 0.5, flow, spacing }, null, 30, 30, 1);
   for (let p = 0; p < passes; p++) {
     const dir = p % 2 === 0 ? 1 : -1;
     for (let k = 1; k <= 60; k++) { const x = dir > 0 ? 30 + k : 90 - k; SharpenBlurFilter.extendBrushStamp(st, x, 30, 1); if (k % 7 === 0) SharpenBlurFilter.flushDirty(st); }
   }
   SharpenBlurFilter.endBrushStroke(st);
+  L.close(rs);
   return st;
 }
 

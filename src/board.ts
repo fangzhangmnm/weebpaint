@@ -831,11 +831,11 @@ export class Board {
   // 2026-09-18 区域程序（StrokeSession preview="region" 的三个注入面）：
   //   openRegionStroke = 造一笔的 RegionStroke（选区平面同 _overlayInputFrom；lockAlpha 跟叶；无 GL / caps 守卫 / 显存不够 → throw）；
   //   setStrokeRegion = 挂/摘 overlay 源；commitRegionStroke = 同 commitBrushStroke 的 GPU merge→readback→applyRegionDiff→收养链。
-  openRegionStroke(layer: ViewLeaf): RegionStroke {
+  openRegionStroke(layer: ViewLeaf, opts: { snapshot: boolean }): RegionStroke {
     if (!this._glBoard) throw new Error("REGION_NO_GL (finger/wash tools need the GL board)");
     const sel = this.doc.selection;
     const selMask = sel ? (() => { const m = (sel as Selection).bboxMask(); return { data: m.data, ox: m.x, oy: m.y, ow: m.w, oh: m.h }; })() : null;
-    const region = this._glBoard.openRegion(layer.id, layer.pixels, this.doc.width, this.doc.height, selMask, !!layer.lockAlpha);
+    const region = this._glBoard.openRegion(layer.id, layer.pixels, this.doc.width, this.doc.height, selMask, !!layer.lockAlpha, !!opts.snapshot);
     this._regionLayers.set(region, layer);
     return region;
   }

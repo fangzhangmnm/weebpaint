@@ -666,6 +666,130 @@ const smudgeDeposit: CpuDraw = (c) => {
   });
 };
 
+
+// ---- 第二批 wash 孪生（镜像 region-programs.ts WASH_*；字节单位、clamp8 = 截断）----
+const clamp8f = (v: number): number => (v < 0 ? 0 : v > 255 ? 255 : Math.floor(v));
+const washCoverage: CpuDraw = (c) => {
+  const [cx, cy] = uv2(c, "u_center");
+  const R = u1(c, "u_R"), innerR = u1(c, "u_innerR"), flow = u1(c, "u_flow");
+  const hasSel = u1(c, "u_hasSel");
+  const sel = c.tex("u_sel");
+  const [sox, soy] = uv2(c, "u_selOrigin");
+  const [ssw, ssh] = uv2(c, "u_selSize");
+  const t = new Float32Array(4);
+  c.forEachPixel((px, py, out) => {
+    const ddx = px + 0.5 - cx, ddy = py + 0.5 - cy;
+    const dist = Math.sqrt(ddx * ddx + ddy * ddy);
+    if (dist > R) return false;
+    let stampA = 1;
+    if (dist > innerR) { const u = (dist - innerR) / (R - innerR); stampA = 1 - u * u * (3 - 2 * u); }
+    let a = stampA * flow;
+    if (hasSel === 1) {
+      const sx = px - sox, sy = py - soy;
+      if (sx < 0 || sy < 0 || sx >= ssw || sy >= ssh || !sel) a = 0;
+      else { sel.fetch(sx, sy, t); a *= t[0]; }
+    }
+    out[0] = 0; out[1] = 0; out[2] = 0; out[3] = a;
+    return true;
+  });
+};
+const washPremult: CpuDraw = (c) => {
+  const [ox, oy] = uv2(c, "u_origin");
+  const W0 = c.tex("u_W0");
+  const s = new Float32Array(4);
+  c.forEachPixel((px, py, out) => {
+    if (W0) W0.fetch(ox + px, oy + py, s); else s.fill(0);
+    const r = s[0] * 255, g = s[1] * 255, b = s[2] * 255, A = s[3] * 255;
+    const a = A / 255;
+    out[0] = r * a; out[1] = g * a; out[2] = b * a; out[3] = A;
+    return true;
+  });
+};
+const washBox3: CpuDraw = (c) => {
+  const [w, h] = uv2(c, "u_size");
+  const src = c.tex("u_src");
+  const t = new Float32Array(4);
+  c.forEachPixel((px, py, out) => {
+    out.fill(0);
+    if (!src) return true;
+    for (let dy = -1; dy <= 1; dy++) {
+      const sy = py + dy < 0 ? 0 : py + dy >= h ? h - 1 : py + dy;
+      for (let dx = -1; dx <= 1; dx++) {
+        const sx = px + dx < 0 ? 0 : px + dx >= w ? w - 1 : px + dx;
+        src.fetch(sx, sy, t);
+        out[0] += t[0]; out[1] += t[1]; out[2] += t[2]; out[3] += t[3];
+      }
+    }
+    out[0] /= 9; out[1] /= 9; out[2] /= 9; out[3] /= 9;
+    return true;
+  });
+};
+const washUnpremult: CpuDraw = (c) => {
+  const [ox, oy] = uv2(c, "u_origin");
+  const src = c.tex("u_src"), W0 = c.tex("u_W0");
+  const s = new Float32Array(4), o4 = new Float32Array(4);
+  c.forEachPixel((px, py, out) => {
+    if (src) src.fetch(px, py, s); else s.fill(0);
+    if (W0) W0.fetch(ox + px, oy + py, o4); else o4.fill(0);
+    const a = s[3];
+    if (a <= 0) { out[0] = (o4[0] * 255) / 255; out[1] = (o4[1] * 255) / 255; out[2] = (o4[2] * 255) / 255; out[3] = 0; return true; }
+    const inv = 255 / a;
+    out[0] = clamp8f(s[0] * inv) / 255; out[1] = clamp8f(s[1] * inv) / 255; out[2] = clamp8f(s[2] * inv) / 255; out[3] = clamp8f(a) / 255;
+    return true;
+  });
+};
+const washSharpen: CpuDraw = (c) => {
+  const [w, h] = uv2(c, "u_size");
+  const [ox, oy] = uv2(c, "u_origin");
+  const k = u1(c, "u_k");
+  const W0 = c.tex("u_W0");
+  const s = new Float32Array(4), t = new Float32Array(4);
+  c.forEachPixel((px, py, out) => {
+    if (!W0) { out.fill(0); return true; }
+    W0.fetch(ox + px, oy + py, s);
+    const sr = s[0] * 255, sg = s[1] * 255, sb = s[2] * 255, sa = s[3] * 255;
+    let r = 0, g = 0, b = 0;
+    for (let dy = -1; dy <= 1; dy++) {
+      const sy = py + dy < 0 ? 0 : py + dy >= h ? h - 1 : py + dy;
+      for (let dx = -1; dx <= 1; dx++) {
+        const sx = px + dx < 0 ? 0 : px + dx >= w ? w - 1 : px + dx;
+        const kw = (dx === 0 ? 2 : 1) * (dy === 0 ? 2 : 1);
+        W0.fetch(ox + sx, oy + sy, t);
+        r += t[0] * 255 * kw; g += t[1] * 255 * kw; b += t[2] * 255 * kw;
+      }
+    }
+    const br = Math.floor(r / 16), bg = Math.floor(g / 16), bb = Math.floor(b / 16);
+    const luma = 0.2126 * sr + 0.7152 * sg + 0.0722 * sb;
+    const lumaB = 0.2126 * br + 0.7152 * bg + 0.0722 * bb;
+    const diff = luma - lumaB;
+    let rr: number, gg: number, bbv: number;
+    if (Math.abs(diff) < 4) { rr = sr; gg = sg; bbv = sb; }
+    else { const delta = k * diff; rr = clamp8f(sr + delta); gg = clamp8f(sg + delta); bbv = clamp8f(sb + delta); }
+    out[0] = rr / 255; out[1] = gg / 255; out[2] = bbv / 255; out[3] = sa / 255;
+    return true;
+  });
+};
+const washLerp: CpuDraw = (c) => {
+  const [ox, oy] = uv2(c, "u_origin");
+  const W0 = c.tex("u_W0"), dstT = c.tex("u_dst"), cov = c.tex("u_cov");
+  const s = new Float32Array(4), d = new Float32Array(4), cv = new Float32Array(4);
+  c.forEachPixel((px, py, out) => {
+    if (cov) cov.fetch(px, py, cv); else cv.fill(0);
+    const a = cv[3];
+    if (W0) W0.fetch(px, py, s); else s.fill(0);
+    const sr = s[0] * 255, sg = s[1] * 255, sb = s[2] * 255, sA = s[3] * 255;
+    if (a <= 0) { out[0] = sr / 255; out[1] = sg / 255; out[2] = sb / 255; out[3] = sA / 255; return true; }
+    if (dstT) dstT.fetch(px - ox, py - oy, d); else d.fill(0);
+    const dr = d[0] * 255, dg = d[1] * 255, db = d[2] * 255, dA = d[3] * 255;
+    const la = sA / 255, fa = dA / 255;
+    const na = la * (1 - a) + fa * a;
+    if (na <= 0) { out.fill(0); return true; }
+    const wl = (la * (1 - a)) / na, wf = (fa * a) / na;
+    out[0] = (sr * wl + dr * wf) / 255; out[1] = (sg * wl + dg * wf) / 255; out[2] = (sb * wl + db * wf) / 255; out[3] = (na * 255) / 255;
+    return true;
+  });
+};
+
 // ---- 注册表 ----
 // GPU-only 显式登记（屏显专属，headless 不需要；SoftGl2Port draw 到这些名字响亮 throw）。
 const GPU_ONLY = new Set<string>(["present-affine", "present-affine-over", "screen-bg"]);
@@ -690,6 +814,12 @@ export function resolveCpuProgram(name: string): CpuDraw | "gpu-only" | null {
   if (name === "box3") return box3;
   if (name === "upsample-bilinear") return upsampleBilinear;
   if (name === "smudge-deposit") return smudgeDeposit;
+  if (name === "wash-coverage") return washCoverage;
+  if (name === "wash-premult") return washPremult;
+  if (name === "wash-box3") return washBox3;
+  if (name === "wash-unpremult") return washUnpremult;
+  if (name === "wash-sharpen") return washSharpen;
+  if (name === "wash-lerp") return washLerp;
   if (name.startsWith("composite:")) {
     const parts = name.split(":");   // composite:<mode>:<src>[:<ovMode>]
     const mode = parts[1] as BlendMode;

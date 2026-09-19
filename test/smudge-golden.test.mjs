@@ -5,7 +5,7 @@ import { describe, it, assert } from "./runner.mjs";
 import { readFileSync } from "node:fs";
 import { SmudgeEngine } from "../src/plugins/smudge-engine.ts";
 import { CASES, DOC_W, DOC_H, buildImage, runCase, decodeBytes, compareBytes, rectContains } from "./smudge-golden-cases.mjs";
-import { gpuLayer } from "./smudge-gpu-target.mjs";
+import { gpuLayer } from "./region-target.mjs";
 
 const GOLDEN = JSON.parse(readFileSync(new URL("./fixtures/smudge-golden.json", import.meta.url), "utf8"));
 

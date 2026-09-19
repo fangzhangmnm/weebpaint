@@ -24,7 +24,7 @@ describe("region-programs · 注册表", () => {
       assert(typeof r === "function", `${id} 缺 CPU 孪生（resolveCpuProgram → ${String(r)}）`);
     }
     port();
-    eq(REGION_PROGRAM_IDS.length, 10);
+    eq(REGION_PROGRAM_IDS.length, 16);
   });
 });
 

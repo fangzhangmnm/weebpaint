@@ -68,7 +68,7 @@ export interface StrokeSessionDeps {
    *  组液化一次挂 N 个替身（一叶一个），board 侧按 layerId 换源。 */
   setShadows(entries: readonly { layerId: number; pixels: LayerPixels }[]): void;
   /** 2026-09-18 区域程序（GPU 驻留写靶）：board.openRegionStroke —— 造一笔的 RegionStroke（caps 守卫 / 显存不够 / 无 GL → throw） */
-  openRegion(leaf: ViewLeaf): RegionStroke;
+  openRegion(leaf: ViewLeaf, opts: { snapshot: boolean }): RegionStroke;
   /** board.setStrokeRegion —— 描边期每帧 W 当 overlay（replace）；null = 关 */
   setRegion(region: RegionStroke | null): void;
   /** board.commitRegionStroke —— = bakeStamps 写回链（GPU merge→readPixels→applyRegionDiff→收养），在令牌内；false = 没落层 */
@@ -81,6 +81,8 @@ export interface StrokeSessionSpec {
   historyType: string;
   /** 抬笔是否按选区 applyMaskPostStroke（filterBrush 在 begin 已吃 selection → false） */
   finalize: boolean;
+  /** preview="region" 时要不要起笔快照 W₀（wash 类 filter 声明 strokeSnapshot） */
+  regionSnapshot?: boolean;
 }
 
 // ---- StrokeShadow：stroke 档的替身叶（C6，census §6.1 施工单）----
@@ -198,7 +200,7 @@ export class StrokeSession {
     if (preview === "region") {
       // GPU 驻留写靶（2026-09-18 区域程序）：单叶；W 就是预览 overlay（replace）；收口走 bakeStamps 写回链；cancel = dispose 零回滚。
       if (layers.length !== 1) { this.token.cancel(); throw new Error("StrokeSession: region preview is single-leaf"); }
-      try { this._region = deps.openRegion(layers[0]); }
+      try { this._region = deps.openRegion(layers[0], { snapshot: !!spec.regionSnapshot }); }
       catch (e) { this.token.cancel(); throw e; }   // caps 守卫 / 显存不够 / GL 丢失：令牌收口再冒错（input 报状态栏 + 黑匣子）
       deps.setRegion(this._region);
       this.targets = [this._region] as unknown as ViewLeaf[];   // 引擎面 = StrokeTarget（RegionStroke 实现）

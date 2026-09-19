@@ -61,9 +61,9 @@ export class GLBoard {
 
   // 2026-09-18 区域程序：造一笔的 GPU 驻留写靶（RegionStroke）。caps 守卫 / 显存不够在构造里响亮 throw；
   //   错误信息附 caps 快照（黑匣子可查「哪台设备没浮点 FBO」，doc §3.7）。
-  openRegion(leafId: number, pixels: LayerPixels, docW: number, docH: number, selMask: SelMaskPlane | null, lockAlpha: boolean): RegionStroke {
+  openRegion(leafId: number, pixels: LayerPixels, docW: number, docH: number, selMask: SelMaskPlane | null, lockAlpha: boolean, snapshot = false): RegionStroke {
     if (this._glctx.isLost) throw new Error("REGION_GL_LOST (context lost; try again)");
-    try { return new RegionStroke(this._room, leafId, pixels, docW, docH, selMask, { lockAlpha }); }
+    try { return new RegionStroke(this._room, leafId, pixels, docW, docH, selMask, { lockAlpha, snapshot }); }
     catch (e) { throw new Error(`${String((e as { message?: unknown })?.message ?? e)} caps=${JSON.stringify(this._glctx.caps)}`); }
   }
 

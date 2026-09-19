@@ -14,7 +14,7 @@
 // StrokeTarget 面（filters.ts）：docW/docH/bbox 真值；两个 ImageData 方法**不实现**（响亮 throw）——GPU 手指 / wash 不调它们，
 //   液化并存期仍走 StrokeShadow；将来要 CPU 读写走 readPixels 显式慢路径，不在这里偷偷回读。
 
-import type { Gl2Port, PooledFBO, Gl2Texture, Gl2TexSource } from "../../common/gl2-port.ts";
+import type { Gl2Port, PooledFBO, Gl2Texture, Gl2TexSource, Gl2Blend } from "../../common/gl2-port.ts";
 import type { GlRoom } from "./gl-room.ts";
 import type { LayerPixels } from "../tiles/tile-layer.ts";
 import { ensureAllRegionPrograms, type RegionProgramId } from "./region-programs.ts";
@@ -108,8 +108,17 @@ export class RegionStroke {
     return t;
   }
 
+  /** 提前归还一张状态纹理（区域尺寸的临时件按 flush 借还；不调也会在 dispose 归还）。 */
+  free(t: RegionTex): void {
+    const impl = t as RegionTexImpl;
+    if (!impl.alive) return;
+    impl.alive = false;
+    this._port.returnFBO(impl.fbo);
+    this._texes = this._texes.filter((x) => x !== impl);
+  }
+
   /** 唯一算子：跑一个 program。dst 与任一采样源同一张 = 响亮 throw（读写冲突，GL 未定义行为）。写 W 时按 scissor 记 dirty。 */
-  run(program: RegionProgramId, dst: RegionDst, textures: Record<string, RegionTexRef>, uniforms?: RegionUniforms, scissor?: RegionRect): void {
+  run(program: RegionProgramId, dst: RegionDst, textures: Record<string, RegionTexRef>, uniforms?: RegionUniforms, scissor?: RegionRect, blend?: Gl2Blend): void {
     this._alive();
     const target = this._resolve(dst) as PooledFBO;
     const texs: Record<string, Gl2TexSource> = {};
@@ -118,7 +127,7 @@ export class RegionStroke {
       if (src === target) throw new Error(`REGION_READ_WRITE_HAZARD (${program}: sampler ${k} is the draw target)`);
       texs[k] = src;
     }
-    this._port.draw({ program, target, uniforms, textures: texs, scissor });
+    this._port.draw({ program, target, uniforms, textures: texs, scissor, blend });
     if (dst === "W") this._markDirty(scissor ?? { x: 0, y: 0, w: this.docW, h: this.docH });
   }
 

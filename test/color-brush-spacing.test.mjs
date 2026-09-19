@@ -5,22 +5,17 @@ import { describe, it, eq, assert } from "./runner.mjs";
 import { SharpenBlurFilter } from "../src/plugins/sharpen-blur.ts";
 import { COLOR_BRUSH_MIN_SPACING } from "../src/filters.ts";
 
-function mockLayer(docW, docH) {
-  const buf = new Uint8ClampedArray(docW * docH * 4).fill(200);
-  const L = {
-    docW, docH, buf, bboxX: 0, bboxY: 0, bboxW: docW, bboxH: docH, puts: 0,
-    getImageData(x0, y0, w, h) { const data = new Uint8ClampedArray(w * h * 4); for (let yy = 0; yy < h; yy++) data.set(buf.subarray(((y0 + yy) * docW + x0) * 4, ((y0 + yy) * docW + x0 + w) * 4), yy * w * 4); return new ImageData(data, w, h); },
-    putImageData(x0, y0, img) { L.puts++; for (let yy = 0; yy < img.height; yy++) buf.set(img.data.subarray(yy * img.width * 4, (yy + 1) * img.width * 4), ((y0 + yy) * docW + x0) * 4); },
-  };
-  return L;
-}
+import { gpuLayer } from "./region-target.mjs";   // 2026-09-18 GPU 写靶（RegionStroke，snapshot=W₀）
+function mockLayer(w, h) { const L = gpuLayer(w, h, { snapshot: true }); L.buf.fill(200); return L; }
 // 一笔 200px 直线，返回 dab 数（2026-09-06 wash 幂等后写回按 flush 不按 dab → 观测 state.dabs）
 function dabs(spacing) {
   const L = mockLayer(300, 60);
-  const st = SharpenBlurFilter.beginBrushStroke([L], { amount: -40 }, { size: 40, hardness: 0.5, flow: 1, spacing }, null, 40, 30, 1);
+  const rs = L.open();
+  const st = SharpenBlurFilter.beginBrushStroke([rs], { amount: -40 }, { size: 40, hardness: 0.5, flow: 1, spacing }, null, 40, 30, 1);
   for (let x = 41; x <= 240; x++) SharpenBlurFilter.extendBrushStamp(st, x, 30, 1);
   SharpenBlurFilter.endBrushStroke(st);
-  assert(L.puts >= 1, "抬笔要把 pending dab 合成掉（至少一次写回）");
+  assert(rs.dirty, "抬笔要把 pending dab 合成掉（W 有 dirty）");
+  L.close(rs);
   return st.dabs;
 }
 

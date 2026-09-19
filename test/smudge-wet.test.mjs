@@ -4,7 +4,7 @@
 //   记忆解耦（paint + 短记忆走一个直径后不再带起点色；smear 记忆律不变）；premult 红线（透明像素 RGB 不进平均）。
 import { describe, it, assert, eq } from "./runner.mjs";
 import { SmudgeEngine } from "../src/plugins/smudge-engine.ts";
-import { gpuLayer } from "./smudge-gpu-target.mjs";   // 2026-09-18 GPU 写靶（RegionStroke on SoftGl2Port），测试面同旧 mockLayer
+import { gpuLayer } from "./region-target.mjs";   // 2026-09-18 GPU 写靶（RegionStroke on SoftGl2Port），测试面同旧 mockLayer
 
 const mockLayer = (w, h) => gpuLayer(w, h);
 const RED = [255, 0, 0, 255], WHITE = [255, 255, 255, 255], BLACK = [0, 0, 0, 255];

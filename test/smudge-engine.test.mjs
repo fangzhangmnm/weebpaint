@@ -5,7 +5,7 @@
 //   dull 出平均色且不发黑（premult）；选区外不动；lockAlpha 不动 alpha；dirty 覆盖所有改动像素、flush 后清空。
 import { describe, it, assert, eq } from "./runner.mjs";
 import { SmudgeEngine } from "../src/plugins/smudge-engine.ts";
-import { gpuLayer } from "./smudge-gpu-target.mjs";   // 2026-09-18 GPU 写靶（RegionStroke on SoftGl2Port），测试面同旧 mockLayer
+import { gpuLayer } from "./region-target.mjs";   // 2026-09-18 GPU 写靶（RegionStroke on SoftGl2Port），测试面同旧 mockLayer
 
 const mockLayer = (w, h) => gpuLayer(w, h);
 const RED = [255, 0, 0, 255], BLUE = [0, 0, 255, 255], CLEAR = [0, 0, 0, 0];
