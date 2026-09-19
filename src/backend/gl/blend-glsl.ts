@@ -66,12 +66,16 @@ export function compositeFragSource(mode: BlendMode, src: SourceKind = "tiled", 
       ? `vec4 base = sampleTiled(u_srcIndex, docPos);
          vec2 ovUv = (docPos - u_ovOrigin) / u_ovSize;
          vec4 ov = (any(lessThan(ovUv, vec2(0.0))) || any(greaterThan(ovUv, vec2(1.0)))) ? vec4(0.0) : texture(u_overlay, ovUv);
+         float srcA; vec3 Cs;
+         if (u_ovReplace == 1) {                                   // 区域 overlay（2026-09-18）：bbox 内 = W 直值，bbox 外 = base
+           bool ovInside = !(any(lessThan(ovUv, vec2(0.0))) || any(greaterThan(ovUv, vec2(1.0))));
+           srcA = ovInside ? ov.a : base.a; Cs = ovInside ? ov.rgb : base.rgb;
+         } else {
          float ovA = ov.a * u_overlayOpacity;
          if (u_ovHasSel == 1) {                                    // 选区：裁到 mask（dst-in 选区）
            vec2 suv = (docPos - u_ovSelOrigin) / u_ovSelSize;
            ovA *= (any(lessThan(suv, vec2(0.0))) || any(greaterThan(suv, vec2(1.0)))) ? 0.0 : texture(u_ovSel, suv).r;   // R8 gray8 直传（v0.4.6）
          }
-         float srcA; vec3 Cs;
          if (u_overlayErase == 1) {
            srcA = base.a * (1.0 - ovA); Cs = base.rgb;             // erase 不受锁α影响（v242 CPU 像素笔：erase 分支优先）
          } else if (u_ovLockAlpha == 1) {
@@ -85,6 +89,7 @@ export function compositeFragSource(mode: BlendMode, src: SourceKind = "tiled", 
            vec3 ovBlend = (1.0 - base.a) * ov.rgb + base.a * blendRGB_ov(base.rgb, ov.rgb);   // W3C blend 只在 base 存在处
            srcA = ovA + base.a * (1.0 - ovA);
            Cs = (srcA > 0.0) ? (ovBlend * ovA + base.rgb * base.a * (1.0 - ovA)) / srcA : vec3(0.0);
+         }
          }`
       : `vec4 s = sampleTiled(u_srcIndex, docPos);
          float srcA = s.a;
@@ -118,6 +123,7 @@ uniform int u_overlayErase;
 uniform vec2 u_ovOrigin;
 uniform vec2 u_ovSize;
 uniform int u_ovLockAlpha;      // 1=锁α（overlay 裁到 base 现有 alpha，对齐 2D _clipOverlayMasks dst-in 层）
+uniform int u_ovReplace;        // 1=区域 overlay：bbox 内直接替换（W 已含一切），bbox 外 base（2026-09-18）
 uniform int u_ovHasSel;         // 1=有选区蒙版
 uniform sampler2D u_ovSel;      // 选区 mask（R8 gray8，bbox 直值；采 .r）
 uniform vec2 u_ovSelOrigin;     // 选区 mask 的 doc bbox 左上

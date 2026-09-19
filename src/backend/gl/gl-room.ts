@@ -25,6 +25,8 @@ import type { BlendMode } from "./blend-glsl.ts";
 
 // ---- board 输入（原 render-tree-gl 同名接口原样迁入） ----
 // v0.6.39 去 canvas 化：替身 = straight 字节平面（filters-adjust 的预览 buffer 直传，就地更新）。
+import type { RegionOverlayInput } from "./region-stroke.ts";
+
 export interface SurrogatePlaneInput { layerId: number; bytes: { data: Uint8ClampedArray; w: number; h: number }; bx: number; by: number; w: number; h: number; }
 // C6 影子变体：替身 = 整个 LayerPixels（stroke 档替身叶，src/stroke-session.ts StrokeShadow）。
 //   未变 tile 与真叶共享句柄 → syncLeafSafe 走 per-tile 增量上传（对比平面变体的全 bbox 重传）；
@@ -63,7 +65,7 @@ export interface FillOverlayInput {
   lockAlpha: boolean;
   selMask: { data: Uint8Array; ox: number; oy: number; ow: number; oh: number };
 }
-export type OverlayInput = StampOverlayInput | FillOverlayInput;
+export type OverlayInput = StampOverlayInput | FillOverlayInput | RegionOverlayInput;   // region（2026-09-18）：W 当 overlay，replace 合成
 
 // overlay 空判据（kind-aware——fill 没有 stamps，旧 stamps.length 守卫会把 fill 静默早退成 false）。
 export function overlayEmpty(ov: OverlayInput): boolean {
@@ -86,7 +88,7 @@ export class GlRoom {
   readonly leaves = new Map<number, LeafRec>();
 
   // pseudo 装置（overlay/float/选区 mask/fill 色）——live 预览与一次性合成（吸管 WYSIWYG）共用。
-  private _overlay: { tex: Gl2TexSource; layerId: number; opacity: number; erase: boolean; blendMode: string; ox: number; oy: number; ow: number; oh: number; lockAlpha: boolean; selMask: { tex: Gl2Texture; ox: number; oy: number; ow: number; oh: number } | null } | null = null;
+  private _overlay: { tex: Gl2TexSource; layerId: number; opacity: number; erase: boolean; blendMode: string; ox: number; oy: number; ow: number; oh: number; lockAlpha: boolean; selMask: { tex: Gl2Texture; ox: number; oy: number; ow: number; oh: number } | null; replace: boolean } | null = null;
   private _overlayOwnedFBO: PooledFBO | null = null;
   private _selTex: Gl2Texture | null = null;
   private _selTexSrc: Uint8Array | null = null;
@@ -327,7 +329,7 @@ export class GlRoom {
   overlayDesc(): OverlayDesc | null {
     const ov = this._overlay;
     if (!ov) return null;
-    return { tex: ov.tex, opacity: ov.opacity, erase: ov.erase, blendMode: safeMode(ov.blendMode), ox: ov.ox, oy: ov.oy, ow: ov.ow, oh: ov.oh, lockAlpha: ov.lockAlpha, selMask: ov.selMask };
+    return { tex: ov.tex, opacity: ov.opacity, erase: ov.erase, blendMode: safeMode(ov.blendMode), ox: ov.ox, oy: ov.oy, ow: ov.ow, oh: ov.oh, lockAlpha: ov.lockAlpha, selMask: ov.selMask, replace: ov.replace };
   }
 
   clearOverlay(): void { this._overlay = null; }
@@ -339,7 +341,13 @@ export class GlRoom {
 
   setStampOverlay(ov: OverlayInput, docW: number, docH: number): void {
     if (overlayEmpty(ov)) { this._overlay = null; return; }
-    if ("kind" in ov) {
+    if ("kind" in ov && ov.kind === "region") {
+      // 区域程序（2026-09-18）：W（doc 尺寸 straight u8，RegionStroke 持有）直接当 overlay，合成 replace——bbox 内 = W 直值。
+      //   不借 FBO（纹理归 RegionStroke，dispose 归它）；opacity/erase/lockAlpha/选区都已在 W 里，这里全关。
+      this._overlay = { tex: ov.tex, layerId: ov.layerId, opacity: 1, erase: false, blendMode: "source-over", ox: 0, oy: 0, ow: docW, oh: docH, lockAlpha: false, selMask: null, replace: true };
+      return;
+    }
+    if ("kind" in ov && ov.kind === "fill") {
       // fill：1×1 填色纹理拉伸到选区 bbox。不碰 stamp 光栅器、不借 FBO；shader overlay 分支
       //   bbox 外自透明（uv 越界检查）+ selMask dst-in = 恰为「选区内 source-over 填色」。
       if (!this._fillTex) this._fillTex = this.glctx.createTexture();
@@ -350,7 +358,7 @@ export class GlRoom {
         this._fillTexColor = colorKey;
       }
       const selMask = this._uploadSelMask(ov.selMask);
-      this._overlay = { tex: this._fillTex, layerId: ov.layerId, opacity: 1, erase: false, blendMode: "source-over", ox: ov.bx, oy: ov.by, ow: ov.bw, oh: ov.bh, lockAlpha: ov.lockAlpha, selMask };
+      this._overlay = { tex: this._fillTex, layerId: ov.layerId, opacity: 1, erase: false, blendMode: "source-over", ox: ov.bx, oy: ov.by, ow: ov.bw, oh: ov.bh, lockAlpha: ov.lockAlpha, selMask, replace: false };
       return;
     }
     // 整屏 doc FBO + scissor（池每帧同尺寸命中零 malloc)；着色靠 scissor 限回 stamp bbox。
@@ -361,7 +369,7 @@ export class GlRoom {
     if (this._overlayOwnedFBO) this.glctx.returnFBO(this._overlayOwnedFBO);
     this._overlayOwnedFBO = fboS;
     const selMask = ov.selMask ? this._uploadSelMask(ov.selMask) : null;
-    this._overlay = { tex: fboS, layerId: ov.layerId, opacity: ov.opacity, erase: ov.erase, blendMode: ov.blendMode, ox: 0, oy: 0, ow: docW, oh: docH, lockAlpha: ov.lockAlpha, selMask };
+    this._overlay = { tex: fboS, layerId: ov.layerId, opacity: ov.opacity, erase: ov.erase, blendMode: ov.blendMode, ox: 0, oy: 0, ow: docW, oh: docH, lockAlpha: ov.lockAlpha, selMask, replace: false };
   }
 
   // 选区 mask 上传（stamp/fill 两分支共用）：单张复用纹理，buffer 身份即内容（Selection 不可变）。

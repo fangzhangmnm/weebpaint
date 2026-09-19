@@ -32,6 +32,7 @@ import type { WriteToken } from "./workpiece/workpiece.ts";
 import type { Selection } from "./selection.ts";
 import { LayerPixels, disposePixelsSnapshot } from "./tiles/tile-layer.ts";
 import { TILE_SIZE } from "../common/tile-geometry.ts";
+import type { RegionStroke } from "./gl/region-stroke.ts";   // preview="region" 的 GPU 驻留写靶（2026-09-18）
 
 export type StampCollect = NonNullable<ReturnType<BrushEngine["collectStamps"]>>;
 
@@ -48,7 +49,7 @@ export interface StrokeEngine {
 }
 
 /** 预览宿（census §3.4；见文件头）。 */
-export type StrokePreview = "overlay" | "livesync" | "shadow";
+export type StrokePreview = "overlay" | "livesync" | "shadow" | "region";   // region（2026-09-18）：GPU 驻留 RegionStroke（手指 / 模糊 / 锐化）
 
 export interface StrokeSessionDeps {
   /** wp2.begin —— 单令牌墙的开口（第二个 begin → throw） */
@@ -66,6 +67,12 @@ export interface StrokeSessionDeps {
   /** board.setStrokeShadows —— shadow 预览宿的显示注入（surrogate 影子变体；空数组 = 关）。
    *  组液化一次挂 N 个替身（一叶一个），board 侧按 layerId 换源。 */
   setShadows(entries: readonly { layerId: number; pixels: LayerPixels }[]): void;
+  /** 2026-09-18 区域程序（GPU 驻留写靶）：board.openRegionStroke —— 造一笔的 RegionStroke（caps 守卫 / 显存不够 / 无 GL → throw） */
+  openRegion(leaf: ViewLeaf): RegionStroke;
+  /** board.setStrokeRegion —— 描边期每帧 W 当 overlay（replace）；null = 关 */
+  setRegion(region: RegionStroke | null): void;
+  /** board.commitRegionStroke —— = bakeStamps 写回链（GPU merge→readPixels→applyRegionDiff→收养），在令牌内；false = 没落层 */
+  commitRegion(region: RegionStroke): boolean;
 }
 
 // begin 期策略（engine-registry PIXEL_STROKE_SPECS 的子集：session 只关心事务面）
@@ -177,6 +184,7 @@ export class StrokeSession {
   private readonly token: WriteToken;
   private readonly deps: StrokeSessionDeps;
   private _shadows: StrokeShadow[] = [];
+  private _region: RegionStroke | null = null;   // preview="region"：GPU 驻留写靶（2026-09-18）
   private _open = true;
 
   constructor(deps: StrokeSessionDeps, engine: StrokeEngine, layers: readonly ViewLeaf[], spec: StrokeSessionSpec, preview: StrokePreview) {
@@ -187,7 +195,14 @@ export class StrokeSession {
     this.finalize = spec.finalize;
     this.inPlace = preview === "livesync";
     this.token = deps.begin(spec.historyType);
-    if (preview === "shadow") {
+    if (preview === "region") {
+      // GPU 驻留写靶（2026-09-18 区域程序）：单叶；W 就是预览 overlay（replace）；收口走 bakeStamps 写回链；cancel = dispose 零回滚。
+      if (layers.length !== 1) { this.token.cancel(); throw new Error("StrokeSession: region preview is single-leaf"); }
+      try { this._region = deps.openRegion(layers[0]); }
+      catch (e) { this.token.cancel(); throw e; }   // caps 守卫 / 显存不够 / GL 丢失：令牌收口再冒错（input 报状态栏 + 黑匣子）
+      deps.setRegion(this._region);
+      this.targets = [this._region] as unknown as ViewLeaf[];   // 引擎面 = StrokeTarget（RegionStroke 实现）
+    } else if (preview === "shadow") {
       this._shadows = layers.map((l) => new StrokeShadow(l));
       deps.setShadows(this._shadows.map((s) => ({ layerId: s.id, pixels: s.pixels })));
       this.targets = this._shadows as unknown as ViewLeaf[];   // 引擎面同形（ViewLeaf 的引擎读写子集）
@@ -230,6 +245,20 @@ export class StrokeSession {
     const cs = (this.engine.endStroke() ?? null) as StampCollect | null;
     let gpuCommitted = false;
     if (cs && cs.stamps.length) gpuCommitted = this.deps.commitStamps(cs);
+    if (this._region) {
+      const region = this._region;
+      this._region = null;
+      let ok = false;
+      try { ok = this.deps.commitRegion(region); }
+      finally { this.deps.setRegion(null); region.dispose(); }
+      if (!ok) {
+        // bakeStamps 返 false = 什么都没写（GL 丢失 / 驻留不齐）：令牌取消、响亮——不静默丢一笔（家规：错误路径不许吞掉照报成功）
+        this.token.cancel();
+        this.deps.invalidate();
+        throw new Error("REGION_COMMIT_FAILED (GPU merge/readback did not land; stroke dropped, token cancelled)");
+      }
+      gpuCommitted = true;
+    }
     if (this._shadows.length) {
       this._shadows.forEach((sh, i) => sh.commitTo(this.layers[i]));
       this.deps.setShadows([]);
@@ -260,6 +289,7 @@ export class StrokeSession {
     if (!this._open) return;
     this._open = false;
     this.engine.cancelStroke();   // shape pixelMode 会 preSnap-restore 到替身——无害（替身随即丢弃）
+    if (this._region) { const r = this._region; this._region = null; this.deps.setRegion(null); r.dispose(); }   // 真层从未被写 → 零回滚
     if (this._shadows.length) this.deps.setShadows([]);
     this.token.cancel();
     this._disposeShadows();

@@ -6,6 +6,7 @@ import { reportError } from "./error-badge.ts";
 import { GLBoard } from "./shell/gl-board.ts";
 import { BrowserGl2Port } from "./shell/browser-gl2-port.ts";
 import { poolCapacityForBudget } from "./backend/gl/gl-room.ts";
+import type { RegionStroke } from "./backend/gl/region-stroke.ts";
 import type { FloatInput, StampOverlayInput, FillOverlayInput, OverlayInput, SurrogateInput } from "./backend/gl/gl-room.ts";
 import type { Stamp, StrokeShape } from "./backend/gl/gl-stamp.ts";
 
@@ -753,6 +754,10 @@ export class Board {
 
   // Stage 3：brush stamp 列表提供者（app 注入 = () => input.brush.collectStamps()）。
   _stampProvider: (() => StampCollect) | null = null;
+  // 2026-09-18 区域程序：描边期的 GPU 驻留写靶（手指 / 模糊 / 锐化）。open 记住叶（commit 要 pixels + applyRegionDiff），
+  //   set 挂成 overlay 源（每帧 region.overlay() 现取，dirty 会长）。与 stamp/fill overlay 互斥（单令牌墙）。
+  _strokeRegion: RegionStroke | null = null;
+  _regionLayers = new Map<RegionStroke, ViewLeaf>();
   setStampProvider(fn: () => StampCollect) { this._stampProvider = fn; }
 
   // StampCollect → GPU overlay 输入（live 每帧 + commit 共用一个构造 = 同源输入喂同一 shader）。
@@ -772,6 +777,7 @@ export class Board {
   // GPU brush stamp overlay（live 每帧；替 CPU overlayCanvas）。
   //   v0.5.11：同一 overlay 槽复用给 fill 预览（brush 优先；lasso 模式下 brush 必空 → 结构上互斥）。
   _glStampOverlay(): OverlayInput | null {
+    if (this._strokeRegion) return this._strokeRegion.overlay();   // 区域程序描边中：W 当 overlay（replace）
     const cs = this._stampProvider?.();
     const brush = (cs && cs.stamps.length) ? this._overlayInputFrom(cs) : null;
     const fill = this._glFillOverlay();
@@ -821,6 +827,34 @@ export class Board {
 
   // GL board 是否启用（brush beginStroke 据此设 glMode）。
   isGLBoard(): boolean { return !!this._glBoard; }
+
+  // 2026-09-18 区域程序（StrokeSession preview="region" 的三个注入面）：
+  //   openRegionStroke = 造一笔的 RegionStroke（选区平面同 _overlayInputFrom；lockAlpha 跟叶；无 GL / caps 守卫 / 显存不够 → throw）；
+  //   setStrokeRegion = 挂/摘 overlay 源；commitRegionStroke = 同 commitBrushStroke 的 GPU merge→readback→applyRegionDiff→收养链。
+  openRegionStroke(layer: ViewLeaf): RegionStroke {
+    if (!this._glBoard) throw new Error("REGION_NO_GL (finger/wash tools need the GL board)");
+    const sel = this.doc.selection;
+    const selMask = sel ? (() => { const m = (sel as Selection).bboxMask(); return { data: m.data, ox: m.x, oy: m.y, ow: m.w, oh: m.h }; })() : null;
+    const region = this._glBoard.openRegion(layer.id, layer.pixels, this.doc.width, this.doc.height, selMask, !!layer.lockAlpha);
+    this._regionLayers.set(region, layer);
+    return region;
+  }
+  setStrokeRegion(region: RegionStroke | null) {
+    this._strokeRegion = region;
+    if (!region) this._regionLayers.forEach((_l, r) => { if (r !== region) { /* 收口后忘记映射（commit 已删；cancel 路径在此清） */ } });
+    this.requestRender();
+  }
+  commitRegionStroke(region: RegionStroke): boolean {
+    const layer = this._regionLayers.get(region);
+    this._regionLayers.delete(region);
+    if (!this._glBoard || !layer) return false;
+    const ov = region.overlay();
+    if (ov.bw <= 0 || ov.bh <= 0) return true;   // 没写过 W = 无事可提（no-op 笔，令牌照常收口不占步）
+    return this._glBoard.commitBrushStroke(
+      layer.id, layer.pixels, ov, this.doc.width, this.doc.height,
+      (px, x, y, w, h) => layer.applyRegionDiff(x, y, w, h, px),
+    );
+  }
 
   // S8 brush commit：抬笔的最终 stamps（含 tail/taper）→ GPU merge（live 同一 shader）→ 只封真变 tile 落层
   //   → 变更 tile GPU 收养。返回 false = 没提交（GL 失败/池到顶保底），调用方别当成功。

@@ -8,6 +8,7 @@ import type { Gl2Port } from "../common/gl2-port.ts";
 import { GlRoom } from "../backend/gl/gl-room.ts";
 import { RenderTree } from "../backend/gl/render-tree.ts";
 import { RasterService } from "../backend/gl/raster-service.ts";
+import { RegionStroke, type SelMaskPlane } from "../backend/gl/region-stroke.ts";
 import type { FloatInput, OverlayInput, SurrogateInput } from "../backend/gl/gl-room.ts";
 import type { LayerPixels } from "../backend/tiles/tile-layer.ts";
 import type { DocNode, DocLeaf } from "../backend/gl/gl-doc-bridge.ts";
@@ -56,6 +57,14 @@ export class GLBoard {
   ): boolean {
     if (this._glctx.isLost) return false;
     return this._raster.bakeStamps(leafId, pixels, ov, docW, docH, apply);
+  }
+
+  // 2026-09-18 区域程序：造一笔的 GPU 驻留写靶（RegionStroke）。caps 守卫 / 显存不够在构造里响亮 throw；
+  //   错误信息附 caps 快照（黑匣子可查「哪台设备没浮点 FBO」，doc §3.7）。
+  openRegion(leafId: number, pixels: LayerPixels, docW: number, docH: number, selMask: SelMaskPlane | null, lockAlpha: boolean): RegionStroke {
+    if (this._glctx.isLost) throw new Error("REGION_GL_LOST (context lost; try again)");
+    try { return new RegionStroke(this._room, leafId, pixels, docW, docH, selMask, { lockAlpha }); }
+    catch (e) { throw new Error(`${String((e as { message?: unknown })?.message ?? e)} caps=${JSON.stringify(this._glctx.caps)}`); }
   }
 
   // v0.7.25 选区笔：stamps → bbox RGBA 字节（纯光栅，不进树）。GL lost → null（调用方走 CPU disc 回退）。

@@ -22,6 +22,7 @@ export interface OverlayDesc {
   ox: number; oy: number; ow: number; oh: number;   // doc 坐标 bbox（shader 按此映射，bbox 外透明）
   lockAlpha?: boolean;    // 锁α：overlay 裁到 base 现有 alpha
   selMask?: { tex: Gl2Texture; ox: number; oy: number; ow: number; oh: number } | null;
+  replace?: boolean;      // 区域 overlay（2026-09-18）：bbox 内直接替换 base（W 已含一切；opacity/erase/lockAlpha/sel 均忽略）
 }
 // 自由变换浮层 = GPU warp 输入：未 warp 源纹理 + 逆单应性 Hinv（doc→源单位方格）+ sampleMode。
 //   在源层 z 之上 source-over α=1，忽略源层 mode/opacity（与 overlay 不同——overlay 随层）。
@@ -371,6 +372,7 @@ export class GLCompositor {
         u_ovOrigin: [overlay ? overlay.ox : 0, overlay ? overlay.oy : 0],
         u_ovSize: [overlay ? overlay.ow : 1, overlay ? overlay.oh : 1],
         u_ovLockAlpha: overlay && overlay.lockAlpha ? 1 : 0,
+        u_ovReplace: overlay && overlay.replace ? 1 : 0,
         u_ovHasSel: sel ? 1 : 0,
         u_ovSelOrigin: [sel ? sel.ox : 0, sel ? sel.oy : 0],
         u_ovSelSize: [sel ? sel.ow : 1, sel ? sel.oh : 1],

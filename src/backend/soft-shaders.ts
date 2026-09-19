@@ -105,6 +105,7 @@ function makeComposite(mode: BlendMode, src: "tiled" | "group" | "overlay", ovMo
     const [ovSw, ovSh] = uv2(c, "u_ovSize");
     const ovLockAlpha = u1(c, "u_ovLockAlpha");
     const ovHasSel = u1(c, "u_ovHasSel");
+    const ovReplace = u1(c, "u_ovReplace");
     const [selOx, selOy] = uv2(c, "u_ovSelOrigin");
     const [selSw, selSh] = uv2(c, "u_ovSelSize");
     const arr = c.arena("u_arr");
@@ -128,6 +129,10 @@ function makeComposite(mode: BlendMode, src: "tiled" | "group" | "overlay", ovMo
         const ou = (docX - ovOx) / ovSw, ovv = (docY - ovOy) / ovSh;
         if (ou < 0 || ou > 1 || ovv < 0 || ovv > 1 || !overlay) ov4.fill(0);
         else sampleNearest(overlay, ou, ovv, ov4);
+        if (ovReplace === 1) {   // 区域 overlay（镜像 blend-glsl u_ovReplace 分支）：bbox 内 = W 直值，bbox 外 = base
+          const ovInside = !(ou < 0 || ou > 1 || ovv < 0 || ovv > 1) && !!overlay;
+          srcA = ovInside ? ov4[3] : base[3]; Cs[0] = ovInside ? ov4[0] : base[0]; Cs[1] = ovInside ? ov4[1] : base[1]; Cs[2] = ovInside ? ov4[2] : base[2];
+        } else {
         let ovA = ov4[3] * ovOpacity;
         if (ovHasSel === 1) {
           const su = (docX - selOx) / selSw, sv = (docY - selOy) / selSh;
@@ -153,6 +158,7 @@ function makeComposite(mode: BlendMode, src: "tiled" | "group" | "overlay", ovMo
             Cs[k] = sA > 0 ? (ovBlend * ovA + base[k] * baseA * (1 - ovA)) / sA : 0;
           }
           srcA = ovA + baseA * (1 - ovA);
+        }
         }
       } else {
         sampleTiled(srcIndex, arr, docX, docY, t);

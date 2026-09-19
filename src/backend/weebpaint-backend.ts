@@ -29,6 +29,8 @@ import { SMOOTH_DEFAULTS } from "../common/smooth-defaults.ts";
 import { SoftGl2Port } from "./soft-gl2-port.ts";
 import { GlRoom, poolCapacityForBudget } from "./gl/gl-room.ts";
 import { RasterService } from "./gl/raster-service.ts";
+import { RegionStroke } from "./gl/region-stroke.ts";
+import type { LayerPixels } from "./tiles/tile-layer.ts";
 import type { Gl2Port } from "../common/gl2-port.ts";
 import { renderNodesToBytes, type DocCompositorBytesFn } from "./doc-render.ts";
 import { encodeDocToOra, decodeOraToPainting, paintingDataToEncodeDoc, type DecodedPainting } from "./ora.ts";
@@ -365,7 +367,32 @@ export class WeebPaintBackend implements WeebPaintBackendInterface {
       commitStamps: (cs) => this._commitStamps(cs),
       invalidate: () => {},
       setShadows: () => {},
+      // 2026-09-18 区域程序（手指 / 模糊 / 锐化）：headless 也真做——栅格域同一个 GlRoom（缺省 SoftGl2Port 的 CPU 孪生跑）。
+      openRegion: (leaf) => this._openRegion(leaf),
+      setRegion: () => {},   // 无屏：不挂 overlay
+      commitRegion: (region) => this._commitRegion(region),
     };
+  }
+
+  private _regionLayers = new Map<RegionStroke, { id: number; pixels: LayerPixels; applyRegionDiff: (x: number, y: number, w: number, h: number, px: Uint8ClampedArray) => { tx: number; ty: number }[] }>();
+  private _openRegion(leaf: { id: number; pixels: LayerPixels; lockAlpha?: boolean; applyRegionDiff: (x: number, y: number, w: number, h: number, px: Uint8ClampedArray) => { tx: number; ty: number }[] }): RegionStroke {
+    this._ensureRaster();
+    const sel = this._view.selection;
+    const m = sel ? sel.bboxMask() : null;
+    const region = new RegionStroke(this._room!, leaf.id, leaf.pixels, this._view.width, this._view.height,
+      m ? { data: m.data, ox: m.x, oy: m.y, ow: m.w, oh: m.h } : null, { lockAlpha: !!leaf.lockAlpha });
+    this._regionLayers.set(region, leaf);
+    return region;
+  }
+  // board.commitRegionStroke 的 headless 同构：W 当 overlay（replace）走 bakeStamps 写回链；没写过 = no-op（true）。
+  private _commitRegion(region: RegionStroke): boolean {
+    const leaf = this._regionLayers.get(region);
+    this._regionLayers.delete(region);
+    if (!leaf) return false;
+    const ov = region.overlay();
+    if (ov.bw <= 0 || ov.bh <= 0) return true;
+    return this._ensureRaster().bakeStamps(leaf.id, leaf.pixels, ov, this._view.width, this._view.height,
+      (px, x, y, w, h) => leaf.applyRegionDiff(x, y, w, h, px));
   }
 
   // board._overlayInputFrom + commitBrushStroke 的 headless 同构（SSoT 语义一字不动：
