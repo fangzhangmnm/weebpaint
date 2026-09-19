@@ -1084,7 +1084,7 @@ export class InputController {
     const spec = pixelStrokeSpec(rec.role as string)!;   // filterBrush → "stroke" 事务，finalize:false
     // filterBrush 在 beginStroke 时已吃了 selection，stamp 内 mask 外保留 pre → 无需 post-stroke finalize（spec.finalize=false）
     // C6：预览宿=shadow——液化/滤镜笔改写替身叶（census §6.1 第一户），真层只在收口一刻被令牌写。
-    // 预览宿由 filter 声明（2026-09-18 区域程序）：region = GPU 驻留 RegionStroke（手指 / 模糊 / 锐化）；缺省 shadow = CPU 替身（液化）。
+    // 预览宿由 filter 声明（2026-09-18 区域程序）：region = GPU 驻留 RegionStroke（手指 / 模糊 / 锐化 / 液化 09-19 起）；缺省 shadow = CPU 替身。
     const preview = (fbState.Filter as { strokePreview?: "shadow" | "region" }).strokePreview === "region" ? "region" : "shadow";
     const specR = { ...spec, regionSnapshot: !!(fbState.Filter as { strokeSnapshot?: boolean }).strokeSnapshot };
     const { x: dx, y: dy } = this.board.screenToDoc(rec.smX!, rec.smY!);

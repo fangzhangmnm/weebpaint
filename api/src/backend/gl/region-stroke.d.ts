@@ -2,7 +2,7 @@ import type { PooledFBO, Gl2Blend } from "../../common/gl2-port.ts";
 import type { GlRoom } from "./gl-room.ts";
 import type { LayerPixels } from "../tiles/tile-layer.ts";
 import { type RegionProgramId } from "./region-programs.ts";
-export type RegionTexFormat = "rgba-f32" | "rgba-u8";
+export type RegionTexFormat = "rgba-f32" | "rgba-u8" | "rgba16f-tex";
 export interface RegionTex {
     readonly w: number;
     readonly h: number;
@@ -51,6 +51,8 @@ export declare class RegionStroke {
     private _disposed;
     /** 叶的锁 α（引擎读；同 StrokeShadow.lockAlpha）。 */
     readonly lockAlpha: boolean;
+    /** 起笔时叶的紧内容框 [x0,y0,x1,y1)（pixels.contentBounds(true)，逐 tile 缓存，µs 级）；null = 空叶。液化的源矩形 / spline 预滤波范围。 */
+    readonly contentBounds: Rect | null;
     constructor(room: GlRoom, leafId: number, pixels: LayerPixels, docW: number, docH: number, selMask: SelMaskPlane | null, opts?: {
         snapshot?: boolean;
         lockAlpha?: boolean;
@@ -68,6 +70,8 @@ export declare class RegionStroke {
     get dirty(): Rect | null;
     /** 状态纹理（借自 FBO 池，清零；dispose 归还）。 */
     alloc(w: number, h: number, format: RegionTexFormat): RegionTex;
+    /** 上传只读纹理（spline 系数平面 rgba16f：CPU 预滤波产物；不能当 run 的 dst）。dispose / free 删除。 */
+    upload(w: number, h: number, data: Float32Array): RegionTex;
     /** 提前归还一张状态纹理（区域尺寸的临时件按 flush 借还；不调也会在 dispose 归还）。 */
     free(t: RegionTex): void;
     /** 唯一算子：跑一个 program。dst 与任一采样源同一张 = 响亮 throw（读写冲突，GL 未定义行为）。写 W 时按 scissor 记 dirty。 */

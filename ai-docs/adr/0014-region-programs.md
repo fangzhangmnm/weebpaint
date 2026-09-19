@@ -12,10 +12,10 @@
 
 ## 决定
 
-1. **区域程序 = 封闭枚举的片元程序**（`src/backend/gl/region-programs.ts`，`RegionProgramId`），每个名在 `soft-shaders.ts` 有逐行镜像的 CPU 孪生（ADR-0009 决策 5，缺 = `SoftGl2Port.program()` throw）。第一批 10 个（手指）+ 第二批 6 个（wash）。**只加不改**：连续形式（#1）= 新名 `advect-segment`，不改接口。
+1. **区域程序 = 封闭枚举的片元程序**（`src/backend/gl/region-programs.ts`，`RegionProgramId`），每个名在 `soft-shaders.ts` 有逐行镜像的 CPU 孪生（ADR-0009 决策 5，缺 = `SoftGl2Port.program()` throw）。第一批 10 个（手指）+ 第二批 6 个（wash）+ 第三批 3 个（液化，2026-09-19，见下补节）。**只加不改**：连续形式（#1）= 新名 `advect-segment`，不改接口。
 2. **RegionStroke = 一笔一个的窄服务**（`src/backend/gl/region-stroke.ts`）：构造时把叶 tile 整幅装进 **W**（doc 尺寸 straight u8 FBO；`snapshot:true` 再装一份 **W₀**），之后只有 `alloc / free / run / overlay / dispose`。`run(program, dst, textures, uniforms, scissor?, blend?)` 是唯一算子；dst 与采样源同一张 = throw。装载失败（显存不够、rec 不齐）= 构造 throw，**绝不带陈旧 W 起笔**（提交会整块替换叶像素）。
 3. **显示与提交 = overlay 的第三成员**：`OverlayInput` 加 `kind:"region"`（W 当 overlay，doc 尺寸、ox/oy=0），合成 shader 加 `u_ovReplace`（bbox 内 = W 直值，bbox 外 = base；不是新 program 名，是现有 overlay program 的一个 uniform 分支，CPU 孪生同步）。预览零 CPU 往返；提交 = `RasterService.bakeStamps` 原封（GPU merge → `readPixels` dirty 矩形 → `applyRegionDiff` → GPU 收养）。否决：每帧 `readPixels` 回替身（GPU 停顿）、GPU-only 替身叶（多一个显示概念）。
-4. **StrokeSession 第四种预览宿 `"region"`**：`deps.openRegion(leaf, {snapshot}) / setRegion / commitRegion`；end = commit → setRegion(null) → dispose；commit 返 false = 令牌取消 + throw `REGION_COMMIT_FAILED`（不静默丢一笔）；cancel = dispose 零回滚；openRegion throw = 令牌先收口再冒错（单令牌墙不卡死）。Filter 声明 `strokePreview:"region"`（+ `strokeSnapshot` 要 W₀）；液化仍 `shadow`。
+4. **StrokeSession 第四种预览宿 `"region"`**：`deps.openRegion(leaf, {snapshot}) / setRegion / commitRegion`；end = commit → setRegion(null) → dispose；commit 返 false = 令牌取消 + throw `REGION_COMMIT_FAILED`（不静默丢一笔）；cancel = dispose 零回滚；openRegion throw = 令牌先收口再冒错（单令牌墙不卡死）。Filter 声明 `strokePreview:"region"`（+ `strokeSnapshot` 要 W₀）。2026-09-19 起液化也走 region（多叶：`setRegions(list)`，见下补节）；`shadow` 只剩形状笔 pixelMode 等。
 5. **精度契约 = 逐 dab 精确翻译**：W straight u8（逐 dab 量化 = 旧 CPU `ImageData` 语义）；状态纹理（cur / mask / accum / release）f32（ρ≈1 时 f16 会冻住记忆）；混色三档 = `color-mix.ts` 原式（GPU 直接 pow，CPU 孪生 `mixPremultIntoExact`）。wash 的 coverage 存 doc 尺寸 u8 alpha（旧 CPU 是 f32，量化到 1/255 是唯一**有意**偏差）。
 6. **验收 = 三方 golden，不靠真机手感**：旧 CPU 引擎删除前录 27 用例 fixture（`test/fixtures/smudge-golden.json`，git a700fad）；新引擎在 SoftGl2Port 上 ±2/255（实测 22 用例逐字节相同、5 用例各 2 字节差 1）；gl-smoke 真 WebGL2（SwiftShader）vs SoftGl 同驱动同输入 ±2（手指 max|Δ|=0、模糊 1、锐化 0）。**fixture 封存**：不许用新引擎重录来让测试变绿。
 7. **要求 `caps.floatColorBuffer`**（EXT_color_buffer_float）：缺席 = 手指 / 模糊 / 锐化起笔 throw `REGION_NO_FLOAT_FBO`，错误信息附 caps 快照（状态栏 + 黑匣子 warning）。**不做 SoftGl 回退**（ADR-0009 决策 4：SoftGl 只在测试 / MCP；两 port 并用 = 数据跨界三接缝各两分支 = 双实现）；逃生口 = f32 打包 RGBA8，记录在案不做。app 此前累积器默认 u8，本轮是第一个浮点渲染目标。
@@ -26,7 +26,7 @@
 - 手指 / 模糊 / 锐化的每 dab 成本从 CPU 上消失（B² 像素 → 4–13 个小 draw）；小手指 2% 间距的 draw 数与大手指的实际帧时待真机计时（总账 #72）。
 - CPU 手指引擎与 filters.ts 的 CPU 分块 wash 删除；体重：src +1427 / −485（净 +942，其中 CPU 孪生 389 行 = ADR-0009 对表税、GLSL 506 行 = 16 个 program 本体）。提案里写的「净值 ≤ 0」没做到，实数如上。
 - headless backend（MCP / node 全量）同一条路：`WeebPaintBackend` 的 deps 用同一个 GlRoom（缺省 SoftGl2Port 孪生跑）。
-- 液化留在 CPU（第三批，AI 排期判断，待 user 一句话，总账 #71）；连续形式（#1）与抽象艺术（#36）接口已留门（`field` 纹理槽 / program 只加不改）。
+- 液化 2026-09-19 搬 GPU（第三批补节；总账 #71 done）；连续形式（#1）与抽象艺术（#36）接口已留门（`field` 纹理槽 / program 只加不改）。
 - 新 program 的纪律：GLSL 与 `soft-shaders.ts` 孪生同 commit；`test/region-programs.test.mjs` 注册表全覆盖 + `test/smudge-golden.test.mjs` / `color-brush-*.test.mjs` 契约 + gl-smoke `regionParity`。
 
 ## 2026-09-19 补：首笔卡顿案（user 真机：「手指第一下会明显卡顿」）
@@ -36,3 +36,12 @@
 - **非阻塞预编译**：`Gl2Port.warmProgram?`（起编译+链接不查状态）+ `KHR_parallel_shader_compile` 的 COMPLETION_STATUS 空闲轮询收尾；无扩展时每拍最多同步收尾一个（把等待切碎）。`program()` 遇到预编译中的名当场收尾。
 - **启动优先**（user「启动速度是更重要的。我不用photoshop不是因为subscription fee，而是bloatware启动非常慢」）：暖场只在 `board.setDoc` 之后的 `requestIdleCallback` 里跑，**不设强制 timeout**，每个空闲片起两个 program；Safari 无 rIC 退 setTimeout 分片。
 - **预借 FBO 守卫**（user「预借再还 不会在小内存机器上惹麻烦可以试」）：池里已有同尺寸空闲件 = 空操作；池预算装不下 = 跳过；只在两者都过时预借一张 doc 尺寸 u8 再还回池。`Gl2Port` 加可选观测口 `fboPoolHas` / `fboPoolBudgetBytes`。
+
+## 2026-09-19 补：第三批 液化（总账 #71，user「液化搬第三批区域程序（总账 #71） 做」）
+
+user 真机（09-19）：「liquidify 的时候似乎每笔落得时候都小小卡顿」——根因 = 旧 CPU 引擎起笔 `snapshotImageData` 拷整块内容框（桌面 node 2048² 38 ms / 4096² 133 ms）+ 同面积 `Float32Array` 位移场 + `_growDispField` 重分配。搬 GPU 后起笔零拷贝（W₀ 由 `snapshot:true` 装载），位移场按笔迹长。落地 dev v0.14.20：
+- **program 三个**（`field-copy` / `liquify-accumulate` / `liquify-warp`，孪生同 commit）：位移场 d = 区域尺寸 rgba f32 纹理（.rg），**按笔迹包围盒生长、只扩不缩**（`field-copy` 搬旧场）；每 event = accumulate（B ← A，scissor = footprint）+ copy-back（A ← B）+ 逐叶 warp（W(p) = W₀(p − d(p))，scissor = footprint）。**组液化 = 一个场多叶采样**（场纹理挂第一叶的 RegionStroke，其余叶只采样）。核 nearest / bilinear / bicubic 镜像 CPU 原式；spline 借 `WARP_FUNCS.sampleSpline`，**预滤波仍是 CPU 递归 IIR，起笔一次**（`readPixels` 内容框 → `RegionStroke.upload` rgba16f），只在用户选 spline 时付。选区 bleed import / clip / edge 的整数 cell march 逐行搬进 GLSL。
+- **多叶 region session**（决定 4 的扩展）：N 叶 → N 个 RegionStroke（`deps.setRegions(list)`，overlay 按叶多张：`GlRoom._overlays` Map + `setStampOverlays` / `overlayDescFor`，clip 合并按基底叶缓存）；end 逐叶 commit 同一令牌，任一叶没落 = 整笔取消响亮；部分打开失败 = 已开的 dispose + 令牌收口。`RegionStroke` 加 `contentBounds`（装载时顺手算）与 `upload`（只读纹理，不能当 dst）。
+- **验收**：旧 CPU 引擎删除前录 20 用例 golden（`test/fixtures/liquify-golden.json`，git e4e5aed；模式 × 核 × bleed × 选区 × 组 × 出界；**封存**，生成器 `liquify-golden.gen.mjs` 直接 exit 1）→ GPU 引擎（SoftGl 孪生）±2/255 全绿；bilinear / docspace-mask / bbox / group / stroke-shadow 旧契约测试改 GPU 写靶 + region session；gl-smoke 真 WebGL2 vs SoftGl 六用例（四核 + sel-clip + 组）**premult 空间 ±2 全绿**（spline 用例 straight 逐位有 21 像素差到 255，全在 α ≤ 2 处：系数平面真 GL 是 rgba16f、SoftGl 按 f32，振铃尾巴 Σ±大系数相消成 α≈0 时 unpremult 放大成不可见噪声——与 warpParity 同法比 premult，并断言差只许出现在不可见处）。
+- **没变的**：数学一字不改（path A 累积位移一次重采样，`ai-docs/20260528-liquify-blur.md`）；`LiquifySettings` 不改；UI 不动。真机未验。
+

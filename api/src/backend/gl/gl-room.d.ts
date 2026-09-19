@@ -97,15 +97,15 @@ export declare class GlRoom {
     readonly comp: GLCompositor;
     readonly rasterizer: GLStampRasterizer;
     readonly leaves: Map<number, LeafRec>;
-    private _overlay;
-    private _overlayOwnedFBO;
+    private _overlays;
+    private _overlayOwnedFBOs;
     private _selTex;
     private _selTexSrc;
     private _fillTex;
     private _fillTexColor;
     private _floatTex;
     private _floats;
-    private _liveMergedClip;
+    private _liveMergedClips;
     private _invalidateListeners;
     constructor(glctx: Gl2Port, maxSlices: number, accumPrec?: FBOPrec);
     get memory(): {
@@ -138,17 +138,25 @@ export declare class GlRoom {
         byKey: Map<number, number>;
     }): boolean;
     cpuAlive(): (id: number) => boolean;
-    toPlanNodes(nodes: DocNode[], updated: Set<number>, overlayLeafId: number | null, leafById: Map<number, DocLeaf>): PlanNode[];
+    toPlanNodes(nodes: DocNode[], updated: Set<number>, overlayLeafIds: ReadonlySet<number>, leafById: Map<number, DocLeaf>): PlanNode[];
     composeSteps(steps: PlanStep[], acc: Acc, docW: number, docH: number, transient: Map<string, PooledFBO>, segLookup: ((key: string) => IndexTexture | undefined) | null): void;
     composeSegTransient(b: SegBuild, docW: number, docH: number, bg: Parameters<GLCompositor["newAcc"]>[2]): PooledFBO;
     liveClipTexFor(clipBaseId: number | null, docW: number, docH: number): Gl2TexSource | null;
     releaseLiveClip(): void;
     get hasOverlay(): boolean;
     get overlayLayerId(): number | null;
+    /** 任一 overlay（bakeStamps 单 overlay 场景用）；多 overlay 时 = 第一个。 */
     overlayDesc(): OverlayDesc | null;
+    /** 某叶的 overlay（合成 leaf pass / clip 基底用）；没有 = null。 */
+    overlayDescFor(layerId: number): OverlayDesc | null;
+    private _descOf;
     clearOverlay(): void;
     releaseOverlayFBO(): void;
+    /** 单 overlay 便利口（bakeStamps / 旧调用点）= setStampOverlays([ov])。 */
     setStampOverlay(ov: OverlayInput, docW: number, docH: number): void;
+    /** 装一帧的全部 overlay（每叶最多一个；空的跳过）。上一帧 stamp 分支借的 FBO 在此归还（与旧单槽「换新时还旧」同序）。 */
+    setStampOverlays(list: readonly OverlayInput[], docW: number, docH: number): void;
+    private _addOverlay;
     private _uploadSelMask;
     get floats(): ReadonlyMap<number, FloatDesc>;
     setFloats(floats: FloatInput[]): void;

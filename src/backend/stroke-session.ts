@@ -15,7 +15,7 @@
 // 预览宿三态（C6，census §3.4「预览有三种宿」）：
 //   overlay  —— buffered 笔（brush/形状笔）：描边活在 smoother/stamps，GPU overlay 显示，零 substrate 写。
 //   livesync —— draw/erase pixelMode：stroke 档合法的令牌内真层就地写（§6.1），live-sync 每帧增量重传。
-//   shadow   —— 液化/filterBrush/形状笔 pixelMode：引擎写**替身叶**（StrokeShadow，零拷贝快照起步，
+//   shadow   —— 形状笔 pixelMode 等（液化 09-19 起改 region）：引擎写**替身叶**（StrokeShadow，零拷贝快照起步，
 //               「预览是引擎自持物」成立）；显示走 surrogate 影子变体（per-tile 增量上传，句柄共享免费）；
 //               End 按 tile 句柄 diff 落账真层（undo 只含真变 tile）；Cancel 丢替身零回滚。
 //

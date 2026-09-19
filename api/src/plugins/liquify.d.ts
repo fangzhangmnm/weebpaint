@@ -36,7 +36,9 @@ export declare class LiquifyFilter {
         short: string;
     }[];
     static sampleModes: boolean;
-    static beginBrushStroke(targets: readonly StrokeTarget[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, pressure: number): LiquifyBrushState;
+    static strokePreview: "region";
+    static strokeSnapshot: boolean;
+    static beginBrushStroke(targets: readonly StrokeTarget[], params: FilterParams, brushSettings: BrushSettings, _selection: BrushSelection | null, x: number, y: number, _pressure: number): LiquifyBrushState;
     static extendBrushStamp(state: LiquifyBrushState, x: number, y: number, _pressure: number): void;
     static endBrushStroke(state: LiquifyBrushState): void;
     static cancelBrushStroke(state: LiquifyBrushState): void;

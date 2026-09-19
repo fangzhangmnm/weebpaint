@@ -34,8 +34,12 @@ export type RegionProgramId =
   | "wash-box3"            // premult 3×3 盒（区域边缘 clamp）× N
   | "wash-unpremult"       // premult f32 → straight u8（clamp8 截断；a≤0 保原字节）
   | "wash-sharpen"         // luma USM（高斯 3×3 字节截断 + 阈值 4；k=0 = 原样）
-  | "wash-lerp";           // W = lerp(W₀, baked, cov)（premult 权重；scissor = dab bbox）
-// 未来只加名：第三批液化 "disp-accumulate" | "warp-disp"（总账 #71）；连续形式 "advect-segment"（#1）。
+  | "wash-lerp"            // W = lerp(W₀, baked, cov)（premult 权重；scissor = dab bbox）
+  // 第三批（液化，2026-09-19，总账 #71）
+  | "field-copy"           // 位移场搬家（长场：新场 ← 旧场 @ offset，其余 0）/ 拷回（A ← B）
+  | "liquify-accumulate"   // B = A + 模式位移 × smoothstep（reconstruct：A·(1−α)）；scissor = footprint
+  | "liquify-warp";        // W(p) = W₀(p − d(p))：核 nearest/bilinear/bicubic/spline(u_plane rgba16f)，选区 bleed import/clip/edge 整数 march
+// 未来只加名：连续形式 "advect-segment"（#1）。
 
 export function ensureRegionProgram(port: import("../src/common/gl2-port.ts").Gl2Port, id: RegionProgramId): void;
 export function ensureAllRegionPrograms(port: import("../src/common/gl2-port.ts").Gl2Port): void;
@@ -68,7 +72,9 @@ export declare class RegionStroke {
   /** 唯一算子。textures 的 key = program 的 sampler 名；dst 与任一采样源同一张 → throw REGION_READ_WRITE_HAZARD；写 W 按 scissor 记 dirty。 */
   run(program: RegionProgramId, dst: RegionDst, textures: Record<string, RegionTexRef>, uniforms?: RegionUniforms, scissor?: RegionRect, blend?: Gl2Blend): void;
   overlay(): RegionOverlayInput;
-  readPixels(x0: number, y0: number, w: number, h: number): Uint8Array;   // 显式慢路径（测试 / 诊断）
+  readPixels(x0: number, y0: number, w: number, h: number): Uint8Array;   // 显式慢路径（测试 / 诊断；液化 spline 起笔预滤波读内容框一次）
+  get contentBounds(): [number, number, number, number] | null;            // 装载时顺手算的内容框 [x0,y0,x1,y1)；空叶 null（2026-09-19）
+  upload(w: number, h: number, data: Float32Array): RegionTex;             // 只读上传纹理（rgba16f-tex；spline 系数平面）；不能当 run 的 dst（2026-09-19）
   dispose(): void;                                                       // 幂等；之后任何动词 throw REGION_DISPOSED
   // ---- StrokeTarget 面：bbox = 整 doc；两个 CPU 字节口响亮不实现（REGION_TARGET_NO_CPU_IO）----
   readonly bboxX: number; readonly bboxY: number; readonly bboxW: number; readonly bboxH: number;
@@ -88,7 +94,7 @@ export interface StrokeTarget {
   putImageData(docX: number, docY: number, img: ImageData): void;
 }
 // Filter 契约新增 / 改动：
-//   strokePreview?: "shadow" | "region";   // 缺省 shadow（液化）；手指 / 模糊 / 锐化 = region
+//   strokePreview?: "shadow" | "region";   // 缺省 shadow（形状笔 pixelMode 等）；手指 / 模糊 / 锐化 / 液化（09-19 起）= region
 //   strokeSnapshot?: boolean;              // region 时要不要起笔快照 W₀（wash 类要）
 //   beginBrushStroke?(targets: readonly StrokeTarget[], params, brushSettings, selection, x, y, p): unknown;   // layers → targets；state 不透明
 //   extendBrushStamp?(state: unknown, x, y, p): void; endBrushStroke?(state: unknown): void; cancelBrushStroke?(state: unknown): void; flushDirty?(state: unknown): DirtyRect | null;
@@ -108,11 +114,11 @@ export const COLOR_BRUSH_MIN_SPACING: 0.1;
 // StrokeSessionSpec.regionSnapshot?: boolean（= Filter.strokeSnapshot）
 export interface StrokeSessionDepsAddition {
   openRegion(leaf: ViewLeaf, opts: { snapshot: boolean }): RegionStroke;   // board.openRegionStroke / backend._openRegion；throw 时 session 先收令牌再冒错
-  setRegion(region: RegionStroke | null): void;                            // board.setStrokeRegion：每帧 region.overlay() 当 overlay；null = 关
+  setRegions(regions: readonly RegionStroke[]): void;                      // board.setStrokeRegions：每帧各 region.overlay() 按叶当 overlay；[] = 关（2026-09-19 多叶：组液化 N 叶 N 个）
   commitRegion(region: RegionStroke): boolean;                             // board.commitRegionStroke = bakeStamps 写回链；没写过 = true；false → 令牌取消 + throw REGION_COMMIT_FAILED
 }
 // GLBoard.openRegion(leafId, pixels, docW, docH, selMask, lockAlpha, snapshot = false): RegionStroke（错误信息附 caps 快照）
-// Board.openRegionStroke(layer, {snapshot}) / setStrokeRegion(region | null) / commitRegionStroke(region)
+// Board.openRegionStroke(layer, {snapshot}) / setStrokeRegions(regions[]) / commitRegionStroke(region)
 
 // ============================================================================
 // 6. plugins/smudge-engine.ts（公共面不变，写靶 = RegionStroke）· plugins/wash-brush.ts

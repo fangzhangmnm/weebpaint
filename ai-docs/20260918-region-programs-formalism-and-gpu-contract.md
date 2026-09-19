@@ -178,7 +178,7 @@ RegionStroke（src/backend/gl/region-stroke.ts；一笔一个；持有自己借�
 ## 5. 不做 / 留门
 
 - 不做：连续形式（#1，(b)）、抽象艺术纪元（#36）、增量 / wash 的 UI 暴露（UX 轮）、手感数字改动（#41）。
-- 液化 GPU = 第三批，**AI 的排期判断，不是 user 决定**（09-18 user 问「这个是什么意思」：09-05 的「液化=CPU 已答」只是「液化走 CPU 还是 GPU」这个问题答过了 = CPU，本文初版误引为拍板，已改）。排后的原因：组液化一个场 N 叶、B 样条预滤波起笔上传、选区 bleed 三模式 march 现在每事件 CPU 算——三件都要接，且 CPU 液化不卡手感（R=60 ≈ 16 ms/事件；R=300 数百 ms，**也值得搬**）。建议本轮立住 RegionStroke + golden 后，下一轮同接口搬；user 要本轮做则排在 wash 之后。
+- 液化 GPU = 第三批（**已做 2026-09-19，见 §7**），当初是 **AI 的排期判断，不是 user 决定**（09-18 user 问「这个是什么意思」：09-05 的「液化=CPU 已答」只是「液化走 CPU 还是 GPU」这个问题答过了 = CPU，本文初版误引为拍板，已改）。排后的原因：组液化一个场 N 叶、B 样条预滤波起笔上传、选区 bleed 三模式 march 现在每事件 CPU 算——三件都要接，且 CPU 液化不卡手感（R=60 ≈ 16 ms/事件；R=300 数百 ms，**也值得搬**）。建议本轮立住 RegionStroke + golden 后，下一轮同接口搬；user 要本轮做则排在 wash 之后。
 - 留门：`inputs.field` 槽；program 枚举只加不改；`RegionStroke` 与 Filter 契约的接缝 = `BrushLayer` 面，CPU 滤镜笔和 GPU 手指并存期不打架。
 - 收官动作（**已做 2026-09-18**）：总账 #42 done、#1 指针回写、ADR-0014 立、StrokeTarget 改名落、api/ 重打、总账新增 #70（smoke 参考窗基线红）/ #71（液化第三批，已问）/ #72（真机计时）。
 
@@ -196,3 +196,19 @@ RegionStroke（src/backend/gl/region-stroke.ts；一笔一个；持有自己借�
 | 体重净值 ≤ 0 | 净 +942（见 §3.6） | 对表税没算 |
 
 commit 链：a700fad golden 锚 → c28c772 StrokeTarget → 8549dea 区域程序第一批 → eb0f6ee RegionStroke → 274979d 手指搬 GPU（golden 绿）→ 4bb35dd overlay replace + session 接线 → 8889370 wash 搬 GPU → fbbad4d gl-smoke 三方 → 4337cdc / ac49e6a / f51cfb4 v0.14.17 源 + 改名 + bundle。
+
+## 7. 第三批 液化 落地记录（2026-09-19，dev v0.14.20；user「液化搬第三批区域程序（总账 #71） 做」）
+
+> as-of v0.14.20 / 2026-09-19，Claude Fable 5.1。决策正文在 ADR-0014「2026-09-19 补：第三批 液化」；这里只记与本文提案的差异。
+
+| 提案（§5 / program 枚举脚注） | 实现 | 为什么 |
+|---|---|---|
+| 两个 program `disp-accumulate` / `warp-disp` | 三个 `field-copy` / `liquify-accumulate` / `liquify-warp` | 场要按笔迹长（只扩不缩）且 accumulate 不能读写同一张 → 搬家 / 拷回抽成独立 program，A/B 两张场纹理 |
+| 位移场 = 区域尺寸 f32 纹理 | 同；**按笔迹包围盒生长**，起笔不分配 | 09-19 真机「每笔落笔卡顿」根因 = 旧 CPU 起笔拷整块内容框 + 同面积 Float32Array |
+| 组液化一场 N 叶 | 同：场纹理挂第一叶 RegionStroke，其余叶只采样；session 多叶 = N 个 RegionStroke，`setRegions(list)`，逐叶 commit 同令牌 | overlay 按叶多张（GlRoom `_overlays` Map）是前置 |
+| spline 预滤波起笔上传 | 同：CPU IIR 一次（`readPixels` 内容框 → `upload` rgba16f）；非 spline 不付 | 递归 IIR 没有便宜的 GPU 形式，一笔一次可接受 |
+| 选区 bleed 三模式 march | 逐行搬进 GLSL（整数 cell march，同 CPU 上限） | 逐事件精确翻译 |
+| 验收 ±2 vs CPU 锚 | golden 20 用例（e4e5aed 封存）全绿；smoke 真 GL vs SoftGl **premult 空间** ±2 | spline 系数平面真 GL 是 rgba16f：振铃尾巴 Σ±大系数相消成 α≈0 处 unpremult 放大成不可见噪声（straight 逐位 21 像素差到 255，全在 α ≤ 2），与 warpParity 同法 |
+
+commit 链：e4e5aed golden 锚 → 4ab5433 overlay 按叶多张 → 1a05a7b 第三批 program + 孪生 → 3ed67f1 session 多叶 → 31469b5 液化引擎搬 GPU + 旧测试改写靶 → v0.14.20 smoke 六用例 + 探针液化笔 + 文档。
+

@@ -41,6 +41,8 @@ import { SharpenBlurFilter } from "../../src/plugins/sharpen-blur.ts";
 import { gpuLayer } from "../region-target.mjs";
 import { CASES, DOC_W, DOC_H, buildImage, runCase, compareBytes } from "../smudge-golden-cases.mjs";
 import { warmAllRegionPrograms, REGION_PROGRAM_IDS } from "../../src/backend/gl/region-programs.ts";
+import { LiquifyEngine } from "../../src/plugins/liquify-engine.ts";
+import { CASES as LQ_CASES, DOC_W as LQ_W, DOC_H as LQ_H, layerFill as lqLayerFill, leafSpecs as lqLeafSpecs, runCase as runLqCase, makeSelection as lqSelection } from "../liquify-golden-cases.mjs";
 
 // ---- CPU warp 参照（golden 基准）：v355 从 src/floating-transform 归档进 harness（运行时单一 GPU SSoT；
 //   这份 CPU 逐像素逆单应性 + 采样器只在测试里当 GPU warp 的对照基准，不在产品路径）。verbatim 复刻原实现，
@@ -1586,7 +1588,7 @@ async function regionParity(glctx: BrowserGl2Port, add: Add): Promise<void> {
     await nextFrames(2);
     const finalized = [...REGION_PROGRAM_IDS].filter((id) => progs.has(id)).length;
     const ext = !!glctx.gl.getExtension("KHR_parallel_shader_compile");
-    add(`region:warm 预编译起手不阻塞（${tStart.toFixed(1)}ms 起 16 个）`, tStart < 200, `start=${tStart.toFixed(1)}ms before=${before}`);
+    add(`region:warm 预编译起手不阻塞（${tStart.toFixed(1)}ms 起 ${REGION_PROGRAM_IDS.length} 个）`, tStart < 200, `start=${tStart.toFixed(1)}ms before=${before}`);
     add(`region:warm 空闲收尾（KHR_parallel=${ext}）`, finalized >= 1, `finalized=${finalized}/${REGION_PROGRAM_IDS.length}`);
   }
   const soft = new SoftGl2Port();
@@ -1618,6 +1620,39 @@ async function regionParity(glctx: BrowserGl2Port, add: Add): Promise<void> {
   };
   washCase(-60, "模糊 -60");
   washCase(50, "锐化 +50");
+  // 第三批 液化（2026-09-19）：真 GL vs SoftGl 孪生；组液化 = 同一 room 多叶（场纹理挂第一叶）。核四种 + 选区 bleed + 组各挑一个。
+  const lqPick = ["push-bilinear", "push-bicubic", "push-spline", "twirl", "sel-clip", "group-AB-sel-bicubic"];
+  const lqRun = (port: Gl2Port, c: (typeof LQ_CASES)[number]): Uint8ClampedArray[] => {
+    const room = new GlRoom(port, 16);
+    const Ls = lqLeafSpecs(c).map((spec, i) => { const L: GL = gpuLayer(LQ_W, LQ_H, { room, leafId: i + 1, snapshot: true }); lqLayerFill(L.buf, LQ_W, spec.rect, spec.seed, spec.tint); return L; });
+    const sel = c.sel ? lqSelection() : null;
+    const rss = Ls.map((L) => L.open(sel));
+    runLqCase(new LiquifyEngine(), rss, c);
+    Ls.forEach((L, i) => L.close(rss[i]));
+    const out = Ls.map((L) => Uint8ClampedArray.from(L.buf));
+    Ls.forEach((L) => L.dispose()); room.dispose();
+    return out;
+  };
+  // 比对在 premult 字节空间（同 warpParity 的 maxPremulDiff）：spline 系数平面真 GL 是 rgba16f、SoftGl 按 f32 算，振铃尾巴处 Σ±大系数
+  //   相消成 α≈0 的像素，unpremult 后 rgb 是 α≈0 下的不可见噪声（straight 逐位可差到 255），premult 空间它归零。
+  //   另附 straight 统计并断言「straight 超差的像素两边 α 都 ≤ 2」——差只许出现在不可见处。
+  const toPremult = (b: Uint8ClampedArray): Uint8ClampedArray => { const o = new Uint8ClampedArray(b.length); for (let i = 0; i < b.length; i += 4) { const a = b[i + 3]; o[i] = Math.round(b[i] * a / 255); o[i + 1] = Math.round(b[i + 1] * a / 255); o[i + 2] = Math.round(b[i + 2] * a / 255); o[i + 3] = a; } return o; };
+  for (const name of lqPick) {
+    const c = LQ_CASES.find((x: { name: string }) => x.name === name)!;
+    const g = lqRun(glctx, c), sft = lqRun(soft, c);
+    let worst = { maxDiff: 0, count: 0 }, straightOver = 0, visibleOver = 0;
+    for (let i = 0; i < g.length; i++) {
+      const r = compareBytes(toPremult(g[i]), toPremult(sft[i]), 2);
+      if (r.maxDiff > worst.maxDiff || r.count > worst.count) worst = r;
+      const a = g[i], b = sft[i];
+      for (let k = 0; k < a.length; k += 4) {
+        let over = false;
+        for (let ch = 0; ch < 4; ch++) if (Math.abs(a[k + ch] - b[k + ch]) > 2) over = true;
+        if (over) { straightOver++; if (a[k + 3] > 2 || b[k + 3] > 2) visibleOver++; }
+      }
+    }
+    add(`region:liquify ${name} 真GL vs SoftGl premult ±2（${g.length} 叶）`, worst.count === 0 && visibleOver === 0, `max|Δ|=${worst.maxDiff} over=${worst.count} straightOver=${straightOver}(visible=${visibleOver})`);
+  }
 }
 
 async function run(): Promise<{ ok: boolean; checks: Check[]; error: string | null }> {

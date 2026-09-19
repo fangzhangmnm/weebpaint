@@ -1,5 +1,6 @@
 // 手指 / 模糊 / 锐化（GPU 区域程序）真浏览器探针（playwright，Chromium；不进 npm test 硬线）。created 2026-09-18 by Claude Fable 5.1
 //   源 = 09-05 的 tmp/smudge-ui-probe.mjs（手指工具 UI 契约）+ 本轮追加：模糊 / 锐化各画一笔走 RegionStroke（ADR-0014），零 pageerror / console.error。
+//   2026-09-19 第三批：先用画笔铺一笔底料（让内容框非空），再进液化画一笔（region + W₀ 快照 + 位移场纹理），零错误。
 // 用法：bash scripts/build-standalone.sh && node tools/probes/smudge-region.mjs
 // 契约：① 顶栏有手指钮 #toolSmudge，点它进 filterBrush（smudge）、滤镜条可见、手指单独 dial（opacity 50）；
 //      ② 手指画一笔零错误；③ 通过 wp:enter-filter-brush {id:"sharpenBlur", variant} 进模糊 / 锐化各画一笔零错误（区域程序 + W₀ 快照路径）；
@@ -28,6 +29,8 @@ async function strokeOnCanvas(label) {
   await page.waitForTimeout(300);
   r[label] = { newErrors: errors.length - before, tool: await page.evaluate(() => document.body.dataset.tool) };
 }
+// ⓪ 底料：默认画笔先铺一笔（手指 / 液化的内容框非空路径）
+await strokeOnCanvas("penStroke");
 // ① 手指
 r.hasSmudgeBtn = await page.$("#toolSmudge") !== null;
 await page.click("#toolSmudge");
@@ -44,6 +47,11 @@ for (const variant of ["blur", "sharp"]) {
   r[`fbTitle_${variant}`] = await page.evaluate(() => document.getElementById("filterBrushTitle")?.textContent);
   await strokeOnCanvas(`${variant}Stroke`);
 }
+// ③b 液化（第三批区域程序：位移场纹理 + W₀）
+await page.evaluate(() => window.dispatchEvent(new CustomEvent("wp:enter-filter-brush", { detail: { id: "liquify" } })));
+await page.waitForTimeout(300);
+r.fbTitle_liquify = await page.evaluate(() => document.getElementById("filterBrushTitle")?.textContent);
+await strokeOnCanvas("liquifyStroke");
 // ④ 手指钮二次点 = 开笔架；切回画笔
 await page.click("#toolSmudge"); await page.waitForTimeout(200);
 await page.click("#toolSmudge"); await page.waitForTimeout(200);
@@ -54,6 +62,6 @@ r.fbToolbarHiddenAfterPen = await page.evaluate(() => document.getElementById("f
 r.errors = errors;
 console.log(JSON.stringify(r, null, 2));
 await browser.close();
-const ok = errors.length === 0 && r.toolAfterSmudge === "filterBrush" && r.fbToolbarVisible && r.smudgeStroke?.newErrors === 0 && r.blurStroke?.newErrors === 0 && r.sharpStroke?.newErrors === 0;
+const ok = errors.length === 0 && r.toolAfterSmudge === "filterBrush" && r.fbToolbarVisible && r.smudgeStroke?.newErrors === 0 && r.blurStroke?.newErrors === 0 && r.sharpStroke?.newErrors === 0 && r.liquifyStroke?.newErrors === 0 && r.liquifyStroke?.tool === "filterBrush";
 console.log(ok ? "[probe] ✓ smudge-region" : "[probe] ✗ smudge-region");
 process.exit(ok ? 0 : 1);

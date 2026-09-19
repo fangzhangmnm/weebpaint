@@ -61,7 +61,7 @@ export class GLBoard {
   }
 
   // 2026-09-19 暖场（手指首笔卡顿案，user「都做」+「启动速度是更重要的」+「预借再还 不会在小内存机器上惹麻烦可以试」）：
-  //   ① 16 个区域程序非阻塞预编译（warmProgram + KHR_parallel_shader_compile 轮询收尾），**分片**：每个空闲片起两个，
+  //   ① 全部区域程序（REGION_PROGRAM_IDS，19 个）非阻塞预编译（warmProgram + KHR_parallel_shader_compile 轮询收尾），**分片**：每个空闲片起两个，
   //      不一次全起、不塞进忙碌期（schedule = board 的 requestIdleCallback，无强制 timeout）；
   //   ② 预借一张 doc 尺寸 u8 FBO 再还回池，让首笔的 W 命中池而不是当场 createTexture——**守卫**：池里已有同尺寸空闲件 = 空操作跳过；
   //      池预算装不下 = 跳过（退化为首笔当场分配，不出错）。幂等（program 已注册 = Map 查一次）。

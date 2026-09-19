@@ -12,7 +12,7 @@
 // 数据安全：W 会在提交时**整块替换**叶像素，所以装载必须是叶的真像素——syncLeafSafe 返回 false（显存不够、rec 可能陈旧/部分）
 //   时构造响亮 throw，绝不带着陈旧 W 起笔（瑞士奶酪：每层承重）。
 // StrokeTarget 面（filters.ts）：docW/docH/bbox 真值；两个 ImageData 方法**不实现**（响亮 throw）——GPU 手指 / wash 不调它们，
-//   液化并存期仍走 StrokeShadow；将来要 CPU 读写走 readPixels 显式慢路径，不在这里偷偷回读。
+//   CPU 读写只有 readPixels / upload 显式慢路径（液化 spline 起笔预滤波用一次），不在这里偷偷回读。
 
 import type { Gl2Port, PooledFBO, Gl2Texture, Gl2TexSource, Gl2Blend } from "../../common/gl2-port.ts";
 import type { GlRoom } from "./gl-room.ts";

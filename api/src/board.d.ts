@@ -254,11 +254,12 @@ export declare class Board {
     };
     _drawPerspGizmo(ctx: Ctx2D, scale: number): void;
     _stampProvider: (() => StampCollect) | null;
-    _strokeRegion: RegionStroke | null;
+    _strokeRegions: RegionStroke[];
     _regionLayers: Map<RegionStroke, ViewLeaf>;
     setStampProvider(fn: () => StampCollect): void;
     _overlayInputFrom(cs: NonNullable<StampCollect>): StampOverlayInput;
-    _glStampOverlay(): OverlayInput | null;
+    _glOverlays(): OverlayInput[];
+    _glFillOverlays(): OverlayInput[];
     rasterizeStampsToMask(cs: NonNullable<StampCollect>): {
         x: number;
         y: number;
@@ -284,7 +285,7 @@ export declare class Board {
     openRegionStroke(layer: ViewLeaf, opts: {
         snapshot: boolean;
     }): RegionStroke;
-    setStrokeRegion(region: RegionStroke | null): void;
+    setStrokeRegions(regions: readonly RegionStroke[]): void;
     commitRegionStroke(region: RegionStroke): boolean;
     commitBrushStroke(cs: NonNullable<StampCollect>): boolean;
     commitFill(f: {

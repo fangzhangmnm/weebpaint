@@ -67,7 +67,7 @@ export interface Filter {
   //   那是另一种语义，要做得先设计，不能靠这个开关顺手拿到。
   supportsLayerGroup?: boolean;
   // 预览宿声明（2026-09-18，区域程序提案 §3.3 ②）：描边期写靶住哪。
-  //   缺省 "shadow" = CPU 替身叶（StrokeShadow；液化现状）；"region" = GPU 驻留的 RegionStroke（手指 / 模糊 / 锐化），
+  //   缺省 "shadow" = CPU 替身叶（StrokeShadow；形状笔 pixelMode 等）；"region" = GPU 驻留的 RegionStroke（手指 / 模糊 / 锐化 / 液化 09-19 起），
   //   input._beginFilterBrush 据此建 StrokeSession。声明 "region" 的 filter 收到的 targets[0] 是 RegionStroke。
   strokePreview?: "shadow" | "region";
   // region 预览要不要起笔快照 W₀（wash 类要：滤波从起笔原像素算；手指不要）。缺省 false。

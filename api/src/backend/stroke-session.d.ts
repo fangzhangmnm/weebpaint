@@ -37,8 +37,8 @@ export interface StrokeSessionDeps {
     openRegion(leaf: ViewLeaf, opts: {
         snapshot: boolean;
     }): RegionStroke;
-    /** board.setStrokeRegion —— 描边期每帧 W 当 overlay（replace）；null = 关 */
-    setRegion(region: RegionStroke | null): void;
+    /** board.setStrokeRegions —— 描边期每帧各 W 当 overlay（replace；组液化 N 叶 N 张）；[] = 关 */
+    setRegions(regions: readonly RegionStroke[]): void;
     /** board.commitRegionStroke —— = bakeStamps 写回链（GPU merge→readPixels→applyRegionDiff→收养），在令牌内；false = 没落层 */
     commitRegion(region: RegionStroke): boolean;
 }
@@ -93,7 +93,7 @@ export declare class StrokeSession {
     private readonly token;
     private readonly deps;
     private _shadows;
-    private _region;
+    private _regions;
     private _open;
     constructor(deps: StrokeSessionDeps, engine: StrokeEngine, layers: readonly ViewLeaf[], spec: StrokeSessionSpec, preview: StrokePreview);
     get open(): boolean;
