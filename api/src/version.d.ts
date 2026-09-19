@@ -1,1 +1,1 @@
-export declare const WEEBPAINT_VERSION = "v0.14.17-2026-09-18";
+export declare const WEEBPAINT_VERSION = "v0.14.18-2026-09-18";

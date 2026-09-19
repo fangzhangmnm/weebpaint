@@ -7690,6 +7690,11 @@ export declare const S: {
         readonly en: "Filter brush error: {msg}";
         readonly ja: "フィルターブラシエラー：{msg}";
     };
+    readonly "st.regionUnsupported": {
+        readonly zh: "此设备不支持手指 / 模糊 / 锐化（GPU 缺浮点渲染目标）";
+        readonly en: "Finger / blur / sharpen unavailable on this device (no float render target)";
+        readonly ja: "この端末では指先 / ぼかし / シャープが使えません（GPU に浮動小数点レンダーターゲットがありません）";
+    };
     readonly "st.selPenNeedLayer": {
         readonly zh: "请先选中一个图层（选区笔预览需要锚点）";
         readonly en: "Select a layer first (the selection pen preview needs an anchor)";

@@ -1525,7 +1525,15 @@ async function referenceComponentCheck(add: Add): Promise<void> {
     add("component:chip 翻页→回图页+发 itemschange", !el.live && itemsEv === 1 && mid3[0] > 200, `live=${el.live} ev=${itemsEv} [${mid3[0]},${mid3[1]},${mid3[2]}]`);
 
     // 拖动把手（0830 user：左上角点阵拖动区；＋退回纯菜单）：拖 .move → 窗动、菜单不开；点 ＋ → 菜单开
+    //   菜单 2026-09-02 起不在 shadow 里（宿主经 menuPort 注入 popup-menu）——smoke 页没宿主，注入一个假端口数开合
+    //   （2026-09-18 修：旧 check 查 shadow 里的 .menu → null.classList，v0.12.20 起基线红，总账 #70）。
     {
+      let menuOpens = 0, menuIsOpen = false;
+      el.menuPort = () => {
+        if (menuIsOpen) { menuIsOpen = false; return null; }   // toggle 语义：同锚已开 → 关并返回 null
+        menuOpens++; menuIsOpen = true;
+        return { close() { menuIsOpen = false; }, refresh() {}, get isOpen() { return menuIsOpen; } };
+      };
       const move = el.shadowRoot!.querySelector(".move") as HTMLElement;
       const mr = move.getBoundingClientRect();
       const r0 = el.getBoundingClientRect();
@@ -1537,13 +1545,13 @@ async function referenceComponentCheck(add: Add): Promise<void> {
       move.dispatchEvent(mk("pointerup", mx0 + 60, my0 + 50));
       await nextFrames(2);
       const r1 = el.getBoundingClientRect();
-      const menuHidden = el.shadowRoot!.querySelector(".menu")!.classList.contains("hidden");
+      const menuHidden = menuOpens === 0 && !menuIsOpen;
       add("component:点阵把手拖=拖窗且不开菜单", Math.abs((r1.left - r0.left) - 60) < 2 && Math.abs((r1.top - r0.top) - 50) < 2 && menuHidden,
         `Δ=${(r1.left - r0.left).toFixed(0)},${(r1.top - r0.top).toFixed(0)} menuHidden=${menuHidden}`);
       const plus = el.shadowRoot!.querySelector(".plus") as HTMLElement;
       plus.click();
-      const menuOpen = !el.shadowRoot!.querySelector(".menu")!.classList.contains("hidden");
-      add("component:＋点击=开菜单", menuOpen);
+      const menuOpen = menuOpens === 1 && menuIsOpen;
+      add("component:＋点击=开菜单（经 menuPort）", menuOpen, `opens=${menuOpens}`);
       plus.click();   // 再点收起，回到已知态
       // 图标 SSoT：组件不再自绘——smoke 页没有宿主 sprite → 必须是虚线占位（data-icon-missing），不是自绘几何
       const missing = el.shadowRoot!.querySelectorAll("[data-icon-missing]").length;
@@ -1691,7 +1699,7 @@ async function run(): Promise<{ ok: boolean; checks: Check[]; error: string | nu
   try { softTripartite(glctx, add); } catch (e) { add("soft tripartite", false, String(e)); }
   try { regionParity(glctx, add); } catch (e) { add("region parity", false, String(e)); }
   try { arenaAccounting(glctx, add); } catch (e) { add("arena accounting", false, String(e)); }
-  try { await referenceComponentCheck(add); } catch (e) { add("reference component", false, String(e)); }
+  try { await referenceComponentCheck(add); } catch (e) { add("reference component", false, String((e as Error)?.stack ?? e).slice(0, 600)); }
 
   const finalErr = gl.getError();   // 只读一次（getError 读后即清，二次读会误报 0）
   add("no GL error", finalErr === gl.NO_ERROR, `0x${finalErr.toString(16)}`);

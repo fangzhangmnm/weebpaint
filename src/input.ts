@@ -1101,7 +1101,8 @@ export class InputController {
       this._activeStroke = null;
       s?.cancel();   // 令牌必须收口，否则后续 begin 全被单令牌门挡死（引擎 begin 半途抛，cancelStroke 清残态无害）
       rec.role = null;
-      this.status?.(t("st.filterBrushErr", { msg: String((e as { message?: unknown })?.message || e) }));
+      // 无浮点 FBO（ADR-0014 §7）给用户中文提示；英文错误码 + caps 快照走上面的 reportError 进黑匣子
+      this.status?.(/REGION_NO_FLOAT_FBO/.test(String(e)) ? t("st.regionUnsupported") : t("st.filterBrushErr", { msg: String((e as { message?: unknown })?.message || e) }));
       return;
     }
     const bbox = this.filterBrush.flushDirty();

@@ -1447,6 +1447,8 @@ export const S = {
   "st.magicWandErr":    { zh: "魔术棒出错：{msg}", en: "Magic wand error: {msg}", ja: "自動選択エラー：{msg}" },
   "st.selOpErr":        { zh: "选区操作出错：{msg}", en: "Selection op error: {msg}", ja: "選択操作エラー：{msg}" },
   "st.filterBrushErr":  { zh: "filter brush 出错：{msg}", en: "Filter brush error: {msg}", ja: "フィルターブラシエラー：{msg}" },
+  // 2026-09-18 区域程序（ADR-0014 §7）：设备无浮点渲染目标（EXT_color_buffer_float）→ 手指 / 模糊 / 锐化不可用；caps 快照进黑匣子
+  "st.regionUnsupported": { zh: "此设备不支持手指 / 模糊 / 锐化（GPU 缺浮点渲染目标）", en: "Finger / blur / sharpen unavailable on this device (no float render target)", ja: "この端末では指先 / ぼかし / シャープが使えません（GPU に浮動小数点レンダーターゲットがありません）" },
   "st.selPenNeedLayer": { zh: "请先选中一个图层（选区笔预览需要锚点）", en: "Select a layer first (the selection pen preview needs an anchor)", ja: "先にレイヤーを選んでください（選択ペンのプレビューに必要）" },
   "st.selAllOutside":   { zh: "选区全在画布外，已取消", en: "Selection is entirely outside the canvas — cancelled", ja: "選択範囲が全てキャンバス外のため取り消しました" },
   "st.magicWandMiss":   { zh: "魔术棒：tap 在线 / 边界上，没选到", en: "Magic wand: tapped on a line/border — nothing selected", ja: "自動選択：線・境界上のため選択できません" },
