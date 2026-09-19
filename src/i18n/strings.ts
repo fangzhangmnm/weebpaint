@@ -676,6 +676,7 @@ export const S = {
   "pe.reset":        { zh: "重置默认", en: "Reset defaults", ja: "既定に戻す", tok: "open sin" },
   "pe.ref":          { zh: "参考点", en: "Reference point", ja: "参照点", tok: "sike lukin" },
   "pe.lock":         { zh: "锁地平线", en: "Lock horizon", ja: "地平線ロック", tok: "awen e linja ma" }, 
+  "pe.done":         { zh: "完成（回到形状笔）", en: "Done (back to shape brush)", ja: "完了（図形ブラシへ戻る）", tok: "pini" },   // 2026-09-18 user「没有勾勾没法回到上一级模式」
   "la.resizeShort":  { zh: "扩张 / 收缩…", en: "Expand / shrink…", ja: "拡張 / 縮小…", tok: "suli / lili…" }, 
   "la.more":         { zh: "更多选区操作", en: "More selection actions", ja: "その他の選択操作", tok: "ijo ante pi ma wile" }, 
   "la.expandShort":  { zh: "扩张", en: "Expand", ja: "拡張", tok: "suli" }, 

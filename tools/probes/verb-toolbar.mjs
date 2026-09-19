@@ -43,6 +43,7 @@ const state = (page) => page.evaluate((visSrc) => {
     planeBtns: document.querySelectorAll("#shapeToolbar [id^='shapePlane-']").length,
     hasVpEdit: !!document.getElementById("shapeVpEdit"), hasGizmoBtn: !!document.getElementById("shapeShowGizmo"),
     rackSheetVis: vis("brushRackSheet"),
+    perspBar: vis("perspToolbar"), hasPerspDone: !!document.getElementById("perspDoneBtn"), perspHandles: vis("perspHandles"),
     shapeRowFits: (() => { const r = document.querySelector("#shapeToolbar .lasso-toolbar"); return r ? r.scrollWidth <= r.clientWidth + 1 : null; })(),
     lassoBarBottom: (() => { const el = document.getElementById("lassoToolbarStack"); return el && !el.classList.contains("hidden") ? el.getBoundingClientRect().bottom : -1; })(),
     undoDisabled: !!document.getElementById("undoButton")?.disabled,
@@ -124,6 +125,13 @@ const clickSeg = (page, barId, sub) => page.evaluate(({ barId, sub }) => {
   await page.waitForTimeout(250);
   const q4 = await state(page);
   c.expect("透视下拉选「二点」→ 平面钮 ×3（地板/左墙/右墙）+ 编辑消失点 + gizmo 钮", q4.perspSel === "p2" && q4.planeBtns === 3 && q4.hasVpEdit && q4.hasGizmoBtn, JSON.stringify(q4));
+  // 编辑消失点（transient）→ ✓ 回形状笔（2026-09-18 user「没有勾勾没法回到上一级模式」）
+  await evClick(page, "shapeVpEdit"); await page.waitForTimeout(250);
+  const q4b = await state(page);
+  c.expect("点「编辑消失点」→ VP 编辑条显（含 ✓）、手柄层显、形状条藏、顶栏无钮亮", q4b.perspBar && q4b.hasPerspDone && q4b.perspHandles && !q4b.shapeBar && q4b.anyToolPressed === 0, JSON.stringify(q4b));
+  await evClick(page, "perspDoneBtn"); await page.waitForTimeout(250);
+  const q4c = await state(page);
+  c.expect("点 ✓ → 回形状笔：VP 编辑条藏、形状条显、形状位亮、透视仍二点", !q4c.perspBar && q4c.shapeBar && q4c.tool === "shapeBrush" && q4c.shapePressed === "true" && q4c.perspSel === "p2", JSON.stringify(q4c));
   await evClick(page, "shapeSub-line"); await page.waitForTimeout(150);
   const q5 = await state(page);
   c.expect("切回 [直线] → 平面钮藏（直线吸 VP 不吃平面）、透视仍二点、格线件藏", q5.shapeSub === "line" && q5.planeBtns === 0 && q5.perspSel === "p2" && q5.hasVpEdit && !q5.hasGridCtl, JSON.stringify(q5));

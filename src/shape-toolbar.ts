@@ -108,16 +108,17 @@ function _setPerspMode(mode: PerspMode): void {
   _rerender();
 }
 
-// 格线行列 stepper（custom 件；行在前 列在后 = v0.6.8「行−6＋ 列−2＋」，加号在右）
+// 格线行列 stepper（custom 件；行在前 列在后 = v0.6.8「行−6＋ 列−2＋」，加号在右）。
+//   2026-09-18 user「rows cols 两个标签删掉，然后数字和 +- 之间紧凑一点，省空间」→ 无文字标签（行/列只留 tooltip），钮 padding 收窄、组内零 gap。
 function _mountGridCtl(host: HTMLElement): () => void {
   host.className = "ct-custom sb-grid-ctl";
   const mk = (label: string, axis: "gridNu" | "gridNv") => {
     const wrap = document.createElement("span");
-    wrap.className = "lasso-section";
-    const lab = document.createElement("span"); lab.className = "lasso-tool-text"; lab.textContent = label;
-    const minus = document.createElement("button"); minus.type = "button"; minus.className = "lasso-tool-btn"; minus.textContent = "−"; minus.setAttribute("aria-label", "−");
+    wrap.className = "lasso-section sb-grid-axis";
+    wrap.title = label; wrap.setAttribute("role", "group"); wrap.setAttribute("aria-label", label);
+    const minus = document.createElement("button"); minus.type = "button"; minus.className = "lasso-tool-btn sb-grid-btn"; minus.textContent = "−"; minus.setAttribute("aria-label", `${label} −`);
     const val = document.createElement("span"); val.className = "lasso-tool-text sb-grid-val";
-    const plus = document.createElement("button"); plus.type = "button"; plus.className = "lasso-tool-btn"; plus.textContent = "＋"; plus.setAttribute("aria-label", "＋");
+    const plus = document.createElement("button"); plus.type = "button"; plus.className = "lasso-tool-btn sb-grid-btn"; plus.textContent = "＋"; plus.setAttribute("aria-label", `${label} ＋`);
     const render = () => { val.textContent = String(desk.shapeBrush[axis]); };
     const step = (d: number) => {
       _abortIfDrawing();
@@ -128,7 +129,7 @@ function _mountGridCtl(host: HTMLElement): () => void {
     minus.addEventListener("click", (e) => { e.stopPropagation(); step(-1); });
     plus.addEventListener("click", (e) => { e.stopPropagation(); step(+1); });
     render();
-    wrap.append(lab, minus, val, plus);
+    wrap.append(minus, val, plus);
     return wrap;
   };
   host.append(mk(tLatin("sb.rows"), "gridNv"), mk(tLatin("sb.cols"), "gridNu"));

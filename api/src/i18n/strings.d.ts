@@ -3520,6 +3520,12 @@ export declare const S: {
         readonly ja: "地平線ロック";
         readonly tok: "awen e linja ma";
     };
+    readonly "pe.done": {
+        readonly zh: "完成（回到形状笔）";
+        readonly en: "Done (back to shape brush)";
+        readonly ja: "完了（図形ブラシへ戻る）";
+        readonly tok: "pini";
+    };
     readonly "la.resizeShort": {
         readonly zh: "扩张 / 收缩…";
         readonly en: "Expand / shrink…";

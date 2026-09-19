@@ -105,7 +105,15 @@ export class ShapeBrushEngine {
     const cfg = this._perspProvider?.();
     if (cfg && cfg.plane !== "off") {
       const fams = planeFamilies(cfg);
-      if (fams) return { kind: "persp", cfg, famA: fams[0], famB: fams[1] };
+      if (fams) {
+        // 行/列语义：格线「行」= 沿 famA（单位方 u 轴）的线，「列」= 沿 famB 的线（_gridSegments）。视口模式 famA 恒水平 → 行 = 水平线。
+        //   一点透视地板 planeFamilies 给 [纵深 pencil, 水平 parallel]，行会画成收敛线——user 2026-09-18「一点透视的时候 rows 和 cols 定义反了，
+        //   二点没这个故障，三点也没有」。规则：**有水平平行族时它就是行的方向**（只命中一点地板；墙面的平行族是竖直的、二/三点两族都是 pencil，不动）。
+        //   在这里换序而不动 perspective-frame（纯几何模块与 ADR-0006 测试不变；矩形/圆/像素 conic 对族序对称）。
+        let [famA, famB] = fams;
+        if (famB.kind === "parallel" && Math.abs(famB.dir.y) < Math.abs(famB.dir.x)) [famA, famB] = [famB, famA];
+        return { kind: "persp", cfg, famA, famB };
+      }
     }
     // 像素格是 doc 轴的 → pixelMode 忽略视口旋转（透视 frame 不受此限——user：像素也透视）
     return { kind: "viewport", rot: pixel ? 0 : (this._rotProvider?.() ?? 0) };

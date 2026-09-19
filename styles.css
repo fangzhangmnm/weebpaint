@@ -2773,9 +2773,12 @@ body[data-mode="gallery"] .board { display: none !important; }
 }
 /* （几何条 .ct-tail 右对齐 + ruler-ui 私有 top 2026-09-11 退役：user「几何对齐还会不小心变成右对齐，然后换 context 的时候会突然空出来一大堆白」——
    多条同时可见的叠放归 ui/context-toolbar 工厂 relayoutContextToolbars，owner 不再自己算 top） */
-/* 形状条里的格线行列 stepper（shape-toolbar _mountGridCtl；2026-09-18 形状笔回滚复活，原尺子条同款） */
-.sb-grid-ctl { display: inline-flex; align-items: center; gap: 2px; }
-.sb-grid-ctl .sb-grid-val { min-width: 1.6em; text-align: center; font-variant-numeric: tabular-nums; }
+/* 形状条里的格线行列 stepper（shape-toolbar _mountGridCtl；2026-09-18 形状笔回滚复活）。
+   user 2026-09-18「rows cols 两个标签删掉，然后数字和 +- 之间紧凑一点，省空间」：无文字标签、组内零 gap、钮 padding 4×4、数字 1.2em 定宽 */
+.sb-grid-ctl { display: inline-flex; align-items: center; gap: 6px; }
+.sb-grid-ctl .sb-grid-axis { gap: 0; }
+.sb-grid-ctl .sb-grid-btn { padding: 4px 4px; min-width: 0; }
+.sb-grid-ctl .sb-grid-val { min-width: 1.2em; padding: 0; text-align: center; font-variant-numeric: tabular-nums; }
 .persp-handle {
   position: absolute;
   width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px;

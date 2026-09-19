@@ -107,7 +107,7 @@
     <link rel="icon" href="./icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=0945e9d87e23" />
+    <link rel="stylesheet" href="./styles.css?v=da15b4e80081" />
     <!-- zip.js UMD bundle：自挂 window.zip。必须在 module bundle 之前。
          defer（v417）：原来是 parser-blocking 的，硬刷新时 SW 被绕过 → 直奔网络 → 网络一卡整个
          文档解析就停住（浏览器标签页转圈）。defer 后它与下面的 type=module bundle 同属延迟脚本、
@@ -1246,12 +1246,15 @@
     </div>
     </div>
 
-    <!-- ADR-0006 VP 编辑 toolbar（UI v2.2：lasso 图标风格同形状笔工具条）：重置/锁地平线/✓/✕ -->
+    <!-- ADR-0006 VP 编辑 toolbar（UI v2.2：lasso 图标风格同形状笔工具条）：重置/锁地平线/✓。
+         v0.6.8 曾撤 ✓/✕（VP 实时生效、无 commit/cancel 语义，出口 = 点工具）→ 2026-09-18 user「edit perspective 为什么没有勾勾，没有这个的话没法回到上一级模式哦」
+         → ✓ 回归 = 退出回形状笔（形状条在 transient 里藏着，出口必须在这条上）；仍无 ✕（每拖一步 Ctrl+Z 可回退，无整体取消语义） -->
     <div class="lasso-toolbar-stack hidden" id="perspToolbar" role="toolbar" data-i18n-aria="pe.hint">
       <div class="lasso-toolbar">
         <div class="lasso-section">
           <button class="lasso-tool-btn lasso-tool-icon" id="perspResetBtn" type="button" data-i18n-title="pe.reset"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#refresh"/></svg></button>
           <button class="lasso-tool-btn lasso-tool-icon" id="perspLockBtn" type="button" aria-pressed="true" data-i18n-title="pe.lock"><svg viewBox="0 0 24 24" aria-hidden="true"><use id="perspLockUse" href="#lock"/></svg></button>
+          <button class="lasso-tool-btn lasso-tool-icon" id="perspDoneBtn" type="button" data-i18n-title="pe.done"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#check"/></svg></button>
         </div>
       </div>
     </div>
@@ -1548,6 +1551,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-0ebde5c1a4f4.mjs"></script>
+    <script type="module" src="./dist/weebpaint-6afba5b4ed20.mjs"></script>
   </body>
 </html>

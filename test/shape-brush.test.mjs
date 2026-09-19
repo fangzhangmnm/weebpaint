@@ -356,7 +356,9 @@ describe("shape-brush · 透视 frame + grid 子工具（ADR-0006）", () => {
     // 默认无 border：上边 y=100 上除竖中线的线头（x≈200）外无横向铺开
     assert(!cs.stamps.some((t) => Math.abs(t.y - 100) < 0.5 && ((t.x > 120 && t.x < 190) || (t.x > 210 && t.x < 280))), "默认无外框");
   });
-  it("grid（透视 frame）：横线仍横、竖分割线过 VP；border 开时四边在", () => {
+  it("grid（一点透视地板）：行 = 水平线（nv−1 条 + border 两边）、列 = 过 VP 的收敛线；border 开时四边在", () => {
+    // user 2026-09-18「一点透视的时候 rows 和 cols 定义反了，二点没这个故障，三点也没有」：
+    //   planeFamilies 一点地板给 [纵深 pencil, 水平 parallel]，行（沿 famA）曾画成收敛线。_resolveFrame 把水平平行族换到 famA。
     const s = resolveBrush({ size: 4, color: "#000", spacing: 0.25 });
     const doc = mkDoc();
     const vp = { x: 250.5, y: 40.5 };
@@ -368,10 +370,20 @@ describe("shape-brush · 透视 frame + grid 子工具（ADR-0006）", () => {
     assert(cs && cs.stamps.length > 30);
     assert(cs.stamps.some((t) => Math.abs(t.y - 300) < 1), "border 上边（水平）");
     assert(cs.stamps.some((t) => Math.abs(t.y - 450) < 1), "border 下边");
-    // 竖分割线（u=1/2）过 VP：找非水平 stamps 验共线
-    const mid = cs.stamps.filter((t) => t.y > 320 && t.y < 430 &&
-      collinear({ x: 250.5, y: 40.5 }, { x: 250, y: 500 }, { x: t.x, y: t.y }, 8));
-    assert(mid.length > 0, "中线在 VP 与盒中之间的走廊里");
+    // 行：水平线族——按 y 聚类；一条水平线（长 ≥ 160px、间距 1px）在同一 y 上落 ≥ 40 颗 stamps，斜线每个 y 层只落 ≤ 3 颗
+    const rows = new Map();
+    for (const t of cs.stamps) { const k = Math.round(t.y * 2) / 2; rows.set(k, (rows.get(k) || 0) + 1); }
+    const horiz = [...rows.entries()].filter(([, n]) => n >= 40).map(([y]) => y).sort((a, b) => a - b);
+    eq(horiz.length, 5, "5 条水平线（3 行分割 + 上下 border），实得 y=" + horiz.join(","));
+    eq(horiz[0], 300); eq(horiz[4], 450);
+    // 列：唯一一条内部分割线（u=1/2）过 VP，且过上边中点（两条 border 侧边也过 VP：VP→c0、VP→c1）
+    const xAt = (p, y) => vp.x + (p.x - vp.x) * (y - vp.y) / (p.y - vp.y);   // 过 VP 与 p 的线在高度 y 处的 x
+    const midTop = { x: (150 + xAt({ x: 350, y: 450 }, 300)) / 2, y: 300 };
+    const slanted = cs.stamps.filter((t) => !horiz.some((y) => Math.abs(t.y - y) < 0.75) && t.y > 305 && t.y < 445);
+    assert(slanted.length > 20, "有非水平的分割线 stamps");
+    const onCol = slanted.filter((t) => collinear(vp, midTop, t, 3) || collinear(vp, { x: 150, y: 300 }, t, 3) || collinear(vp, { x: 350, y: 450 }, t, 3));
+    eq(onCol.length, slanted.length, "非水平 stamps 全部落在过 VP 的线上（中分割线 / 两 border 侧边）");
+    assert(slanted.some((t) => collinear(vp, midTop, t, 2) && Math.abs(t.x - xAt({ x: 150, y: 300 }, t.y)) > 15), "中分割线存在（过 VP 与上边中点，不是侧边）");
   });
   it("透视像素圆：AABB 拖拽 → conic 环 exact-once（alpha 全等）", () => {
     const s = resolveBrush({ size: 1, color: "#000000", opacity: 0.5, preset: { pixelMode: true } });

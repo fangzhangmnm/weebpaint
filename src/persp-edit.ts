@@ -398,6 +398,8 @@ export function initPerspEdit(ctx: AppContext): void {
   _layer = document.getElementById("perspHandles")!;
   _lockBtn = document.getElementById("perspLockBtn")!;
   _lockUse = document.getElementById("perspLockUse") as unknown as SVGUseElement;
+  // ✓ = 退出回形状笔（2026-09-18 user「没有勾勾没法回到上一级模式」；VP 实时生效，这不是 commit，只是出口——形状条在 transient 里藏着）
+  document.getElementById("perspDoneBtn")!.addEventListener("click", () => togglePerspEdit());
   // 重置/锁切换也是一步（整包记账：锁切换可能带 vp2 吸附地平线，撕开记会账目不齐）
   document.getElementById("perspResetBtn")!.addEventListener("click", () => {
     _dragStart(); _resetDefaults(); _dragCommit();
