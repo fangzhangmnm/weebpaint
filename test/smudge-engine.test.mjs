@@ -5,27 +5,9 @@
 //   dull 出平均色且不发黑（premult）；选区外不动；lockAlpha 不动 alpha；dirty 覆盖所有改动像素、flush 后清空。
 import { describe, it, assert, eq } from "./runner.mjs";
 import { SmudgeEngine } from "../src/plugins/smudge-engine.ts";
+import { gpuLayer } from "./smudge-gpu-target.mjs";   // 2026-09-18 GPU 写靶（RegionStroke on SoftGl2Port），测试面同旧 mockLayer
 
-function mockLayer(docW, docH) {
-  const buf = new Uint8ClampedArray(docW * docH * 4);
-  return {
-    docW, docH, buf,
-    fill(x, y, w, h, [r, g, b, a]) {
-      for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) {
-        const i = (yy * docW + xx) * 4; buf[i] = r; buf[i + 1] = g; buf[i + 2] = b; buf[i + 3] = a;
-      }
-    },
-    px(x, y) { const i = (y * docW + x) * 4; return [buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]; },
-    getImageData(x0, y0, w, h) {
-      const data = new Uint8ClampedArray(w * h * 4);
-      for (let yy = 0; yy < h; yy++) data.set(buf.subarray(((y0 + yy) * docW + x0) * 4, ((y0 + yy) * docW + x0 + w) * 4), yy * w * 4);
-      return new ImageData(data, w, h);
-    },
-    putImageData(x0, y0, img) {
-      for (let yy = 0; yy < img.height; yy++) buf.set(img.data.subarray(yy * img.width * 4, (yy + 1) * img.width * 4), ((y0 + yy) * docW + x0) * 4);
-    },
-  };
-}
+const mockLayer = (w, h) => gpuLayer(w, h);
 const RED = [255, 0, 0, 255], BLUE = [0, 0, 255, 255], CLEAR = [0, 0, 0, 0];
 function settings(over = {}) {
   return {
@@ -36,12 +18,10 @@ function settings(over = {}) {
 }
 // 从 (x0,y) 直线拖到 (x1,y)，每 1px 一个事件
 function drag(eng, layer, s, x0, x1, y, p = 1, sel = null) {
-  eng.beginStroke(layer, s, x0, y, p, sel);
   const dir = Math.sign(x1 - x0);
-  for (let x = x0 + dir; dir > 0 ? x <= x1 : x >= x1; x += dir) eng.extendStroke(x, y, p);
-  const dirty = eng.flushDirty();
-  eng.endStroke();
-  return dirty;
+  const pts = [{ x: x0, y, p }];
+  for (let x = x0 + dir; dir > 0 ? x <= x1 : x >= x1; x += dir) pts.push({ x, y, p });
+  return layer.stroke(eng, s, pts, sel);
 }
 function snapshot(layer) { return Uint8ClampedArray.from(layer.buf); }
 function same(a, b) { if (a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
@@ -78,9 +58,12 @@ describe("smudge-engine · smear", () => {
     const before = snapshot(L);
     const eng = new SmudgeEngine();
     const s = settings({ strength: 0.8 });
-    eng.beginStroke(L, s, 6, 15, 1, null);
+    const rs = L.open();
+    eng.beginStroke(rs, s, 6, 15, 1);
     for (let x = 7; x <= 40; x++) eng.extendStroke(x, 15, 1);
     const d = eng.flushDirty();
+    eng.endStroke();
+    L.close(rs);
     assert(d, "应有 dirty");
     for (let y = 0; y < 30; y++) for (let x = 0; x < 80; x++) {
       const i = (y * 80 + x) * 4;
@@ -94,10 +77,12 @@ describe("smudge-engine · smear", () => {
     const L = mockLayer(30, 20);
     L.fill(0, 0, 30, 20, RED);
     const eng = new SmudgeEngine();
-    eng.beginStroke(L, settings(), 25, 10, 1, null);
+    const rs = L.open();
+    eng.beginStroke(rs, settings(), 25, 10, 1);
     for (let x = 26; x <= 45; x++) eng.extendStroke(x, 10, 1);
     for (let x = 44; x >= 5; x--) eng.extendStroke(x, 10, 1);
     eng.endStroke();
+    L.close(rs);
     assert(true, "无异常");
   });
 });

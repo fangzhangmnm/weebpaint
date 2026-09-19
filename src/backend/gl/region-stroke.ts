@@ -52,8 +52,10 @@ export class RegionStroke {
   private _texes: RegionTexImpl[] = [];
   private _dirty: Rect | null = null;
   private _disposed = false;
+  /** 叶的锁 α（引擎读；同 StrokeShadow.lockAlpha）。 */
+  readonly lockAlpha: boolean;
 
-  constructor(room: GlRoom, leafId: number, pixels: LayerPixels, docW: number, docH: number, selMask: SelMaskPlane | null, opts?: { snapshot?: boolean }) {
+  constructor(room: GlRoom, leafId: number, pixels: LayerPixels, docW: number, docH: number, selMask: SelMaskPlane | null, opts?: { snapshot?: boolean; lockAlpha?: boolean }) {
     if (!room.glctx.caps.floatColorBuffer) {
       throw new Error("REGION_NO_FLOAT_FBO (device cannot render to RGBA32F; finger/wash tools unavailable here — see ai-docs/20260918-region-programs-formalism-and-gpu-contract.md §3.7)");
     }
@@ -62,6 +64,7 @@ export class RegionStroke {
     this.leafId = leafId;
     this.docW = docW;
     this.docH = docH;
+    this.lockAlpha = !!opts?.lockAlpha;
     ensureAllRegionPrograms(this._port);
     this._W = this._port.borrowFBO(docW, docH, "u8");
     this._load(this._W, pixels);

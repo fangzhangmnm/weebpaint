@@ -1,24 +1,8 @@
-// smudge golden 生成器（created 2026-09-18 by Claude Fable 5.1）：用**当前** src/plugins/smudge-engine.ts 跑 CASES，写 test/fixtures/smudge-golden.json。
-//   只在「录 golden」时手动跑：`node test/smudge-golden.gen.mjs`。删旧 CPU 引擎之前录一次（2026-09-18，v0.14.16）；之后
-//   fixture 就是锚，**不许**用新引擎重录来「让测试变绿」（那等于把翻译错误烤进锚）。重录必须在 commit message 里说明为什么。
-import "./dom-shim-first.mjs";
-import { writeFileSync, mkdirSync } from "node:fs";
-import { SmudgeEngine } from "../src/plugins/smudge-engine.ts";
-import { WEEBPAINT_VERSION } from "../src/version.ts";
-import { CASES, DOC_W, DOC_H, buildImage, makeByteTarget, runCase, encodeBytes } from "./smudge-golden-cases.mjs";
-
-const out = { recordedWith: WEEBPAINT_VERSION, recordedAt: new Date().toISOString().slice(0, 10), engine: "src/plugins/smudge-engine.ts (CPU)", docW: DOC_W, docH: DOC_H, cases: {} };
-const t0 = performance.now();
-for (const c of CASES) {
-  const buf = buildImage();
-  const before = Uint8ClampedArray.from(buf);
-  const target = makeByteTarget(buf);
-  const dirty = runCase(new SmudgeEngine(), target, c);
-  let changed = 0;
-  for (let i = 0; i < buf.length; i++) if (buf[i] !== before[i]) changed++;
-  out.cases[c.name] = { dirty, changedBytes: changed, bytes: encodeBytes(buf) };
-  console.log(`${c.name.padEnd(26)} dirty=${JSON.stringify(dirty)} changedBytes=${changed}`);
-}
-mkdirSync("test/fixtures", { recursive: true });
-writeFileSync("test/fixtures/smudge-golden.json", JSON.stringify(out, null, 1) + "\n");
-console.log(`wrote test/fixtures/smudge-golden.json (${CASES.length} cases, ${((performance.now() - t0) | 0)} ms)`);
+// smudge golden 生成器 —— **已封存**（created 2026-09-18 by Claude Fable 5.1）。
+//   fixture test/fixtures/smudge-golden.json 于 2026-09-18 用旧 CPU SmudgeEngine（v0.14.16，git a700fad）录定，
+//   之后旧引擎已被 GPU 区域程序版替换（同一文件名 src/plugins/smudge-engine.ts，签名不同）。
+//   这份锚的意义就是「不许用新引擎重录来让测试变绿」——那等于把翻译错误烤进锚。
+//   真要重录（= 改锚，例如 user 改了手感数字）：从 git a700fad 复活旧引擎到临时路径，用当时的这份脚本跑
+//   （`git show a700fad:test/smudge-golden.gen.mjs`），并在 commit message 里写明为什么改锚。
+console.error("smudge-golden.gen.mjs is sealed: the golden was recorded from the CPU engine at git a700fad; the CPU engine is gone. See file header.");
+process.exit(1);

@@ -15,7 +15,8 @@ import { sanitizeCurve } from "../common/anim-curve.ts";
 import { registerFilter } from "../filters.ts";
 import { t, tLatin } from "../i18n/index.ts";
 import type { Filter, FilterParams, StrokeTarget, BrushSettings, BrushSelection, DirtyRect } from "../filters.ts";
-import { SmudgeEngine, type SmudgeSettings, type SmudgeMode, type SmudgeSelection } from "./smudge-engine.ts";
+import { SmudgeEngine, type SmudgeSettings, type SmudgeMode } from "./smudge-engine.ts";
+import { RegionStroke } from "../backend/gl/region-stroke.ts";
 import { isMixSpace } from "../backend/algorithms/color-mix.ts";
 
 interface SmudgeBrushState { engine: SmudgeEngine; }
@@ -97,12 +98,14 @@ export class SmudgeFilter {
     { id: "spectral", title: tLatin("flt.smudge.mix.spectral"), short: tLatin("flt.smudge.mix.spectralShort") },
   ];
 
-  static beginBrushStroke(targets: readonly StrokeTarget[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, pressure: number): SmudgeBrushState {
+  // 预览宿 = GPU 区域（2026-09-18）：targets[0] 必须是 RegionStroke（选区平面 + lockAlpha 都在它身上；selection 参数由 session 已吃进 RegionStroke）。
+  static strokePreview = "region" as const;
+  static beginBrushStroke(targets: readonly StrokeTarget[], params: FilterParams, brushSettings: BrushSettings, _selection: BrushSelection | null, x: number, y: number, pressure: number): SmudgeBrushState {
     if (targets.length !== 1) throw new Error(`Filter smudge: single-leaf only (got ${targets.length} targets)`);
-    const layer = targets[0] as StrokeTarget & { lockAlpha?: boolean };
-    if (!(typeof layer.docW === "number" && typeof layer.docH === "number")) throw new Error("Filter smudge: target leaf has no doc size");
+    const rs = targets[0];
+    if (!(rs instanceof RegionStroke)) throw new Error("Filter smudge: target must be a RegionStroke (strokePreview=\"region\"); got a CPU StrokeTarget");
     const engine = new SmudgeEngine();
-    engine.beginStroke(layer, smudgeSettingsFrom(params, brushSettings, layer), x, y, pressure, selection as unknown as SmudgeSelection | null);
+    engine.beginStroke(rs, smudgeSettingsFrom(params, brushSettings, rs), x, y, pressure);
     return { engine };
   }
   static extendBrushStamp(state: SmudgeBrushState, x: number, y: number, pressure: number): void { state.engine.extendStroke(x, y, pressure); }

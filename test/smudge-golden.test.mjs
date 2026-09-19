@@ -4,7 +4,8 @@
 import { describe, it, assert } from "./runner.mjs";
 import { readFileSync } from "node:fs";
 import { SmudgeEngine } from "../src/plugins/smudge-engine.ts";
-import { CASES, buildImage, makeByteTarget, runCase, decodeBytes, compareBytes, rectContains } from "./smudge-golden-cases.mjs";
+import { CASES, DOC_W, DOC_H, buildImage, runCase, decodeBytes, compareBytes, rectContains } from "./smudge-golden-cases.mjs";
+import { gpuLayer } from "./smudge-gpu-target.mjs";
 
 const GOLDEN = JSON.parse(readFileSync(new URL("./fixtures/smudge-golden.json", import.meta.url), "utf8"));
 
@@ -21,7 +22,7 @@ export function runGoldenSuite(label, makeEngine, makeTarget, tol) {
         const buf = buildImage();
         const target = makeTarget(buf);
         const dirty = runCase(makeEngine(), target, c);
-        const got = target.readAll ? target.readAll() : buf;
+        const got = target.buf;
         const want = decodeBytes(g.bytes);
         const r = compareBytes(got, want, tol);
         assert(r.count === 0, `${c.name}: ${r.count} 字节超 tol（max |Δ|=${r.maxDiff}，首处 index ${r.first} = px(${((r.first / 4) | 0) % GOLDEN.docW},${(((r.first / 4) | 0) / GOLDEN.docW) | 0}) ch${r.first % 4}）`);
@@ -31,4 +32,5 @@ export function runGoldenSuite(label, makeEngine, makeTarget, tol) {
   });
 }
 
-runGoldenSuite("CPU SmudgeEngine 自证", () => new SmudgeEngine(), (buf) => makeByteTarget(buf), 0);
+// GPU 引擎（区域程序，SoftGl2Port 孪生跑）vs 旧 CPU 引擎锚：±2/255（f64→f32、sRGB LUT vs pow、归约求和顺序）。
+runGoldenSuite("GPU SmudgeEngine · SoftGl2Port", () => new SmudgeEngine(), (buf) => { const L = gpuLayer(DOC_W, DOC_H); L.buf.set(buf); return L; }, 2);

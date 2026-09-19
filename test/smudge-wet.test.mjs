@@ -4,17 +4,9 @@
 //   记忆解耦（paint + 短记忆走一个直径后不再带起点色；smear 记忆律不变）；premult 红线（透明像素 RGB 不进平均）。
 import { describe, it, assert, eq } from "./runner.mjs";
 import { SmudgeEngine } from "../src/plugins/smudge-engine.ts";
+import { gpuLayer } from "./smudge-gpu-target.mjs";   // 2026-09-18 GPU 写靶（RegionStroke on SoftGl2Port），测试面同旧 mockLayer
 
-function mockLayer(docW, docH) {
-  const buf = new Uint8ClampedArray(docW * docH * 4);
-  return {
-    docW, docH, buf,
-    fill(x, y, w, h, [r, g, b, a]) { for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) { const i = (yy * docW + xx) * 4; buf[i] = r; buf[i + 1] = g; buf[i + 2] = b; buf[i + 3] = a; } },
-    px(x, y) { const i = (y * docW + x) * 4; return [buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]; },
-    getImageData(x0, y0, w, h) { const data = new Uint8ClampedArray(w * h * 4); for (let yy = 0; yy < h; yy++) data.set(buf.subarray(((y0 + yy) * docW + x0) * 4, ((y0 + yy) * docW + x0 + w) * 4), yy * w * 4); return new ImageData(data, w, h); },
-    putImageData(x0, y0, img) { for (let yy = 0; yy < img.height; yy++) buf.set(img.data.subarray(yy * img.width * 4, (yy + 1) * img.width * 4), ((y0 + yy) * docW + x0) * 4); },
-  };
-}
+const mockLayer = (w, h) => gpuLayer(w, h);
 const RED = [255, 0, 0, 255], WHITE = [255, 255, 255, 255], BLACK = [0, 0, 0, 255];
 const GREEN = [0, 1, 0];
 function settings(over = {}) {
@@ -22,10 +14,10 @@ function settings(over = {}) {
     colorRate: 1, color: GREEN, mix: "srgb", lockAlpha: false, dilution: 0, memoryLength: 0.5, ...over };
 }
 function drag(eng, layer, s, x0, x1, y, p = 1) {
-  eng.beginStroke(layer, s, x0, y, p, null);
   const dir = Math.sign(x1 - x0);
-  for (let x = x0 + dir; dir > 0 ? x <= x1 : x >= x1; x += dir) eng.extendStroke(x, y, p);
-  eng.endStroke();
+  const pts = [{ x: x0, y, p }];
+  for (let x = x0 + dir; dir > 0 ? x <= x1 : x >= x1; x += dir) pts.push({ x, y, p });
+  layer.stroke(eng, s, pts, null);
 }
 const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 

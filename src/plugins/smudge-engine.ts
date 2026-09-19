@@ -1,48 +1,35 @@
-// smudge-engine —— 手指 / 涂抹引擎（CPU，premult float；路线 = GIMP 形持久 Accum + 按笔程归一的记忆）。
-// created 2026-09-05 by Claude Fable 5.1。数学考古与候选比较：ai-docs/20260905-smudge-math-survey.md §3 / §5。
-// user 2026-09-05 拍板：先 CPU prototype；需求 ①②③④⑦ 同一引擎（手指 = colorRate 0，带颜料的手指 = paint 模式）。
+// smudge-engine —— 手指 / 涂抹引擎（**GPU 区域程序版**，2026-09-18 Claude Fable 5.1 逐 dab 精确翻译自 09-05 的 CPU 版；
+//   CPU 版最后形态 = git a700fad（golden fixture 录自它）；提案 ai-docs/20260918-region-programs-formalism-and-gpu-contract.md）。
+// user 拍板：「先做已有的的数学形式化，以后做创新。目的是一个很窄的gpu的接口加速」「逐 dab 精确翻译 同意」。
+//   → 数学一字不改（SmudgeSettings 字段不动，手感数字不动）；每颗 dab 变成 4–13 个 RegionStroke.run；
+//     验收 = test/smudge-golden.test.mjs：对旧 CPU 引擎录的 27 用例 fixture ±2/255（差异只来自 f64→f32、sRGB LUT vs pow、归约求和顺序）。
 //
-// 模型（每颗 dab；「块」= 以 round(cx),round(cy) 为中心的 B×B **整数**窗口，Accum 与它逐像素对齐——
-//   整数位移 → 零重采样，不会像逐 dab bilinear 那样越拖越糊；亚像素运动被量化到整像素，spacing ≥ 1px 时看不出）：
-//   1) 记忆：Accum = mix(cur, Accum, ρ)，ρ = (s^MEMORY_EXP)^(step/D)。s = 本 dab 强度，step = 距上颗 dab 的笔程，
-//      D = dab 直径 → 「走过一个直径后旧颜料还剩 s³」：满强度 = 永不衰减的纯拖（drag lines），半强度 ≈ 12% = 柔和揉。
-//      按笔程归一使手感与 spacing 解耦（MyPaint/GIMP 是每 dab 衰减，见 survey §3.2 坑）。MEMORY_EXP=3 是首版手感数字
-//      （对照：MyPaint 常用 smudge_length 0.5 × spacing 25% ≈ 每直径 6%，GIMP rate 50% × spacing 20% ≈ 3%）。
+// 模型（每颗 dab；「块」= 以 round(cx),round(cy) 为中心的 B×B **整数**窗口，Accum 与它逐像素对齐——整数位移 → 零重采样）：
+//   1) 记忆：Accum = mix(cur, Accum, ρ)，ρ = (s^MEMORY_EXP)^(step/D)（smear/dull）或 exp(−(step/D)/L)（paint 带 memoryLength）。
 //      smear 的 Accum 是一整块（带纹理，才有 drag lines）；dull 的 Accum 是一个颜色（mask 加权平均）。
-//   2) 出料：P = Accum（smear）/ Accum 色（dull）/ mix(Accum, 画笔色, colorRate)（paint，带颜料的手指）。
-//   3) 上色：cur' = mix(cur, P, M·s)，M = 圆/软边 falloff（与 gl-stamp 同式）× 选区 mask；mix 走 color-mix 的混色空间。
-//      lockAlpha：只混颜色不动 alpha（cur.a = 0 的像素恒不动）。
-//   4) 写回 + dirty。
-//   首颗 dab：Accum ← cur（手指先「沾」上画布），不上色。
-// 强度 s = strength × signedLerp(flowCoeff, p^γ) × signedLerp(opaCoeff, p^γ)；半径 r = size/2 × signedLerp(sizeCoeff, p^γ)（与 brush.ts 同式）。
-// footprint 夹 **doc 边界**，不夹 layer.bbox——颜料要能拖出内容框（同液化 tile era 的结论；tile 按需分配，写哪都行）。
-// 全程 premult：透明像素 RGB 永不参与（黑边病根的反面）。
+//   2) 出料：P = Accum（smear）/ Accum 色（dull）/ 多分辨率块（dull 中段）；paint 再 mix(P, 画笔色, colorRate·压感) 与稀释。
+//   3) 上色：cur' = mix(cur, P, M·s)，M = 圆/软边 falloff × 选区；混色走三档空间。lockAlpha：只混颜色不动 alpha。
+//   4) 写回 W（straight u8，逐 dab 量化 = 旧 CPU ImageData 语义）+ dirty。首颗 dab：Accum ← cur（先「沾」），不上色。
+//   强度 s = strength × signedLerp(flowCoeff, p^γ) × signedLerp(opaCoeff, p^γ)；半径 r = size/2 × signedLerp(sizeCoeff, p^γ)。
+//   footprint 夹 doc 边界（颜料可拖出内容框）。全程 premult：透明像素 RGB 永不参与。
 //
-// 2026-09-06 湿画笔补全（ai-docs/20260906-wet-brush-completion-handoff.md，user「回到混色，123 同意」；clean-room：本实现只读 handoff）：
-//   A) paint 压感反向：colorRate_eff = colorRate × s_p（轻按只揉、重按落色）；稀释反向默认关（PAINT_PRESSURE_DILUTION）。
-//   B) 稀释 dilution（paint）：出料 P 上色前整体 × (1 − d·(1 − ā))，ā = 本 dab mask 加权的画布 alpha → 透明处画不上、半透明按比例。
-//   C) 多分辨率出料（三 variant 共用「揉匀」中段）：k = round(B^(1−dull)) ∈ [2, B−1]，Accum 按 k×k 格 mask 加权 premult 平均
-//      （无 mask 像素 = 死格）→ 活格 3×3 盒滤 → 双线性放大回 B×B。两端不变：dull=0 块、dull=1 单色（accumColor 回归一致）。
-//   D) 记忆解耦（paint）：ρ = exp(−(step/D)/L)，L = memoryLength（直径数，1/e 衰减）；smear/dull 仍 ρ = (s³)^(step/D)。
-//
-// 性能（CPU）：每 dab B² 像素 × 一次 mix（smear 再 + 一次记忆 mix）。srgb 档 = 4 mul-add/px；oklab/spectral 档
-//   每像素十几个超越函数，大笔会慢——这是「先 CPU 原型」的已知代价，GPU 契约等手感定了再看（survey §5 候选 B）。
+// GPU 落法（program 名见 backend/gl/region-programs.ts；每个都有 CPU 孪生，SoftGl2Port 上可全量跑）：
+//   region-window → cur；smudge-mask → mask；[reduce-weighted×2 → reduce-sum×2 → divide → avg]（dull>0 或稀释）；
+//   [smudge-absorb 1×1 → accumColor]（dull>0）；[smudge-absorb B×B → accum]（dull<1 且 ρ<1）；
+//   [reduce-weighted×2 k×k → box3 → upsample-bilinear → release]（0<dull<1）；smudge-deposit → W（scissor = 裁过 doc 的窗口）。
+//   状态纹理全 f32（ρ≈1 时 f16 会冻住记忆），W u8。写靶 = RegionStroke（一笔一个，session 造、session 销）。
+// 性能：dab 数 × 4–13 draw；大手指的 B² 像素成本从 CPU 上消失（本轮目标场景，总账 #42）。小手指 2% 间距的 draw 数待真机计时。
 
 import { makePressureShaper, type PressureShaper } from "../common/pressure-curve.ts";
 import type { AnimCurve } from "../common/anim-curve.ts";
-import { mixPremultInto, type MixSpace } from "../backend/algorithms/color-mix.ts";
-import type { StrokeTarget } from "../filters.ts";
+import type { MixSpace } from "../backend/algorithms/color-mix.ts";
+import type { RegionStroke, RegionTex, RegionUniforms } from "../backend/gl/region-stroke.ts";
 
-// 写靶 = filters.ts StrokeTarget（2026-09-18 改名合并；原 SmudgeLayer 与 BrushLayer 同义 = 一笔期间的像素写靶 / 替身，非图层树节点）。
-export type SmudgeLayer = StrokeTarget;
-export interface SmudgeSelection {
-  materializeMaskRegion(x0: number, y0: number, w: number, h: number): Uint8Array;   // gray8
-}
 export type SmudgeMode = "smear" | "dull" | "paint";
 
 export interface SmudgeSettings {
   mode: SmudgeMode;
-  dull: number;          // 0..1 smear↔dull 连续量：0 = 搬块（smear），1 = 揉平均色（dull），中间 = 多分辨率出料（2026-09-06 handoff §3-C；旧版 lerp 两端）
+  dull: number;          // 0..1 smear↔dull 连续量：0 = 搬块（smear），1 = 揉平均色（dull），中间 = 多分辨率出料（2026-09-06 handoff §3-C）
   size: number;          // dab 直径（p=1 时，doc px）
   hardness: number;      // 0..1（硬芯比例）
   spacing: number;       // dab 间距 = 直径 × spacing
@@ -61,25 +48,26 @@ export interface SmudgeSettings {
 }
 
 type Rect = [number, number, number, number];   // x0,y0,x1,y1（x1/y1 exclusive）
+const SPACE_INDEX: Record<MixSpace, number> = { srgb: 0, oklab: 1, spectral: 2 };
+const REDUCE_N = 16;   // 全平均的第一级归约格数（两级：B → 16×16 → 1）
 
 interface StrokeState {
-  layer: SmudgeLayer;
+  rs: RegionStroke;
   s: SmudgeSettings;
-  pShape: PressureShaper;   // 压感整形（begin 烤一次）
-  selection: SmudgeSelection | null;
+  pShape: PressureShaper;
   Rmax: number;
-  B: number;                 // 窗口边长（整数）
-  half: number;              // floor(B/2)：窗口原点 = round(c) − half
-  accum: Float32Array;       // smear：B×B premult；dull/paint-dull 不用（用 accumColor）
-  accumColor: Float32Array;  // dull：一个 premult 颜色
-  paint: Float32Array;       // paint 模式的画笔色（premult，α=1）
-  cur: Float32Array;         // 本 dab 的画布块（B×B premult；doc 外 = 0）
-  mask: Float32Array;        // 本 dab 的 M（B×B）
-  tmp: Float32Array;         // 4 floats scratch
-  avg: Float32Array;         // 本 dab mask 加权的画布平均色（premult；alpha 分量 = ā）
-  release: Float32Array;     // 多分辨率出料块（B×B premult）
-  cellK: number;             // 多分辨率格数缓存（k 变了重分配）
-  cellSum: Float32Array | null; cellW: Float32Array | null; cellBox: Float32Array | null; cellLive: Uint8Array | null; cellBoxLive: Uint8Array | null;
+  B: number;
+  half: number;
+  space: number;
+  cur: RegionTex;
+  mask: RegionTex;
+  accum: [RegionTex, RegionTex]; ai: number;      // ping-pong：accum[ai] = 当前读
+  color: [RegionTex, RegionTex]; ci: number;      // accumColor 1×1 ping-pong
+  avg: RegionTex;                                  // 本 dab 的 mask 加权平均（1×1）
+  sumN: RegionTex; wN: RegionTex; sum1: RegionTex; w1: RegionTex;
+  release: RegionTex | null;
+  cellK: number; cellSum: RegionTex | null; cellW: RegionTex | null; box: RegionTex | null;
+  paint: [number, number, number, number];
   primed: boolean;
   lastX: number; lastY: number;
   pendingDist: number;
@@ -92,28 +80,28 @@ function signedLerp(coeff: number, p: number): number {
   return coeff >= 0 ? amp + (1 - amp) * p : 1 + (amp - 1) * p;
 }
 const clamp01 = (v: number) => (v <= 0 ? 0 : v >= 1 ? 1 : v);
-const MEMORY_EXP = 3;   // 每直径残留 = s^MEMORY_EXP（手感数字，见文件头）
+const MEMORY_EXP = 3;   // 每直径残留 = s^MEMORY_EXP（手感数字，user 09-05「别的 app 没有先不要画蛇添足」记忆不封顶）
 const PAINT_PRESSURE_COLOR_RATE = true;   // handoff §3-A：paint 掺色率吃压感（作者出厂开）
 const PAINT_PRESSURE_DILUTION = false;    // handoff §3-A：稀释吃压感（作者出厂关；要不要暴露开关归 user）
 
 export class SmudgeEngine {
   private _st: StrokeState | null = null;
 
-  beginStroke(layer: SmudgeLayer, settings: SmudgeSettings, x: number, y: number, pressure: number, selection: SmudgeSelection | null): void {
+  /** 起笔。rs = 本笔的 RegionStroke（session 造；选区平面与 lockAlpha 都在它身上）。 */
+  beginStroke(rs: RegionStroke, settings: SmudgeSettings, x: number, y: number, pressure: number): void {
     const Rmax = Math.max(0.5, settings.size / 2);
     const B = Math.ceil(2 * Rmax) + 2;
-    const n = B * B;
+    const f32 = "rgba-f32" as const;
     const st: StrokeState = {
-      layer, s: settings, pShape: makePressureShaper(settings), selection, Rmax, B, half: Math.floor(B / 2),
-      accum: new Float32Array(n * 4),   // 2026-09-05 连续 dull：块记忆恒分配（旋钮中途拧到 <1 也有料）
-      accumColor: new Float32Array(4),
-      paint: new Float32Array([settings.color[0], settings.color[1], settings.color[2], 1]),
-      cur: new Float32Array(n * 4),
-      mask: new Float32Array(n),
-      tmp: new Float32Array(4),
-      avg: new Float32Array(4),
-      release: new Float32Array(n * 4),
-      cellK: 0, cellSum: null, cellW: null, cellBox: null, cellLive: null, cellBoxLive: null,
+      rs, s: settings, pShape: makePressureShaper(settings), Rmax, B, half: Math.floor(B / 2),
+      space: SPACE_INDEX[settings.mix] ?? 0,
+      cur: rs.alloc(B, B, f32), mask: rs.alloc(B, B, f32),
+      accum: [rs.alloc(B, B, f32), rs.alloc(B, B, f32)], ai: 0,
+      color: [rs.alloc(1, 1, f32), rs.alloc(1, 1, f32)], ci: 0,
+      avg: rs.alloc(1, 1, f32),
+      sumN: rs.alloc(REDUCE_N, REDUCE_N, f32), wN: rs.alloc(REDUCE_N, REDUCE_N, f32), sum1: rs.alloc(1, 1, f32), w1: rs.alloc(1, 1, f32),
+      release: null, cellK: 0, cellSum: null, cellW: null, box: null,
+      paint: [settings.color[0], settings.color[1], settings.color[2], 1],
       primed: false,
       lastX: x, lastY: y, pendingDist: 0, dirty: null,
     };
@@ -159,57 +147,61 @@ export class SmudgeEngine {
     return Math.max(0.5, st.Rmax * signedLerp(st.s.sizeCoeff || 0, pc));
   }
 
-  // 一颗 dab。step = 距上颗 dab 的笔程（首颗 0）。
+  // 本 dab 的 mask 加权平均（src 按 mask 加权）→ dst（1×1）：两级归约 + 除法（镜像旧 _weightedAverage）。
+  private _average(st: StrokeState, src: RegionTex, dst: RegionTex): void {
+    const rs = st.rs, B = st.B;
+    rs.run("reduce-weighted", st.sumN, { u_src: src, u_mask: st.mask }, { u_size: [REDUCE_N, REDUCE_N], u_B: B, u_which: 0 });
+    rs.run("reduce-weighted", st.wN, { u_src: src, u_mask: st.mask }, { u_size: [REDUCE_N, REDUCE_N], u_B: B, u_which: 1 });
+    rs.run("reduce-sum", st.sum1, { u_src: st.sumN }, { u_srcSize: [REDUCE_N, REDUCE_N] });
+    rs.run("reduce-sum", st.w1, { u_src: st.wN }, { u_srcSize: [REDUCE_N, REDUCE_N] });
+    rs.run("divide", dst, { u_sum: st.sum1, u_w: st.w1 });
+  }
+
+  // 多分辨率出料（handoff §3-C，镜像旧 _multiRes）：Accum 按 k×k 格 mask 加权平均 → 活格 3×3 盒滤 → 双线性放大回 B×B → release。
+  private _multiRes(st: StrokeState, dullK: number): void {
+    const rs = st.rs, B = st.B;
+    const k = Math.max(2, Math.min(B - 1, Math.round(Math.pow(B, 1 - dullK))));
+    if (st.cellK !== k || !st.cellSum || !st.cellW || !st.box) {
+      st.cellK = k;
+      st.cellSum = rs.alloc(k, k, "rgba-f32"); st.cellW = rs.alloc(k, k, "rgba-f32"); st.box = rs.alloc(k, k, "rgba-f32");
+    }
+    if (!st.release) st.release = rs.alloc(B, B, "rgba-f32");
+    const acc = st.accum[st.ai];
+    rs.run("reduce-weighted", st.cellSum, { u_src: acc, u_mask: st.mask }, { u_size: [k, k], u_B: B, u_which: 0 });
+    rs.run("reduce-weighted", st.cellW, { u_src: acc, u_mask: st.mask }, { u_size: [k, k], u_B: B, u_which: 1 });
+    rs.run("box3", st.box, { u_sum: st.cellSum, u_w: st.cellW }, { u_size: [k, k] });
+    rs.run("upsample-bilinear", st.release, { u_box: st.box, u_w: st.cellW, u_mask: st.mask }, { u_size: [B, B], u_k: k });
+  }
+
+  // 一颗 dab。step = 距上颗 dab 的笔程（首颗 0）。顺序 = 旧 _dab 的 1)–4)。
   private _dab(st: StrokeState, cx: number, cy: number, pressure: number, step: number): void {
-    const s0 = st.s;
+    const s0 = st.s, rs = st.rs;
     const pc = st.pShape(pressure);
     const r = Math.max(0.5, st.Rmax * signedLerp(s0.sizeCoeff || 0, pc));
     const strength = clamp01(s0.strength * signedLerp(s0.flowCoeff || 0, pc) * signedLerp(s0.opaCoeff || 0, pc));
     const B = st.B;
     const ox = Math.round(cx) - st.half, oy = Math.round(cy) - st.half;   // 窗口原点（doc 坐标）
-    const { docW, docH } = st.layer;
+    const docW = rs.docW, docH = rs.docH;
     const x0 = Math.max(0, ox), y0 = Math.max(0, oy);
     const x1 = Math.min(docW, ox + B), y1 = Math.min(docH, oy + B);
     if (x1 <= x0 || y1 <= y0) return;   // 整块在 doc 外：手指悬空，什么都不发生（Accum 保持）
-    const w = x1 - x0, h = y1 - y0;
-    const img = st.layer.getImageData(x0, y0, w, h);
-    const d = img.data;
-    const cur = st.cur, mask = st.mask;
-    cur.fill(0);
-    // 读块（premult float）+ 算 mask
+    const win: RegionUniforms = { u_size: [B, B], u_origin: [ox, oy], u_docSize: [docW, docH] };
+    // 读块（premult f32）+ 算 mask
+    rs.run("region-window", st.cur, { u_W: "W" }, win);
     const innerR = Math.max(0, Math.min(0.999, s0.hardness)) * r;
-    const decay = r - innerR;
-    let sel: Uint8Array | null = null;
-    if (st.selection) sel = st.selection.materializeMaskRegion(x0, y0, w, h);
-    mask.fill(0);
-    for (let j = 0; j < h; j++) {
-      const py = y0 + j;
-      const wy = py - oy;
-      for (let i = 0; i < w; i++) {
-        const px = x0 + i;
-        const wx = px - ox;
-        const k = (j * w + i) * 4;
-        const q = wy * B + wx;
-        const a = d[k + 3] / 255;
-        cur[q * 4] = (d[k] / 255) * a; cur[q * 4 + 1] = (d[k + 1] / 255) * a; cur[q * 4 + 2] = (d[k + 2] / 255) * a; cur[q * 4 + 3] = a;
-        const ddx = px + 0.5 - cx, ddy = py + 0.5 - cy;
-        const dist = Math.hypot(ddx, ddy);
-        if (dist >= r) continue;
-        let m = 1;
-        if (decay > 0 && dist > innerR) { const u = (dist - innerR) / decay; m = 1 - u * u * (3 - 2 * u); }
-        if (sel) m *= sel[j * w + i] / 255;
-        mask[q] = m;
-      }
-    }
+    const sel = rs.selection;
+    rs.run("smudge-mask", st.mask, sel ? { u_sel: "selection" } : {}, {
+      ...win, u_center: [cx, cy], u_r: r, u_innerR: innerR,
+      u_hasSel: sel ? 1 : 0, u_selOrigin: sel ? [sel.ox, sel.oy] : [0, 0], u_selSize: sel ? [sel.ow, sel.oh] : [1, 1],
+    });
     const mode = s0.mode;
-    const space = s0.mix;
-    const n = B * B;
+    const space = st.space;
     // smear↔dull 连续量（旧 settings 无 dull 字段 → 按 mode 二值；NaN 防御）
     const dullK = clamp01(Number.isFinite(s0.dull) ? s0.dull : (mode === "dull" ? 1 : 0));
     if (!st.primed) {
       // 首颗：沾色，不上色（两份记忆都沾：块 + 平均色，旋钮中途拧也有料）
-      st.accum.set(cur);
-      this._weightedAverage(cur, mask, n, st.accumColor);
+      rs.run("region-window", st.accum[st.ai], { u_W: "W" }, win);
+      this._average(st, st.cur, st.color[st.ci]);
       st.primed = true;
       return;
     }
@@ -221,147 +213,34 @@ export class SmudgeEngine {
       : (strength >= 1 ? 1 : strength <= 0 ? 0 : Math.pow(strength, MEMORY_EXP * Math.max(0, step) / D));
     const dil = mode === "paint" ? clamp01(Number.isFinite(s0.dilution) ? (s0.dilution as number) : 0) : 0;
     const dilEff = PAINT_PRESSURE_DILUTION ? 1 - pc * (1 - dil) : dil;
-    if (dullK > 0 || dilEff > 0) this._weightedAverage(cur, mask, n, st.avg);
-    if (dullK > 0) mixPremultInto(st.accumColor, 0, st.avg, 0, st.accumColor, 0, rho, space);
+    if (dullK > 0 || dilEff > 0) this._average(st, st.cur, st.avg);
+    if (dullK > 0) {
+      const ni = 1 - st.ci;
+      rs.run("smudge-absorb", st.color[ni], { u_A: st.color[st.ci], u_cur: st.avg },
+        { u_size: [1, 1], u_origin: [0, 0], u_docSize: [docW, docH], u_clip: 0, u_space: space, u_rho: rho });
+      st.ci = ni;
+    }
     if (dullK < 1 && rho < 1) {
-      const acc = st.accum;
-      for (let q = 0; q < n; q++) {
-        const o = q * 4;
-        // 只更新窗口内落在 doc 里的像素（doc 外 cur=0：手指探出画布不「沾」到透明）
-        const wx = q % B, wy = (q - wx) / B;
-        const px = ox + wx, py = oy + wy;
-        if (px < x0 || px >= x1 || py < y0 || py >= y1) continue;
-        mixPremultInto(acc, o, cur, o, acc, o, rho, space);
-      }
+      // 只更新窗口内落在 doc 里的像素（doc 外 cur=0：手指探出画布不「沾」到透明）→ u_clip=1
+      const ni = 1 - st.ai;
+      rs.run("smudge-absorb", st.accum[ni], { u_A: st.accum[st.ai], u_cur: st.cur },
+        { ...win, u_clip: 1, u_space: space, u_rho: rho });
+      st.ai = ni;
     }
     if (strength <= 0) return;
     // 2)+3) 出料 + 上色
-    const tmp = st.tmp;
-    const lock = s0.lockAlpha;
     const colorRate = mode === "paint" ? clamp01(s0.colorRate) * (PAINT_PRESSURE_COLOR_RATE ? pc : 1) : 0;   // §3-A 压感反向
-    const dilF = dilEff > 0 ? 1 - dilEff * (1 - clamp01(st.avg[3])) : 1;                                       // §3-B 稀释系数
     if (dullK > 0 && dullK < 1) this._multiRes(st, dullK);                                                        // §3-C 中段出料块
-    let dirty = false;
-    for (let j = 0; j < h; j++) {
-      const wy = y0 + j - oy;
-      for (let i = 0; i < w; i++) {
-        const wx = x0 + i - ox;
-        const q = wy * B + wx;
-        const m = mask[q];
-        if (m <= 0) continue;
-        const a = m * strength;
-        const o = q * 4;
-        const ca = cur[o + 3];
-        if (lock && ca <= 0) continue;
-        // 出料 P
-        let P: Float32Array, pi: number;
-        if (dullK >= 1) { P = st.accumColor; pi = 0; }
-        else if (dullK <= 0) { P = st.accum; pi = o; }
-        else { P = st.release; pi = o; }   // 中段 = 多分辨率出料（handoff §3-C；旧版是块与平均色 lerp）
-        if (colorRate > 0) { mixPremultInto(tmp, 0, P, pi, st.paint, 0, colorRate, space); P = tmp; pi = 0; }
-        if (dilF < 1) {   // 稀释：出料四通道同乘（保持 premult）
-          if (P !== tmp) { tmp[0] = P[pi]; tmp[1] = P[pi + 1]; tmp[2] = P[pi + 2]; tmp[3] = P[pi + 3]; P = tmp; pi = 0; }
-          tmp[0] *= dilF; tmp[1] *= dilF; tmp[2] *= dilF; tmp[3] *= dilF;
-        }
-        // 上色（写进 cur 就地）
-        mixPremultInto(cur, o, cur, o, P, pi, a, space);
-        const k = (j * w + i) * 4;
-        let na = cur[o + 3];
-        let nr = cur[o], ng = cur[o + 1], nb = cur[o + 2];
-        if (lock) {
-          // 只混颜色：去预乘再按原 alpha 重预乘
-          if (na > 1e-6) { const f = ca / na; nr *= f; ng *= f; nb *= f; }
-          else { nr = ng = nb = 0; }
-          na = ca;
-        }
-        // premult → straight 字节（ImageData 是 straight）
-        if (na <= 1e-6) { d[k] = 0; d[k + 1] = 0; d[k + 2] = 0; d[k + 3] = 0; }
-        else {
-          d[k] = Math.round((nr / na) * 255); d[k + 1] = Math.round((ng / na) * 255); d[k + 2] = Math.round((nb / na) * 255);
-          d[k + 3] = Math.round(na * 255);
-        }
-        dirty = true;
-      }
-    }
-    if (!dirty) return;
-    st.layer.putImageData(x0, y0, img);
+    const Psel = dullK >= 1 ? 1 : dullK <= 0 ? 0 : 2;
+    const P = Psel === 1 ? st.color[st.ci] : Psel === 0 ? st.accum[st.ai] : st.release!;
+    rs.run("smudge-deposit", "W", { u_cur: st.cur, u_mask: st.mask, u_P: P, u_avg: st.avg }, {
+      u_docSize: [docW, docH], u_origin: [ox, oy],
+      u_strength: strength, u_colorRate: colorRate, u_dilEff: dilEff,
+      u_lock: s0.lockAlpha ? 1 : 0, u_space: space, u_Psel: Psel, u_paint: st.paint,
+    }, { x: x0, y: y0, w: x1 - x0, h: y1 - y0 });
+    // 4) dirty（CPU 版只在真有像素被处理时标；这里按裁过 doc 的窗口标——多报无害，golden 契约 = ⊇）
     const dr = st.dirty;
     if (!dr) st.dirty = [x0, y0, x1, y1];
     else { dr[0] = Math.min(dr[0], x0); dr[1] = Math.min(dr[1], y0); dr[2] = Math.max(dr[2], x1); dr[3] = Math.max(dr[3], y1); }
-  }
-
-  // 多分辨率出料（handoff §3-C）：Accum 按 k×k 格 mask 加权 premult 平均 → 活格 3×3 盒滤 → 双线性放大回 B×B 进 st.release。
-  //   死格（无 mask 像素）不进平均；盒滤只数活格（死格自身也拿邻活格均值，双线性时邻格有料）；透明像素 RGB 全程 premult。
-  private _multiRes(st: StrokeState, dullK: number): void {
-    const B = st.B, n = B * B;
-    const k = Math.max(2, Math.min(B - 1, Math.round(Math.pow(B, 1 - dullK))));
-    if (st.cellK !== k || !st.cellSum) {
-      st.cellK = k;
-      st.cellSum = new Float32Array(k * k * 4); st.cellW = new Float32Array(k * k); st.cellBox = new Float32Array(k * k * 4);
-      st.cellLive = new Uint8Array(k * k); st.cellBoxLive = new Uint8Array(k * k);
-    }
-    const sum = st.cellSum!, wsum = st.cellW!, box = st.cellBox!, live = st.cellLive!, boxLive = st.cellBoxLive!;
-    sum.fill(0); wsum.fill(0); live.fill(0); boxLive.fill(0);
-    const acc = st.accum, mask = st.mask, rel = st.release;
-    const scale = k / B;
-    for (let q = 0; q < n; q++) {
-      const m = mask[q];
-      if (m <= 0) continue;
-      const x = q % B, y = (q - x) / B;
-      const c = Math.min(k - 1, Math.floor(y * scale)) * k + Math.min(k - 1, Math.floor(x * scale));
-      const o = q * 4, co = c * 4;
-      sum[co] += acc[o] * m; sum[co + 1] += acc[o + 1] * m; sum[co + 2] += acc[o + 2] * m; sum[co + 3] += acc[o + 3] * m; wsum[c] += m;
-    }
-    for (let c = 0; c < k * k; c++) {
-      const w = wsum[c];
-      if (w <= 0) continue;
-      live[c] = 1;
-      const co = c * 4; sum[co] /= w; sum[co + 1] /= w; sum[co + 2] /= w; sum[co + 3] /= w;
-    }
-    for (let cy = 0; cy < k; cy++) for (let cx = 0; cx < k; cx++) {
-      let r = 0, g = 0, b = 0, a = 0, cnt = 0;
-      for (let dy = -1; dy <= 1; dy++) {
-        const yy = cy + dy; if (yy < 0 || yy >= k) continue;
-        for (let dx = -1; dx <= 1; dx++) {
-          const xx = cx + dx; if (xx < 0 || xx >= k) continue;
-          const c2 = yy * k + xx; if (!live[c2]) continue;
-          const o2 = c2 * 4; r += sum[o2]; g += sum[o2 + 1]; b += sum[o2 + 2]; a += sum[o2 + 3]; cnt++;
-        }
-      }
-      const c = cy * k + cx, co = c * 4;
-      if (cnt > 0) { box[co] = r / cnt; box[co + 1] = g / cnt; box[co + 2] = b / cnt; box[co + 3] = a / cnt; boxLive[c] = 1; }
-    }
-    for (let q = 0; q < n; q++) {
-      const o = q * 4;
-      if (mask[q] <= 0) { rel[o] = rel[o + 1] = rel[o + 2] = rel[o + 3] = 0; continue; }   // mask 外用不到
-      const x = q % B, y = (q - x) / B;
-      const u = (x + 0.5) * scale - 0.5, v = (y + 0.5) * scale - 0.5;
-      const i0 = Math.floor(u), j0 = Math.floor(v), fu = u - i0, fv = v - j0;
-      let r = 0, g = 0, b = 0, a = 0, wt = 0;
-      for (let dj = 0; dj <= 1; dj++) {
-        const jj = Math.min(k - 1, Math.max(0, j0 + dj)), wv = dj ? fv : 1 - fv;
-        for (let di = 0; di <= 1; di++) {
-          const ii = Math.min(k - 1, Math.max(0, i0 + di)), w = (di ? fu : 1 - fu) * wv;
-          const c = jj * k + ii;
-          if (w <= 0 || !boxLive[c]) continue;
-          const co = c * 4; r += box[co] * w; g += box[co + 1] * w; b += box[co + 2] * w; a += box[co + 3] * w; wt += w;
-        }
-      }
-      if (wt > 0) { rel[o] = r / wt; rel[o + 1] = g / wt; rel[o + 2] = b / wt; rel[o + 3] = a / wt; }
-      else { rel[o] = rel[o + 1] = rel[o + 2] = rel[o + 3] = 0; }
-    }
-  }
-
-  // mask 加权平均（premult；alpha 也平均——透明处会把平均色拉淡，与 Krita dulling 同）
-  private _weightedAverage(cur: Float32Array, mask: Float32Array, n: number, out: Float32Array): void {
-    let sr = 0, sg = 0, sb = 0, sa = 0, sw = 0;
-    for (let q = 0; q < n; q++) {
-      const m = mask[q];
-      if (m <= 0) continue;
-      const o = q * 4;
-      sr += cur[o] * m; sg += cur[o + 1] * m; sb += cur[o + 2] * m; sa += cur[o + 3] * m; sw += m;
-    }
-    if (sw <= 0) { out[0] = out[1] = out[2] = out[3] = 0; return; }
-    out[0] = sr / sw; out[1] = sg / sw; out[2] = sb / sw; out[3] = sa / sw;
   }
 }

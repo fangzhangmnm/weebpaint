@@ -111,13 +111,17 @@ export const CASES = [
 ];
 
 // ---- 跑一个用例：engine 是 SmudgeEngine 形（beginStroke/extendStroke/flushDirty/endStroke），target 是写靶 ----
+//   target 有 open/close（GPU 写靶，test/smudge-gpu-target.mjs）→ 一笔一个 RegionStroke；否则按旧 CPU 签名直接传（录 golden 时的路径，已封存）。
 export function runCase(engine, target, c) {
   const pts = strokePoints(c.stroke);
   const sel = c.sel ? makeSelection() : null;
-  engine.beginStroke(target, settingsFor(c.s), pts[0].x, pts[0].y, pts[0].p, sel);
+  const rs = target.open ? target.open(sel) : null;
+  if (rs) engine.beginStroke(rs, settingsFor(c.s), pts[0].x, pts[0].y, pts[0].p);
+  else engine.beginStroke(target, settingsFor(c.s), pts[0].x, pts[0].y, pts[0].p, sel);
   for (let i = 1; i < pts.length; i++) engine.extendStroke(pts[i].x, pts[i].y, pts[i].p);
   const dirty = engine.flushDirty();
   engine.endStroke();
+  if (rs) target.close(rs);
   return dirty;
 }
 
