@@ -113,6 +113,9 @@ export declare class WeebPaintBackend implements WeebPaintBackendInterface {
     canRedo(): boolean;
     private _ensureRaster;
     private _strokeSessionDeps;
+    private _regionLayers;
+    private _openRegion;
+    private _commitRegion;
     private _commitStamps;
     private _requireStroke;
     strokeBegin(leafId: number, brush: ResolvedBrushSnapshot): StrokeId;

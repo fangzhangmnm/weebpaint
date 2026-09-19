@@ -8,6 +8,7 @@ import { GLStampRasterizer } from "./gl-stamp.ts";
 import type { Stamp, StrokeShape } from "./gl-stamp.ts";
 import type { PlanNode, PlanStep, SegBuild } from "./render-plan.ts";
 import type { PooledFBO, FBOPrec, Gl2Port, Gl2TexSource, Gl2TileArena } from "../../common/gl2-port.ts";
+import type { RegionOverlayInput } from "./region-stroke.ts";
 export interface SurrogatePlaneInput {
     layerId: number;
     bytes: {
@@ -79,7 +80,7 @@ export interface FillOverlayInput {
         oh: number;
     };
 }
-export type OverlayInput = StampOverlayInput | FillOverlayInput;
+export type OverlayInput = StampOverlayInput | FillOverlayInput | RegionOverlayInput;
 export declare function overlayEmpty(ov: OverlayInput): boolean;
 export interface LeafRec {
     index: IndexTexture;

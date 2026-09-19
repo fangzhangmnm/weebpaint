@@ -1,4 +1,4 @@
-import type { FilterParams, BrushLayer, BrushSettings, BrushSelection, DirtyRect } from "../filters.ts";
+import type { FilterParams, StrokeTarget, BrushSettings, BrushSelection, DirtyRect } from "../filters.ts";
 import { SmudgeEngine, type SmudgeSettings } from "./smudge-engine.ts";
 interface SmudgeBrushState {
     engine: SmudgeEngine;
@@ -86,7 +86,8 @@ export declare class SmudgeFilter {
         title: string;
         short: string;
     }[];
-    static beginBrushStroke(layers: readonly BrushLayer[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, pressure: number): SmudgeBrushState;
+    static strokePreview: "region";
+    static beginBrushStroke(targets: readonly StrokeTarget[], params: FilterParams, brushSettings: BrushSettings, _selection: BrushSelection | null, x: number, y: number, pressure: number): SmudgeBrushState;
     static extendBrushStamp(state: SmudgeBrushState, x: number, y: number, pressure: number): void;
     static endBrushStroke(state: SmudgeBrushState): void;
     static cancelBrushStroke(state: SmudgeBrushState): void;

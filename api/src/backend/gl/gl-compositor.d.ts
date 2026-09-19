@@ -18,6 +18,7 @@ export interface OverlayDesc {
         ow: number;
         oh: number;
     } | null;
+    replace?: boolean;
 }
 export interface FloatDesc {
     tex: Gl2Texture;

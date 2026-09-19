@@ -1,5 +1,6 @@
 import type { Gl2Port } from "../common/gl2-port.ts";
 import { RasterService } from "../backend/gl/raster-service.ts";
+import { RegionStroke, type SelMaskPlane } from "../backend/gl/region-stroke.ts";
 import type { FloatInput, OverlayInput, SurrogateInput } from "../backend/gl/gl-room.ts";
 import type { LayerPixels } from "../backend/tiles/tile-layer.ts";
 import type { DocNode, DocLeaf } from "../backend/gl/gl-doc-bridge.ts";
@@ -41,6 +42,7 @@ export declare class GLBoard {
         tx: number;
         ty: number;
     }[]): boolean;
+    openRegion(leafId: number, pixels: LayerPixels, docW: number, docH: number, selMask: SelMaskPlane | null, lockAlpha: boolean, snapshot?: boolean): RegionStroke;
     rasterizeStampsToBytes(stamps: Parameters<RasterService["rasterizeStampsToBytes"]>[0], shape: Parameters<RasterService["rasterizeStampsToBytes"]>[1], bx: number, by: number, bw: number, bh: number): Uint8ClampedArray | null;
     compositeToBytes(nodes: DocNode[], docW: number, docH: number, surrogates?: readonly SurrogateInput[], overlay?: OverlayInput | null): {
         data: Uint8ClampedArray;

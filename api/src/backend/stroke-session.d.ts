@@ -3,6 +3,7 @@ import type { ViewLeaf, ViewLeafSnap } from "./workpiece/painting-view.ts";
 import type { WriteToken } from "./workpiece/workpiece.ts";
 import type { Selection } from "./selection.ts";
 import { LayerPixels } from "./tiles/tile-layer.ts";
+import type { RegionStroke } from "./gl/region-stroke.ts";
 export type StampCollect = NonNullable<ReturnType<BrushEngine["collectStamps"]>>;
 export interface StrokeEngine {
     extendStroke(x: number, y: number, pressure: number, t?: number | null): void;
@@ -12,7 +13,7 @@ export interface StrokeEngine {
     collectStamps?(): StampCollect | null;
 }
 /** 预览宿（census §3.4；见文件头）。 */
-export type StrokePreview = "overlay" | "livesync" | "shadow";
+export type StrokePreview = "overlay" | "livesync" | "shadow" | "region";
 export interface StrokeSessionDeps {
     /** wp2.begin —— 单令牌墙的开口（第二个 begin → throw） */
     begin(historyType: string): WriteToken;
@@ -32,12 +33,22 @@ export interface StrokeSessionDeps {
         layerId: number;
         pixels: LayerPixels;
     }[]): void;
+    /** 2026-09-18 区域程序（GPU 驻留写靶）：board.openRegionStroke —— 造一笔的 RegionStroke（caps 守卫 / 显存不够 / 无 GL → throw） */
+    openRegion(leaf: ViewLeaf, opts: {
+        snapshot: boolean;
+    }): RegionStroke;
+    /** board.setStrokeRegion —— 描边期每帧 W 当 overlay（replace）；null = 关 */
+    setRegion(region: RegionStroke | null): void;
+    /** board.commitRegionStroke —— = bakeStamps 写回链（GPU merge→readPixels→applyRegionDiff→收养），在令牌内；false = 没落层 */
+    commitRegion(region: RegionStroke): boolean;
 }
 export interface StrokeSessionSpec {
     /** 令牌事务标签（wp2.begin(label)） */
     historyType: string;
     /** 抬笔是否按选区 applyMaskPostStroke（filterBrush 在 begin 已吃 selection → false） */
     finalize: boolean;
+    /** preview="region" 时要不要起笔快照 W₀（wash 类 filter 声明 strokeSnapshot） */
+    regionSnapshot?: boolean;
 }
 export declare class StrokeShadow {
     readonly pixels: LayerPixels;
@@ -82,6 +93,7 @@ export declare class StrokeSession {
     private readonly token;
     private readonly deps;
     private _shadows;
+    private _region;
     private _open;
     constructor(deps: StrokeSessionDeps, engine: StrokeEngine, layers: readonly ViewLeaf[], spec: StrokeSessionSpec, preview: StrokePreview);
     get open(): boolean;

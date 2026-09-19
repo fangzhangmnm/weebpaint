@@ -1,4 +1,4 @@
-import type { FilterParams, BrushLayer, BrushSettings, BrushSelection, DirtyRect } from "../filters.ts";
+import type { FilterParams, StrokeTarget, BrushSettings, BrushSelection, DirtyRect } from "../filters.ts";
 import { LiquifyEngine } from "./liquify-engine.ts";
 interface LiquifyBrushState {
     engine: LiquifyEngine;
@@ -36,7 +36,7 @@ export declare class LiquifyFilter {
         short: string;
     }[];
     static sampleModes: boolean;
-    static beginBrushStroke(layers: readonly BrushLayer[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, pressure: number): LiquifyBrushState;
+    static beginBrushStroke(targets: readonly StrokeTarget[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, pressure: number): LiquifyBrushState;
     static extendBrushStamp(state: LiquifyBrushState, x: number, y: number, _pressure: number): void;
     static endBrushStroke(state: LiquifyBrushState): void;
     static cancelBrushStroke(state: LiquifyBrushState): void;

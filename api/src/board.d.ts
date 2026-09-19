@@ -1,5 +1,6 @@
 import type { WarpBakeFn } from "./floating-transform.ts";
 import { GLBoard } from "./shell/gl-board.ts";
+import type { RegionStroke } from "./backend/gl/region-stroke.ts";
 import type { FloatInput, StampOverlayInput, FillOverlayInput, OverlayInput, SurrogateInput } from "./backend/gl/gl-room.ts";
 import type { Stamp, StrokeShape } from "./backend/gl/gl-stamp.ts";
 type StampCollect = {
@@ -252,6 +253,8 @@ export declare class Board {
     };
     _drawPerspGizmo(ctx: Ctx2D, scale: number): void;
     _stampProvider: (() => StampCollect) | null;
+    _strokeRegion: RegionStroke | null;
+    _regionLayers: Map<RegionStroke, ViewLeaf>;
     setStampProvider(fn: () => StampCollect): void;
     _overlayInputFrom(cs: NonNullable<StampCollect>): StampOverlayInput;
     _glStampOverlay(): OverlayInput | null;
@@ -277,6 +280,11 @@ export declare class Board {
         layer: ViewLeaf;
     }): FillOverlayInput | null;
     isGLBoard(): boolean;
+    openRegionStroke(layer: ViewLeaf, opts: {
+        snapshot: boolean;
+    }): RegionStroke;
+    setStrokeRegion(region: RegionStroke | null): void;
+    commitRegionStroke(region: RegionStroke): boolean;
     commitBrushStroke(cs: NonNullable<StampCollect>): boolean;
     commitFill(f: {
         color: string;
