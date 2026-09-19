@@ -31,13 +31,10 @@
 import { makePressureShaper, type PressureShaper } from "../common/pressure-curve.ts";
 import type { AnimCurve } from "../common/anim-curve.ts";
 import { mixPremultInto, type MixSpace } from "../backend/algorithms/color-mix.ts";
+import type { StrokeTarget } from "../filters.ts";
 
-export interface SmudgeLayer {
-  docW: number;
-  docH: number;
-  getImageData(docX: number, docY: number, w: number, h: number): ImageData;
-  putImageData(docX: number, docY: number, img: ImageData): void;
-}
+// 写靶 = filters.ts StrokeTarget（2026-09-18 改名合并；原 SmudgeLayer 与 BrushLayer 同义 = 一笔期间的像素写靶 / 替身，非图层树节点）。
+export type SmudgeLayer = StrokeTarget;
 export interface SmudgeSelection {
   materializeMaskRegion(x0: number, y0: number, w: number, h: number): Uint8Array;   // gray8
 }

@@ -14,8 +14,8 @@
 import { sanitizeCurve } from "../common/anim-curve.ts";
 import { registerFilter } from "../filters.ts";
 import { t, tLatin } from "../i18n/index.ts";
-import type { Filter, FilterParams, BrushLayer, BrushSettings, BrushSelection, DirtyRect } from "../filters.ts";
-import { SmudgeEngine, type SmudgeSettings, type SmudgeMode, type SmudgeLayer, type SmudgeSelection } from "./smudge-engine.ts";
+import type { Filter, FilterParams, StrokeTarget, BrushSettings, BrushSelection, DirtyRect } from "../filters.ts";
+import { SmudgeEngine, type SmudgeSettings, type SmudgeMode, type SmudgeSelection } from "./smudge-engine.ts";
 import { isMixSpace } from "../backend/algorithms/color-mix.ts";
 
 interface SmudgeBrushState { engine: SmudgeEngine; }
@@ -97,9 +97,9 @@ export class SmudgeFilter {
     { id: "spectral", title: tLatin("flt.smudge.mix.spectral"), short: tLatin("flt.smudge.mix.spectralShort") },
   ];
 
-  static beginBrushStroke(layers: readonly BrushLayer[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, pressure: number): SmudgeBrushState {
-    if (layers.length !== 1) throw new Error(`Filter smudge: single-leaf only (got ${layers.length} targets)`);
-    const layer = layers[0] as unknown as SmudgeLayer & { lockAlpha?: boolean };
+  static beginBrushStroke(targets: readonly StrokeTarget[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, pressure: number): SmudgeBrushState {
+    if (targets.length !== 1) throw new Error(`Filter smudge: single-leaf only (got ${targets.length} targets)`);
+    const layer = targets[0] as StrokeTarget & { lockAlpha?: boolean };
     if (!(typeof layer.docW === "number" && typeof layer.docH === "number")) throw new Error("Filter smudge: target leaf has no doc size");
     const engine = new SmudgeEngine();
     engine.beginStroke(layer, smudgeSettingsFrom(params, brushSettings, layer), x, y, pressure, selection as unknown as SmudgeSelection | null);

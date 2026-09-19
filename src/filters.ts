@@ -66,6 +66,10 @@ export interface Filter {
   //   色彩类 filter（attachColorBrushBehavior）**不该**声明 true——逐叶 blur 再合成 ≠ 合成后 blur，
   //   那是另一种语义，要做得先设计，不能靠这个开关顺手拿到。
   supportsLayerGroup?: boolean;
+  // 预览宿声明（2026-09-18，区域程序提案 §3.3 ②）：描边期写靶住哪。
+  //   缺省 "shadow" = CPU 替身叶（StrokeShadow；液化现状）；"region" = GPU 驻留的 RegionStroke（手指 / 模糊 / 锐化），
+  //   input._beginFilterBrush 据此建 StrokeSession。声明 "region" 的 filter 收到的 targets[0] 是 RegionStroke。
+  strokePreview?: "shadow" | "region";
   bake(
     srcData: Uint8ClampedArray,
     dstData: Uint8ClampedArray,
@@ -75,9 +79,9 @@ export interface Filter {
     h: number,
   ): void;
   // attachColorBrushBehavior 注入的 runtime brush 方法（color-brush 类 filter）。
-  // layers = 写靶叶列表（单叶恒 [leaf]；组液化 = 组内全部叶）——见 supportsLayerGroup。
+  // targets = 写靶列表（单叶恒 [target]；组液化 = 组内全部叶各一个）——见 supportsLayerGroup。
   beginBrushStroke?(
-    layers: readonly BrushLayer[],
+    targets: readonly StrokeTarget[],
     params: FilterParams,
     brushSettings: BrushSettings,
     selection: BrushSelection | null,
@@ -90,8 +94,12 @@ export interface Filter {
   flushDirty?(state: ColorBrushState): DirtyRect | null;
 }
 
-// color-brush 行为操作的层读写面（ViewLeaf/StrokeShadow 同形——C6 起引擎写靶可能是替身叶）。
-export interface BrushLayer {
+// StrokeTarget = 一笔期间的像素写靶（2026-09-18 改名，user「反正别叫Layer, brushlayer也改名，如果语义一样那么改一样的名字」）：
+//   运行时是 StrokeShadow 替身（C6）或 GPU 驻留的 RegionStroke，**不是图层树节点**。原 BrushLayer（filters）与
+//   SmudgeLayer（smudge-engine）语义相同，合并为一个，字段取并集：doc 尺寸 + 内容框 + 字节读写口。
+export interface StrokeTarget {
+  docW: number;
+  docH: number;
   bboxX: number;
   bboxY: number;
   bboxW: number;
@@ -136,7 +144,7 @@ export interface ColorBrushTile {
   sel: Uint8Array | null;       // 选区 gray8（懒物化）
 }
 export interface ColorBrushState {
-  layer: BrushLayer;
+  layer: StrokeTarget;
   params: FilterParams;
   brushSettings: BrushSettings;
   selection: BrushSelection | null;
@@ -228,13 +236,13 @@ export const COLOR_BRUSH_MIN_SPACING = 0.1;
 const CB_TILE = 256;
 
 export function attachColorBrushBehavior(FilterClass: Filter): void {
-  FilterClass.beginBrushStroke = function(layers: readonly BrushLayer[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, p: number): ColorBrushState {
+  FilterClass.beginBrushStroke = function(targets: readonly StrokeTarget[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, p: number): ColorBrushState {
     // 色彩类 filter 是单叶语义（见 Filter.supportsLayerGroup 注释）——多叶传进来 = 上游路由错了，
     // 响亮拒绝而不是静默只处理第一叶（家规：不许静默吞）。
-    if (layers.length !== 1) {
-      throw new Error(`Filter ${FilterClass.id}: color-brush behavior is single-leaf (got ${layers.length} targets)`);
+    if (targets.length !== 1) {
+      throw new Error(`Filter ${FilterClass.id}: color-brush behavior is single-leaf (got ${targets.length} targets)`);
     }
-    const layer = layers[0];
+    const layer = targets[0];
     const state: ColorBrushState = {
       layer, params, brushSettings, selection, FilterClass,
       lastX: x, lastY: y, pendingDist: 0, dirty: null,

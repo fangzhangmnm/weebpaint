@@ -13,7 +13,7 @@
 
 import { registerFilter } from "../filters.ts";
 import { t, tLatin } from "../i18n/index.ts";
-import type { Filter, FilterParams, BrushLayer, BrushSettings, BrushSelection, DirtyRect } from "../filters.ts";
+import type { Filter, FilterParams, StrokeTarget, BrushSettings, BrushSelection, DirtyRect } from "../filters.ts";
 import { LiquifyEngine } from "./liquify-engine.ts";
 import type { ViewLeaf } from "../backend/workpiece/painting-view.ts";
 import type { Selection } from "../backend/selection.ts";
@@ -67,7 +67,7 @@ export class LiquifyFilter {
   // region 模式没意义（液化天生是 stroke-based），所以不提供 bake / buildBody
 
   // Filter brush 契约：begin / extend / end / cancel / flushDirty
-  static beginBrushStroke(layers: readonly BrushLayer[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, pressure: number): LiquifyBrushState {
+  static beginBrushStroke(targets: readonly StrokeTarget[], params: FilterParams, brushSettings: BrushSettings, selection: BrushSelection | null, x: number, y: number, pressure: number): LiquifyBrushState {
     const engine = new LiquifyEngine();
     const scale = (params.strengthScale as number) ?? 1;
     const settings = {
@@ -77,7 +77,7 @@ export class LiquifyFilter {
       bleed: (params.bleed as string) || "edge",          // v147 选区边界取样模式
       sample: (params.sample as string) || "bilinear",    // 采样核（v0.6.45 默认回 bilinear，真机裁决）
     };
-    engine.beginStroke(layers as unknown as readonly ViewLeaf[], settings, x, y, selection as unknown as Selection | null);
+    engine.beginStroke(targets as unknown as readonly ViewLeaf[], settings, x, y, selection as unknown as Selection | null);
     return { engine };
   }
 
