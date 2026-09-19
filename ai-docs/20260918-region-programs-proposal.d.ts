@@ -1,5 +1,8 @@
 // 提案 .h —— 区域程序 / RegionStroke 目标契约（API .h ritual：现状 = api/ v0.14.16，本文件 = 目标形状）。
-// created 2026-09-18 by Claude Fable 5.1（claude-fable-5-1）· 状态：提案，等 user「没问题」；实现中形状变了要回写此文件。
+// created 2026-09-18 by Claude Fable 5.1（claude-fable-5-1）· 状态：**已落地 v0.14.17；现值 = api/src/backend/gl/region-stroke.d.ts /
+//   region-programs.d.ts / stroke-session.d.ts / filters.d.ts（gen-api 重打）。本文件保留为提案历史；与现值的差异表在
+//   20260918-region-programs-formalism-and-gpu-contract.md §6（要点：无 load()、多 free()/readPixels()、run 多 blend、textures key = sampler 名、
+//   replace 是 uniform u_ovReplace 不是新 ovMode、第二批 6 个 program、region-window → region-crop、Filter 多 strokeSnapshot、deps openRegion(leaf,{snapshot})/setRegion/commitRegion）。**
 // 论证与出处：20260918-region-programs-formalism-and-gpu-contract.md。
 // 纪律：只列新增 / 改动的签名；没列的（Gl2Port、GlRoom、RasterService.bakeStamps、Filter 笔契约、SmudgeSettings）**一个字不动**。
 

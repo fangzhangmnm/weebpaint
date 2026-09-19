@@ -1,6 +1,6 @@
 # 区域程序（Region Programs）：手指族的统一数学形式 + 窄 GPU 契约提案
 
-> 作者：Claude Fable 5.1（claude-fable-5-1）· created 20260918 · as-of dev v0.14.16 / 2026-09-18 · 状态：**提案已全部拍板（§4 四条），2026-09-18 开工**；实现中形状变了回写提案 .h。
+> 作者：Claude Fable 5.1（claude-fable-5-1）· created 20260918 · as-of dev v0.14.16 / 2026-09-18 · 状态：**已落地 dev v0.14.17（2026-09-18 同日）**，决策收进 `adr/0014-region-programs.md`；与实现的差异见 §6。
 > 提案 .h = `20260918-region-programs-proposal.d.ts`（同目录）；现状 .h = `api/`（v0.14.16 重生成，本文 §2 摘录）。
 >
 > 出处（user 2026-09-18 原话，本 session）：「convert the finger tools into GPU, perhaps use that fluid dynamics we proposed. first pick up our old discussion before taking actions」「以及对于血迹和拿铁拉花来说其实感觉现在也够用。先做已有的的数学形式化，以后做创新。目的是一个很窄的gpu的接口加速」「不过也不用把未来的脑洞堵死。总之答案就是half lagrangian?」「**逐 dab 精确翻译 同意**」「（增量 vs wash）这个是ux应该不动数学引擎」；第二轮：「模糊 / 锐化 wash 本轮顺路搬 yes」「显示走『overlay replace』也许可以」「缺席时手指族响亮不可用 咱们不是有cpu fallback吗？还是softgl vs gl只能用一个，两个都用会打架？这个会造成多大的架构混乱？」「**反正别叫Layer, brushlayer也改名，如果语义一样那么改一样的名字**」。
@@ -103,22 +103,23 @@ RegionStroke（src/backend/gl/region-stroke.ts；一笔一个；持有自己借�
 | 批 | program | 读 | 写 | 用途 |
 |---|---|---|---|---|
 | 1（本轮） | `region-load` | 叶 index+arena（straight u8） | W 矩形 | 图层 → 工作区域 |
-| 1 | `region-window` | W | cur（B×B premult f32；doc 外 = 0） | 每 dab 的「读块」 |
+| 1 | `region-crop`（原名 region-window，backend 目录格律禁浏览器词） | W | cur（B×B premult f32；doc 外 = 0） | 每 dab 的「读块」 |
 | 1 | `smudge-mask` | selection | mask（B×B f32） | falloff × 选区（与 gl-stamp 同式） |
 | 1 | `smudge-absorb` | cur, accum | accum'（同尺寸 ping-pong） | A' = mix(cur, A, ρ)，doc 外不沾 |
 | 1 | `reduce-weighted` | cur, mask | k×k（premult 加权和 / 权重和） | ā、稀释的 ā_α、多分辨率的 k×k 格；两级（B→16×16→1） |
 | 1 | `box3` | 任意 | 同尺寸 | dull 中段的 3×3 盒；第二批的模糊 ×N 同一 program |
 | 1 | `upsample-bilinear` | k×k | B×B | 多分辨率出料回放 |
 | 1 | `smudge-deposit` | cur, mask, release/accum/accumColor | W 窗口（scissor，straight u8） | mix(cur, P, M·s) 三混色空间 + 掺色 + 稀释 + lockAlpha + premult→straight 量化 |
-| 2（本轮，user 09-18 yes） | `wash-coverage` | coverage, mask | coverage'（max） | 模糊 / 锐化 wash |
-| 2 | `unsharp` | W₀ | 临时 | 锐化 |
-| 2 | `wash-lerp` | W₀, baked, coverage | W | flush 一次烤（预览每帧也烤得起） |
+| 2（本轮，user 09-18 yes） | `wash-coverage` | selection | coverage（doc u8 alpha，blend max-alpha，scissor = dab bbox） | ① cov = max(cov, stampA·flow·sel) |
+| 2 | `wash-premult` / `wash-box3` / `wash-unpremult` | W₀ | 区域尺寸临时（premult f32 → straight u8） | 模糊 = premult 3×3 盒 × N（镜像 sharpen-blur bake） |
+| 2 | `wash-sharpen` | W₀ | 区域 straight u8 | 锐化 = 高斯 3×3 字节截断 + luma USM 阈值 4（k=0 = 原样） |
+| 2 | `wash-lerp` | W₀, baked, coverage | W（scissor = dab bbox） | ③ W = lerp(W₀, baked, cov) premult 权重 |
 | 3（另案） | `disp-accumulate` / `warp-disp` | field / W₀, field | field' / W | 液化搬家 |
 | 远景 | `advect-segment` | W, field | W | 连续形式 #1 |
 
 ### 3.2 显示与提交 = overlay 的第三种成员（零新概念）
 
-`OverlayInput` 加 `RegionOverlayInput { kind: "region"; tex; layerId; bx; by; bw; bh; selMask: null }`；`blend-glsl.ts` overlay 分支加 `ovMode = "replace"`（bbox 内 result = overlay 直值，bbox 外 = base；不裁 selMask，选区已在 `smudge-mask` 吃过）；`composite:<mode>:overlay:replace` 进 soft-shaders 表（现有 `makeComposite` 参数化，一条分支）。
+`OverlayInput` 加 `RegionOverlayInput { kind: "region"; tex; layerId; bx; by; bw; bh }`；**落地形状**：不是新 ovMode 名，而是现有 overlay program 的一个 uniform `u_ovReplace`（bbox 内 result = overlay 直值，bbox 外 = base；不裁 selMask，选区已在 `smudge-mask` / `wash-coverage` 吃过），`blend-glsl.ts` 与 `soft-shaders.ts makeComposite` 同步分支，零新 program 名。
 
 - **预览**：每帧 `room.setStampOverlay(region.overlay())` → 现有 overlay pass。**零 CPU 往返**，W 就是那张纹理。
 - **提交**：`StrokePreview` 加 `"region"`。`StrokeSession.end()` → `deps.commitRegion(ov)` = `RasterService.bakeStamps` 原封不动（merge 用 replace；`readPixels` → `applyRegionDiff` → `copyBatchFrom` → `registerPair` → `index.rebuild`），在令牌内。取消 = `dispose()`，真层从未被写，零回滚（同 shadow）。
@@ -142,7 +143,7 @@ RegionStroke（src/backend/gl/region-stroke.ts；一笔一个；持有自己借�
 - **混色空间**：shader 里就是 `color-mix.ts` 的原式（GPU 直接 pow / cbrt / exp，不需要 §H 的 LUT 层 2/3；层 1 的 4096 段 LUT 是 CPU 孪生用的现状，GPU 用精确 pow → 差 < 1/255，进 ±ε）。CPU 孪生复用 `color-mix.ts` 函数本体（一份实现，两处消费，防漂移）。
 - **确定性**（ADR-0009 决策 6）：手指 = 「GPU 写真相 op 发结果」一类（同笔画 / transform），preview 零保证，commit 载荷 = 结果像素。
 
-### 3.5 验收 = 三方 golden，不靠真机手感
+### 3.5 验收 = 三方 golden，不靠真机手感（**结果 2026-09-18**：27 用例 vs 旧 CPU 锚——22 逐字节相同、5 个（oklab / spectral 混色）各 2 字节差 1/255；gl-smoke 真 WebGL2 vs SoftGl：手指 4 用例 max|Δ|=0、模糊 1、锐化 0；wash 三份契约测试含「三遍 = 一次 CPU bake」逐字节；UI 探针 GPU 路径画一笔零错误）
 
 1. 删旧引擎**之前**，用旧 CPU `SmudgeEngine` 录 golden 夹具进 `test/fixtures/smudge-golden/`（新建目录）：若干笔 × 三 variant × 三混色空间 × {选区, lockAlpha, doc 边界, 首 dab, dull 中段, 稀释}。
 2. 新引擎在 SoftGl2Port 上跑同夹具 → **±2/255**（差异来源只有 f64→f32、sRGB LUT vs pow、归约求和顺序；超出 = 翻译错了，不是调参）。
@@ -153,7 +154,7 @@ RegionStroke（src/backend/gl/region-stroke.ts；一笔一个；持有自己借�
 
 ### 3.6 体重
 
-删：`plugins/smudge-engine.ts`（370 行）；第二批（本轮）：`filters.ts attachColorBrushBehavior` 的 CPU 分块 wash（约 200 行）+ `sharpen-blur.ts bake` 的 CPU 盒滤波。加：`backend/gl/region-stroke.ts`、`backend/gl/region-programs.ts`（GLSL）、`soft-shaders.ts` 孪生、`plugins/smudge-engine.ts` 新体、`blend-glsl.ts` replace 分支、`stroke-session.ts` region 预览、`gl-room.ts` overlay 第三成员。净值目标 ≤ 0（交付时回填实数，家规「承诺了重构就交付体重变化」）。
+删：`plugins/smudge-engine.ts`（370 行）；第二批（本轮）：`filters.ts attachColorBrushBehavior` 的 CPU 分块 wash（约 200 行）+ `sharpen-blur.ts bake` 的 CPU 盒滤波。加：`backend/gl/region-stroke.ts`、`backend/gl/region-programs.ts`（GLSL）、`soft-shaders.ts` 孪生、`plugins/smudge-engine.ts` 新体、`blend-glsl.ts` replace 分支、`stroke-session.ts` region 预览、`gl-room.ts` overlay 第三成员。**实数（v0.14.17，src）：+1427 / −485 = 净 +942 行**——CPU 孪生 389 行是 ADR-0009 对表税（GLSL ↔ CPU 双写是家规不是可选），GLSL 506 行是 16 个 program 本体；删掉的：CPU 手指引擎 370 → GPU 驱动 246（−124）、filters.ts −188、sharpen-blur CPU wash 接线。**「净值 ≤ 0」没做到**，原因是对表税没算进去；这是事实不是辩解。
 
 ### 3.7 浮点 FBO 缺席：为什么不用 SoftGl 当回退（user 09-18 问「咱们不是有cpu fallback吗？还是softgl vs gl只能用一个，两个都用会打架？」）
 
@@ -179,4 +180,19 @@ RegionStroke（src/backend/gl/region-stroke.ts；一笔一个；持有自己借�
 - 不做：连续形式（#1，(b)）、抽象艺术纪元（#36）、增量 / wash 的 UI 暴露（UX 轮）、手感数字改动（#41）。
 - 液化 GPU = 第三批，**AI 的排期判断，不是 user 决定**（09-18 user 问「这个是什么意思」：09-05 的「液化=CPU 已答」只是「液化走 CPU 还是 GPU」这个问题答过了 = CPU，本文初版误引为拍板，已改）。排后的原因：组液化一个场 N 叶、B 样条预滤波起笔上传、选区 bleed 三模式 march 现在每事件 CPU 算——三件都要接，且 CPU 液化不卡手感（R=60 ≈ 16 ms/事件；R=300 数百 ms，**也值得搬**）。建议本轮立住 RegionStroke + golden 后，下一轮同接口搬；user 要本轮做则排在 wash 之后。
 - 留门：`inputs.field` 槽；program 枚举只加不改；`RegionStroke` 与 Filter 契约的接缝 = `BrushLayer` 面，CPU 滤镜笔和 GPU 手指并存期不打架。
-- 收官动作：总账 #42 → done、#1 指针回写本文 §1.3(b)、ADR（`adr/0014-region-programs.md`）在 user「没问题」后立，`StrokeTarget` 改名随源 commit 一起落（含 `filter-brush.ts` 注释与 `stroke-session.ts` 的 `targets` 注释），API .h 重打。
+- 收官动作（**已做 2026-09-18**）：总账 #42 done、#1 指针回写、ADR-0014 立、StrokeTarget 改名落、api/ 重打、总账新增 #70（smoke 参考窗基线红）/ #71（液化第三批，已问）/ #72（真机计时）。
+
+## 6. 落地记录（2026-09-18，dev v0.14.17；差异 = 实现 vs 本文提案）
+
+| 提案 | 实现 | 为什么 |
+|---|---|---|
+| RegionStroke 5 动词 load / alloc / run / overlay / dispose | **构造即整幅装载 W（+ W₀）**，无 `load(rect)`；多 `free(tex)`（区域尺寸临时件按 flush 借还）与 `run(..., scissor, blend)`；多 `readPixels`（显式慢路径）/ `selection` / `dirty` / `lockAlpha` | doc 尺寸 u8 FBO 与 overlay 路径同尺寸池命中，按需扩矩形是多余的复杂度 |
+| inputs 封闭 key（W / cur / accum…） | textures 的 key = program 的 sampler 名（`u_W` / `u_cur` …），值 = RegionTex 或 "W" / "W0" / "selection" | 少一层翻译；封闭性由 program 枚举保证 |
+| ovMode "replace" 新 program 名 | 现有 overlay program 的 uniform `u_ovReplace` | 零新 program 名，孪生同步一处 |
+| 第二批 3 个 program | 6 个（coverage / premult / box3 / unpremult / sharpen / lerp） | 逐 dab 精确翻译 sharpen-blur.ts bake 的两条路径（premult 盒 N 次 + luma USM）各需自己的核 |
+| program 名 region-window | region-crop | backend 目录格律禁浏览器词（build.sh lint 挡下） |
+| Filter 只加 strokePreview | 还加 `strokeSnapshot`（wash 要 W₀） | 手指不要快照，省一张 doc 尺寸 FBO |
+| StrokeSessionDeps openRegion(leaf) | openRegion(leaf, {snapshot}) + setRegion + commitRegion；commit 返 false = 令牌取消 + throw | 不静默丢一笔 |
+| 体重净值 ≤ 0 | 净 +942（见 §3.6） | 对表税没算 |
+
+commit 链：a700fad golden 锚 → c28c772 StrokeTarget → 8549dea 区域程序第一批 → eb0f6ee RegionStroke → 274979d 手指搬 GPU（golden 绿）→ 4bb35dd overlay replace + session 接线 → 8889370 wash 搬 GPU → fbbad4d gl-smoke 三方 → 4337cdc / ac49e6a / f51cfb4 v0.14.17 源 + 改名 + bundle。

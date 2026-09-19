@@ -38,6 +38,10 @@ _Avoid_: 手势识别自动 snap（ADR-0005 §1）, adjusting 态 / 手柄 / giz
 _Avoid_: 形状笔子工具自带透视模式（被全局 frame 吃掉）, 3D grid（弃案：两角点拖不出第三轴，手动画）, grid 最小间距护栏（弃案：不可控）, 把 VP 存 viewport/设备态（它是画的属性，跟 ora 走）
 _Avoid_: tool (tool 是 UI 层的工具选择), brush (brush 专指圆笔引擎)
 
+**区域程序（Region Program）/ RegionStroke / StrokeTarget**:
+手指（smear / dull / paint）、模糊、锐化这一族「沿笔迹推 / 搓 / 糊」的工具的统一形式（ADR-0014，2026-09-18）：对笔迹扫过的区域跑一个片元程序，`out(x) = mix(src(x), Σ_k w_k·src'(x − d_k(x)), m(x))`；每个 program 名是封闭枚举（`backend/gl/region-programs.ts`），在 `soft-shaders.ts` 有逐行 CPU 孪生（ADR-0009）。**RegionStroke** = 一笔一个的 GPU 驻留写靶：构造时把叶整幅装进 **W**（doc 尺寸 straight u8 FBO；`snapshot` 再装起笔快照 **W₀**），动词只有 alloc / free / run / overlay / dispose；W 当 overlay（`u_ovReplace`）预览，收口走 bakeStamps 写回链。**StrokeTarget** = 一笔期间的像素写靶（运行时 = StrokeShadow 替身或 RegionStroke），**不是图层树节点**（user 09-18「别叫 Layer」）。手感数学一字不改（逐 dab 精确翻译，golden 三方对拍）。
+_Avoid_: SmudgeLayer / BrushLayer（已改名 StrokeTarget）, 「CPU fallback」（ADR-0009 决策 4：无 WebGL2 = 整个 app 响亮失败；SoftGl 只在测试/MCP）, 连续形式 / 平流引擎（总账 #1，未做；接口留门 = field 槽 + advect-segment）, 血迹 / 拉花 / 吹画（#36 远景）
+
 **Stroke smoother**:
 笔触位置平滑：把 raw 输入点序列变成平滑的中心线（笔迹脊线），抑制手抖、保住有意的形状。强度由 streamline 参数控制。是 Input→Engine 之间的一级处理。
 _Avoid_: streamline (那是它的强度参数 / UI 名), stabilizer, 防抖
