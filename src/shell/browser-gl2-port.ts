@@ -134,6 +134,11 @@ export class BrowserGl2Port implements Gl2Port {
 
   private _programs = new Map<string, ProgMeta>();
   private _programSrc = new Map<string, { vert: string; frag: string }>();   // 重建用
+  // 预编译中（warmProgram 起的链接，尚未查状态/反射）；轮询收尾。context 重建时整表作废（旧句柄死）。
+  private _pending = new Map<string, { p: WebGLProgram; vs: WebGLShader; fs: WebGLShader }>();
+  private _pendingTimer: ReturnType<typeof setTimeout> | null = null;
+  private _warmFailed = new Map<string, string>();   // 预编译失败的名 → 错误（program() 使用时再抛，不在空闲轮询里炸）
+  private _parallelExt: { COMPLETION_STATUS_KHR: number } | null | undefined = undefined;   // 懒取；null = 无扩展
   private _fboPool: BrowserFBO[] = [];      // 已归还、待复用
   private _quad: WebGLVertexArrayObject | null = null;
   // drawInstanced 的持久 VAO（loc0=单位 quad static + loc1=vec4/实例 dynamic）。
@@ -195,9 +200,55 @@ export class BrowserGl2Port implements Gl2Port {
   // ---- shader program 缓存 + 反射 ----
   program(name: string, vert?: string, frag?: string): void {
     if (this._programs.has(name)) return;
+    const pend = this._pending.get(name);
+    if (pend) {   // 预编译已起：当场收尾（LINK_STATUS 查询会等链接完成，但编译早已在后台跑了）
+      this._pending.delete(name);
+      this._programs.set(name, this._finishLink(name, pend.p, pend.vs, pend.fs));
+      return;
+    }
+    const failed = this._warmFailed.get(name);
+    if (failed) { this._warmFailed.delete(name); throw new Error(failed); }
     if (vert == null || frag == null) throw new Error(`PROGRAM_NOT_BUILT:${name}`);
     this._programSrc.set(name, { vert, frag });
     this._programs.set(name, this._compile(vert, frag, name));
+  }
+
+  // 非阻塞预编译（契约见 gl2-port.ts）：起编译+链接不查状态，轮询 KHR_parallel_shader_compile 收尾。
+  warmProgram(name: string, vert: string, frag: string): void {
+    if (this._programs.has(name) || this._pending.has(name)) return;
+    if (this.isLost) return;   // 丢失期不起；restore 后按需同步编译
+    this._programSrc.set(name, { vert, frag });
+    try {
+      this._pending.set(name, this._startLink(vert, frag, name));
+    } catch (e) {   // compileShader 本身不抛（状态查询才抛）；这里只可能是 create* 失败
+      this._warmFailed.set(name, String((e as { message?: unknown })?.message ?? e));
+      return;
+    }
+    this._schedulePendingPoll();
+  }
+
+  private _schedulePendingPoll(): void {
+    if (this._pendingTimer != null) return;
+    this._pendingTimer = setTimeout(() => { this._pendingTimer = null; this._pollPending(); }, 40);
+  }
+
+  private _pollPending(): void {
+    if (this.isLost) return;
+    const gl = this.gl;
+    if (this._parallelExt === undefined) this._parallelExt = gl.getExtension("KHR_parallel_shader_compile") as { COMPLETION_STATUS_KHR: number } | null;
+    // 有扩展：只收尾已完成的（查询不阻塞）；无扩展：每拍最多同步收尾**一个**（把等待切碎，主线程单次停顿 ≤ 一个 program 的链接）
+    //   ——user 2026-09-19「启动速度是更重要的」：暖场不许攒成一次大停顿。
+    let budget = this._parallelExt ? Infinity : 1;
+    for (const [name, pend] of [...this._pending]) {
+      if (budget <= 0) break;
+      const done = this._parallelExt ? !!gl.getProgramParameter(pend.p, this._parallelExt.COMPLETION_STATUS_KHR) : true;
+      if (!done) continue;
+      this._pending.delete(name);
+      budget--;
+      try { this._programs.set(name, this._finishLink(name, pend.p, pend.vs, pend.fs)); }
+      catch (e) { this._warmFailed.set(name, String((e as { message?: unknown })?.message ?? e)); }
+    }
+    if (this._pending.size) this._schedulePendingPoll();
   }
 
   private _meta(name: string): ProgMeta {
@@ -207,6 +258,12 @@ export class BrowserGl2Port implements Gl2Port {
   }
 
   private _compile(vert: string, frag: string, name: string): ProgMeta {
+    const { p, vs, fs } = this._startLink(vert, frag, name);
+    return this._finishLink(name, p, vs, fs);
+  }
+
+  // 起编译 + 链接，不查任何状态（查状态才会等驱动；warmProgram 靠这点把等待挪到空闲轮询）。
+  private _startLink(vert: string, frag: string, name: string): { p: WebGLProgram; vs: WebGLShader; fs: WebGLShader } {
     const gl = this.gl;
     const vs = this._shader(gl.VERTEX_SHADER, vert, name);
     const fs = this._shader(gl.FRAGMENT_SHADER, frag, name);
@@ -215,10 +272,16 @@ export class BrowserGl2Port implements Gl2Port {
     gl.attachShader(p, vs);
     gl.attachShader(p, fs);
     gl.linkProgram(p);
+    return { p, vs, fs };
+  }
+
+  // 收尾：查 LINK_STATUS（编译错也在这里冒——_shader 不再单独查 COMPILE_STATUS，见其注）+ 反射 uniform/sampler。
+  private _finishLink(name: string, p: WebGLProgram, vs: WebGLShader, fs: WebGLShader): ProgMeta {
+    const gl = this.gl;
     // link 错只在 !LINK_STATUS 时拉 log（getProgramInfoLog 同步 stall，故守门后取）。
     if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
-      const log = gl.getProgramInfoLog(p);
-      throw new Error(`LINK_FAILED:${name}:${log}`);
+      const vlog = gl.getShaderInfoLog(vs), flog = gl.getShaderInfoLog(fs), log = gl.getProgramInfoLog(p);
+      throw new Error(`LINK_FAILED:${name}:${log}${vlog ? " vert:" + vlog : ""}${flog ? " frag:" + flog : ""}`);
     }
     gl.deleteShader(vs);
     gl.deleteShader(fs);
@@ -245,20 +308,22 @@ export class BrowserGl2Port implements Gl2Port {
     return { prog: p, uniforms, samplers };
   }
 
-  private _shader(type: number, src: string, name: string): WebGLShader {
+  // 只起编译不查 COMPILE_STATUS（查了就同步等驱动，预编译白做）；编译错在 _finishLink 的 LINK_STATUS 失败时连 shader log 一起抛。
+  private _shader(type: number, src: string, _name: string): WebGLShader {
     const gl = this.gl;
     const s = gl.createShader(type);
     if (!s) throw new Error("CREATE_SHADER_FAILED");
     gl.shaderSource(s, src);
     gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-      const log = gl.getShaderInfoLog(s);
-      throw new Error(`COMPILE_FAILED:${name}:${log}`);
-    }
     return s;
   }
 
   // ---- FBO 池 ----
+  fboPoolHas(w: number, h: number, prec: FBOPrec): boolean {
+    return this._fboPool.some((f) => f.w === w && f.h === h && f.prec === prec);
+  }
+  get fboPoolBudgetBytes(): number { return FBO_POOL_BUDGET_BYTES; }
+
   borrowFBO(w: number, h: number, prec: FBOPrec = "u8"): PooledFBO {
     for (let i = 0; i < this._fboPool.length; i++) {
       const f = this._fboPool[i];
@@ -597,6 +662,7 @@ export class BrowserGl2Port implements Gl2Port {
   private _rebuildAfterRestore(): void {
     this._gen++;   // 旧 program/FBO/VAO 句柄全废 → 代际 +1，持久对象 holder 据此重建
     this._programs.clear();
+    this._pending.clear(); this._warmFailed.clear();   // 预编译中的旧句柄同废；下面按源同步重编（含预编译过的名）
     for (const [name, src] of this._programSrc) {
       this._programs.set(name, this._compile(src.vert, src.frag, name));
     }

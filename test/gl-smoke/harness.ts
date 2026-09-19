@@ -40,6 +40,7 @@ import { SmudgeEngine } from "../../src/plugins/smudge-engine.ts";
 import { SharpenBlurFilter } from "../../src/plugins/sharpen-blur.ts";
 import { gpuLayer } from "../region-target.mjs";
 import { CASES, DOC_W, DOC_H, buildImage, runCase, compareBytes } from "../smudge-golden-cases.mjs";
+import { warmAllRegionPrograms, REGION_PROGRAM_IDS } from "../../src/backend/gl/region-programs.ts";
 
 // ---- CPU warp 参照（golden 基准）：v355 从 src/floating-transform 归档进 harness（运行时单一 GPU SSoT；
 //   这份 CPU 逐像素逆单应性 + 采样器只在测试里当 GPU warp 的对照基准，不在产品路径）。verbatim 复刻原实现，
@@ -1573,7 +1574,21 @@ async function referenceComponentCheck(add: Add): Promise<void> {
 
 // ---- 区域程序（2026-09-18）：真 GL vs SoftGl2Port 同一驱动同一输入 ±2/255（GLSL ↔ CPU 孪生防漂移锚；ADR-0009 决定 5 三方 golden 之一）----
 //   手指：4 个 golden 用例（srgb / dull 中段 / spectral paint / 选区）；wash：模糊 -60 与锐化 +50 各一笔（W₀ 快照路径）。
-function regionParity(glctx: BrowserGl2Port, add: Add): void {
+async function regionParity(glctx: BrowserGl2Port, add: Add): Promise<void> {
+  // 2026-09-19 首笔卡顿案：非阻塞预编译走一遍真 GL（warmProgram → 空闲轮询收尾）；之后手指用例的 program() 只是当场收尾/命中。
+  {
+    const progs = (glctx as unknown as { _programs: Map<string, unknown> })._programs;
+    const before = progs.size;
+    const t0 = performance.now();
+    warmAllRegionPrograms(glctx);
+    const tStart = performance.now() - t0;
+    await new Promise((r) => setTimeout(r, 120));   // 轮询节拍 40ms → 三拍
+    await nextFrames(2);
+    const finalized = [...REGION_PROGRAM_IDS].filter((id) => progs.has(id)).length;
+    const ext = !!glctx.gl.getExtension("KHR_parallel_shader_compile");
+    add(`region:warm 预编译起手不阻塞（${tStart.toFixed(1)}ms 起 16 个）`, tStart < 200, `start=${tStart.toFixed(1)}ms before=${before}`);
+    add(`region:warm 空闲收尾（KHR_parallel=${ext}）`, finalized >= 1, `finalized=${finalized}/${REGION_PROGRAM_IDS.length}`);
+  }
   const soft = new SoftGl2Port();
   type GL = ReturnType<typeof gpuLayer>;
   const pick = ["smear-srgb", "dull-mid-0.5", "paint-spectral", "smear-selection"];
@@ -1697,7 +1712,7 @@ async function run(): Promise<{ ok: boolean; checks: Check[]; error: string | nu
   try { warpClipParity(glctx, add); } catch (e) { add("warpclip parity", false, String(e)); }
   try { mergeDownParity(glctx, add); } catch (e) { add("mergedown parity", false, String(e)); }
   try { softTripartite(glctx, add); } catch (e) { add("soft tripartite", false, String(e)); }
-  try { regionParity(glctx, add); } catch (e) { add("region parity", false, String(e)); }
+  try { await regionParity(glctx, add); } catch (e) { add("region parity", false, String(e)); }
   try { arenaAccounting(glctx, add); } catch (e) { add("arena accounting", false, String(e)); }
   try { await referenceComponentCheck(add); } catch (e) { add("reference component", false, String((e as Error)?.stack ?? e).slice(0, 600)); }
 

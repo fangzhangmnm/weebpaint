@@ -188,6 +188,7 @@ export declare class Board {
     _configureDocMemory(): void;
     _setupGLBoard(): void;
     setDoc(doc: PaintingView): void;
+    private _scheduleGlWarmUp;
     setShowCheckerboard(on: boolean): void;
     setPixelGridEnabled(on: boolean): void;
     getPixelGridEnabled(): boolean;

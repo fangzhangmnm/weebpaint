@@ -28,3 +28,11 @@
 - headless backend（MCP / node 全量）同一条路：`WeebPaintBackend` 的 deps 用同一个 GlRoom（缺省 SoftGl2Port 孪生跑）。
 - 液化留在 CPU（第三批，AI 排期判断，待 user 一句话，总账 #71）；连续形式（#1）与抽象艺术（#36）接口已留门（`field` 纹理槽 / program 只加不改）。
 - 新 program 的纪律：GLSL 与 `soft-shaders.ts` 孪生同 commit；`test/region-programs.test.mjs` 注册表全覆盖 + `test/smudge-golden.test.mjs` / `color-brush-*.test.mjs` 契约 + gl-smoke `regionParity`。
+
+## 2026-09-19 补：首笔卡顿案（user 真机：「手指第一下会明显卡顿」）
+
+根因 = `RegionStroke` 构造时同步编译全部 16 个 program（`program()` 的 LINK_STATUS 查询等驱动），加首张 doc 尺寸 FBO 分配。落地 v0.14.19（user「都做」）：
+- **按需注册**：构造只注册 `region-load`，`run()` 到哪个 program 才注册哪个（只编当前 variant 要的）。
+- **非阻塞预编译**：`Gl2Port.warmProgram?`（起编译+链接不查状态）+ `KHR_parallel_shader_compile` 的 COMPLETION_STATUS 空闲轮询收尾；无扩展时每拍最多同步收尾一个（把等待切碎）。`program()` 遇到预编译中的名当场收尾。
+- **启动优先**（user「启动速度是更重要的。我不用photoshop不是因为subscription fee，而是bloatware启动非常慢」）：暖场只在 `board.setDoc` 之后的 `requestIdleCallback` 里跑，**不设强制 timeout**，每个空闲片起两个 program；Safari 无 rIC 退 setTimeout 分片。
+- **预借 FBO 守卫**（user「预借再还 不会在小内存机器上惹麻烦可以试」）：池里已有同尺寸空闲件 = 空操作；池预算装不下 = 跳过；只在两者都过时预借一张 doc 尺寸 u8 再还回池。`Gl2Port` 加可选观测口 `fboPoolHas` / `fboPoolBudgetBytes`。

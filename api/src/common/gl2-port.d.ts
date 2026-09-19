@@ -49,6 +49,7 @@ export interface Gl2Port {
     readonly generation: number;
     onInvalidated(cb: () => void): void;
     program(name: string, vert?: string, frag?: string): void;
+    warmProgram?(name: string, vert: string, frag: string): void;
     borrowFBO(w: number, h: number, prec?: FBOPrec): PooledFBO;
     returnFBO(f: PooledFBO): void;
     clearPool(): void;
@@ -56,6 +57,8 @@ export interface Gl2Port {
         count: number;
         bytes: number;
     };
+    fboPoolHas?(w: number, h: number, prec: FBOPrec): boolean;
+    readonly fboPoolBudgetBytes?: number;
     clearFBO(f: PooledFBO, rgba: [number, number, number, number]): void;
     draw(spec: Gl2DrawSpec): void;
     drawInstanced(spec: Gl2DrawSpec, instances: Float32Array, count: number): void;

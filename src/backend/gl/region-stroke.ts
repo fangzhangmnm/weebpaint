@@ -17,7 +17,7 @@
 import type { Gl2Port, PooledFBO, Gl2Texture, Gl2TexSource, Gl2Blend } from "../../common/gl2-port.ts";
 import type { GlRoom } from "./gl-room.ts";
 import type { LayerPixels } from "../tiles/tile-layer.ts";
-import { ensureAllRegionPrograms, type RegionProgramId } from "./region-programs.ts";
+import { ensureRegionProgram, type RegionProgramId } from "./region-programs.ts";
 
 export type RegionTexFormat = "rgba-f32" | "rgba-u8";
 export interface RegionTex { readonly w: number; readonly h: number; readonly format: RegionTexFormat; }
@@ -65,7 +65,7 @@ export class RegionStroke {
     this.docW = docW;
     this.docH = docH;
     this.lockAlpha = !!opts?.lockAlpha;
-    ensureAllRegionPrograms(this._port);
+    ensureRegionProgram(this._port, "region-load");   // 其余 program 在 run() 按需注册（只编当前 variant 要的；预编译见 warmAllRegionPrograms）
     this._W = this._port.borrowFBO(docW, docH, "u8");
     this._load(this._W, pixels);
     if (opts?.snapshot) { this._W0 = this._port.borrowFBO(docW, docH, "u8"); this._load(this._W0, pixels); }
@@ -127,6 +127,7 @@ export class RegionStroke {
       if (src === target) throw new Error(`REGION_READ_WRITE_HAZARD (${program}: sampler ${k} is the draw target)`);
       texs[k] = src;
     }
+    ensureRegionProgram(this._port, program);   // 幂等：已注册 = Map 查一次；预编译过 = 当场收尾；否则同步编译
     this._port.draw({ program, target, uniforms, textures: texs, scissor, blend });
     if (dst === "W") this._markDirty(scissor ?? { x: 0, y: 0, w: this.docW, h: this.docH });
   }

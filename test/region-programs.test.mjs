@@ -28,6 +28,27 @@ describe("region-programs · 注册表", () => {
   });
 });
 
+describe("region-programs · 按需注册 / 预编译（2026-09-19 首笔卡顿案）", () => {
+  it("RegionStroke 构造只注册 region-load；run 到哪个 program 才注册哪个；warmAllRegionPrograms 一次全注册", async () => {
+    const { GlRoom } = await import("../src/backend/gl/gl-room.ts");
+    const { LayerPixels } = await import("../src/backend/tiles/tile-layer.ts");
+    const { RegionStroke } = await import("../src/backend/gl/region-stroke.ts");
+    const { warmAllRegionPrograms } = await import("../src/backend/gl/region-programs.ts");
+    const p = new SoftGl2Port();
+    const room = new GlRoom(p, 16);
+    const px = new LayerPixels(16, 16);
+    const rs = new RegionStroke(room, 1, px, 16, 16, null);
+    eq(p._programs.size, 1, "构造只注册 region-load");
+    assert(p._programs.has("region-load"));
+    const cur = rs.alloc(4, 4, "rgba-f32");
+    rs.run("region-crop", cur, { u_W: "W" }, { u_size: [4, 4], u_origin: [0, 0], u_docSize: [16, 16] });
+    eq(p._programs.size, 2, "run 按需注册 region-crop");
+    warmAllRegionPrograms(p);
+    eq(p._programs.size, REGION_PROGRAM_IDS.length, "预编译（软域 = 同步注册）全到齐");
+    rs.dispose(); px.dispose(); room.dispose();
+  });
+});
+
 describe("region-programs · region-crop / smudge-mask / smudge-absorb", () => {
   it("region-crop：W 直值 → premult；doc 外 = 0", () => {
     const p = port();

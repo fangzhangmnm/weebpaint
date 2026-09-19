@@ -153,6 +153,7 @@ export class SoftGl2Port implements Gl2Port {
   onInvalidated(cb: () => void): void { this._invalidated.push(cb); }
 
   // ---- program：注册即对表核验（CPU 版缺席响亮 throw，ADR-0009 决定 5）----
+  warmProgram(name: string, vert: string, frag: string): void { this.program(name, vert, frag); }   // 软域无编译成本：同义
   program(name: string, _vert?: string, _frag?: string): void {
     if (this._programs.has(name)) return;
     const cpu = resolveCpuProgram(name);
@@ -173,6 +174,8 @@ export class SoftGl2Port implements Gl2Port {
     return fbo;
   }
   returnFBO(f: PooledFBO): void { this._fboPool.push(f as SoftFBO); }
+  fboPoolHas(w: number, h: number, prec: FBOPrec): boolean { return this._fboPool.some((f) => f.w === w && f.h === h && f.prec === prec); }
+  get fboPoolBudgetBytes(): number { return Infinity; }
   clearPool(): void { this._fboPool = []; }
   get fboPoolStats(): { count: number; bytes: number } {
     let b = 0;

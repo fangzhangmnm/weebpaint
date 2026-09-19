@@ -266,6 +266,20 @@ export class Board {
     this._configureDocMemory();
     this._glBoard?.markContentDirty();   // GL：新 doc → 全量重传
     this.fitToScreen();
+    this._scheduleGlWarmUp(doc.width, doc.height);
+  }
+
+  // 2026-09-19 手指首笔卡顿案：doc 就位后在**空闲片**里分片预编译区域程序 + 守卫预借 doc 尺寸 FBO（GLBoard.warmUp）。
+  //   user「启动速度是更重要的」：只在真空闲时跑（requestIdleCallback，**不设强制 timeout**——宁可不暖也不挤启动）；
+  //   Safari 无 rIC 退 setTimeout 500ms 分片。每片非致命：出错只记 log。幂等，多次 setDoc 无害。
+  private _scheduleGlWarmUp(docW: number, docH: number): void {
+    if (!this._glBoard) return;
+    const schedule = (fn: () => void) => {
+      const guarded = () => { try { fn(); } catch (e) { reportError(new Error("[board] GL warm-up step failed (non-fatal): " + String(e)), "log"); } };
+      if (typeof requestIdleCallback === "function") requestIdleCallback(() => guarded());
+      else setTimeout(guarded, 500);
+    };
+    this._glBoard.warmUp(docW, docH, schedule);
   }
 
   setShowCheckerboard(on: boolean) {

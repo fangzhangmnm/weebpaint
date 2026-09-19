@@ -23,6 +23,10 @@ export declare class BrowserGl2Port implements Gl2Port {
     readonly caps: Gl2Caps;
     private _programs;
     private _programSrc;
+    private _pending;
+    private _pendingTimer;
+    private _warmFailed;
+    private _parallelExt;
     private _fboPool;
     private _quad;
     private _instVao;
@@ -37,9 +41,16 @@ export declare class BrowserGl2Port implements Gl2Port {
     get generation(): number;
     onInvalidated(cb: () => void): void;
     program(name: string, vert?: string, frag?: string): void;
+    warmProgram(name: string, vert: string, frag: string): void;
+    private _schedulePendingPoll;
+    private _pollPending;
     private _meta;
     private _compile;
+    private _startLink;
+    private _finishLink;
     private _shader;
+    fboPoolHas(w: number, h: number, prec: FBOPrec): boolean;
+    get fboPoolBudgetBytes(): number;
     borrowFBO(w: number, h: number, prec?: FBOPrec): PooledFBO;
     returnFBO(f: PooledFBO): void;
     private _fboBytes;

@@ -7,9 +7,12 @@ export declare class SoftGl2Port implements Gl2Port {
     private _programs;
     private _fboPool;
     onInvalidated(cb: () => void): void;
+    warmProgram(name: string, vert: string, frag: string): void;
     program(name: string, _vert?: string, _frag?: string): void;
     borrowFBO(w: number, h: number, prec?: FBOPrec): PooledFBO;
     returnFBO(f: PooledFBO): void;
+    fboPoolHas(w: number, h: number, prec: FBOPrec): boolean;
+    get fboPoolBudgetBytes(): number;
     clearPool(): void;
     get fboPoolStats(): {
         count: number;

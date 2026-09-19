@@ -496,9 +496,18 @@ const FRAGS: Record<RegionProgramId, string> = {
 export function ensureRegionProgram(port: Gl2Port, id: RegionProgramId): void {
   port.program(id, COMPOSITE_VERT, FRAGS[id]);
 }
-/** 一次注册全部（RegionStroke 构造时调；也是对表测试的入口）。 */
+/** 一次同步注册全部（对表测试 / gl-smoke 入口；产品路径不再在起笔时调——RegionStroke.run 按需 ensure，2026-09-19）。 */
 export function ensureAllRegionPrograms(port: Gl2Port): void {
   for (const id of REGION_PROGRAM_IDS) ensureRegionProgram(port, id);
+}
+/** 非阻塞预编译一个（有 warmProgram 走它，否则退化为同步 program）。分片暖场的原子（GLBoard.warmUp 每个空闲片两个）。 */
+export function warmRegionProgram(port: Gl2Port, id: RegionProgramId): void {
+  if (port.warmProgram) port.warmProgram(id, COMPOSITE_VERT, FRAGS[id]);
+  else port.program(id, COMPOSITE_VERT, FRAGS[id]);
+}
+/** 非阻塞预编译全部（gl-smoke 用；产品路径走 GLBoard.warmUp 分片，不一次全起——user 2026-09-19「启动速度是更重要的」）。 */
+export function warmAllRegionPrograms(port: Gl2Port): void {
+  for (const id of REGION_PROGRAM_IDS) warmRegionProgram(port, id);
 }
 /** 只读：GLSL 源（gl-smoke / 调试）。 */
 export function regionProgramSource(id: RegionProgramId): { vert: string; frag: string } {

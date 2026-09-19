@@ -109,6 +109,10 @@ export interface Gl2Port {
   // 确保 name 已注册；首次需给源。（C8 后棒起注册表扩成 { GLSL 源, CPU 等价函数 } 的 GPU/CPU
   //   对表——新 shader 不配 CPU 版必须显式 GPU-only 登记，ADR-0009 决定 5。）
   program(name: string, vert?: string, frag?: string): void;
+  // 非阻塞预编译（2026-09-19，手指首笔卡顿案）：起编译+链接但**不查状态**，实现体在空闲时轮询 KHR_parallel_shader_compile 的
+  //   COMPLETION_STATUS 收尾（无扩展则下一 tick 同步收尾）。之后 program(name) 若还没收尾就当场收尾（比从零编译快）。
+  //   可选动词：SoftGl2Port = program 同义；调用方用 `port.warmProgram ?? port.program`。
+  warmProgram?(name: string, vert: string, frag: string): void;
 
   // ---- FBO 借还（有界池：MRU 复用、LRU 驱逐真删） ----
   borrowFBO(w: number, h: number, prec?: FBOPrec): PooledFBO;
@@ -117,6 +121,10 @@ export interface Gl2Port {
   clearPool(): void;
   // dev HUD：池占用（确认有界）。
   readonly fboPoolStats: { count: number; bytes: number };
+  // 暖场预借守卫（2026-09-19，user「预借再还 不会在小内存机器上惹麻烦可以试」）：池里已有同尺寸空闲件 → 预借是空操作，别做；
+  //   预算不够 → 跳过。可选口，实现体缺席 = 调用方跳过预借。
+  fboPoolHas?(w: number, h: number, prec: FBOPrec): boolean;
+  readonly fboPoolBudgetBytes?: number;
   // FBO 清成纯色（累积器铺底等「只清不画」场景；draw 顺带清用 spec.clear）。
   clearFBO(f: PooledFBO, rgba: [number, number, number, number]): void;
 

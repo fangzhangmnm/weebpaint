@@ -9,6 +9,7 @@ import { GlRoom } from "../backend/gl/gl-room.ts";
 import { RenderTree } from "../backend/gl/render-tree.ts";
 import { RasterService } from "../backend/gl/raster-service.ts";
 import { RegionStroke, type SelMaskPlane } from "../backend/gl/region-stroke.ts";
+import { warmRegionProgram, REGION_PROGRAM_IDS } from "../backend/gl/region-programs.ts";
 import type { FloatInput, OverlayInput, SurrogateInput } from "../backend/gl/gl-room.ts";
 import type { LayerPixels } from "../backend/tiles/tile-layer.ts";
 import type { DocNode, DocLeaf } from "../backend/gl/gl-doc-bridge.ts";
@@ -57,6 +58,34 @@ export class GLBoard {
   ): boolean {
     if (this._glctx.isLost) return false;
     return this._raster.bakeStamps(leafId, pixels, ov, docW, docH, apply);
+  }
+
+  // 2026-09-19 暖场（手指首笔卡顿案，user「都做」+「启动速度是更重要的」+「预借再还 不会在小内存机器上惹麻烦可以试」）：
+  //   ① 16 个区域程序非阻塞预编译（warmProgram + KHR_parallel_shader_compile 轮询收尾），**分片**：每个空闲片起两个，
+  //      不一次全起、不塞进忙碌期（schedule = board 的 requestIdleCallback，无强制 timeout）；
+  //   ② 预借一张 doc 尺寸 u8 FBO 再还回池，让首笔的 W 命中池而不是当场 createTexture——**守卫**：池里已有同尺寸空闲件 = 空操作跳过；
+  //      池预算装不下 = 跳过（退化为首笔当场分配，不出错）。幂等（program 已注册 = Map 查一次）。
+  warmUp(docW: number, docH: number, schedule: (fn: () => void) => void): void {
+    const port = this._glctx;
+    if (port.isLost) return;
+    const ids = [...REGION_PROGRAM_IDS];
+    const step = () => {
+      if (port.isLost) return;
+      for (let i = 0; i < 2 && ids.length; i++) warmRegionProgram(port, ids.shift()!);
+      if (ids.length) schedule(step);
+      else schedule(() => this._preborrowDocFBO(docW, docH));   // program 都起完再预借（顺序无关，只是别挤在一个片里）
+    };
+    schedule(step);
+  }
+  private _preborrowDocFBO(docW: number, docH: number): void {
+    const port = this._glctx;
+    if (port.isLost || docW <= 0 || docH <= 0) return;
+    if (!port.fboPoolHas || port.fboPoolBudgetBytes == null) return;          // 实现体没观测口 = 不做（软域/未来 port）
+    if (port.fboPoolHas(docW, docH, "u8")) return;                             // 已有同尺寸空闲件：预借是空操作
+    const need = docW * docH * 4;
+    if (port.fboPoolStats.bytes + need > port.fboPoolBudgetBytes) return;     // 预算装不下：跳过
+    const f = port.borrowFBO(docW, docH, "u8");
+    port.returnFBO(f);
   }
 
   // 2026-09-18 区域程序：造一笔的 GPU 驻留写靶（RegionStroke）。caps 守卫 / 显存不够在构造里响亮 throw；

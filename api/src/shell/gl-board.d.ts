@@ -42,6 +42,8 @@ export declare class GLBoard {
         tx: number;
         ty: number;
     }[]): boolean;
+    warmUp(docW: number, docH: number, schedule: (fn: () => void) => void): void;
+    private _preborrowDocFBO;
     openRegion(leafId: number, pixels: LayerPixels, docW: number, docH: number, selMask: SelMaskPlane | null, lockAlpha: boolean, snapshot?: boolean): RegionStroke;
     rasterizeStampsToBytes(stamps: Parameters<RasterService["rasterizeStampsToBytes"]>[0], shape: Parameters<RasterService["rasterizeStampsToBytes"]>[1], bx: number, by: number, bw: number, bh: number): Uint8ClampedArray | null;
     compositeToBytes(nodes: DocNode[], docW: number, docH: number, surrogates?: readonly SurrogateInput[], overlay?: OverlayInput | null): {
