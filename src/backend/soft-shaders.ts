@@ -790,6 +790,150 @@ const washLerp: CpuDraw = (c) => {
   });
 };
 
+
+// ---- 第三批 液化 孪生（镜像 region-programs.ts FIELD_COPY / LIQUIFY_ACCUMULATE / LIQUIFY_WARP；字节单位）----
+const fieldCopy: CpuDraw = (c) => {
+  const [ox, oy] = uv2(c, "u_offset");
+  const [sw, sh] = uv2(c, "u_srcSize");
+  const src = c.tex("u_src");
+  c.forEachPixel((px, py, out) => {
+    const sx = px - ox, sy = py - oy;
+    if (sx < 0 || sy < 0 || sx >= sw || sy >= sh || !src) { out.fill(0); return true; }
+    src.fetch(sx, sy, out);
+    return true;
+  });
+};
+const liquifyAccumulate: CpuDraw = (c) => {
+  const [ox, oy] = uv2(c, "u_origin");
+  const [cx, cy] = uv2(c, "u_center");
+  const R = u1(c, "u_R"), strength = u1(c, "u_strength"), mode = u1(c, "u_mode");
+  const [vx, vy] = uv2(c, "u_vel");
+  const A = c.tex("u_A");
+  const t = new Float32Array(4);
+  const R2 = R * R;
+  c.forEachPixel((px, py, out) => {
+    if (A) A.fetch(px, py, t); else t.fill(0);
+    let dx = t[0], dy = t[1];
+    const wx = px + ox, wy = py + oy;
+    const dxc = wx - cx, dyc = wy - cy;
+    const r2 = dxc * dxc + dyc * dyc;
+    if (r2 < R2) {
+      const r = Math.sqrt(r2);
+      const tt = 1 - r / R;
+      const ff = tt * tt * (3 - 2 * tt);
+      if (mode === 5) { const alpha = Math.min(1, ff * strength); dx *= (1 - alpha); dy *= (1 - alpha); }
+      else {
+        let ddx: number, ddy: number;
+        if (mode === 1) { ddx = -dxc * ff * strength; ddy = -dyc * ff * strength; }
+        else if (mode === 2) { ddx = dxc * ff * strength; ddy = dyc * ff * strength; }
+        else if (mode === 3) { ddx = -dyc * ff * strength; ddy = dxc * ff * strength; }
+        else if (mode === 4) { ddx = dyc * ff * strength; ddy = -dxc * ff * strength; }
+        else { ddx = vx * ff * strength; ddy = vy * ff * strength; }
+        dx += ddx; dy += ddy;
+      }
+    }
+    out[0] = dx; out[1] = dy; out[2] = 0; out[3] = 0;
+    return true;
+  });
+};
+const crK = (t: number): number => { const A = -0.5, at = Math.abs(t); if (at < 1) return (A + 2) * at * at * at - (A + 3) * at * at + 1; if (at < 2) return A * at * at * at - 5 * A * at * at + 8 * A * at - 4 * A; return 0; };
+const rnd = (x: number): number => Math.floor(x + 0.5);
+const liquifyWarp: CpuDraw = (c) => {
+  const [fox, foy] = uv2(c, "u_fieldOrigin");
+  const rect = c.uniforms["u_srcRect"] as number[] | Float32Array | undefined;
+  const rx = rect ? rect[0] : 0, ry = rect ? rect[1] : 0, rw = rect ? rect[2] : 0, rh = rect ? rect[3] : 0;
+  const sample = u1(c, "u_sample"), bleed = u1(c, "u_bleed"), hasSel = u1(c, "u_hasSel");
+  const [sox, soy] = uv2(c, "u_selOrigin");
+  const [ssw, ssh] = uv2(c, "u_selSize");
+  const [pw, ph] = uv2(c, "u_planeSize");
+  const field = c.tex("u_field"), W0 = c.tex("u_W0"), sel = c.tex("u_sel"), plane = c.tex("u_plane");
+  const t = new Float32Array(4), cc = new Float32Array(4);
+  const cellIn = (ix: number, iy: number): boolean => {
+    const sx = ix - sox, sy = iy - soy;
+    if (sx < 0 || sy < 0 || sx >= ssw || sy >= ssh || !sel) return false;
+    sel.fetch(sx, sy, t); return t[0] * 255 >= 127.5;
+  };
+  const inMask = (px: number, py: number) => cellIn(rnd(px), rnd(py));
+  const srcFootprintIn = (fsx: number, fsy: number) => { const ix = Math.floor(fsx), iy = Math.floor(fsy); return cellIn(ix, iy) && cellIn(ix + 1, iy) && cellIn(ix, iy + 1) && cellIn(ix + 1, iy + 1); };
+  const inRect = (x: number, y: number) => x >= rx && x < rx + rw && y >= ry && y < ry + rh;
+  const fetchB = (x: number, y: number, out4: Float32Array) => { if (W0) W0.fetch(x, y, out4); else out4.fill(0); out4[0] *= 255; out4[1] *= 255; out4[2] *= 255; out4[3] *= 255; };
+  c.forEachPixel((wx, wy, out) => {
+    if (field) field.fetch(wx - fox, wy - foy, t); else t.fill(0);
+    const tdx = t[0], tdy = t[1];
+    let srcX = wx - tdx, srcY = wy - tdy;
+    if (hasSel === 1) {
+      if (!inMask(wx, wy)) { srcX = wx; srcY = wy; }
+      else if (bleed !== 0 && !srcFootprintIn(srcX, srcY)) {
+        if (bleed === 1) { srcX = wx; srcY = wy; }
+        else {
+          const len = Math.sqrt(tdx * tdx + tdy * tdy);
+          if (len >= 1e-3) {
+            const dirX = -tdx / len, dirY = -tdy / len;
+            const maxK = Math.min(Math.ceil(len), 4096);
+            let sxi = wx, syi = wy;
+            for (let k = 1; k <= maxK; k++) {
+              const rxi = rnd(wx + dirX * k), ryi = rnd(wy + dirY * k);
+              if (!cellIn(rxi, ryi)) break;
+              sxi = rxi; syi = ryi;
+            }
+            srcX = sxi; srcY = syi;
+          } else { srcX = wx; srcY = wy; }
+        }
+      }
+    }
+    if (sample === 3) {
+      if (plane) sampleSpline(plane, pw, ph, srcX - rx, srcY - ry, out); else out.fill(0);
+      return true;
+    }
+    if (sample === 0) {
+      const nx = rnd(srcX), ny = rnd(srcY);
+      if (inRect(nx, ny)) { fetchB(nx, ny, cc); out[0] = cc[0] / 255; out[1] = cc[1] / 255; out[2] = cc[2] / 255; out[3] = cc[3] / 255; }
+      else out.fill(0);
+      return true;
+    }
+    const ix = Math.floor(srcX), iy = Math.floor(srcY);
+    if (sample === 1) {
+      const fx = srcX - ix, fy = srcY - iy;
+      let pr = 0, pg = 0, pb = 0, pa = 0;
+      const wts = [(1 - fx) * (1 - fy), fx * (1 - fy), (1 - fx) * fy, fx * fy];
+      const offs = [[0, 0], [1, 0], [0, 1], [1, 1]];
+      for (let k = 0; k < 4; k++) {
+        const wt = wts[k], px = ix + offs[k][0], py = iy + offs[k][1];
+        if (wt === 0 || !inRect(px, py)) continue;
+        fetchB(px, py, cc);
+        const af = (cc[3] / 255) * wt;
+        pr += cc[0] * af; pg += cc[1] * af; pb += cc[2] * af; pa += cc[3] * wt;
+      }
+      if (pa < 1e-4) { out.fill(0); return true; }
+      const afSum = pa / 255;
+      out[0] = pr / afSum / 255; out[1] = pg / afSum / 255; out[2] = pb / afSum / 255; out[3] = pa / 255;
+      return true;
+    }
+    let r = 0, g = 0, b = 0, a = 0;
+    for (let j = 0; j < 4; j++) {
+      const yy = iy - 1 + j; if (!(yy >= ry && yy < ry + rh)) continue;
+      const wy = crK(yy - srcY);
+      if (wy === 0) continue;
+      for (let i = 0; i < 4; i++) {
+        const xx = ix - 1 + i; if (!(xx >= rx && xx < rx + rw)) continue;
+        const wgt = crK(xx - srcX) * wy;
+        if (wgt === 0) continue;
+        fetchB(xx, yy, cc);
+        const av = cc[3];
+        r += cc[0] * av * wgt; g += cc[1] * av * wgt; b += cc[2] * av * wgt; a += av * wgt;
+      }
+    }
+    const nA = (xx: number, yy: number) => { if (!inRect(xx, yy)) return 0; fetchB(xx, yy, cc); return cc[3]; };
+    const n00 = nA(ix, iy), n10 = nA(ix + 1, iy), n01 = nA(ix, iy + 1), n11 = nA(ix + 1, iy + 1);
+    const acl = Math.max(Math.min(n00, n10, n01, n11), Math.min(Math.max(n00, n10, n01, n11), a));
+    if (acl !== a && a > 1e-4) { const sc = acl / a; r *= sc; g *= sc; b *= sc; a = acl; }
+    if (a < 1e-4) { out.fill(0); return true; }
+    const cl = (v: number) => Math.max(0, Math.min(255, v));
+    out[0] = rnd(cl(r / a)) / 255; out[1] = rnd(cl(g / a)) / 255; out[2] = rnd(cl(b / a)) / 255; out[3] = rnd(cl(a)) / 255;
+    return true;
+  });
+};
+
 // ---- 注册表 ----
 // GPU-only 显式登记（屏显专属，headless 不需要；SoftGl2Port draw 到这些名字响亮 throw）。
 const GPU_ONLY = new Set<string>(["present-affine", "present-affine-over", "screen-bg"]);
@@ -820,6 +964,9 @@ export function resolveCpuProgram(name: string): CpuDraw | "gpu-only" | null {
   if (name === "wash-unpremult") return washUnpremult;
   if (name === "wash-sharpen") return washSharpen;
   if (name === "wash-lerp") return washLerp;
+  if (name === "field-copy") return fieldCopy;
+  if (name === "liquify-accumulate") return liquifyAccumulate;
+  if (name === "liquify-warp") return liquifyWarp;
   if (name.startsWith("composite:")) {
     const parts = name.split(":");   // composite:<mode>:<src>[:<ovMode>]
     const mode = parts[1] as BlendMode;

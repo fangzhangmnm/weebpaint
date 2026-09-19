@@ -24,7 +24,7 @@ describe("region-programs · 注册表", () => {
       assert(typeof r === "function", `${id} 缺 CPU 孪生（resolveCpuProgram → ${String(r)}）`);
     }
     port();
-    eq(REGION_PROGRAM_IDS.length, 16);
+    eq(REGION_PROGRAM_IDS.length, 19);
   });
 });
 
@@ -166,6 +166,51 @@ describe("region-programs · 归约链 / 多分辨率链 vs JS 参照", () => {
       let maxd = 0;
       for (let i = 0; i < want.length; i++) maxd = Math.max(maxd, Math.abs(rel.data[i] - want[i]));
       assert(maxd < 1e-5, `dull ${dull} k=${k}: max |Δ| = ${maxd}`);
+    }
+  });
+});
+
+describe("region-programs · 第三批 液化（field-copy / liquify-accumulate / liquify-warp）", () => {
+  it("field-copy：偏移搬运，越界 0", () => {
+    const p = port();
+    const src = p.borrowFBO(4, 4, "f32"); fill(src, [0, 0, 0, 0]); setTexel(src, 1, 2, [7, -3, 0, 0]);
+    const dst = p.borrowFBO(8, 8, "f32"); fill(dst, [9, 9, 9, 9]);
+    p.draw({ program: "field-copy", target: dst, uniforms: { u_size: [8, 8], u_offset: [2, 3], u_srcSize: [4, 4] }, textures: { u_src: src } });
+    eqArr(texel(dst, 3, 5), [7, -3, 0, 0], "(1,2)+(2,3)");
+    eqArr(texel(dst, 0, 0), [0, 0, 0, 0], "源外 0");
+    eqArr(texel(dst, 7, 7), [0, 0, 0, 0], "源外 0");
+  });
+  it("liquify-accumulate：push 圈内 smoothstep 累加、圈外原样；reconstruct 乘 1−α", () => {
+    const p = port();
+    const A = p.borrowFBO(8, 8, "f32"); fill(A, [0, 0, 0, 0]); setTexel(A, 7, 7, [5, 5, 0, 0]);
+    const B = p.borrowFBO(8, 8, "f32");
+    const uni = { u_size: [8, 8], u_origin: [0, 0], u_center: [4, 4], u_R: 3, u_strength: 1, u_mode: 0, u_vel: [2, 0] };
+    p.draw({ program: "liquify-accumulate", target: B, uniforms: uni, textures: { u_A: A } });
+    eqArr(texel(B, 4, 4).slice(0, 2), [2, 0], "中心 ff=1 → +vel");
+    const t = 1 - 1 / 3, ff = t * t * (3 - 2 * t);
+    eqArr(texel(B, 5, 4).slice(0, 2), [2 * ff, 0], "r=1", 1e-5);
+    eqArr(texel(B, 7, 4).slice(0, 2), [0, 0], "r=3 不在圈内（严格 <）");
+    eqArr(texel(B, 7, 7).slice(0, 2), [5, 5], "圈外原样");
+    p.draw({ program: "liquify-accumulate", target: B, uniforms: { ...uni, u_mode: 5, u_strength: 0.5 }, textures: { u_A: A } });
+    eqArr(texel(B, 7, 7).slice(0, 2), [5, 5], "reconstruct 圈外原样");
+    fill(A, [4, 2, 0, 0]);
+    p.draw({ program: "liquify-accumulate", target: B, uniforms: { ...uni, u_mode: 5, u_strength: 0.5 }, textures: { u_A: A } });
+    eqArr(texel(B, 4, 4).slice(0, 2), [2, 1], "中心 α=0.5 → ×0.5");
+  });
+  it("liquify-warp：零位移场下四核（nearest/bilinear/bicubic）都是恒等（内容框内逐字节）；框外 0", () => {
+    const p = port();
+    const W0 = p.borrowFBO(12, 12, "u8"); fill(W0, [0, 0, 0, 0]);
+    const rnd = lcg(5);
+    for (let y = 2; y < 10; y++) for (let x = 3; x < 9; x++) setTexel(W0, x, y, [Math.round(rnd() * 255) / 255, Math.round(rnd() * 255) / 255, Math.round(rnd() * 255) / 255, Math.round(rnd() * 255) / 255]);
+    setTexel(W0, 0, 0, [1, 1, 1, 1]);   // 内容框外的脏像素（CPU 快照框外 = 不采）
+    const field = p.borrowFBO(12, 12, "f32"); fill(field, [0, 0, 0, 0]);
+    for (const sample of [0, 1, 2]) {
+      const W = p.borrowFBO(12, 12, "u8"); fill(W, [0.5, 0.5, 0.5, 1]);
+      p.draw({ program: "liquify-warp", target: W, uniforms: { u_docSize: [12, 12], u_fieldOrigin: [0, 0], u_srcRect: [3, 2, 6, 8], u_sample: sample, u_bleed: 2, u_hasSel: 0, u_selOrigin: [0, 0], u_selSize: [1, 1], u_planeSize: [6, 8] }, textures: { u_field: field, u_W0: W0 } });
+      for (let y = 0; y < 12; y++) for (let x = 0; x < 12; x++) {
+        const want = (x >= 3 && x < 9 && y >= 2 && y < 10) ? texel(W0, x, y) : [0, 0, 0, 0];
+        eqArr(texel(W, x, y), want, `sample=${sample} (${x},${y})`, 1e-6);
+      }
     }
   });
 });

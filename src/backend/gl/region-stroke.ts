@@ -19,9 +19,9 @@ import type { GlRoom } from "./gl-room.ts";
 import type { LayerPixels } from "../tiles/tile-layer.ts";
 import { ensureRegionProgram, type RegionProgramId } from "./region-programs.ts";
 
-export type RegionTexFormat = "rgba-f32" | "rgba-u8";
+export type RegionTexFormat = "rgba-f32" | "rgba-u8" | "rgba16f-tex";   // *-tex = 只读上传纹理（upload），不能当 dst
 export interface RegionTex { readonly w: number; readonly h: number; readonly format: RegionTexFormat; }
-interface RegionTexImpl extends RegionTex { fbo: PooledFBO; alive: boolean; }
+interface RegionTexImpl extends RegionTex { fbo: PooledFBO | null; tex: Gl2Texture | null; alive: boolean; }
 
 /** run 的写靶：状态纹理，或 "W"（工作区域本体；配 scissor 只写窗口）。 */
 export type RegionDst = RegionTex | "W";
@@ -54,6 +54,8 @@ export class RegionStroke {
   private _disposed = false;
   /** 叶的锁 α（引擎读；同 StrokeShadow.lockAlpha）。 */
   readonly lockAlpha: boolean;
+  /** 起笔时叶的紧内容框 [x0,y0,x1,y1)（pixels.contentBounds(true)，逐 tile 缓存，µs 级）；null = 空叶。液化的源矩形 / spline 预滤波范围。 */
+  readonly contentBounds: Rect | null;
 
   constructor(room: GlRoom, leafId: number, pixels: LayerPixels, docW: number, docH: number, selMask: SelMaskPlane | null, opts?: { snapshot?: boolean; lockAlpha?: boolean }) {
     if (!room.glctx.caps.floatColorBuffer) {
@@ -65,6 +67,8 @@ export class RegionStroke {
     this.docW = docW;
     this.docH = docH;
     this.lockAlpha = !!opts?.lockAlpha;
+    const cb = pixels.contentBounds(true);
+    this.contentBounds = cb ? [cb.x, cb.y, cb.x + cb.w, cb.y + cb.h] : null;
     ensureRegionProgram(this._port, "region-load");   // 其余 program 在 run() 按需注册（只编当前 variant 要的；预编译见 warmAllRegionPrograms）
     this._W = this._port.borrowFBO(docW, docH, "u8");
     this._load(this._W, pixels);
@@ -103,7 +107,17 @@ export class RegionStroke {
     this._alive();
     const fbo = this._port.borrowFBO(w, h, format === "rgba-u8" ? "u8" : "f32");
     this._port.clearFBO(fbo, [0, 0, 0, 0]);
-    const t: RegionTexImpl = { w, h, format, fbo, alive: true };
+    const t: RegionTexImpl = { w, h, format, fbo, tex: null, alive: true };
+    this._texes.push(t);
+    return t;
+  }
+
+  /** 上传只读纹理（spline 系数平面 rgba16f：CPU 预滤波产物；不能当 run 的 dst）。dispose / free 删除。 */
+  upload(w: number, h: number, data: Float32Array): RegionTex {
+    this._alive();
+    const tex = this._port.createTexture();
+    this._port.uploadTexture(tex, "rgba16f", w, h, data);
+    const t: RegionTexImpl = { w, h, format: "rgba16f-tex", fbo: null, tex, alive: true };
     this._texes.push(t);
     return t;
   }
@@ -113,13 +127,14 @@ export class RegionStroke {
     const impl = t as RegionTexImpl;
     if (!impl.alive) return;
     impl.alive = false;
-    this._port.returnFBO(impl.fbo);
+    if (impl.fbo) this._port.returnFBO(impl.fbo); else if (impl.tex) this._port.deleteTexture(impl.tex);
     this._texes = this._texes.filter((x) => x !== impl);
   }
 
   /** 唯一算子：跑一个 program。dst 与任一采样源同一张 = 响亮 throw（读写冲突，GL 未定义行为）。写 W 时按 scissor 记 dirty。 */
   run(program: RegionProgramId, dst: RegionDst, textures: Record<string, RegionTexRef>, uniforms?: RegionUniforms, scissor?: RegionRect, blend?: Gl2Blend): void {
     this._alive();
+    if (dst !== "W" && !(dst as RegionTexImpl).fbo) throw new Error(`REGION_DST_NOT_RENDERABLE (${program}: upload textures are read-only)`);
     const target = this._resolve(dst) as PooledFBO;
     const texs: Record<string, Gl2TexSource> = {};
     for (const k of Object.keys(textures)) {
@@ -138,7 +153,7 @@ export class RegionStroke {
     if (ref === "selection") { if (!this._sel) throw new Error("REGION_NO_SELECTION (no selection plane on this stroke)"); return this._sel.tex; }
     const t = ref as RegionTexImpl;
     if (!t.alive) throw new Error("REGION_TEX_FREED");
-    return t.fbo;
+    return (t.fbo ?? t.tex)!;
   }
 
   private _markDirty(r: RegionRect): void {
@@ -167,7 +182,7 @@ export class RegionStroke {
   dispose(): void {
     if (this._disposed) return;
     this._disposed = true;
-    for (const t of this._texes) { if (t.alive) { t.alive = false; this._port.returnFBO(t.fbo); } }
+    for (const t of this._texes) { if (t.alive) { t.alive = false; if (t.fbo) this._port.returnFBO(t.fbo); else if (t.tex) this._port.deleteTexture(t.tex); } }
     this._texes = [];
     if (this._W) { this._port.returnFBO(this._W); this._W = null; }
     if (this._W0) { this._port.returnFBO(this._W0); this._W0 = null; }

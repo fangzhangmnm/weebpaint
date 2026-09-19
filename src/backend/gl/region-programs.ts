@@ -25,12 +25,15 @@
 
 import type { Gl2Port } from "../../common/gl2-port.ts";
 import { COMPOSITE_VERT } from "./blend-glsl.ts";
+import { WARP_FUNCS } from "./gl-compositor.ts";
 
 export const REGION_PROGRAM_IDS = [
   "region-load", "region-crop", "smudge-mask", "smudge-absorb",
   "reduce-weighted", "reduce-sum", "divide", "box3", "upsample-bilinear", "smudge-deposit",
   // 第二批（模糊 / 锐化 wash，2026-09-18 同轮；镜像 filters.ts 旧 attachColorBrushBehavior + sharpen-blur.ts bake）
   "wash-coverage", "wash-premult", "wash-box3", "wash-unpremult", "wash-sharpen", "wash-lerp",
+  // 第三批（液化，2026-09-19，总账 #71；镜像 plugins/liquify-engine.ts 旧 CPU 版 = git e4e5aed 前）
+  "field-copy", "liquify-accumulate", "liquify-warp",
 ] as const;
 export type RegionProgramId = typeof REGION_PROGRAM_IDS[number];
 
@@ -473,6 +476,172 @@ void main(){
   o = vec4(src.rgb * wl + d.rgb * wf, na * 255.0) / 255.0;
 }`;
 
+// ============================================================================
+// 第三批：液化（镜像旧 liquify-engine.ts extendStroke (a)(b)(c) + bilinearSample / bicubicSamplePremult / sampleSplinePremult）
+//   位移场 = 区域尺寸 rgba f32（.rg = dx,dy），按笔迹包围盒增长（field-copy 搬旧场）；每事件：accumulate B←A（scissor footprint）
+//   → field-copy A←B（同 scissor）→ 每叶 liquify-warp 写 W（scissor footprint，全写不 discard——CPU 整块 putImageData）。
+//   采样核按液化自己的 CPU 原式（bilinear 越界 tap=0 而非 clamp，与 GL warp 采样器不同，故不借 sampleSrc）；spline 借 WARP_FUNCS.sampleSpline。
+//   坐标：像素 = 整数 doc 坐标（无 +0.5，CPU 同）；源矩形 u_srcRect = 叶起笔内容框（CPU 快照 bbox：框外 tap = 0 / nearest 不写）。
+// ============================================================================
+
+// ---- field-copy：dst(q) = src(q − offset)（越界 0）——场增长搬旧场 / B→A 拷回 ----
+const FIELD_COPY_FRAG = HEAD + `
+uniform vec2 u_size;
+uniform vec2 u_offset;
+uniform vec2 u_srcSize;
+uniform sampler2D u_src;
+void main(){
+  ivec2 q = ivec2(floor(v_uv * u_size));
+  ivec2 s = q - ivec2(u_offset);
+  if (s.x < 0 || s.y < 0 || s.x >= int(u_srcSize.x) || s.y >= int(u_srcSize.y)) { o = vec4(0.0); return; }
+  o = texelFetch(u_src, s, 0);
+}`;
+
+// ---- liquify-accumulate：圈内 d += 模式位移（reconstruct：d *= 1−α）；圈外原样 ----
+const LIQUIFY_ACCUMULATE_FRAG = HEAD + `
+uniform vec2 u_size;      // 场尺寸
+uniform vec2 u_origin;    // 场原点（doc 整数）
+uniform vec2 u_center;    // (cx,cy) doc 浮点
+uniform float u_R;
+uniform float u_strength;
+uniform int u_mode;       // 0 push 1 pinch 2 bloat 3 twirl 4 twirlCW 5 reconstruct
+uniform vec2 u_vel;
+uniform sampler2D u_A;
+void main(){
+  ivec2 q = ivec2(floor(v_uv * u_size));
+  vec2 d = texelFetch(u_A, q, 0).rg;
+  float wx = float(q.x) + u_origin.x, wy = float(q.y) + u_origin.y;
+  float dxc = wx - u_center.x, dyc = wy - u_center.y;
+  float r2 = dxc * dxc + dyc * dyc;
+  float R2 = u_R * u_R;
+  if (r2 < R2) {
+    float r = sqrt(r2);
+    float t = 1.0 - r / u_R;
+    float ff = t * t * (3.0 - 2.0 * t);
+    if (u_mode == 5) {
+      float alpha = min(1.0, ff * u_strength);
+      d *= (1.0 - alpha);
+    } else {
+      vec2 dd;
+      if (u_mode == 1) dd = vec2(-dxc * ff * u_strength, -dyc * ff * u_strength);
+      else if (u_mode == 2) dd = vec2(dxc * ff * u_strength, dyc * ff * u_strength);
+      else if (u_mode == 3) dd = vec2(-dyc * ff * u_strength, dxc * ff * u_strength);
+      else if (u_mode == 4) dd = vec2(dyc * ff * u_strength, -dxc * ff * u_strength);
+      else dd = vec2(u_vel.x * ff * u_strength, u_vel.y * ff * u_strength);
+      d += dd;
+    }
+  }
+  o = vec4(d, 0.0, 0.0);
+}`;
+
+// ---- liquify-warp：W(p) = 采样 W0 于 p − d(p)（选区 / bleed 三模式 / 四核；字节单位）----
+const LIQUIFY_WARP_FRAG = HEAD + WARP_FUNCS + `
+uniform vec2 u_docSize;
+uniform vec2 u_fieldOrigin;
+uniform sampler2D u_field;
+uniform sampler2D u_W0;
+uniform vec4 u_srcRect;   // 叶起笔内容框 (x,y,w,h)：框外 tap = 0；nearest 框外不写（=0）
+uniform int u_sample;     // 0 nearest 1 bilinear 2 bicubic 3 spline
+uniform int u_bleed;      // 0 import 1 clip 2 edge
+uniform int u_hasSel;
+uniform sampler2D u_sel;
+uniform vec2 u_selOrigin;
+uniform vec2 u_selSize;
+uniform sampler2D u_plane;    // spline 系数平面（rgba16f，PAD=8）
+uniform vec2 u_planeSize;     // 逻辑尺寸 = 内容框 w,h
+float rnd(float x){ return floor(x + 0.5); }
+bool cellIn(int ix, int iy){
+  int sx = ix - int(u_selOrigin.x), sy = iy - int(u_selOrigin.y);
+  if (sx < 0 || sy < 0 || sx >= int(u_selSize.x) || sy >= int(u_selSize.y)) return false;
+  return texelFetch(u_sel, ivec2(sx, sy), 0).r * 255.0 >= 127.5;
+}
+bool inMask(float px, float py){ return cellIn(int(rnd(px)), int(rnd(py))); }
+bool srcFootprintIn(float fsx, float fsy){
+  int ix = int(floor(fsx)), iy = int(floor(fsy));
+  return cellIn(ix, iy) && cellIn(ix + 1, iy) && cellIn(ix, iy + 1) && cellIn(ix + 1, iy + 1);
+}
+bool inRect(int x, int y){ return x >= int(u_srcRect.x) && x < int(u_srcRect.x + u_srcRect.z) && y >= int(u_srcRect.y) && y < int(u_srcRect.y + u_srcRect.w); }
+vec4 fetchB(int x, int y){ return texelFetch(u_W0, ivec2(x, y), 0) * 255.0; }   // 字节单位（调用方保证 inRect）
+float crK(float t){ float A = -0.5; float at = abs(t); if (at < 1.0) return (A + 2.0) * at * at * at - (A + 3.0) * at * at + 1.0; if (at < 2.0) return A * at * at * at - 5.0 * A * at * at + 8.0 * A * at - 4.0 * A; return 0.0; }
+void main(){
+  ivec2 p = ivec2(floor(v_uv * u_docSize));
+  int wx = p.x, wy = p.y;
+  vec2 d = texelFetch(u_field, p - ivec2(u_fieldOrigin), 0).rg;
+  float tdx = d.x, tdy = d.y;
+  float srcX = float(wx) - tdx, srcY = float(wy) - tdy;
+  if (u_hasSel == 1) {
+    if (!inMask(float(wx), float(wy))) { srcX = float(wx); srcY = float(wy); }
+    else if (u_bleed != 0 && !srcFootprintIn(srcX, srcY)) {
+      if (u_bleed == 1) { srcX = float(wx); srcY = float(wy); }
+      else {
+        float len = sqrt(tdx * tdx + tdy * tdy);
+        if (len >= 1e-3) {
+          float dirX = -tdx / len, dirY = -tdy / len;
+          int maxK = min(int(ceil(len)), 4096);
+          int sxi = wx, syi = wy;
+          for (int k = 1; k <= maxK; k++) {
+            int rxi = int(rnd(float(wx) + dirX * float(k)));
+            int ryi = int(rnd(float(wy) + dirY * float(k)));
+            if (!cellIn(rxi, ryi)) break;
+            sxi = rxi; syi = ryi;
+          }
+          srcX = float(sxi); srcY = float(syi);
+        } else { srcX = float(wx); srcY = float(wy); }
+      }
+    }
+  }
+  if (u_sample == 3) {
+    o = sampleSpline(u_plane, u_planeSize, srcX - u_srcRect.x, srcY - u_srcRect.y);
+    return;
+  }
+  if (u_sample == 0) {
+    int nx = int(rnd(srcX)), ny = int(rnd(srcY));
+    o = inRect(nx, ny) ? fetchB(nx, ny) / 255.0 : vec4(0.0);
+    return;
+  }
+  int ix = int(floor(srcX)), iy = int(floor(srcY));
+  if (u_sample == 1) {
+    float fx = srcX - float(ix), fy = srcY - float(iy);
+    float pr = 0.0, pg = 0.0, pb = 0.0, pa = 0.0;
+    float wts[4]; wts[0] = (1.0 - fx) * (1.0 - fy); wts[1] = fx * (1.0 - fy); wts[2] = (1.0 - fx) * fy; wts[3] = fx * fy;
+    ivec2 offs[4]; offs[0] = ivec2(0, 0); offs[1] = ivec2(1, 0); offs[2] = ivec2(0, 1); offs[3] = ivec2(1, 1);
+    for (int k = 0; k < 4; k++) {
+      float wt = wts[k]; int px = ix + offs[k].x, py = iy + offs[k].y;
+      if (wt == 0.0 || !inRect(px, py)) continue;
+      vec4 c = fetchB(px, py);
+      float af = (c.a / 255.0) * wt;
+      pr += c.r * af; pg += c.g * af; pb += c.b * af; pa += c.a * wt;
+    }
+    if (pa < 1e-4) { o = vec4(0.0); return; }
+    float afSum = pa / 255.0;
+    o = vec4(pr / afSum, pg / afSum, pb / afSum, pa) / 255.0;
+    return;
+  }
+  // bicubic（Catmull-Rom + 反振铃 + round）
+  float r = 0.0, g = 0.0, b = 0.0, a = 0.0;
+  for (int j = 0; j < 4; j++) {
+    int yy = iy - 1 + j; if (!(yy >= int(u_srcRect.y) && yy < int(u_srcRect.y + u_srcRect.w))) continue;
+    float wy = crK(float(yy) - srcY);
+    if (wy == 0.0) continue;
+    for (int i = 0; i < 4; i++) {
+      int xx = ix - 1 + i; if (!(xx >= int(u_srcRect.x) && xx < int(u_srcRect.x + u_srcRect.z))) continue;
+      float wgt = crK(float(xx) - srcX) * wy;
+      if (wgt == 0.0) continue;
+      vec4 c = fetchB(xx, yy);
+      float av = c.a;
+      r += c.r * av * wgt; g += c.g * av * wgt; b += c.b * av * wgt; a += av * wgt;
+    }
+  }
+  float n00 = inRect(ix, iy) ? fetchB(ix, iy).a : 0.0;
+  float n10 = inRect(ix + 1, iy) ? fetchB(ix + 1, iy).a : 0.0;
+  float n01 = inRect(ix, iy + 1) ? fetchB(ix, iy + 1).a : 0.0;
+  float n11 = inRect(ix + 1, iy + 1) ? fetchB(ix + 1, iy + 1).a : 0.0;
+  float acl = max(min(min(n00, n10), min(n01, n11)), min(max(max(n00, n10), max(n01, n11)), a));
+  if (acl != a && a > 1e-4) { float sc = acl / a; r *= sc; g *= sc; b *= sc; a = acl; }
+  if (a < 1e-4) { o = vec4(0.0); return; }
+  o = vec4(rnd(clamp(r / a, 0.0, 255.0)), rnd(clamp(g / a, 0.0, 255.0)), rnd(clamp(b / a, 0.0, 255.0)), rnd(clamp(a, 0.0, 255.0))) / 255.0;
+}`;
+
 const FRAGS: Record<RegionProgramId, string> = {
   "region-load": REGION_LOAD_FRAG,
   "region-crop": REGION_CROP_FRAG,
@@ -490,6 +659,9 @@ const FRAGS: Record<RegionProgramId, string> = {
   "wash-unpremult": WASH_UNPREMULT_FRAG,
   "wash-sharpen": WASH_SHARPEN_FRAG,
   "wash-lerp": WASH_LERP_FRAG,
+  "field-copy": FIELD_COPY_FRAG,
+  "liquify-accumulate": LIQUIFY_ACCUMULATE_FRAG,
+  "liquify-warp": LIQUIFY_WARP_FRAG,
 };
 
 /** 确保 id 已在 port 注册（幂等；SoftGl2Port 在此核对 CPU 孪生，缺 = throw）。 */

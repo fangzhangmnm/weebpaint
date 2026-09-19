@@ -57,7 +57,7 @@ void main(){
 // GPU warp 共用 GLSL：逐 dst 像素逆单应性 gather + 手写采样器（nearest/bilinear/bicubic），**逐位复刻
 //   floating-transform 的 CPU 采样器**（golden 对拍）。WARP_FRAG（live 合成）与 WARP_BAKE_FRAG（commit 烤定，
 //   输出 straight）共用，零漂移。源纹理存**直值**（typed array verbatim 上传），texelFetch 整数 texel。
-const WARP_FUNCS = `
+export const WARP_FUNCS = `   // 2026-09-19 export：region-programs 的 liquify-warp 复用 sampleSpline（B 样条保锐核）
 float cubicK(float t){
   float a = -0.5;
   float at = abs(t);
