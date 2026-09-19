@@ -35,6 +35,11 @@ import type { SplinePlane } from "../../src/backend/algorithms/bspline.ts";
 import { rotspriteUpscale } from "../../src/backend/algorithms/rotsprite.ts";
 import type { U8Plane } from "../../src/backend/algorithms/rotsprite.ts";
 import { WpReferenceWindow } from "../../src/frontend/reference-window.ts";
+// 2026-09-18 区域程序（手指 / wash）三方 golden 的第三方：真 GL vs SoftGl（第一方 = 旧 CPU 引擎 fixture，在 node 的 smudge-golden.test）。
+import { SmudgeEngine } from "../../src/plugins/smudge-engine.ts";
+import { SharpenBlurFilter } from "../../src/plugins/sharpen-blur.ts";
+import { gpuLayer } from "../region-target.mjs";
+import { CASES, DOC_W, DOC_H, buildImage, runCase, compareBytes } from "../smudge-golden-cases.mjs";
 
 // ---- CPU warp 参照（golden 基准）：v355 从 src/floating-transform 归档进 harness（运行时单一 GPU SSoT；
 //   这份 CPU 逐像素逆单应性 + 采样器只在测试里当 GPU warp 的对照基准，不在产品路径）。verbatim 复刻原实现，
@@ -1558,6 +1563,40 @@ async function referenceComponentCheck(add: Add): Promise<void> {
   }
 }
 
+// ---- 区域程序（2026-09-18）：真 GL vs SoftGl2Port 同一驱动同一输入 ±2/255（GLSL ↔ CPU 孪生防漂移锚；ADR-0009 决定 5 三方 golden 之一）----
+//   手指：4 个 golden 用例（srgb / dull 中段 / spectral paint / 选区）；wash：模糊 -60 与锐化 +50 各一笔（W₀ 快照路径）。
+function regionParity(glctx: BrowserGl2Port, add: Add): void {
+  const soft = new SoftGl2Port();
+  type GL = ReturnType<typeof gpuLayer>;
+  const pick = ["smear-srgb", "dull-mid-0.5", "paint-spectral", "smear-selection"];
+  for (const name of pick) {
+    const c = CASES.find((x: { name: string }) => x.name === name)!;
+    const Lg: GL = gpuLayer(DOC_W, DOC_H, { port: glctx, slices: 8 }); Lg.buf.set(buildImage()); runCase(new SmudgeEngine(), Lg, c);
+    const Ls: GL = gpuLayer(DOC_W, DOC_H, { port: soft, slices: 8 }); Ls.buf.set(buildImage()); runCase(new SmudgeEngine(), Ls, c);
+    const r = compareBytes(Lg.buf, Ls.buf, 2);
+    add(`region:smudge ${name} 真GL vs SoftGl ±2`, r.count === 0, `max|Δ|=${r.maxDiff} over=${r.count}`);
+    Lg.dispose(); Ls.dispose();
+  }
+  const washCase = (amount: number, label: string) => {
+    const mk = (port: Gl2Port): GL => {
+      const L: GL = gpuLayer(140, 60, { port, slices: 8, snapshot: true });
+      for (let y = 0; y < 60; y++) for (let x = 0; x < 140; x++) { const i = (y * 140 + x) * 4; L.buf[i] = (x * 7) & 255; L.buf[i + 1] = (y * 13) & 255; L.buf[i + 2] = ((x ^ y) * 5) & 255; L.buf[i + 3] = x < 120 ? 255 : 0; }
+      const rs = L.open();
+      const st = SharpenBlurFilter.beginBrushStroke([rs], { amount }, { size: 24, hardness: 0.5, flow: 0.8, spacing: 0.1 }, null, 30, 30, 1);
+      for (let k = 1; k <= 80; k++) { SharpenBlurFilter.extendBrushStamp(st, 30 + k, 30 + Math.sin(k / 5) * 6, 1); if (k % 9 === 0) SharpenBlurFilter.flushDirty(st); }
+      SharpenBlurFilter.endBrushStroke(st);
+      L.close(rs);
+      return L;
+    };
+    const Lg = mk(glctx), Ls = mk(soft);
+    const r = compareBytes(Lg.buf, Ls.buf, 2);
+    add(`region:wash ${label} 真GL vs SoftGl ±2`, r.count === 0, `max|Δ|=${r.maxDiff} over=${r.count}`);
+    Lg.dispose(); Ls.dispose();
+  };
+  washCase(-60, "模糊 -60");
+  washCase(50, "锐化 +50");
+}
+
 async function run(): Promise<{ ok: boolean; checks: Check[]; error: string | null }> {
   const checks: Check[] = [];
   const add: Add = (name, ok, detail = "") => checks.push({ name, ok, detail });
@@ -1650,6 +1689,7 @@ async function run(): Promise<{ ok: boolean; checks: Check[]; error: string | nu
   try { warpClipParity(glctx, add); } catch (e) { add("warpclip parity", false, String(e)); }
   try { mergeDownParity(glctx, add); } catch (e) { add("mergedown parity", false, String(e)); }
   try { softTripartite(glctx, add); } catch (e) { add("soft tripartite", false, String(e)); }
+  try { regionParity(glctx, add); } catch (e) { add("region parity", false, String(e)); }
   try { arenaAccounting(glctx, add); } catch (e) { add("arena accounting", false, String(e)); }
   try { await referenceComponentCheck(add); } catch (e) { add("reference component", false, String(e)); }
 

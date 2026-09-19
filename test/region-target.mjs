@@ -8,8 +8,8 @@ import { RegionStroke } from "../src/backend/gl/region-stroke.ts";
 
 export function gpuLayer(docW, docH, opts = {}) {
   const buf = new Uint8ClampedArray(docW * docH * 4);
-  const port = new SoftGl2Port();
-  const room = new GlRoom(port, 1024);
+  const port = opts.port ?? new SoftGl2Port();          // 传真 GL port（gl-smoke harness）→ 同一套驱动跑真 WebGL2
+  const room = new GlRoom(port, opts.slices ?? 64);   // 64 tile 够测试 doc；真 GL 下 arena 是预分配的，别开大
   let pixels = null;
   const L = {
     docW, docH, buf, port, room,

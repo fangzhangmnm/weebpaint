@@ -141,10 +141,7 @@ export function makeByteTarget(buf, docW = DOC_W, docH = DOC_H) {
   };
 }
 
-// ---- 编解码（fixture 里存整图：deflateRaw + base64）----
-import { deflateRawSync, inflateRawSync } from "node:zlib";
-export function encodeBytes(u8) { return Buffer.from(deflateRawSync(Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength))).toString("base64"); }
-export function decodeBytes(b64) { const b = inflateRawSync(Buffer.from(b64, "base64")); return new Uint8ClampedArray(b.buffer, b.byteOffset, b.byteLength); }
+// （fixture 编解码 encodeBytes/decodeBytes 用 node:zlib，住 smudge-golden.test.mjs——本模块保持纯 JS，gl-smoke harness 也要 bundle 它。）
 
 /** 逐字节比较：返回 {maxDiff, count(>tol), first(index)}。 */
 export function compareBytes(a, b, tol) {

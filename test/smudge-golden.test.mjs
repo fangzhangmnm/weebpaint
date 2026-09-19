@@ -4,7 +4,9 @@
 import { describe, it, assert } from "./runner.mjs";
 import { readFileSync } from "node:fs";
 import { SmudgeEngine } from "../src/plugins/smudge-engine.ts";
-import { CASES, DOC_W, DOC_H, buildImage, runCase, decodeBytes, compareBytes, rectContains } from "./smudge-golden-cases.mjs";
+import { CASES, DOC_W, DOC_H, buildImage, runCase, compareBytes, rectContains } from "./smudge-golden-cases.mjs";
+import { inflateRawSync } from "node:zlib";
+function decodeBytes(b64) { const b = inflateRawSync(Buffer.from(b64, "base64")); return new Uint8ClampedArray(b.buffer, b.byteOffset, b.byteLength); }
 import { gpuLayer } from "./region-target.mjs";
 
 const GOLDEN = JSON.parse(readFileSync(new URL("./fixtures/smudge-golden.json", import.meta.url), "utf8"));
