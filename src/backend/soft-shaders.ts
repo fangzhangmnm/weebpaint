@@ -14,6 +14,7 @@
 
 import type { BlendMode } from "../common/blend-modes.ts";
 import { blendChannel } from "../common/blend-modes.ts";
+import { mixPremultIntoExact, type MixSpace } from "./algorithms/color-mix.ts";
 
 // ---- CPU 程序的执行环境（soft-gl2-port 组好递入）----
 // 纹理已解析成统一读面；目标写入（含 blend/量化）由 soft-gl2-port 的 write 回调收口。
@@ -418,6 +419,247 @@ const warpbake: CpuDraw = (c) => {
   });
 };
 
+
+// ============================================================================
+// 区域程序孪生（镜像 backend/gl/region-programs.ts；created 2026-09-18 by Claude Fable 5.1）
+//   B×B 窗口目标：GLSL q = floor(v_uv·u_size) 且 vw = B → q ≡ (px,py)，这里直接用 px,py。
+//   doc 尺寸目标（W）：GLSL p = floor(v_uv·u_docSize) 且 vw = docW → p ≡ (px,py)。
+//   混色 = mixPremultIntoExact（pow 版，与 GLSL mixPremult 同式；u_space 0=srgb 1=oklab 2=spectral）。
+// ============================================================================
+const MIX_SPACES: MixSpace[] = ["srgb", "oklab", "spectral"];
+function mixP(out: Float32Array, a: Float32Array, b: Float32Array, t: number, space: number): void {
+  mixPremultIntoExact(out, 0, a, 0, b, 0, t, MIX_SPACES[space] ?? "srgb");
+}
+const outsideDoc = (x: number, y: number, docW: number, docH: number): boolean => x < 0 || y < 0 || x >= docW || y >= docH;
+
+// ---- region-load（镜像 REGION_LOAD_FRAG）----
+const regionLoad: CpuDraw = (c) => {
+  const [docW, docH] = uv2(c, "u_docSize");
+  const arr = c.arena("u_arr"), idx = c.tex("u_srcIndex");
+  c.forEachPixel((px, py, out) => {
+    const docX = ((px + 0.5) / c.vw) * docW, docY = ((py + 0.5) / c.vh) * docH;
+    sampleTiled(idx, arr, docX, docY, out);
+    return true;
+  });
+};
+
+// ---- region-window（镜像 REGION_WINDOW_FRAG）----
+const regionWindow: CpuDraw = (c) => {
+  const [ox, oy] = uv2(c, "u_origin");
+  const [docW, docH] = uv2(c, "u_docSize");
+  const W = c.tex("u_W");
+  const s = new Float32Array(4);
+  c.forEachPixel((px, py, out) => {
+    const X = ox + px, Y = oy + py;
+    if (outsideDoc(X, Y, docW, docH) || !W) { out.fill(0); return true; }
+    W.fetch(X, Y, s);
+    out[0] = s[0] * s[3]; out[1] = s[1] * s[3]; out[2] = s[2] * s[3]; out[3] = s[3];
+    return true;
+  });
+};
+
+// ---- smudge-mask（镜像 SMUDGE_MASK_FRAG）----
+const smudgeMask: CpuDraw = (c) => {
+  const [ox, oy] = uv2(c, "u_origin");
+  const [docW, docH] = uv2(c, "u_docSize");
+  const [cx, cy] = uv2(c, "u_center");
+  const r = u1(c, "u_r"), innerR = u1(c, "u_innerR");
+  const hasSel = u1(c, "u_hasSel");
+  const sel = c.tex("u_sel");
+  const [sox, soy] = uv2(c, "u_selOrigin");
+  const [ssw, ssh] = uv2(c, "u_selSize");
+  const t = new Float32Array(4);
+  c.forEachPixel((px, py, out) => {
+    out[0] = 0; out[1] = 0; out[2] = 0; out[3] = 1;
+    const X = ox + px, Y = oy + py;
+    if (outsideDoc(X, Y, docW, docH)) return true;
+    const ddx = X + 0.5 - cx, ddy = Y + 0.5 - cy;
+    const dist = Math.sqrt(ddx * ddx + ddy * ddy);
+    if (dist >= r) return true;
+    let m = 1;
+    const decay = r - innerR;
+    if (decay > 0 && dist > innerR) { const u = (dist - innerR) / decay; m = 1 - u * u * (3 - 2 * u); }
+    if (hasSel === 1) {
+      const sx = X - sox, sy = Y - soy;
+      if (sx < 0 || sy < 0 || sx >= ssw || sy >= ssh || !sel) m = 0;
+      else { sel.fetch(sx, sy, t); m *= t[0]; }
+    }
+    out[0] = m;
+    return true;
+  });
+};
+
+// ---- smudge-absorb（镜像 SMUDGE_ABSORB_FRAG）----
+const smudgeAbsorb: CpuDraw = (c) => {
+  const [ox, oy] = uv2(c, "u_origin");
+  const [docW, docH] = uv2(c, "u_docSize");
+  const clip = u1(c, "u_clip"), space = u1(c, "u_space"), rho = u1(c, "u_rho");
+  const A = c.tex("u_A"), cur = c.tex("u_cur");
+  const a4 = new Float32Array(4), c4 = new Float32Array(4);
+  c.forEachPixel((px, py, out) => {
+    if (A) A.fetch(px, py, a4); else a4.fill(0);
+    if (clip === 1 && outsideDoc(ox + px, oy + py, docW, docH)) { out.set(a4); return true; }
+    if (cur) cur.fetch(px, py, c4); else c4.fill(0);
+    mixP(out, c4, a4, rho, space);
+    return true;
+  });
+};
+
+// ---- reduce-weighted（镜像 REDUCE_WEIGHTED_FRAG）----
+const reduceWeighted: CpuDraw = (c) => {
+  const [k] = uv2(c, "u_size");
+  const B = u1(c, "u_B");
+  const which = u1(c, "u_which");
+  const src = c.tex("u_src"), mask = c.tex("u_mask");
+  const scale = k / B;
+  const m4 = new Float32Array(4), s4 = new Float32Array(4);
+  c.forEachPixel((cx, cy, out) => {
+    const x0 = Math.max(0, Math.floor(cx / scale) - 1), y0 = Math.max(0, Math.floor(cy / scale) - 1);
+    const x1 = cx === k - 1 ? B : Math.min(B, Math.ceil((cx + 1) / scale) + 1);
+    const y1 = cy === k - 1 ? B : Math.min(B, Math.ceil((cy + 1) / scale) + 1);
+    out.fill(0);
+    for (let y = y0; y < y1; y++) {
+      if (Math.min(k - 1, Math.floor(y * scale)) !== cy) continue;
+      for (let x = x0; x < x1; x++) {
+        if (Math.min(k - 1, Math.floor(x * scale)) !== cx) continue;
+        if (!mask) continue;
+        mask.fetch(x, y, m4);
+        const m = m4[0];
+        if (m <= 0) continue;
+        if (which === 0) { if (src) { src.fetch(x, y, s4); out[0] += s4[0] * m; out[1] += s4[1] * m; out[2] += s4[2] * m; out[3] += s4[3] * m; } }
+        else out[0] += m;
+      }
+    }
+    return true;
+  });
+};
+
+// ---- reduce-sum（镜像 REDUCE_SUM_FRAG）----
+const reduceSum: CpuDraw = (c) => {
+  const [w, h] = uv2(c, "u_srcSize");
+  const src = c.tex("u_src");
+  const t = new Float32Array(4);
+  c.forEachPixel((_px, _py, out) => {
+    out.fill(0);
+    if (!src) return true;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { src.fetch(x, y, t); out[0] += t[0]; out[1] += t[1]; out[2] += t[2]; out[3] += t[3]; }
+    return true;
+  });
+};
+
+// ---- divide（镜像 DIVIDE_FRAG）----
+const divide: CpuDraw = (c) => {
+  const sum = c.tex("u_sum"), w = c.tex("u_w");
+  const s = new Float32Array(4), t = new Float32Array(4);
+  c.forEachPixel((_px, _py, out) => {
+    if (sum) sum.fetch(0, 0, s); else s.fill(0);
+    if (w) w.fetch(0, 0, t); else t.fill(0);
+    const ww = t[0];
+    if (ww <= 0) { out.fill(0); return true; }
+    out[0] = s[0] / ww; out[1] = s[1] / ww; out[2] = s[2] / ww; out[3] = s[3] / ww;
+    return true;
+  });
+};
+
+// ---- box3（镜像 BOX3_FRAG）----
+const box3: CpuDraw = (c) => {
+  const [k] = uv2(c, "u_size");
+  const sum = c.tex("u_sum"), w = c.tex("u_w");
+  const s = new Float32Array(4), t = new Float32Array(4);
+  c.forEachPixel((cx, cy, out) => {
+    out.fill(0);
+    let cnt = 0;
+    for (let dy = -1; dy <= 1; dy++) {
+      const yy = cy + dy; if (yy < 0 || yy >= k) continue;
+      for (let dx = -1; dx <= 1; dx++) {
+        const xx = cx + dx; if (xx < 0 || xx >= k) continue;
+        if (!w || !sum) continue;
+        w.fetch(xx, yy, t);
+        const ww = t[0];
+        if (ww <= 0) continue;
+        sum.fetch(xx, yy, s);
+        out[0] += s[0] / ww; out[1] += s[1] / ww; out[2] += s[2] / ww; out[3] += s[3] / ww;
+        cnt++;
+      }
+    }
+    if (cnt > 0) { out[0] /= cnt; out[1] /= cnt; out[2] /= cnt; out[3] /= cnt; } else out.fill(0);
+    return true;
+  });
+};
+
+// ---- upsample-bilinear（镜像 UPSAMPLE_BILINEAR_FRAG）----
+const upsampleBilinear: CpuDraw = (c) => {
+  const [B] = uv2(c, "u_size");
+  const k = u1(c, "u_k");
+  const box = c.tex("u_box"), w = c.tex("u_w"), mask = c.tex("u_mask");
+  const t = new Float32Array(4), b4 = new Float32Array(4);
+  const boxLive = (ii: number, jj: number): boolean => {
+    if (!w) return false;
+    for (let dy = -1; dy <= 1; dy++) { const yy = jj + dy; if (yy < 0 || yy >= k) continue;
+      for (let dx = -1; dx <= 1; dx++) { const xx = ii + dx; if (xx < 0 || xx >= k) continue;
+        w.fetch(xx, yy, t); if (t[0] > 0) return true; } }
+    return false;
+  };
+  const scale = k / B;
+  c.forEachPixel((px, py, out) => {
+    out.fill(0);
+    if (!mask) return true;
+    mask.fetch(px, py, t);
+    if (t[0] <= 0) return true;
+    const u = (px + 0.5) * scale - 0.5, v = (py + 0.5) * scale - 0.5;
+    const fu = u - Math.floor(u), fv = v - Math.floor(v);
+    const i0 = Math.floor(u), j0 = Math.floor(v);
+    let wt = 0;
+    for (let dj = 0; dj <= 1; dj++) {
+      const jj = Math.min(k - 1, Math.max(0, j0 + dj)); const wv = dj === 1 ? fv : 1 - fv;
+      for (let di = 0; di <= 1; di++) {
+        const ii = Math.min(k - 1, Math.max(0, i0 + di)); const ww = (di === 1 ? fu : 1 - fu) * wv;
+        if (ww <= 0 || !boxLive(ii, jj) || !box) continue;
+        box.fetch(ii, jj, b4);
+        out[0] += b4[0] * ww; out[1] += b4[1] * ww; out[2] += b4[2] * ww; out[3] += b4[3] * ww; wt += ww;
+      }
+    }
+    if (wt > 0) { out[0] /= wt; out[1] /= wt; out[2] /= wt; out[3] /= wt; } else out.fill(0);
+    return true;
+  });
+};
+
+// ---- smudge-deposit（镜像 SMUDGE_DEPOSIT_FRAG；目标 W = u8，soft-gl2-port 逐写量化 = round(v·255)）----
+const smudgeDeposit: CpuDraw = (c) => {
+  const [ox, oy] = uv2(c, "u_origin");
+  const strength = u1(c, "u_strength"), colorRate = u1(c, "u_colorRate"), dilEff = u1(c, "u_dilEff");
+  const lock = u1(c, "u_lock"), space = u1(c, "u_space"), Psel = u1(c, "u_Psel");
+  const paintU = c.uniforms["u_paint"] as number[] | Float32Array | undefined;
+  const paint = new Float32Array(paintU ? [paintU[0], paintU[1], paintU[2], paintU[3]] : [0, 0, 0, 1]);
+  const curT = c.tex("u_cur"), maskT = c.tex("u_mask"), PT = c.tex("u_P"), avgT = c.tex("u_avg");
+  const m4 = new Float32Array(4), cur = new Float32Array(4), P = new Float32Array(4), tmp = new Float32Array(4), n = new Float32Array(4), avg = new Float32Array(4);
+  c.forEachPixel((px, py, out) => {
+    const qx = px - ox, qy = py - oy;
+    if (!maskT) return false;
+    maskT.fetch(qx, qy, m4);
+    const m = m4[0];
+    if (m <= 0) return false;
+    const a = m * strength;
+    if (curT) curT.fetch(qx, qy, cur); else cur.fill(0);
+    const ca = cur[3];
+    if (lock === 1 && ca <= 0) return false;
+    if (PT) { if (Psel === 1) PT.fetch(0, 0, P); else PT.fetch(qx, qy, P); } else P.fill(0);
+    if (colorRate > 0) { mixP(tmp, P, paint, colorRate, space); P.set(tmp); }
+    let dilF = 1;
+    if (dilEff > 0) { if (avgT) avgT.fetch(0, 0, avg); else avg.fill(0); const avgA = Math.min(1, Math.max(0, avg[3])); dilF = 1 - dilEff * (1 - avgA); }
+    if (dilF < 1) { P[0] *= dilF; P[1] *= dilF; P[2] *= dilF; P[3] *= dilF; }
+    mixP(n, cur, P, a, space);
+    let na = n[3];
+    let nr = n[0], ng = n[1], nb = n[2];
+    if (lock === 1) {
+      if (na > 1e-6) { const f = ca / na; nr *= f; ng *= f; nb *= f; } else { nr = ng = nb = 0; }
+      na = ca;
+    }
+    if (na <= 1e-6) { out.fill(0); } else { out[0] = nr / na; out[1] = ng / na; out[2] = nb / na; out[3] = na; }
+    return true;
+  });
+};
+
 // ---- 注册表 ----
 // GPU-only 显式登记（屏显专属，headless 不需要；SoftGl2Port draw 到这些名字响亮 throw）。
 const GPU_ONLY = new Set<string>(["present-affine", "present-affine-over", "screen-bg"]);
@@ -431,6 +673,17 @@ export function resolveCpuProgram(name: string): CpuDraw | "gpu-only" | null {
   if (name === "stamp-color") return stampColor;
   if (name === "warp") return warp;
   if (name === "warpbake") return warpbake;
+  // 区域程序（region-programs.ts；2026-09-18）
+  if (name === "region-load") return regionLoad;
+  if (name === "region-window") return regionWindow;
+  if (name === "smudge-mask") return smudgeMask;
+  if (name === "smudge-absorb") return smudgeAbsorb;
+  if (name === "reduce-weighted") return reduceWeighted;
+  if (name === "reduce-sum") return reduceSum;
+  if (name === "divide") return divide;
+  if (name === "box3") return box3;
+  if (name === "upsample-bilinear") return upsampleBilinear;
+  if (name === "smudge-deposit") return smudgeDeposit;
   if (name.startsWith("composite:")) {
     const parts = name.split(":");   // composite:<mode>:<src>[:<ovMode>]
     const mode = parts[1] as BlendMode;
