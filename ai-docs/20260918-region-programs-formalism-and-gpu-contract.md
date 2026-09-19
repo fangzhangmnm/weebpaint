@@ -1,6 +1,6 @@
 # 区域程序（Region Programs）：手指族的统一数学形式 + 窄 GPU 契约提案
 
-> 作者：Claude Fable 5.1（claude-fable-5-1）· created 20260918 · as-of dev v0.14.16 / 2026-09-18 · 状态：**提案，等 user「没问题」再动码**（brainstorm ≠ decision）。
+> 作者：Claude Fable 5.1（claude-fable-5-1）· created 20260918 · as-of dev v0.14.16 / 2026-09-18 · 状态：**提案已全部拍板（§4 四条），2026-09-18 开工**；实现中形状变了回写提案 .h。
 > 提案 .h = `20260918-region-programs-proposal.d.ts`（同目录）；现状 .h = `api/`（v0.14.16 重生成，本文 §2 摘录）。
 >
 > 出处（user 2026-09-18 原话，本 session）：「convert the finger tools into GPU, perhaps use that fluid dynamics we proposed. first pick up our old discussion before taking actions」「以及对于血迹和拿铁拉花来说其实感觉现在也够用。先做已有的的数学形式化，以后做创新。目的是一个很窄的gpu的接口加速」「不过也不用把未来的脑洞堵死。总之答案就是half lagrangian?」「**逐 dab 精确翻译 同意**」「（增量 vs wash）这个是ux应该不动数学引擎」；第二轮：「模糊 / 锐化 wash 本轮顺路搬 yes」「显示走『overlay replace』也许可以」「缺席时手指族响亮不可用 咱们不是有cpu fallback吗？还是softgl vs gl只能用一个，两个都用会打架？这个会造成多大的架构混乱？」「**反正别叫Layer, brushlayer也改名，如果语义一样那么改一样的名字**」。
@@ -163,7 +163,7 @@ RegionStroke（src/backend/gl/region-stroke.ts；一笔一个；持有自己借�
 - **两个 port 同时用不打架的是代码，打架的是数据**：SoftGl 的 FBO 是 JS typed array，真 GL 的是显存纹理，每次跨界 = 上传 / 回读。手指跑 SoftGl、画板跑真 GL ⇒ 装载 W 从 LayerPixels 而非 arena、显示每帧上传字节（= 今天的替身路）、提交走 putImageData：**三个接缝各两条分支 + 每笔选 port** = 正是要杀的双实现。且 SoftGl 是逐片元 JS 闭包的迂腐模拟器，比手写 CPU 循环慢（估几倍，未测）——当性能回退是负价值。
 - **真要无浮点路，正解 = f32 打包进 RGBA8**（4 字节编码 / 解码，只碰记忆相关三个 program，CPU 孪生镜像同一打包）：一条代码路走遍所有 WebGL2 设备，不是架构分叉。记录在案当逃生口，**本轮不做**。
 - 覆盖面：每个有 WebGL2 的浏览器都带该扩展（Chrome 57 / Firefox 51 / Safari 与 iOS 15 起）；iPad / Quest / 桌面在内；剩余风险 = 老 Android GPU（待核）。
-- **提案**：要求 `floatColorBuffer`；缺席 → 手指 / 模糊 / 锐化动词提示「此设备不支持」（一条 caps 守卫，不是 fallback）。**待 user 点头**。
+- **已定（user 09-18「『要求 floatColorBuffer + 一条 caps 守卫』定」）**：缺席 → 手指 / 模糊 / 锐化动词提示「此设备不支持」，守卫触发时黑匣子记一条 caps 快照（真实覆盖面从用户数据来）。可能不支持的设备（AI 记忆，未查证）：本来就没 WebGL2 的（iOS ≤ 14、老 macOS Safari、Mali-400 代）今天已失败，非新损失；有 WebGL2 但只渲半浮点的 2013–2016 安卓 SoC（Adreno 3xx、PowerVR SGX 544 / G6xxx、Vivante GC；Mali T6xx/T7xx 待核）是新损失；iPad / iPhone（iOS 15+）、Quest、近十年桌面 GPU、SwiftShader 不受影响。
 
 ## 4. user 已答 / 待答（2026-09-18）
 
@@ -171,11 +171,12 @@ RegionStroke（src/backend/gl/region-stroke.ts；一笔一个；持有自己借�
 |---|---|---|
 | ① 模糊 / 锐化 wash 本轮顺路搬？ | **yes** | §3.1 第二批入本轮；§3.6 体重含 CPU wash 删除 |
 | ② 显示走「overlay replace」？ | 「也许可以」 | 按此做；它是一条 ovMode 分支，随时可撤（替代 A/B 否决理由在 §3.2） |
-| ③ 浮点 FBO 缺席时手指族响亮不可用？ | user 问了 SoftGl 回退（§3.7 已答）；「app 已依赖浮点 FBO 就不做 fallback」——事实是**不依赖** | **待 user 点头**：要求 floatColorBuffer + caps 守卫，逃生口 = RGBA8 打包 |
+| ③ 浮点 FBO 缺席时手指族响亮不可用？ | user 问了 SoftGl 回退（§3.7 已答）；「app 已依赖浮点 FBO 就不做 fallback」——事实是**不依赖** | **定**（user「『要求 floatColorBuffer + 一条 caps 守卫』定」）：逃生口 = RGBA8 打包记录在案不做；设备面见 §3.7 |
 | ④（user 追加）写靶别叫 Layer，BrushLayer 也改，语义一样就同名 | 指令 | §3.3 ①：`BrushLayer` + `SmudgeLayer` → `StrokeTarget` |
 
 ## 5. 不做 / 留门
 
-- 不做：连续形式（#1，(b)）、抽象艺术纪元（#36）、液化 GPU（第三批另案，user 09-05「液化=CPU 已答」）、增量 / wash 的 UI 暴露（UX 轮）、手感数字改动（#41）。
+- 不做：连续形式（#1，(b)）、抽象艺术纪元（#36）、增量 / wash 的 UI 暴露（UX 轮）、手感数字改动（#41）。
+- 液化 GPU = 第三批，**AI 的排期判断，不是 user 决定**（09-18 user 问「这个是什么意思」：09-05 的「液化=CPU 已答」只是「液化走 CPU 还是 GPU」这个问题答过了 = CPU，本文初版误引为拍板，已改）。排后的原因：组液化一个场 N 叶、B 样条预滤波起笔上传、选区 bleed 三模式 march 现在每事件 CPU 算——三件都要接，且 CPU 液化不卡手感（R=60 ≈ 16 ms/事件；R=300 数百 ms，**也值得搬**）。建议本轮立住 RegionStroke + golden 后，下一轮同接口搬；user 要本轮做则排在 wash 之后。
 - 留门：`inputs.field` 槽；program 枚举只加不改；`RegionStroke` 与 Filter 契约的接缝 = `BrushLayer` 面，CPU 滤镜笔和 GPU 手指并存期不打架。
 - 收官动作：总账 #42 → done、#1 指针回写本文 §1.3(b)、ADR（`adr/0014-region-programs.md`）在 user「没问题」后立，`StrokeTarget` 改名随源 commit 一起落（含 `filter-brush.ts` 注释与 `stroke-session.ts` 的 `targets` 注释），API .h 重打。
