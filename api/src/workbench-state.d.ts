@@ -90,15 +90,16 @@ declare function freshGroups(): {
         eraser: string;
         smudge: string;
         lasso: string;
+        shape: string;
     };
-    ruler: {
-        on: boolean;
-        kind: string;
-        constrain: boolean;
-        geo: unknown;
+    shapeBrush: {
+        sub: string;
+        constrainLine: boolean;
+        constrainRect: boolean;
+        constrainCircle: boolean;
         gridNu: number;
         gridNv: number;
-        use: string;
+        gridBorder: boolean;
     };
     persp: {
         mode: string;
@@ -256,6 +257,7 @@ export declare const desk: {
         eraser: string;
         smudge: string;
         lasso: string;
+        shape: string;
     };
     lassoTool: {
         sub: string;
@@ -285,15 +287,14 @@ export declare const desk: {
         lineartTipSens: number;
         lineartBleed: number;
     };
-    ruler: {
-        on: boolean;
-        kind: string;
-        constrain: boolean;
-        /** 放好的尺（ruler.ts Ruler | null）。读方经 sanitizeRuler 校验（文件来的 JSON）。 */
-        geo: unknown;
+    shapeBrush: {
+        sub: string;
+        constrainLine: boolean;
+        constrainRect: boolean;
+        constrainCircle: boolean;
         gridNu: number;
         gridNv: number;
-        use: string;
+        gridBorder: boolean;
     };
     persp: {
         mode: string;
@@ -401,13 +402,6 @@ export declare function remapShapePersp(f: (p: {
     y: number;
 }, opts?: {
     unlockHorizon?: boolean;
-}): void;
-export declare function remapDeskRuler(f: (p: {
-    x: number;
-    y: number;
-}) => {
-    x: number;
-    y: number;
 }): void;
 export declare function snapshotShapePersp(): unknown;
 export declare function restoreShapePersp(snap: unknown): void;

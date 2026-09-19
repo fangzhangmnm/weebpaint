@@ -363,14 +363,11 @@ function _finish() {
   _handles.clear();
   for (const el of _boxHandles) el?.remove();
   _boxHandles.length = 0;
-  window.dispatchEvent(new CustomEvent("wp:ruler-sync"));   // ADR-0013：尺子条重画（VP/锁/重置可能变了）
+  window.dispatchEvent(new CustomEvent("wp:shape-sync"));   // 形状条重画（VP/锁/重置可能变了；shape-toolbar 听）
   _ctx!.board.requestRender();
 }
 
-// ADR-0013：绘图态 gizmo 显示门由 ruler-ui 注入（透视尺吸附开 + showGizmo；放置态选透视尺）——原 `current() === "shapeBrush"` 随形状笔退役
-let _liveGate: () => boolean = () => false;
-export function setPerspGizmoLiveGate(fn: () => boolean): void { _liveGate = fn; }
-/** 尺子条「编辑消失点」钮：再点 = 退出（恒 apply）；点其他工具 = onToolSwitch apply 同款。 */
+/** 形状条「编辑消失点」钮：再点 = 退出（恒 apply）；点其他工具 = onToolSwitch apply 同款。 */
 export function togglePerspEdit(): void {
   if (!_ctx) return;
   if (_active) { _finish(); _ctx.editMode.exitTransient(); }
@@ -427,12 +424,12 @@ export function initPerspEdit(ctx: AppContext): void {
     _box = _loadBox() ?? _defaultBox();
     _syncUi();
   });
-  // gizmo：淡地平线 + VP 圈 + box 棱线（编辑模式）；绘图态经 _liveGate（ruler-ui：透视尺吸附开 + showGizmo）→ 只显 VP+地平线
+  // gizmo：淡地平线 + VP 圈 + box 棱线（编辑模式）；绘图态 showGizmo 开 + 形状笔活着 → 只显 VP+地平线（2026-09-18 回滚复活原门）
   ctx.board.setPerspGizmoProvider(() => {
     const g = desk.persp;
     const m = _mode();
     if (m === "off") return null;
-    if (!_active && !_liveGate()) return null;
+    if (!_active && (!g.showGizmo || _ctx!.editMode.current() !== "shapeBrush")) return null;
     if (m === "iso") {
       // iso 无地平线/VP：常显 gizmo = 过锚点的三轴参考线（rays 槽复活）；编辑态另加 box 棱线
       const out: PerspGizmoData = { horizon: null, rays: [], vps: [] };

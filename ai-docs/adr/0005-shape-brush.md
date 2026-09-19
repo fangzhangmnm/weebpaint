@@ -1,7 +1,7 @@
 # ADR-0005：形状笔 = 一个 shape 一个 stroke 的笔（supersede v120「shapes 收进笔刷 preset」+ artist-priorities「形状工具=anti-feature」）
 
 > created 20260725
-> 状态：**已决定 —— 实现中（worktree-shape-brush 分支）** → **2026-09-09 §2/§3 被 ADR-0013 尺子模型 supersede**（形状 = 画布辅助对象，引擎 `shape-brush.ts` 已删；§1 否决手势 snap、§4 拟合哲学仍有效）edited by Claude Fable 5.1
+> 状态：**现行（2026-09-18 回滚复活，v0.14.15）**。历史：v0.6.1 落地 → 2026-09-09 §2/§3 被 ADR-0013 尺子模型 supersede（引擎 `shape-brush.ts` 删）→ 2026-09-10 真机打回、插头拔 → **2026-09-18 user「行为回滚到那时候。不当笔刷模式了」**：引擎原样复活（git 30e8a5c^），ADR-0013 整体回滚。入口变化：不再是笔位子工具（ADR-0012 §2 的 freehand/shape），而是**独立顶栏动词位**（user「单独一个顶栏按钮」；ADR-0012 修订 ⑦）；形状条 = `src/shape-toolbar.ts` 工厂条（线/矩/圆/格平铺 + 变体菜单 + 格线行列 + 透视四件，行为同 v0.14.6）。§1–§6 全部有效。edited by Claude Fable 5.1 2026-09-18
 
 ## 背景
 

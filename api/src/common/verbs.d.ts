@@ -1,4 +1,4 @@
-export type Verb = "brush" | "eraser" | "smudge" | "lasso";
+export type Verb = "brush" | "eraser" | "smudge" | "lasso" | "shape";
 export declare const VERBS: readonly Verb[];
 export interface SubToolDef {
     id: string;

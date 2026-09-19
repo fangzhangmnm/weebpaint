@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 
 describe("verbs · 表的形状", () => {
   it("四个动词；每个动词的缺省子工具在表里；子工具 id 不重复", () => {
-    eq(VERBS.join(","), "brush,eraser,smudge,lasso");
+    eq(VERBS.join(","), "brush,eraser,smudge,lasso,shape", "2026-09-18 形状 = 第五动词位（独立顶栏钮）");
     for (const v of VERBS) {
       const ids = VERB_SUBTOOLS[v].map((s) => s.id);
       assert(ids.includes(DEFAULT_SUBTOOL[v]), `${v} 缺省 ${DEFAULT_SUBTOOL[v]} 不在 ${ids}`);
@@ -25,8 +25,8 @@ describe("verbs · 表的形状", () => {
 });
 
 describe("verbs · mode ↔ 动词/子工具", () => {
-  it("verbOfMode：brush→brush（shapeBrush 2026-09-09 随尺子模型退役 → null），lasso/fill→lasso，filterBrush(有 payload)→smudge，其余 null", () => {
-    eq(verbOfMode("brush"), "brush"); eq(verbOfMode("shapeBrush"), null);
+  it("verbOfMode：brush→brush，shapeBrush→shape（2026-09-18 独立动词位），lasso/fill→lasso，filterBrush(有 payload)→smudge，其余 null", () => {
+    eq(verbOfMode("brush"), "brush"); eq(verbOfMode("shapeBrush"), "shape");
     eq(verbOfMode("eraser"), "eraser");
     eq(verbOfMode("lasso"), "lasso"); eq(verbOfMode("fill"), "lasso");
     eq(verbOfMode("filterBrush", "smudge"), "smudge"); eq(verbOfMode("filterBrush", "liquify"), "smudge");
@@ -34,7 +34,7 @@ describe("verbs · mode ↔ 动词/子工具", () => {
     eq(verbOfMode("picker"), null); eq(verbOfMode("hand"), null); eq(verbOfMode("transform"), null);
   });
   it("subToolOfMode：老模式反推子工具；滤镜笔按 filter+variant；未知 variant 归该 filter 首条", () => {
-    eq(subToolOfMode("shapeBrush"), null, "形状笔已退役");
+    eq(subToolOfMode("shapeBrush").verb, "shape"); eq(subToolOfMode("shapeBrush").sub, "shape", "形状位单子工具");
     eq(subToolOfMode("brush").sub, "freehand");
     eq(subToolOfMode("fill").sub, "fill");
     eq(subToolOfMode("lasso").sub, "select");

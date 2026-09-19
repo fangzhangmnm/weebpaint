@@ -1,9 +1,11 @@
 // 顶栏动词位 + 上下文条左段子工具栏 真浏览器探针（playwright，Chromium；不进 npm test 硬线）。created 2026-09-06 by Claude Fable 5.1
 // 2026-09-06 晚重写（ADR-0012 修订 ③，user「子工具栈并入上下文条，成为它的左段；长按不再弹菜单，只是把这条上下文条叫出来」）。
 // 用法：bash scripts/build.sh && node tools/probes/verb-toolbar.mjs
-// 契约：① 顶栏没有形状笔/油漆桶独立钮；笔位/橡皮位都无小三角（2026-09-09 ADR-0013：形状笔退役，笔位单子工具）；初始 brush、笔位 #pencil；
-//   ② 几何 extension **插头已拔**（2026-09-10 晚 user「ui 问题非常大，先把几何尺拔了，代码留着」）：无 #rulerToolbar / #leftRuler / 笔架钮 / #rulerPlaceLayer；
-//      左栏滑条任何工具下都可见；S 键无事。插回后把 v0.14.11 的 ② 段契约（git 64bcb71 本文件）恢复；
+// 契约：① 顶栏有形状笔独立钮 #toolShape（data-verb=shape，图标 #shapes；2026-09-18 回滚复活，user「单独一个顶栏按钮」）、无油漆桶独立钮；
+//      笔位/橡皮位/形状位都无小三角（单子工具）；初始 brush、笔位 #pencil；
+//   ② 形状笔（ADR-0005，行为 = v0.14.6）：点形状位 → shapeBrush + 工厂形状条 #shapeToolbar（线/矩/圆/格平铺，默认 [直线] pressed）+ 左栏滑条可见；
+//      拖一下 = 一笔（undo 可用）；[矩形] 已选中再点 → 变体菜单 2 项 → 选「正方形」→ 钮面 #square；[格线] → 行/列 stepper + 外框钮；透视下拉选二点 → 平面钮 ×3 + 编辑消失点 + gizmo 钮，
+//      切回 [直线] → 平面钮藏；已激活再点形状位 → 开共享画笔笔架 #brushRackSheet；B → brush 条藏；S → shapeBrush 条显、子工具记住；无几何 extension 残留（#rulerToolbar / #leftRuler）；
 //   ③ B → brush、笔位图标 #pencil；④ 点套索位 → 套索条显、左段 [选区] pressed；点左段「油漆桶」→ fill、顶栏图标 #paint-bucket；
 //   ⑤ 点手指位 → filterBrush、滤镜笔条第一件 = 子工具下拉 #filterBrushSubSel（2026-09-09 修订 ④：六颗图标左段 → 带图标下拉；2026-09-11 钮面只图标 face=icon，值读 data-value），弹层 6 项各带图标；
 //      选「模糊」→ sharpenBlur/blur、手指位图标仍 #finger（六项同图标，user 2026-09-09）、adjust 不亮、**无 variant 下拉**（子工具下拉盖住了）；
@@ -28,12 +30,20 @@ const state = (page) => page.evaluate((visSrc) => {
     adjustPressed: document.getElementById("topAdjustBtn").getAttribute("aria-pressed"),
     lassoBar: vis("lassoToolbarStack"), fbBar: vis("filterBrushToolbar"),
     lassoSeg: pressedIn("lassoToolbarStack"), fbSeg: pressedIn("filterBrushToolbar"),
-    rulerBar: vis("rulerToolbar"), hasRulerBar: !!document.getElementById("rulerToolbar"), placeLayer: !!document.getElementById("rulerPlaceLayer"),
-    hasLeftRuler: !!document.getElementById("leftRuler"), hasLeftRackBtn: !!document.querySelector("#leftSidebar .left-sidebar-brush:not(.left-sidebar-pick)"),
-    shapeOn: document.getElementById("rulerShapeToggle")?.getAttribute("aria-pressed"), hasKindSel: !!document.getElementById("rulerKindSel"),
-    traceOn: document.getElementById("rulerUseTrace")?.getAttribute("aria-pressed"), snapOn: document.getElementById("rulerSnap")?.getAttribute("aria-pressed"),
-    hasClear: !!document.getElementById("rulerClear"),
-    rulerBarTop: document.getElementById("rulerToolbar")?.getBoundingClientRect().top ?? -1,
+    hasRulerBar: !!document.getElementById("rulerToolbar"), hasLeftRuler: !!document.getElementById("leftRuler"), placeLayer: !!document.getElementById("rulerPlaceLayer"),
+    hasLeftRackBtn: !!document.querySelector("#leftSidebar .left-sidebar-brush:not(.left-sidebar-pick)"),
+    shapeIcon: document.querySelector("#toolShape use")?.getAttribute("href"), shapeCaret: !!document.querySelector("#toolShape .tool-caret"),
+    shapePressed: document.getElementById("toolShape")?.getAttribute("aria-pressed"),
+    shapeBar: vis("shapeToolbar"), hasShapeBar: !!document.getElementById("shapeToolbar"),
+    shapeSub: ["line", "rect", "circle", "grid"].find((s) => document.getElementById("shapeSub-" + s)?.getAttribute("aria-pressed") === "true") ?? null,
+    shapeSubVisible: ["line", "rect", "circle", "grid"].filter((s) => vis("shapeSub-" + s)).length,
+    rectIcon: document.querySelector("#shapeSub-rect use")?.getAttribute("href"), lineIcon: document.querySelector("#shapeSub-line use")?.getAttribute("href"),
+    hasGridCtl: !!document.getElementById("shapeGridCtl"), hasGridBorder: !!document.getElementById("shapeGridBorder"),
+    perspSel: document.getElementById("shapePerspSel")?.dataset.value,
+    planeBtns: document.querySelectorAll("#shapeToolbar [id^='shapePlane-']").length,
+    hasVpEdit: !!document.getElementById("shapeVpEdit"), hasGizmoBtn: !!document.getElementById("shapeShowGizmo"),
+    rackSheetVis: vis("brushRackSheet"),
+    shapeRowFits: (() => { const r = document.querySelector("#shapeToolbar .lasso-toolbar"); return r ? r.scrollWidth <= r.clientWidth + 1 : null; })(),
     lassoBarBottom: (() => { const el = document.getElementById("lassoToolbarStack"); return el && !el.classList.contains("hidden") ? el.getBoundingClientRect().bottom : -1; })(),
     undoDisabled: !!document.getElementById("undoButton")?.disabled,
     sizeSliderVis: vis("sizeSlider"),
@@ -80,22 +90,59 @@ const clickSeg = (page, barId, sub) => page.evaluate(({ barId, sub }) => {
   allErrors.push(...errors);
   await drawStroke(page);
   const s0 = await state(page);
-  c.expect("顶栏无形状笔/油漆桶独立钮", !s0.hasShapeBtn && !s0.hasFillBtn);
-  c.expect("笔位 / 橡皮位都无小三角（单子工具；形状笔 2026-09-09 退役）", !s0.penCaret && !s0.eraserCaret, JSON.stringify(s0));
+  c.expect("顶栏有形状笔独立钮（#shapes）、无油漆桶独立钮", s0.hasShapeBtn && s0.shapeIcon === "#shapes" && !s0.hasFillBtn, JSON.stringify(s0));
+  c.expect("笔位 / 橡皮位 / 形状位都无小三角（单子工具）", !s0.penCaret && !s0.eraserCaret && !s0.shapeCaret, JSON.stringify(s0));
   c.expect("初始 brush、笔位 #pencil", s0.tool === "brush" && s0.pen === "#pencil", JSON.stringify(s0));
   // 长按笔位（单子工具）不叫出任何条、不弹菜单
   await longPress(page, "toolPen");
   const s0b = await state(page);
-  c.expect("长按笔位 → 无事（无子工具）：无 popup、无几何条、仍 brush", s0b.popupMenus === 0 && !s0b.hasRulerBar && s0b.tool === "brush", JSON.stringify(s0b));
+  c.expect("长按笔位 → 无事（无子工具）：无 popup、无形状条、仍 brush", s0b.popupMenus === 0 && !s0b.shapeBar && s0b.tool === "brush", JSON.stringify(s0b));
 
-  // ② 几何 extension 插头已拔（user 2026-09-10 晚「先把几何尺拔了，代码留着」）：无几何条、无左栏尺钮 / 笔架钮、无捕获层；左栏滑条任何工具下都在
-  c.expect("插头已拔：无 #rulerToolbar / #leftRuler / 笔架钮 / #rulerPlaceLayer；左栏滑条可见", !s0.rulerBar && !s0.hasRulerBar && !s0.hasLeftRuler && !s0.hasLeftRackBtn && !s0.placeLayer && s0.sizeSliderVis, JSON.stringify(s0));
-  await page.keyboard.press("s"); await page.waitForTimeout(150);
-  const s1 = await state(page);
-  c.expect("S 键无事（没人听 wp:ruler-tap）、仍 brush", s1.tool === "brush" && !s1.rulerBar, JSON.stringify(s1));
+  // ② 形状笔（2026-09-18 回滚复活，ADR-0005；几何 extension 已删）
+  c.expect("初始：形状条已登记但藏；无几何 extension 残留（#rulerToolbar / #leftRuler / 笔架钮 / 捕获层）；左栏滑条可见", s0.hasShapeBar && !s0.shapeBar && !s0.hasRulerBar && !s0.hasLeftRuler && !s0.hasLeftRackBtn && !s0.placeLayer && s0.sizeSliderVis, JSON.stringify(s0));
+  await evClick(page, "toolShape"); await page.waitForTimeout(250);
+  const q1 = await state(page);
+  c.expect("点形状位 → shapeBrush、形状位亮（只它亮）、形状条显、四子工具平铺 [直线] pressed、透视下拉=off、无格线件、左栏滑条可见", q1.tool === "shapeBrush" && q1.shapePressed === "true" && q1.anyToolPressed === 1 && q1.shapeBar && q1.shapeSubVisible === 4 && q1.shapeSub === "line" && q1.lineIcon === "#line" && q1.perspSel === "off" && !q1.hasGridCtl && q1.planeBtns === 0 && q1.sizeSliderVis && q1.shapeRowFits === true, JSON.stringify(q1));
+  await drawStroke(page);
+  const q1b = await state(page);
+  c.expect("形状笔拖一下 = 一笔落像素（undo 可用）、仍 shapeBrush", !q1b.undoDisabled && q1b.tool === "shapeBrush", JSON.stringify(q1b));
+  await evClick(page, "shapeSub-rect"); await page.waitForTimeout(150);
+  const q2 = await state(page);
+  c.expect("点 [矩形] → pressed rect、钮面 #rectangle（未约束）", q2.shapeSub === "rect" && q2.rectIcon === "#rectangle" && q2.popupMenus === 0, JSON.stringify(q2));
+  await evClick(page, "shapeSub-rect"); await page.waitForTimeout(200);
+  const q2b = await state(page);
+  c.expect("已选中再点 [矩形] → 变体菜单开（长方形 / 正方形 2 项）", q2b.popupMenus === 2 && q2b.shapeSub === "rect", JSON.stringify(q2b));
+  await page.evaluate(() => { const b = [...document.querySelectorAll(".popup-menu--compact [data-id]")].find((x) => x.dataset.id === "constrain"); if (!b) throw new Error("no constrain variant"); b.click(); });
+  await page.waitForTimeout(200);
+  const q2c = await state(page);
+  c.expect("选「正方形」→ 钮面 #square、菜单关、仍 rect", q2c.rectIcon === "#square" && q2c.popupMenus === 0 && q2c.shapeSub === "rect", JSON.stringify(q2c));
+  await evClick(page, "shapeSub-grid"); await page.waitForTimeout(150);
+  const q3 = await state(page);
+  c.expect("点 [格线] → 行/列 stepper + 外框钮出现、行不溢出", q3.shapeSub === "grid" && q3.hasGridCtl && q3.hasGridBorder && q3.shapeRowFits === true, JSON.stringify(q3));
+  await page.evaluate(() => document.getElementById("shapePerspSel").click()); await page.waitForTimeout(150);
+  await page.evaluate(() => { const b = [...document.querySelectorAll(".popup-menu--compact [data-id]")].find((x) => x.dataset.id === "p2"); if (!b) throw new Error("no p2 item"); b.click(); });
+  await page.waitForTimeout(250);
+  const q4 = await state(page);
+  c.expect("透视下拉选「二点」→ 平面钮 ×3（地板/左墙/右墙）+ 编辑消失点 + gizmo 钮", q4.perspSel === "p2" && q4.planeBtns === 3 && q4.hasVpEdit && q4.hasGizmoBtn, JSON.stringify(q4));
+  await evClick(page, "shapeSub-line"); await page.waitForTimeout(150);
+  const q5 = await state(page);
+  c.expect("切回 [直线] → 平面钮藏（直线吸 VP 不吃平面）、透视仍二点、格线件藏", q5.shapeSub === "line" && q5.planeBtns === 0 && q5.perspSel === "p2" && q5.hasVpEdit && !q5.hasGridCtl, JSON.stringify(q5));
+  await page.evaluate(() => document.getElementById("shapePerspSel").click()); await page.waitForTimeout(150);
+  await page.evaluate(() => { const b = [...document.querySelectorAll(".popup-menu--compact [data-id]")].find((x) => x.dataset.id === "off"); b.click(); });
+  await page.waitForTimeout(200);
+  await evClick(page, "toolShape"); await page.waitForTimeout(250);
+  const q6 = await state(page);
+  c.expect("已激活再点形状位 → 开共享画笔笔架（#brushRackSheet），仍 shapeBrush", q6.rackSheetVis && q6.tool === "shapeBrush", JSON.stringify(q6));
+  await evClick(page, "toolShape"); await page.waitForTimeout(200);   // 再点 = toggle 关笔架
+  await page.keyboard.press("b"); await page.waitForTimeout(200);
+  const q7 = await state(page);
+  c.expect("B → brush、形状条藏、形状位不亮", q7.tool === "brush" && !q7.shapeBar && q7.shapePressed === "false", JSON.stringify(q7));
+  await page.keyboard.press("s"); await page.waitForTimeout(200);
+  const q8 = await state(page);
+  c.expect("S → shapeBrush、形状条显、子工具记住 [直线]", q8.tool === "shapeBrush" && q8.shapeBar && q8.shapeSub === "line", JSON.stringify(q8));
   await evClick(page, "toolLasso"); await page.waitForTimeout(250);
-  const s2d = await state(page);
-  c.expect("切套索 → 左栏滑条仍可见（不再玩消失）", s2d.sizeSliderVis && !s2d.rulerBar, JSON.stringify(s2d));
+  const q2d = await state(page);
+  c.expect("切套索 → 形状条藏、套索条显、左栏滑条仍可见", !q2d.shapeBar && q2d.lassoBar && q2d.sizeSliderVis, JSON.stringify(q2d));
   // ③ B → brush
   await page.keyboard.press("b"); await page.waitForTimeout(200);
   const s3 = await state(page);
@@ -147,6 +194,9 @@ const clickSeg = (page, barId, sub) => page.evaluate(({ barId, sub }) => {
   // 量的是**行**（.lasso-toolbar 才是 overflow 容器；stack 永远不溢出，原来量 stack 是假绿）
   const fb = await page.evaluate(() => { const h = document.getElementById("filterBrushToolbar"); const r = h.querySelector(".lasso-toolbar"); return { scrollW: r.scrollWidth, clientW: r.clientWidth, vis: !h.classList.contains("hidden"), more: !!h.querySelector(".ct-more"), subSel: !!document.getElementById("filterBrushSubSel") && !document.getElementById("filterBrushSubSel").hidden }; });
   c.expect("375 宽滤镜笔条行不横向溢出（工厂「…」折叠；子工具下拉永不折）", fb.vis && fb.scrollW <= fb.clientW + 1 && fb.subSel, JSON.stringify(fb));
+  await evClick(page, "toolShape"); await page.waitForTimeout(400);
+  const sb = await page.evaluate(() => { const h = document.getElementById("shapeToolbar"); const r = h.querySelector(".lasso-toolbar"); const subs = ["line", "rect", "circle", "grid"].filter((s) => { const b = document.getElementById("shapeSub-" + s); return b && !b.hidden && !b.classList.contains("hidden"); }).length; return { scrollW: r.scrollWidth, clientW: r.clientWidth, vis: !h.classList.contains("hidden"), subs }; });
+  c.expect("375 宽形状条行不横向溢出、四子工具钉住不折", sb.vis && sb.scrollW <= sb.clientW + 1 && sb.subs === 4, JSON.stringify(sb));
   await ctx.close();
 }
 await browser.close(); await srv.close();

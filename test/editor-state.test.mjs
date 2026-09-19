@@ -109,27 +109,22 @@ test("[editor-state] v0.5.11 迁移：stale bucket 键忽略、magicWand.thresho
   eq("bucket" in desk, false, "bucket facade 已删");
 });
 
-test("[editor-state] 尺子（ADR-0013）：默认 / 往返 / 老 doc 缺组或带 stale shapeBrush 组不崩", () => {
+test("[editor-state] 形状笔（ADR-0005；2026-09-18 回滚复活）：默认 / 往返 / 老 doc 缺组或带 stale ruler 组不崩", () => {
   desk.reset();
-  eq(desk.ruler.on, false, "吸附默认关");
-  eq(desk.ruler.kind, "parallel", "尺种默认平行线");
-  eq(desk.ruler.constrain, false, "放置约束默认关");
-  eq(desk.ruler.geo, null, "默认没放尺");
-  eq(desk.ruler.gridNu, 2, "格线默认 2×6（头身比）"); eq(desk.ruler.gridNv, 6);
-  eq(desk.ruler.use, "off", "几何默认关（2026-09-10 修订 ③：use = off | drag | trace，per-doc 记住）");
-  desk.ruler.on = true; desk.ruler.kind = "rect"; desk.ruler.constrain = true;
-  desk.ruler.geo = { kind: "rect", corners: [{ x: 1, y: 2 }, { x: 11, y: 2 }, { x: 11, y: 7 }, { x: 1, y: 7 }] };
-  desk.ruler.gridNv = 8; desk.ruler.use = "drag";
+  eq(desk.shapeBrush.sub, "line", "子工具默认直线");
+  eq(desk.shapeBrush.constrainLine, false, "约束分槽默认全不锁"); eq(desk.shapeBrush.constrainRect, false); eq(desk.shapeBrush.constrainCircle, false);
+  eq(desk.shapeBrush.gridNu, 2, "格线默认 2×6（头身比）"); eq(desk.shapeBrush.gridNv, 6); eq(desk.shapeBrush.gridBorder, false, "外框默认关");
+  eq(desk.subTool.shape, "shape", "形状位单子工具（common/verbs.ts）");
+  desk.shapeBrush.sub = "circle"; desk.shapeBrush.constrainCircle = true; desk.shapeBrush.gridNv = 8; desk.shapeBrush.gridBorder = true;
   const ser = desk.Serialize();
   desk.reset();
   desk.Unserialize(ser);
-  eq(desk.ruler.on, true, "on 往返"); eq(desk.ruler.kind, "rect", "kind 往返"); eq(desk.ruler.constrain, true);
-  eq(JSON.stringify(desk.ruler.geo.corners[2]), JSON.stringify({ x: 11, y: 7 }), "geo 整包往返");
-  eq(desk.ruler.gridNv, 8); eq(desk.ruler.use, "drag", "use 往返");
+  eq(desk.shapeBrush.sub, "circle", "sub 往返"); eq(desk.shapeBrush.constrainCircle, true, "constrainCircle 往返");
+  eq(desk.shapeBrush.constrainLine, false, "别槽不受影响"); eq(desk.shapeBrush.gridNv, 8); eq(desk.shapeBrush.gridBorder, true);
   desk.reset();
-  desk.Unserialize({ magicWand: { threshold: 30 }, shapeBrush: { sub: "circle", constrainCircle: true } });   // v0.14.6 及更早的 doc
-  eq(desk.ruler.kind, "parallel", "缺组 → 默认；stale shapeBrush 组静默忽略");
-  eq("shapeBrush" in desk, false, "shapeBrush facade 已删（ADR-0005 引擎随尺子退役）");
+  desk.Unserialize({ magicWand: { threshold: 30 }, ruler: { on: true, kind: "rect", use: "drag", geo: { kind: "rect" } } });   // v0.14.7–14 的 dev doc（ADR-0013 尺子组）
+  eq(desk.shapeBrush.sub, "line", "缺组 → 默认；stale ruler 组静默忽略");
+  eq("ruler" in desk, false, "ruler facade 已删（ADR-0013 回滚）");
 });
 
 test("[editor-state] 透视 frame（ADR-0006）：默认 / 往返 / 老 doc 缺组补默认", () => {

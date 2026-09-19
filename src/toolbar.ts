@@ -383,7 +383,7 @@ export function _syncEditModeUI() {
   // 工具按钮高亮：transient 时一个都不亮；持久工具高亮对应按钮
   // v0.6.31：四工具并列（fill 有自己的顶栏钮），高亮 = data-tool 直配
   // 2026-09-05 手指：filterBrush 模式 + smudge payload 时高亮工具栏「手指」钮（而不是 adjust 钮）
-  // 2026-09-06 ADR-0012：动词位按动词亮（笔位 = brush|shapeBrush，套索位 = lasso|fill，手指位 = 任何 filterBrush payload）；
+  // 2026-09-06 ADR-0012：动词位按动词亮（笔位 = brush，形状位 = shapeBrush（2026-09-18 独立动词位），套索位 = lasso|fill，手指位 = 任何 filterBrush payload）；
   //   无动词的钮（吸色/抓手）仍按 data-tool 直配。
   const verb = _currentVerb();
   for (const b of els.toolBtns) {
@@ -640,6 +640,7 @@ function initSelEditUI() {
 // Rack 工具 → 对应的 exclusive panel id
 export const RACK_PANEL_BY_TOOL: Record<string, string> = {
   brush: PANELS.RACK_BRUSH,
+  shapeBrush: PANELS.RACK_BRUSH,            // ADR-0005：形状笔共享 brush 笔架（2026-09-18 回滚复活；再点形状位 = 开画笔笔架）
   eraser: PANELS.RACK_ERASER,
   filterBrush: PANELS.RACK_FILTER_BRUSH,    // v132
   // v0.7.26 选区笔走笔架：lasso/fill 二次点工具钮 = 开选区笔笔架（getRackToolKey → "selPen" 列表）
@@ -1054,7 +1055,8 @@ export function initToolbar(ctx: AppContext) {
   // v0.6.31 回滚：四工具并列，单击=切换。长按/Alt/右键/组菜单全撤（真机难受）。
   // v0.6.55（user 2026-07-30）：恢复「二次点弹笔架」（v79 语义回归）——已激活的画笔/橡皮
   //   再点 = toggle 该工具的笔架（openExclusive 自带 toggle）；无笔架的工具（lasso/fill）二次点仍无事。
-  // （修订 ③ 的笔·自由手条 #brushToolbar 2026-09-09 随形状笔退役——笔位只剩自由手，无子工具、无条、无小三角；ADR-0013）
+  // （修订 ③ 的笔·自由手条 #brushToolbar 2026-09-09 随形状笔退役——笔位只剩自由手，无子工具、无条、无小三角。
+  //   2026-09-18 形状笔回归为独立动词位 data-verb="shape"（单子工具）：单击切、再点开共享画笔笔架；形状条由 shape-toolbar.ts 随 shapeBrush 模式显隐。）
   for (const b of els.toolBtns) {
     // 2026-09-06 ADR-0012 动词位：单击 = 切动词（子工具走记忆）/ 已激活再点 = 开该动词的笔架（v0.6.55 语义）；
     //   长按 / 右键 = 叫出该动词的上下文条（ui/subtool-slot 接管 click，长按后吞掉那一击；2026-09-06 晚修订 ③，原弹子工具菜单）。

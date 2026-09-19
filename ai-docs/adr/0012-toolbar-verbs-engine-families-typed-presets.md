@@ -67,7 +67,18 @@ popup-menu 补一条栈纪律：落在**子弹层**（锚在本弹层里）上�
 ④ 参考窗「关闭」从 ＋ 菜单提出成窗右上角 ×（＋ 左移）；主菜单「参考小窗」= toggle 项（开/关态同步）；所有开窗入口（主菜单 / 图层面板 PiP / 快捷键 / ×）都是 toggle，
 导入参考图仍是「开」。探针 `tools/probes/context-toolbar.mjs` ⑤–⑨ 钉住全部；`test/select-field-face.test.mjs` 钉钮面三档；`test/context-toolbar.test.mjs` 钉「叠放只在工厂」。
 
-## 修订 2026-09-09 ⑤：笔位只剩自由手——形状笔退役为尺子（v0.14.7，ADR-0013）
+## 修订 2026-09-18 ⑦：形状 = 第五个动词位（独立顶栏钮）——形状笔回滚复活（v0.14.15；Claude Fable 5.1）
+
+user 2026-09-18：「形状笔：单独一个顶栏按钮，总之就是行为回滚到那时候。不当笔刷模式了。所以几乎就是回滚。只是需要接新UI」。
+- 顶栏 `菜单 云保存 | 笔 手指 橡皮 套索 形状 | fx 图层 颜色`：`#toolShape` = `data-verb="shape"`（`common/verbs.ts` 第五动词，单子工具 `shape` → shapeBrush EditMode，
+  图标 `shapes`；无小三角；已激活再点 = 开**共享画笔笔架**（ADR-0005 §3 alias）；S 键 = 切形状笔）。位置放套索之后 = v0.6–v0.13 时代的老位置。
+- 形状条 = 工厂条 `#shapeToolbar`（`src/shape-toolbar.ts`），行为 = v0.14.6 形状条：线/矩/圆/格 **平铺**（user v0.6.13「图形切换高频不折叠」，pin 不折）、
+  钮面 = 当前变体图标、已选中再点/长按 = 变体菜单（工厂 `button.variants`，v0.6.25/v0.6.31 语义）、格线行/列 stepper + 外框钮只在 grid、
+  透视模式 = `select-field` 下拉（修订 ⑥ 标准件）、平面钮常驻（透视开 + 非 line）、编辑消失点、gizmo 显隐。多条叠放归工厂（修订 ⑥ ③）。
+- 修订 ⑤ 作废；§2 决定 1「笔 = paint 族，子工具 freehand / shape」**不恢复**——形状不进笔位（user 明确要独立按钮），笔位仍单子工具。
+- ADR-0013 几何 extension 整体删除（`ruler.ts` / `shape-stroke.ts` / `ruler-ui.ts`、`desk.ruler`、input 的 `setRulerGuideProvider` / `setStrokeShaper` 接线口、board `GuideOverlay`）。
+
+## 修订 2026-09-09 ⑤：笔位只剩自由手——形状笔退役为尺子（v0.14.7，ADR-0013）——**2026-09-18 作废（修订 ⑦）**
 
 user 2026-09-09「形状笔放的位置 ux 非常不合理……同意形状笔不是笔而是辅助」。§2 决定 1「笔 = paint 族，子工具 freehand / shape」改为**笔位单子工具**（无小三角、`#brushToolbar` 删）；形状 = 左栏尺钮的辅助对象（ADR-0013）。修订 ③ 关于笔条的段落随之作废；套索 / 手指位不变。
 

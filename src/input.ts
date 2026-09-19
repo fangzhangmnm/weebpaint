@@ -25,38 +25,7 @@ import { BrushEngine } from "./backend/brush.ts";
 import { reportError } from "./error-badge.ts";
 import { LassoEngine } from "./lasso.ts";
 import { FilterBrushEngine } from "./filter-brush.ts";
-import type { StrokeEngine } from "./backend/stroke-session.ts";
-import type { ViewLeafSnap } from "./backend/workpiece/painting-view.ts";
-import { disposePixelsSnapshot } from "./backend/tiles/tile-layer.ts";
-
-// ═══ 「几何」extension 的接线口（ADR-0013；2026-09-10 修订 ③）═══
-// 本文件**不 import 任何几何脚本**（ruler.ts / shape-stroke.ts / ruler-ui.ts）：两个可选 provider 由 app.ts 安装，不装 = 一切照旧。
-//   user 2026-09-10：「如果 geometry engine related 脚本突然不见了，其他地方只要最小的修复程序也能跑」。
-//   ① 描尺（留尺后沿尺画）= StrokeGuide 逐点投影（09-09 唯一切口 _move）；② 拖画 = StrokeShaper 把内引擎包成「拖一下 = 整形」的 decorator。
-//   谁吸尺 / 谁整形（画笔 / 橡皮 / 手指族 / 选区笔）由 provider 按 role 决定，这里只问。
-/** 一笔一个投影器：begin 给起点（曲线尺把起点也吸上去，返回吸后的点）；project 逐点投影；像素链尺另有 projectPath（返回沿链新吐的像素，调用方逐颗 stampPixels）。 */
-export interface StrokeGuide { begin(x: number, y: number): { x: number; y: number }; project(x: number, y: number): { x: number; y: number }; projectPath?(x: number, y: number): Array<{ x: number; y: number }> }
-/** 被包的内引擎 + 调用方给的闭包（各引擎 begin 签名不同，调用方最清楚）。 */
-export interface ShapedInner {
-  inner: StrokeEngine & { stampPixels?(pts: Array<{ x: number; y: number }>, pressure: number): void };
-  /** 在 (x,y) 给内引擎起一笔（settings / mode / 写靶全由闭包捕获）。 */
-  beginInner(x: number, y: number): void;
-  /** 把写靶退回笔前：buffered 笔只需 inner.cancelStroke；就地写（shadow）要 restore 替身。每次重驱前调一次。 */
-  reset(): void;
-  /** 引擎就地写靶（像素笔 / 滤镜笔）= 每帧必须 reset 后重画；buffered 笔（StampCollect）= 纯收集，不写靶。 */
-  inPlace: boolean;
-  /** 像素画模式：整数像素集经 stampPixels 每像素一次（ADR-0013 Q5）。 */
-  pixel: boolean;
-  /** 像素链裁剪盒（doc + 出血）。 */
-  box: { x0: number; y0: number; x1: number; y1: number };
-}
-/** 包好的引擎：满足 StrokeEngine 面 + begin(x,y)，StrokeSession 当它是引擎。 */
-export interface ShapedStroke extends StrokeEngine { begin(x: number, y: number): void; collectStamps(): ReturnType<BrushEngine["collectStamps"]> }
-/** 每笔起笔问一次 mode：null = 本笔不整形；"drag" = 拖画（重驱内引擎）；"trace" = 留尺（只记手势，引擎不动）。 */
-export interface StrokeShaper {
-  mode(role: string): "drag" | "trace" | null;
-  wrap(io: ShapedInner | null): ShapedStroke;
-}
+import { ShapeBrushEngine } from "./shape-brush.ts";   // 形状笔引擎（ADR-0005；2026-09-18 回滚复活——ADR-0013 几何 extension 已删）
 import { isPixelStroke, pixelStrokeSpec } from "./engine-registry.ts";
 import { computePinchViewport, snapRotation, isTap, isDoubleTap, gestureTapAction } from "./common/pointer-gesture.ts";
 import { assignRole, effectiveTool, toolToRole, strokeMode, eraserTapOnRelease } from "./pointer-route.ts";
@@ -273,7 +242,8 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     when: _floating, run: (i) => i._abortLasso() },
   // 方向键像素微调（user：「变换的时候可以用上下左右键进行像素坐标精调」）：浮层平移 1 doc px，
   //   Shift = 10px。每按一下 = 一个 undo 整点（同 flip/rotate90 节奏，无 coalescing——已知取舍）。
-  //   已知无害副作用：Shift+Arrow 会顺带置 shiftDown（尺子旁路位，_keydown 无条件设），floating 时不起笔，keyup 会清位。
+  //   已知无害副作用：Shift+Arrow 会顺带 shapeBrush.setConstrainInvert(true)（_keydown 无条件设），
+  //   floating 时形状笔不活跃，keyup 会清位。
   { combo: "ArrowLeft",        desc: "sc.nudgeFloat", category: "sc.cat.lasso",
     when: _floating, run: (i) => { i.lasso.nudgeFloat(-1, 0); i.board.invalidateAll(); } },
   { combo: "ArrowRight",       desc: "sc.nudgeFloat", category: "sc.cat.lasso",
@@ -331,9 +301,8 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   // 工具切换（gallery / floating 时跳过）
   { combo: "B",                desc: "sc.brush",     category: "sc.cat.tools",
     when: (i) => _editMode(i) && !_floating(i), run: (i) => i._emitTool("brush") },
-  // S = 「几何」开关（ADR-0005 原形状笔快捷键；2026-09-10 修订 ③：几何是任何工具都能开的修饰模式）；语义归 ruler-ui，这里只派事件
-  { combo: "S",                desc: "sc.ruler", category: "sc.cat.tools",
-    when: (i) => _editMode(i) && !_floating(i), run: () => window.dispatchEvent(new CustomEvent("wp:ruler-tap")) },
+  { combo: "S",                desc: "sc.shapeBrush", category: "sc.cat.tools",
+    when: (i) => _editMode(i) && !_floating(i), run: (i) => i._emitTool("shapeBrush") },
   // spring-loaded E（2026-08-21 拍板）：dispatch 硬编码在 _keydown/_keyup（tap 要 keyup
   //   时机 + hold 状态，registry 的 keydown-run 语义装不下；同 Space hold 先例）。两条 display-only
   //   供快捷键面板渲染（同 Ctrl+V / Ctrl+C ×2 先例）：tap=切橡皮、hold=临时橡皮（松开回原工具）。
@@ -410,17 +379,7 @@ export class InputController {
   brush: BrushEngine;
   lasso: LassoEngine;
   filterBrush: FilterBrushEngine;
-  // ADR-0013 尺子（2026-09-09，形状笔引擎退役）：一笔一个投影器，_beginStroke 从 provider 取（app 接 ruler-ui），
-  //   _move 的 doc 坐标经它投影再进引擎——画笔 / 橡皮 / 手指族同一切口（RULER_ROLES）。Shift 按住 = 本笔旁路尺。
-  _strokeGuide: StrokeGuide | null = null;
-  _selPenGuide: StrokeGuide | null = null;   // 选区笔那条路的投影器（Q4 全员吸尺）
-  _rulerGuideProvider: ((role: string, pixel: boolean) => StrokeGuide | null) | null = null;   // pixel = 当前笔 pixelMode（Q5 整数像素链尺）
-  shiftDown = false;
-  // 「几何」拖画（ADR-0013 修订 ③，2026-09-10）：可选 provider——起笔时把内引擎包成「拖一下 = 整形」的 decorator（shape-stroke.ts），
-  //   StrokeSession 当它是引擎。三处起笔（像素笔 / 滤镜笔 / 选区笔）各问一次；_shapeCleanup = 本笔的 shadow 快照释放。
-  _strokeShaper: StrokeShaper | null = null;
-  _shapeCleanup: (() => void) | null = null;
-  _selPenEng: StrokeEngine & { collectStamps(): ReturnType<BrushEngine["collectStamps"]> } = null!;   // 选区笔本笔用的引擎（brush 或包好的 decorator）
+  shapeBrush: ShapeBrushEngine;
   getTool: () => string;
   editMode: EditMode | null;
   getResolvedBrush: () => ResolvedBrush | null;
@@ -470,7 +429,8 @@ export class InputController {
     // v132 filter brush（user：「blur/sharpen/液化 走 filter brush engine」）
     //   引擎本身是薄 delegate；filter 自己提供 begin/extend/end brush 方法
     this.filterBrush = new FilterBrushEngine();
-    this._selPenEng = this.brush;   // 选区笔默认直接用 brush 引擎；几何拖画时换成包好的 decorator（_beginLasso）
+    // 形状笔（ADR-0005）：几何重合成引擎，与 brush 共享 ResolvedBrush + stroke 事务
+    this.shapeBrush = new ShapeBrushEngine();
     this.lasso.onChange = () => {
       this.board.requestRender();
       window.dispatchEvent(new CustomEvent("wp:lassochange"));
@@ -704,7 +664,8 @@ export class InputController {
       if (role === "filterBrush") this._beginFilterBrush(rec);
       else {
         // mode 推断：erase / brush（纯函数 pointer-route.strokeMode）。按住 E = 临时橡皮：
-        //   draw 吃（brush.ts comp="erase"，与普通橡皮同一条管线，2026-08-21 核实）。
+        //   draw/shapeBrush 都吃（形状笔 erase 链经 _inner.beginStroke 透传 → brush.ts comp="erase"，
+        //   与普通橡皮同一条管线，2026-08-21 核实）。
         // mode 在**落笔一刻锁定**（引擎 st.mode 只在 beginStroke 收一次）——描边进行中按/松 E
         //   不影响当前笔。这正是取 hold 而非 mid-stroke 切换语义的原因。
         const mode = strokeMode(role as string, this.eraserHold);
@@ -844,18 +805,11 @@ export class InputController {
           const sp = inputSmooth(rec as unknown as Parameters<typeof inputSmooth>[0], settings, drx, dry);
           psx = sp.x; psy = sp.y;
         }
-        let { x: dx, y: dy } = this.board.screenToDoc(psx, psy);
-        //   e.pressure 当 fallback：coalesced 样本没带 pressure（0/缺失）时退回派发事件的值，不整笔冻住（2026-09-02）。
-        const pressure = effectivePressureFor(rec, ev, e.pressure);
-        // ADR-0013：过尺（唯一切口）。像素链尺（像素画模式）= 链上新像素按序 stampPixels，永不走弦；连续尺 = 投影后照常 extend
-        if (this._strokeGuide?.projectPath) {
-          const path = this._strokeGuide.projectPath(dx, dy);
-          if (path.length) this._activeStroke?.stampPixels(path, pressure);
-          continue;
-        }
-        if (this._strokeGuide) ({ x: dx, y: dy } = this._strokeGuide.project(dx, dy));
+        const { x: dx, y: dy } = this.board.screenToDoc(psx, psy);
         // 活动 engine 统一接口：liquify/filterBrush/像素 忽略多余的 pressure/时间戳参数
         //   ev.timeStamp 给主笔刷时间常数平滑用（dt 取真实事件间隔，含 coalesced）
+        //   e.pressure 当 fallback：coalesced 样本没带 pressure（0/缺失）时退回派发事件的值，不整笔冻住（2026-09-02）。
+        const pressure = effectivePressureFor(rec, ev, e.pressure);
         this._activeStroke?.extend(dx, dy, pressure, ev.timeStamp);
       }
       // 把活动 engine 累的 dirty bbox 送进 board
@@ -899,14 +853,10 @@ export class InputController {
         // v0.7.25 选区笔：吃 coalesced（引擎平滑要密点）；预览=stamp overlay 色带（provider 拉取）
         const evs = (e.getCoalescedEvents?.() ?? [e]);
         for (const ev of evs) {
-          let { x: mx, y: my } = this.board.screenToDoc(ev.clientX, ev.clientY);
-          const mp = effectivePressureFor(rec, ev);
-          const g = this._selPenGuide;   // ADR-0013 Q4：过尺（像素链尺 → 链像素逐颗直通；连续尺 → 投影）
-          if (g?.projectPath) { for (const q of g.projectPath(mx, my)) this._selPenEng.extendStroke(q.x, q.y, mp, ev.timeStamp); continue; }
-          if (g) ({ x: mx, y: my } = g.project(mx, my));
-          this._selPenEng.extendStroke(mx, my, mp, ev.timeStamp);
+          const { x: mx, y: my } = this.board.screenToDoc(ev.clientX, ev.clientY);
+          this.brush.extendStroke(mx, my, effectivePressureFor(rec, ev), ev.timeStamp);
         }
-        const bbox = this._selPenEng.flushDirty();
+        const bbox = this.brush.flushDirty();
         if (bbox) this.board.markDocDirty(bbox[0], bbox[1], bbox[2], bbox[3]);
         this.board.requestRender();
       } else if (rec._lassoMode === "magic-drag") {
@@ -1035,90 +985,60 @@ export class InputController {
     if (!settings || !this.doc.activeLayer) return;
     // activeLayer 是 Node（叶|组）；上游 activeEditableLeaf 已硬拒组 → 此处确为可写叶。
     const layer = this.doc.activeLayer as ViewLeaf;
-    const spec = pixelStrokeSpec(rec.role as string)!;   // draw / erase → 同 stroke 事务 + finalize
-    // engineKey 查表（registry 注释的本意）：draw/erase → brush。（形状笔引擎 2026-09-09 随尺子模型退役，ADR-0013）
-    const eng = this[spec.engineKey as "brush"];
-    const pixel = !!settings.pixelMode;
-    // 「几何」（ADR-0013 修订 ③）：起笔问一次要不要整形。拖画 + 像素笔 → 预览宿改 shadow（每帧 restore 替身重画，旧形状笔像素路）。
-    const shapeMode = this._strokeShaper?.mode(rec.role as string) ?? null;
+    const spec = pixelStrokeSpec(rec.role as string)!;   // draw / erase / shapeBrush → 同 stroke 事务 + finalize
+    // engineKey 查表（registry 注释的本意）：draw/erase → brush；shapeBrush → 形状笔。签名一致。
+    const eng = this[spec.engineKey as "brush" | "shapeBrush"];
     // C5：session 构造 = wp2.begin 开令牌（stroke 档口；单令牌墙在 workpiece 侧 fail-loud）。
-    // C6 预览宿三态（census §3.4）：buffered=overlay；draw/erase pixelMode=livesync（stroke 档合法就地写）；拖画像素笔=shadow。
-    const preview = !pixel ? "overlay" : (shapeMode === "drag" ? "shadow" : "livesync");
-    let session: StrokeSession;
-    let snap: ViewLeafSnap | null = null;
-    let shaped: ShapedStroke | null = null;
-    const pressure = effectivePressureFor(rec, e);
-    if (shapeMode) {
-      const io: ShapedInner | null = shapeMode === "drag" ? {
-        inner: eng,
-        beginInner: (x, y) => eng.beginStroke(session.targets[0], settings, x, y, pressure, mode, { tau: 0, deadzone: 0 }, e.timeStamp),
-        reset: () => { eng.cancelStroke(); if (snap) session.targets[0].restoreFromSnapshot(snap); },
-        inPlace: pixel, pixel, box: this._shapeClipBox(),
-      } : null;
-      shaped = this._strokeShaper!.wrap(io);
-    }
-    session = new StrokeSession(this._strokeDeps, shaped ?? eng, [layer], spec, preview);
-    if (preview === "shadow") { snap = session.targets[0].snapshot(); const sn = snap; this._shapeCleanup = () => disposePixelsSnapshot(sn.pixels); }
-    this._activeStroke = session;
+    // C6 预览宿三态（census §3.4）：buffered=overlay；draw/erase pixelMode=livesync（stroke 档合法
+    //   就地写）；形状笔 pixelMode=shadow（参数重算——每帧 restore+重画改在替身叶上，真层只在
+    //   收口一刻被令牌写，cancel 丢替身零回滚）。
+    const preview = !settings.pixelMode ? "overlay" : (rec.role === "shapeBrush" ? "shadow" : "livesync");
+    this._activeStroke = new StrokeSession(this._strokeDeps, eng, [layer], spec, preview);
 
-    let { x: dx, y: dy } = this.board.screenToDoc(rec.smX!, rec.smY!);
-    // ADR-0013 尺子：起点也过尺（曲线尺把起点吸上去）；Shift 按住 = 本笔不吸；谁吸尺 = RULER_ROLES。整形中的笔不吸尺（几何优先）。
-    const guide = (!shaped && !this.shiftDown) ? (this._rulerGuideProvider?.(rec.role as string, pixel) ?? null) : null;
-    this._strokeGuide = guide;
-    if (guide) ({ x: dx, y: dy } = guide.begin(dx, dy));
+    const { x: dx, y: dy } = this.board.screenToDoc(rec.smX!, rec.smY!);
+    const pressure = effectivePressureFor(rec, e);
     // v148: buffered（brush/erase 非 pixel）位置平滑由引擎做（lookahead/frozen/tail），
-    //   input 直传 raw（见 pointermove 的 rec.rawToEngine 分支）。pixel 仍走四件套；整形恒吃 raw（几何要原始点）。
-    const buffered = !pixel;
-    rec.rawToEngine = buffered || !!shaped;
+    //   input 直传 raw（见 pointermove 的 rec.rawToEngine 分支）。pixel 仍走四件套。
+    //   形状笔恒吃 raw（几何/拟合要原始点；input 平滑会跟吸附打架），pixelMode 也不例外。
+    const buffered = !settings.pixelMode;
+    rec.rawToEngine = buffered || rec.role === "shapeBrush";
     const scale = this.board.viewport.scale || 1;
-    // v249：时间常数指数追踪 + 死区。{tau, deadzone}。尺子开着 → 直通（尺就是平滑器：引擎 EMA 会把投影点拉离曲线尺，
-    //   形状笔时代 tau=0 直通的同一条路）。
-    const smooth = buffered ? (guide ? { tau: 0, deadzone: 0 } : _resolveSmooth(settings, scale)) : {};
-    if (shaped) shaped.begin(dx, dy);
-    else eng.beginStroke(session.targets[0], settings, dx, dy, pressure, mode, smooth, e.timeStamp);
-    const bbox = session.flushDirty();
+    // v249：时间常数指数追踪 + 死区。{tau, deadzone}。
+    const smooth = buffered ? _resolveSmooth(settings, scale) : {};
+    eng.beginStroke(this._activeStroke.targets[0], settings, dx, dy, pressure, mode, smooth, e.timeStamp);
+    const bbox = eng.flushDirty();
     if (bbox) this.board.markDocDirty(bbox[0], bbox[1], bbox[2], bbox[3]);
     this.board.requestRender();
   }
-  /** 像素链 / 拖画像素集的裁剪盒 = doc + 64px 出血（透视链端点可飞远）。 */
-  _shapeClipBox() { const PAD = 64; return { x0: -PAD, y0: -PAD, x1: this.doc.width + PAD, y1: this.doc.height + PAD }; }
   // brush / liquify / filterBrush 共享 begin/extend/end/cancel 协议；活动笔画存进 _activeStroke。
   // 抬笔收口（GPU commit / 选区 finalize / 令牌 commit）与取消回滚全在 StrokeSession（C5 迁出），
   // 这里只剩「取下活动 session、调收口」的手势侧转发。
   _endStroke() {
     const as = this._activeStroke;
-    this._strokeGuide = null;
     if (!as) return;
     this._activeStroke = null;
     as.end();
-    this._shapeCleanup?.(); this._shapeCleanup = null;
   }
   _abortStroke() {
     const as = this._activeStroke;
-    this._strokeGuide = null;
     if (!as) return;
     this._activeStroke = null;
     as.cancel();   // 引擎丢状态 + collector 倒序回滚，无痕
-    this._shapeCleanup?.(); this._shapeCleanup = null;
   }
-  /** ADR-0013：尺子投影器提供方（app 接 ruler-ui.guideForStroke）；返回 null = 本笔不吸。 */
-  setRulerGuideProvider(fn: ((role: string, pixel: boolean) => StrokeGuide | null) | null) { this._rulerGuideProvider = fn; }
-  /** 「几何」拖画 / 留尺的接线口（app 接 ruler-ui.strokeShaper；null = 拔掉 extension）。 */
-  setStrokeShaper(fn: StrokeShaper | null) { this._strokeShaper = fn; }
-  // 任一像素笔画进行中（brush / 像素笔 / liquify / filterBrush 都设 _activeStroke）。
+  // 任一像素笔画进行中（brush / 像素笔 / liquify / filterBrush / 形状笔 都设 _activeStroke）。
   // board._strokeActiveHint 用它判 livePreview（描边中走直接合成 / GL 门控），含像素笔/liquify/filterBrush。
   isStrokeActive() { return !!this._activeStroke; }
   // GPU stamp overlay 拉取口（app 接给 board.setStampProvider）：当前活动引擎的 stamps。
-  //   brush 有 collectStamps；liquify/filterBrush 无（写替身叶，走 stroke shadow 显示，C6）。
+  //   brush 与形状笔都有 collectStamps；liquify/filterBrush 无（写替身叶，走 stroke shadow 显示，C6）。
   collectActiveStamps(): ReturnType<BrushEngine["collectStamps"]> {
     // v0.7.25 选区笔：同一 overlay 拉取口出色带预览（selPenBand 旗 → board 跳过 selMask/lockAlpha 裁剪）
     if (this._selPenLive) {
-      const cs = this._selPenEng.collectStamps();
+      const cs = this.brush.collectStamps();
       return cs ? (Object.assign(cs, { selPenBand: true }) as typeof cs) : null;
     }
     return this._activeStroke?.collectStamps() ?? null;
   }
-  // 公开取消口（描边中切子工具 / 换尺 = cancel 不进 undo，同画一半被手势接管）
+  // 公开取消口（toolbar 描边中切形状笔子工具 = cancel 不进 undo，同画一半被手势接管）
   abortActiveStroke() { this._abortStroke(); }
 
   // GL live-sync 接缝：描边中原地改真层的笔（draw/erase pixelMode）→ 返回活动叶，board 每帧把它
@@ -1161,41 +1081,22 @@ export class InputController {
     const spec = pixelStrokeSpec(rec.role as string)!;   // filterBrush → "stroke" 事务，finalize:false
     // filterBrush 在 beginStroke 时已吃了 selection，stamp 内 mask 外保留 pre → 无需 post-stroke finalize（spec.finalize=false）
     // C6：预览宿=shadow——液化/滤镜笔改写替身叶（census §6.1 第一户），真层只在收口一刻被令牌写。
-    // 「几何」（ADR-0013 修订 ③）：手指族也能拖画——每帧 restore 替身 + 沿形重揉（大形会慢：一个输入事件批只重驱一次）。
-    const Filter = fbState.Filter as Parameters<FilterBrushEngine["beginStroke"]>[1];
-    const shapeMode = this._strokeShaper?.mode("filterBrush") ?? null;
-    let session: StrokeSession;
-    let snaps: ViewLeafSnap[] = [];
-    let shaped: ShapedStroke | null = null;
-    if (shapeMode) {
-      const io: ShapedInner | null = shapeMode === "drag" ? {
-        inner: this.filterBrush,
-        beginInner: (x, y) => this.filterBrush.beginStroke(session.targets, Filter, fbState.params, brushSettings, this.doc.selection, x, y, 0.5),
-        reset: () => { this.filterBrush.cancelStroke(); session.targets.forEach((tg, i) => { if (snaps[i]) tg.restoreFromSnapshot(snaps[i]); }); },
-        inPlace: true, pixel: false, box: this._shapeClipBox(),
-      } : null;
-      shaped = this._strokeShaper!.wrap(io);
-    }
-    session = new StrokeSession(this._strokeDeps, shaped ?? this.filterBrush, layers, spec, "shadow");
-    if (shapeMode === "drag") { snaps = session.targets.map((tg) => tg.snapshot()); const sn = snaps; this._shapeCleanup = () => { for (const x of sn) disposePixelsSnapshot(x.pixels); }; }
-    this._activeStroke = session;
+    this._activeStroke = new StrokeSession(this._strokeDeps, this.filterBrush, layers, spec, "shadow");
     const { x: dx, y: dy } = this.board.screenToDoc(rec.smX!, rec.smY!);
     const pressure = effectivePressureFor(rec, { pressure: rec.lastP ?? 1 });
     try {
       // fbState.Filter 对 input 不透明（BrushFilter 未 export）→ 在引擎接缝处断言到 beginStroke 入参类型。
-      if (shaped) shaped.begin(dx, dy);
-      else this.filterBrush.beginStroke(session.targets, Filter, fbState.params, brushSettings, this.doc.selection, dx, dy, pressure);
+      this.filterBrush.beginStroke(this._activeStroke.targets, fbState.Filter as Parameters<FilterBrushEngine["beginStroke"]>[1], fbState.params, brushSettings, this.doc.selection, dx, dy, pressure);
     } catch (e) {
       reportError(new Error("[filter brush] begin failed: " + String(e)), "log");
       const s = this._activeStroke;
       this._activeStroke = null;
       s.cancel();   // 令牌必须收口，否则后续 begin 全被单令牌门挡死（引擎 begin 半途抛，cancelStroke 清残态无害）
-      this._shapeCleanup?.(); this._shapeCleanup = null;
       rec.role = null;
       this.status?.(t("st.filterBrushErr", { msg: String((e as { message?: unknown })?.message || e) }));
       return;
     }
-    const bbox = session.flushDirty();
+    const bbox = this.filterBrush.flushDirty();
     if (bbox) this.board.markDocDirty(bbox[0], bbox[1], bbox[2], bbox[3]);
     this.board.requestRender();
   }
@@ -1239,25 +1140,9 @@ export class InputController {
       rec.lastP = null; rec.smP = -1; rec.lastEventTs = -Infinity;
       const scale = this.board.viewport.scale || 1;
       const pressure = e ? effectivePressureFor(rec, e) : 0.5;
-      // ADR-0013 Q4：选区笔也吸尺（伪 role "selPen"）。像素链尺的像素经 extendStroke 直通喂进 buffered 笔（选区笔不写层、抬笔才光栅），
-      //   非 stampPixels——直通 + 相邻像素 ≤ √2 → 抬笔 disc 光栅落在链上。Shift = 本笔不吸。
-      // 「几何」（ADR-0013 修订 ③）：选区笔也能拖画（形的色带进选区）/ 留尺。选区笔不写层、抬笔才光栅 → 恒走折线（pixel:false）。
-      const t0 = e?.timeStamp ?? performance.now();
-      const shapeMode = this._strokeShaper?.mode("selPen") ?? null;
-      const shaped = shapeMode ? this._strokeShaper!.wrap(shapeMode === "drag" ? {
-        inner: this.brush,
-        beginInner: (x, y) => this.brush.beginStroke(leaf as ViewLeaf, settings, x, y, 0.5, "brush", { tau: 0, deadzone: 0 }, t0),
-        reset: () => this.brush.cancelStroke(), inPlace: false, pixel: false, box: this._shapeClipBox(),
-      } : null) : null;
-      this._selPenEng = shaped ?? this.brush;
-      const guide = (!shaped && !this.shiftDown) ? (this._rulerGuideProvider?.("selPen", !!base.pixelMode) ?? null) : null;
-      this._selPenGuide = guide;
-      let bx = dx, by = dy;
-      if (guide) ({ x: bx, y: by } = guide.begin(dx, dy));
-      if (shaped) shaped.begin(bx, by);
-      else this.brush.beginStroke(leaf as ViewLeaf, settings, bx, by, pressure, "brush", guide ? { tau: 0, deadzone: 0 } : _resolveSmooth(settings, scale), t0);
+      this.brush.beginStroke(leaf as ViewLeaf, settings, dx, dy, pressure, "brush", _resolveSmooth(settings, scale), e?.timeStamp ?? performance.now());
       this._selPenLive = true;
-      const bbox = this._selPenEng.flushDirty();
+      const bbox = this.brush.flushDirty();
       if (bbox) this.board.markDocDirty(bbox[0], bbox[1], bbox[2], bbox[3]);
       this.board.requestRender();
       return;
@@ -1382,8 +1267,7 @@ export class InputController {
   _endSelPen() {
     if (!this._selPenLive) return;
     this._selPenLive = false;
-    this._selPenGuide = null;
-    const cs = (this._selPenEng.endStroke() ?? null) as ReturnType<BrushEngine["collectStamps"]>;
+    const cs = this.brush.endStroke() ?? null;
     if (!cs || !cs.stamps.length) { this.board.requestRender(); return; }
     // 软边笔 → GPU 光栅（阈值化）；pixelMode 笔/GL 不可用 → 引擎 Bresenham disc 同核 CPU 光栅
     let mask = this._selPenPixel ? null : this.board.rasterizeStampsToMask(cs);
@@ -1404,8 +1288,7 @@ export class InputController {
   _abortSelPen() {
     if (!this._selPenLive) return;
     this._selPenLive = false;
-    this._selPenGuide = null;
-    this._selPenEng.cancelStroke();
+    this.brush.cancelStroke();
     this.board.requestRender();
   }
   _abortLasso() {
@@ -1639,8 +1522,8 @@ export class InputController {
     if (e.key === "Alt" || e.code === "AltLeft" || e.code === "AltRight") {
       this.altDown = true;
     }
-    // Shift hold = 本笔旁路尺子（ADR-0013；行业惯例：Blender Ctrl 反转 snap）——起笔一刻判定，mid-stroke 不变
-    if (e.key === "Shift") this.shiftDown = true;
+    // Shift hold = 形状笔约束临时反转（行业惯例：PS/Figma 画线 Shift 约束、Blender Ctrl 反转 snap）
+    if (e.key === "Shift") this.shapeBrush.setConstrainInvert(true);
     for (const sc of KEYBOARD_SHORTCUTS) {
       if (sc.when && !sc.when(this)) continue;
       if (!_matchCombo(e, sc.combo)) continue;
@@ -1658,7 +1541,7 @@ export class InputController {
     if (e.key === "Alt" || e.code === "AltLeft" || e.code === "AltRight") {
       this.altDown = false;
     }
-    if (e.key === "Shift") this.shiftDown = false;
+    if (e.key === "Shift") this.shapeBrush.setConstrainInvert(false);
     // E 松开：清 hold（不看修饰键——按住 E 期间又按了 Ctrl 也必须能清位）。
     //   tap = 短按且没落过笔 → 执行原「切到橡皮」（判定纯函数 eraserTapOnRelease）。
     //   busy 期间不切工具（同 _keydown 的 busy 闸语义；清位本身永远落地，见 _keyup 不拦的注释）。
@@ -1776,7 +1659,6 @@ export class InputController {
   clearKeyHolds() {
     this.eraserHold = false;
     this.altDown = false;
-    this.shiftDown = false;
   }
 }
 

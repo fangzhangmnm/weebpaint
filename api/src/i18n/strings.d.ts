@@ -48,6 +48,12 @@ export declare const S: {
         readonly ja: "指先";
         readonly tok: "ilo luka";
     };
+    readonly "tool.shapeBrush": {
+        readonly zh: "形状笔 (S)";
+        readonly en: "Shape brush (S)";
+        readonly ja: "図形ブラシ (S)";
+        readonly tok: "ilo selo (S)";
+    };
     readonly "tool.pan": {
         readonly zh: "平移 (H / Space)";
         readonly en: "Pan (H / Space)";
@@ -3286,125 +3292,107 @@ export declare const S: {
         readonly ja: "ブールモード";
         readonly tok: "nasin (sin / namako / weka)";
     };
-    readonly "rl.bar": {
-        readonly zh: "几何";
-        readonly en: "Geometry";
-        readonly ja: "図形";
+    readonly "sb.stack": {
+        readonly zh: "形状笔工具栏";
+        readonly en: "Shape brush toolbar";
+        readonly ja: "図形ブラシツールバー";
+        readonly tok: "poki pi ilo selo";
+    };
+    readonly "sb.subSlot": {
+        readonly zh: "形状（直线 / 矩形 / 圆·弧 / 格线）";
+        readonly en: "Shape (line / rect / circle·arc / grid)";
+        readonly ja: "図形（直線 / 矩形 / 円·弧 / グリッド）";
         readonly tok: "selo";
     };
-    readonly "rl.toggle": {
-        readonly zh: "几何（开：用当前工具拖一下 = 画整个形，椭圆画一圈；画笔 / 橡皮 / 手指 / 选区笔都行。S）";
-        readonly en: "Geometry (on: one drag = one whole shape with the current tool; ellipse = draw a loop. S)";
-        readonly ja: "図形モード（オン：ドラッグ一回で図形一つ。S）";
-        readonly tok: "selo (open la tawa wan li selo wan. S)";
-    };
-    readonly "rl.kind": {
-        readonly zh: "形 / 尺的种类";
-        readonly en: "Shape / ruler kind";
-        readonly ja: "図形の種類";
-        readonly tok: "nasin selo";
-    };
-    readonly "rl.kind.parallel": {
+    readonly "sb.line": {
         readonly zh: "直线";
         readonly en: "Line";
         readonly ja: "直線";
         readonly tok: "linja";
     };
-    readonly "rl.kind.persp": {
-        readonly zh: "透视线";
-        readonly en: "Perspective line";
-        readonly ja: "パース線";
-        readonly tok: "linja pi sike weka";
-    };
-    readonly "rl.kind.ellipse": {
-        readonly zh: "圆 / 椭圆";
-        readonly en: "Circle / ellipse";
-        readonly ja: "円 / 楕円";
-        readonly tok: "sike";
-    };
-    readonly "rl.kind.rect": {
-        readonly zh: "矩形";
-        readonly en: "Rectangle";
-        readonly ja: "矩形";
+    readonly "sb.rect": {
+        readonly zh: "矩形（相对屏幕拉框，斜的转视口画）";
+        readonly en: "Rectangle (screen-aligned; rotate view for tilted)";
+        readonly ja: "矩形（画面基準、斜めはビュー回転で）";
         readonly tok: "leko";
     };
-    readonly "rl.kind.grid": {
-        readonly zh: "格线";
-        readonly en: "Grid";
-        readonly ja: "グリッド";
-        readonly tok: "leko mute";
+    readonly "sb.circle": {
+        readonly zh: "圆 / 弧（徒手画一圈自动拟合，不满一圈出弧）";
+        readonly en: "Circle / arc (freehand, auto-fit; partial sweep = arc)";
+        readonly ja: "円 / 弧（手描きフィット、一周未満は弧）";
+        readonly tok: "sike";
     };
-    readonly "rl.constrain": {
-        readonly zh: "约束（15° 吸附 / 正方 / 正圆；透视下吸向消失点·平面正形。拖的时候按住 Shift 临时反转）";
-        readonly en: "Constrain (15° snap / square / circle; toward VP in perspective. Hold Shift while dragging to invert)";
-        readonly ja: "拘束（15° / 正方形 / 正円。Shift で一時反転）";
-        readonly tok: "sama poka";
+    readonly "sb.grid": {
+        readonly zh: "格线（头身比 / 构图格；默认 2×6）";
+        readonly en: "Grid (proportions; default 2×6)";
+        readonly ja: "グリッド（頭身 / 構図、既定 2×6）";
+        readonly tok: "linja mute (2×6)";
     };
-    readonly "rl.rows": {
+    readonly "sb.constrain": {
+        readonly zh: "约束（直线 15° 吸附 / 正方 / 正圆；透视下吸向消失点·平面正形。按住 Shift 临时反转）";
+        readonly en: "Constrain (15° snap / square / circle; toward VP · true shape on plane in perspective. Hold Shift to invert)";
+        readonly ja: "拘束（15° スナップ / 正方 / 正円；パース時は消失点へ。Shift で一時反転）";
+        readonly tok: "wawa selo (Shift)";
+    };
+    readonly "sb.varLineFree": {
+        readonly zh: "自由线条";
+        readonly en: "Free line";
+        readonly ja: "自由な直線";
+        readonly tok: "linja nasa";
+    };
+    readonly "sb.varLineSnap": {
+        readonly zh: "吸附线条（15°/透视）";
+        readonly en: "Snapped line (15° / perspective)";
+        readonly ja: "スナップ直線";
+        readonly tok: "linja pi nasin pona";
+    };
+    readonly "sb.varRect": {
+        readonly zh: "长方形";
+        readonly en: "Rectangle";
+        readonly ja: "長方形";
+        readonly tok: "leko suli";
+    };
+    readonly "sb.varSquare": {
+        readonly zh: "正方形";
+        readonly en: "Square";
+        readonly ja: "正方形";
+        readonly tok: "leko sama";
+    };
+    readonly "sb.varEllipse": {
+        readonly zh: "椭圆";
+        readonly en: "Ellipse";
+        readonly ja: "楕円";
+        readonly tok: "sike suli";
+    };
+    readonly "sb.varCircle": {
+        readonly zh: "正圆";
+        readonly en: "Circle";
+        readonly ja: "正円";
+        readonly tok: "sike sama";
+    };
+    readonly "sb.border": {
+        readonly zh: "外框（默认关）";
+        readonly en: "Outer border (default off)";
+        readonly ja: "外枠（既定オフ）";
+        readonly tok: "selo sinpin";
+    };
+    readonly "sb.rows": {
         readonly zh: "行";
         readonly en: "Rows";
         readonly ja: "行";
         readonly tok: "linja";
     };
-    readonly "rl.cols": {
+    readonly "sb.cols": {
         readonly zh: "列";
         readonly en: "Cols";
         readonly ja: "列";
         readonly tok: "palisa";
     };
-    readonly "rl.useTrace": {
-        readonly zh: "留尺（开：拖出来的形留在画布当尺，画笔 / 橡皮 / 手指 / 选区笔沿它走；关 = 拖一下直接落笔）";
-        readonly en: "Keep as ruler (on: the dragged shape stays on canvas as a ruler for brush / eraser / smudge / selection pen; off = paint the shape)";
-        readonly ja: "定規として残す（オン：描いた図形が定規になる）";
-        readonly tok: "awen e ilo linja";
-    };
-    readonly "rl.snap": {
-        readonly zh: "沿尺走（开关吸附；尺还在）";
-        readonly en: "Snap to ruler (toggle; ruler kept)";
-        readonly ja: "定規に沿う（切替）";
-        readonly tok: "tawa lon ilo linja";
-    };
-    readonly "rl.clear": {
-        readonly zh: "清除这把尺";
-        readonly en: "Remove ruler";
-        readonly ja: "定規を消す";
-        readonly tok: "weka e ilo linja";
-    };
-    readonly "rl.dragHint": {
-        readonly zh: "几何：在画布上拖一下 = 用当前工具画一整个形（圆：画一圈）。按住 Shift 反转约束";
-        readonly en: "Geometry: one drag = one whole shape with the current tool (circle: draw a loop). Hold Shift to invert constrain";
-        readonly ja: "図形：ドラッグ一回で図形一つ（円は一周）";
-        readonly tok: "tawa wan la selo wan";
-    };
-    readonly "rl.traceHint": {
-        readonly zh: "留尺：拖一下（圆：画一圈）= 放尺；关掉几何后画笔 / 橡皮 / 手指 / 选区笔沿尺走。按住 Shift 画 = 本笔不吸尺";
-        readonly en: "Keep as ruler: drag (circle: loop) to place; turn geometry off and any tool follows it. Hold Shift while drawing to bypass";
-        readonly ja: "定規として残す：ドラッグで配置。図形モードを切ると各ツールが定規に沿う";
-        readonly tok: "o tawa: ilo linja li kama";
-    };
-    readonly "rl.placed": {
-        readonly zh: "尺已放好：关掉几何后任何工具沿尺走（再拖 = 换掉）";
-        readonly en: "Ruler placed: turn geometry off and any tool follows it (drag again to replace)";
-        readonly ja: "定規を置いた：図形モードを切ると定規に沿う";
-        readonly tok: "ilo linja li lon";
-    };
-    readonly "rl.on": {
-        readonly zh: "尺子：吸附开";
-        readonly en: "Ruler: snapping on";
-        readonly ja: "定規：スナップ オン";
-        readonly tok: "ilo linja li open";
-    };
-    readonly "rl.off": {
-        readonly zh: "尺子：吸附关（尺还在，再点开）";
-        readonly en: "Ruler: snapping off (ruler kept)";
-        readonly ja: "定規：スナップ オフ";
-        readonly tok: "ilo linja li pini";
-    };
-    readonly "sc.ruler": {
-        readonly zh: "几何（开关：拖一下 = 画整个形）";
-        readonly en: "Geometry (toggle: one drag = one whole shape)";
-        readonly ja: "図形モード";
-        readonly tok: "selo";
+    readonly "sc.shapeBrush": {
+        readonly zh: "形状笔";
+        readonly en: "Shape brush";
+        readonly ja: "シェイプブラシ";
+        readonly tok: "ilo pi sitelen selo";
     };
     readonly "sb.perspModeSlot": {
         readonly zh: "透视模式（视口对齐 / 一点 / 二点 / 三点）";
@@ -3447,6 +3435,36 @@ export declare const S: {
         readonly en: "Isometric (2:1 pixel convention)";
         readonly ja: "アイソメトリック（2:1）";
         readonly tok: "nasin sitelen leko";
+    };
+    readonly "sb.modeViewportShort": {
+        readonly zh: "视口";
+        readonly en: "View";
+        readonly ja: "ビュー";
+        readonly tok: "lukin";
+    };
+    readonly "sb.mode1pShort": {
+        readonly zh: "一点";
+        readonly en: "1-pt";
+        readonly ja: "一点";
+        readonly tok: "wan";
+    };
+    readonly "sb.mode2pShort": {
+        readonly zh: "二点";
+        readonly en: "2-pt";
+        readonly ja: "二点";
+        readonly tok: "tu";
+    };
+    readonly "sb.mode3pShort": {
+        readonly zh: "三点";
+        readonly en: "3-pt";
+        readonly ja: "三点";
+        readonly tok: "tu wan";
+    };
+    readonly "sb.modeIsoShort": {
+        readonly zh: "等轴";
+        readonly en: "Iso";
+        readonly ja: "等軸";
+        readonly tok: "leko";
     };
     readonly "sb.planeGround": {
         readonly zh: "地板";

@@ -6,9 +6,9 @@ describe("pointer-route · effectiveTool", () => {
   it("transform → lasso（抢画布路由走 gizmo）", () => eq(effectiveTool("transform", false), "lasso"));
   it("alt + brush → picker（临时取色）", () => eq(effectiveTool("brush", true), "picker"));
   it("alt + fill → picker（v0.7.8 油漆桶吸色，吸预览色）", () => eq(effectiveTool("fill", true), "picker"));
-  it("alt 只对 brush/fill 生效（eraser/filterBrush 不扩权；shapeBrush 2026-09-09 随尺子模型退役）", () => {
+  it("alt + shapeBrush → picker（user：「形状笔的时候应该也能alt取色」；2026-09-18 回滚复活）", () => eq(effectiveTool("shapeBrush", true), "picker"));
+  it("alt 只对 brush/fill/shapeBrush 生效（eraser/filterBrush 不扩权）", () => {
     eq(effectiveTool("eraser", true), "eraser"); eq(effectiveTool("lasso", true), "lasso");
-    eq(effectiveTool("shapeBrush", true), "shapeBrush", "已无此工具：原样透传");
     eq(effectiveTool("filterBrush", true), "filterBrush");
   });
   it("其余原样", () => { eq(effectiveTool("brush", false), "brush"); eq(effectiveTool("crop", false), "crop"); });
@@ -19,6 +19,7 @@ describe("pointer-route · toolToRole", () => {
     eq(toolToRole("eraser"), "erase"); eq(toolToRole("picker"), "pick");
     eq(toolToRole("filterBrush"), "filterBrush");   // 液化 = filterBrush payload（S8 删直连 role）
     eq(toolToRole("lasso"), "lasso");
+    eq(toolToRole("shapeBrush"), "shapeBrush", "ADR-0005：形状笔 = 第四个 pixel-stroke 引擎");
     eq(toolToRole("brush"), "draw"); eq(toolToRole("未知"), "draw");
   });
 });
@@ -66,7 +67,7 @@ describe("pointer-route · assignRole", () => {
   });
 
   it("回归锁：三设备分支对同一非特殊工具给同一 role（旧 map 抄 3 份的去重）", () => {
-    for (const t of ["brush", "eraser", "picker", "filterBrush", "lasso"]) {
+    for (const t of ["brush", "eraser", "picker", "filterBrush", "lasso", "shapeBrush"]) {
       const expected = toolToRole(effectiveTool(t, false));
       eq(role({ tool: t, pointerType: "mouse", button: 0 }), expected, `mouse ${t}`);
       eq(role({ tool: t, pointerType: "pen", button: 0, buttons: 1 }), expected, `pen ${t}`);

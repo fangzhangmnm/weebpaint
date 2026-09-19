@@ -57,16 +57,6 @@ export interface PerspGizmoData {
         y: number;
     }]>;
 }
-export interface GuideOverlay {
-    segments: Array<[{
-        x: number;
-        y: number;
-    }, {
-        x: number;
-        y: number;
-    }]>;
-    style: "active" | "dim" | "draft";
-}
 import type { Selection } from "./backend/selection.ts";
 interface MeshPt {
     x: number;
@@ -260,9 +250,6 @@ export declare class Board {
         x1: number;
         y1: number;
     };
-    _guideProvider: (() => GuideOverlay | null) | null;
-    setGuideProvider(fn: (() => GuideOverlay | null) | null): void;
-    _drawGuides(ctx: Ctx2D, scale: number): void;
     _drawPerspGizmo(ctx: Ctx2D, scale: number): void;
     _stampProvider: (() => StampCollect) | null;
     setStampProvider(fn: () => StampCollect): void;

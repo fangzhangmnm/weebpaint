@@ -1,8 +1,8 @@
 # ADR-0013：尺子模型——形状 = 画布上的辅助对象，不是笔（supersede ADR-0005 §2/§3、ADR-0006 §5/§6）
 
 > created 20260909 · 作者 Claude Fable 5.1（claude-fable-5-1）
-> 状态：**已决定 · v0.14.7 落地 → 2026-09-10 真机打回 → 修订 ③ v0.14.11 重落 → 同晚 user「ui 问题非常大，先把几何尺拔了，代码留着，就是插头拔了，然后下礼拜有空再研究」→ v0.14.12 插头已拔**
-> （`src/app.ts` 搜「插头已拔」：一行 import + 三行 init/set 注释掉；ruler.ts / shape-stroke.ts / ruler-ui.ts 原样留，测试照跑；这正是修订 ③ 可拔性标准的首次实证）。策划稿 = `ai-docs/20260909-ruler-model-proposal.md`。
+> 状态：**已回滚（2026-09-18，v0.14.15）**——user「形状笔：单独一个顶栏按钮，总之就是行为回滚到那时候。不当笔刷模式了。所以几乎就是回滚。只是需要接新UI」。历史：v0.14.7 落地 → 2026-09-10 真机打回 → 修订 ③ v0.14.11 重落 → 同晚「ui 问题非常大，先把几何尺拔了，代码留着」→ v0.14.12 插头已拔 → 2026-09-18 整个 extension 删除（`ruler.ts` / `shape-stroke.ts` / `ruler-ui.ts` + `desk.ruler` + input 两个 provider 接线口 + board GuideOverlay），ADR-0005 复活为现行（形状笔 = 第五动词位，见 ADR-0012 修订 ⑦）。本文只作历史与「已探过的路」记录，别再 re-litigate。edited by Claude Fable 5.1 2026-09-18
+> （被回滚的形态在 git：v0.14.11 = 64bcb71、拔插头 = b2c892e、修订 ④ 定位 = 6cdd5ec；纯几何 ruler.ts 的像素链投影器 / 曲线尺 polyline 若将来要「留尺」再从史里捞。）
 > ⚠ 读法：§决定 3/4/6 的「左栏尺钮 / 放置态 rulerPlace / 捕获层 / 左栏 context smart sense」已被 **§修订 ③** 整体推翻，以修订 ③ 为准。
 
 ## 背景

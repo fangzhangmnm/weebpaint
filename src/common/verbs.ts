@@ -1,13 +1,15 @@
 // verbs —— 顶栏动词表（ADR-0012「动词原则」）：动词 × 子工具 × 路由到现有 EditMode / 滤镜笔 payload 的纯数据（零 DOM，node 直测）。
 // created 2026-09-06 by Claude Fable 5.1。策划 = ai-docs/20260906-ui-abstraction-round-proposal.md §2.3。
 //
-// 动词 = 你的手在做什么（笔 / 橡皮 / 手指 / 套索）；子工具 = 同一动词下的另一种走法，长按顶栏钮切（钮面图标随之换，角上小三角）。
-// 行为语义零变更：子工具只是**入口**，落地仍是老 EditMode（brush / lasso / fill）或滤镜笔 payload（smudge / sharpenBlur / liquify）。
+// 动词 = 你的手在做什么（笔 / 橡皮 / 手指 / 套索 / 形状）；子工具 = 同一动词下的另一种走法，长按顶栏钮切（钮面图标随之换，角上小三角）。
+// 行为语义零变更：子工具只是**入口**，落地仍是老 EditMode（brush / shapeBrush / lasso / fill）或滤镜笔 payload（smudge / sharpenBlur / liquify）。
+// 2026-09-18 user：「形状笔：单独一个顶栏按钮，总之就是行为回滚到那时候。不当笔刷模式了」→ 形状 = 第五个动词位（独立顶栏钮，单子工具，
+//   落地 = ADR-0005 的 shapeBrush EditMode；直线 / 矩形 / 圆 / 格线是引擎子工具，住形状条，不是动词子工具）。ADR-0013 几何修饰模式已回滚。
 // user 2026-09-06 工作流观察（进 ADR 理由栏）：「你要么是形状笔和橡皮，要么是画笔和橡皮。反而不太会在形状笔和画笔之间切」。
 // 记忆：desk.subTool[verb]（per-doc，user 2026-09-06 批准）。
 
-export type Verb = "brush" | "eraser" | "smudge" | "lasso";
-export const VERBS: readonly Verb[] = ["brush", "eraser", "smudge", "lasso"];
+export type Verb = "brush" | "eraser" | "smudge" | "lasso" | "shape";
+export const VERBS: readonly Verb[] = ["brush", "eraser", "smudge", "lasso", "shape"];
 
 export interface SubToolDef {
   id: string;
@@ -18,9 +20,13 @@ export interface SubToolDef {
 }
 
 export const VERB_SUBTOOLS: Record<Verb, readonly SubToolDef[]> = {
-  // 笔位只剩自由手（形状笔 2026-09-09 随尺子模型退役——ADR-0013：形状 = 左栏尺钮的辅助对象，不是子工具）
+  // 笔位只有自由手（形状笔 2026-09-18 起是自己的动词位，见 shape）
   brush: [
     { id: "freehand", icon: "pencil", titleKey: "tool.brush", route: { mode: "brush" } },
+  ],
+  // 形状位（2026-09-18 回滚：独立顶栏钮）：单子工具 → shapeBrush EditMode；线/矩/圆/格 在形状条上切（desk.shapeBrush.sub）
+  shape: [
+    { id: "shape", icon: "shapes", titleKey: "tool.shapeBrush", route: { mode: "shapeBrush" } },
   ],
   eraser: [
     { id: "pixel", icon: "eraser", titleKey: "tool.eraser", route: { mode: "eraser" } },
@@ -43,7 +49,7 @@ export const VERB_SUBTOOLS: Record<Verb, readonly SubToolDef[]> = {
   ],
 };
 
-export const DEFAULT_SUBTOOL: Record<Verb, string> = { brush: "freehand", eraser: "pixel", smudge: "smear", lasso: "select" };
+export const DEFAULT_SUBTOOL: Record<Verb, string> = { brush: "freehand", eraser: "pixel", smudge: "smear", lasso: "select", shape: "shape" };
 
 export function isVerb(v: unknown): v is Verb { return typeof v === "string" && (VERBS as readonly string[]).includes(v); }
 
@@ -56,6 +62,7 @@ export function subToolDef(verb: Verb, id: string): SubToolDef {
 export function verbOfMode(mode: string, filterId?: string | null): Verb | null {
   switch (mode) {
     case "brush": return "brush";
+    case "shapeBrush": return "shape";
     case "eraser": return "eraser";
     case "lasso": case "fill": return "lasso";
     case "filterBrush": return filterId ? "smudge" : null;   // 任何滤镜笔 payload 都归手指位（模糊/锐化/液化已搬家）

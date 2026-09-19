@@ -58,9 +58,7 @@ import { initSmoothDevPanel } from "./smooth-dev-panel.ts";
 import { selectionToNewLayer, initSelectionOps } from "./selection-ops.ts";
 import { initFillMode } from "./fill-mode.ts";
 import { initPerspEdit } from "./persp-edit.ts";
-// ADR-0013 几何 extension —— **插头已拔**（user 2026-09-10 晚「ui 问题非常大，先把几何尺拔了，代码留着，就是插头拔了，然后下礼拜有空再研究」）。
-//   代码原样留在 src/ruler.ts / src/shape-stroke.ts / src/ruler-ui.ts；插回 = 恢复本行 import + 下面三行 init/set（搜 "插头已拔"）。
-// import { initRulerUi, guideForStroke, strokeShaper } from "./ruler-ui.ts";
+import { initShapeToolbar } from "./shape-toolbar.ts";   // 形状条（ADR-0005；2026-09-18 回滚复活：独立顶栏动词位 + 工厂上下文条；ADR-0013 几何 extension 已删）
 import { updateSaveStatus, updateNewerBanner } from "./save-status.ts";
 import { initErrorBadge, reportError } from "./error-badge.ts";
 import { initDiagLog, note as diagNote } from "./diag-log.ts";   // 黑匣子（2026-08-31）
@@ -276,9 +274,10 @@ const input = new InputController(board, doc, {
 // iPad 系统手势抢断 canvas pointer 后偶尔不发 pointercancel 到 canvas，map 里残留 ghost。
 // pointer 自愈 + iPad/触屏系统手势拦截 = platform-guards.ts initPlatformGuards。
 
-// brush live 预览：GPU stamp overlay（活动引擎 collectStamps→GPU 栅格；选区/lockAlpha 在 shader 内裁）。
+// brush/形状笔 live 预览：GPU stamp overlay（活动引擎 collectStamps→GPU 栅格；选区/lockAlpha 在 shader 内裁）。
 board.setStampProvider(() => input.collectActiveStamps());
-// （形状笔视口旋转注入 2026-09-09 随尺子模型退役——尺子放置时 ruler-ui 自己读 board.viewport.rot，ADR-0013）
+// 形状笔视口相对几何（矩形/圆拟合沿屏幕轴；斜的 = 转视口画）——rot 注入，引擎不认识 Board。
+input.shapeBrush.setViewportRotProvider(() => board.viewport.rot);
 // strokeActiveHint：任一笔画进行中 → board 走 livePreview（直接合成，不用静态缓存）。
 //   含 brush/像素笔/liquify/filterBrush（各自的显示宿见下两条接缝 + StrokeSession 的 shadow 注入）。
 board.setStrokeActiveHint(() => input.isStrokeActive());
@@ -363,11 +362,8 @@ initFiltersAdjust(ctx);
 initToolbar(ctx);
 initSelectionOps(ctx);
 initFillMode(ctx);   // v0.5.11 套索填充模式（原 #22 油漆桶的重生，见 fill-mode.ts 头注释）
-initPerspEdit(ctx);  // ADR-0006 VP 编辑（透视框的消失点 gizmo，crop 同款 transient；透视框 = 尺子模型的透视尺）
-// （ADR-0013 几何 extension 插头已拔，2026-09-10 晚；插回 = 取消下面三行注释 + 顶部 import）
-// initRulerUi(ctx);    // 几何条（上下文条区尾位）/ 已放尺 overlay / 透视 gizmo 门
-// input.setRulerGuideProvider(guideForStroke);   // 描尺：像素笔 / 选区笔起笔取投影器（唯一切口在 input._move）
-// input.setStrokeShaper(strokeShaper);           // 拖画 / 留尺：起笔把内引擎包成「拖一下 = 整形」（shape-stroke.ts）
+initPerspEdit(ctx);  // ADR-0006 VP 编辑（形状笔透视 frame 的消失点 gizmo，crop 同款 transient）
+initShapeToolbar(ctx);   // 形状条（线/矩/圆/格 + 约束 + 格线行列 + 透视四件）+ desk.shapeBrush ↔ 引擎回灌（ADR-0005，2026-09-18 回滚复活）
 initSmoothDevPanel(ctx);
 initTransientPanels(ctx);
 initSideWindows(ctx);

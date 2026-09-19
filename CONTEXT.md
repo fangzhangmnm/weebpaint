@@ -26,17 +26,16 @@ _Avoid_: controller, handler
 _Avoid_: rt（旧全局占位）, DI container / service locator（这只是显式参数对象，不是框架）, god-object
 
 **Engine**:
-把一笔落到 layer 像素上的东西（BrushEngine / LiquifyEngine / FilterBrushEngine / LassoEngine；ShapeBrushEngine 2026-09-09 随 ADR-0013 删）。统一节律 begin/extend/end/cancel。pixel-stroke 家族的成员判定与 begin 期策略 = `engine-registry.ts` 的纯数据表（加引擎 = 加一行）。
-_Avoid_: ShapesEngine（旧名——v257 删掉的 ctx.fillRect 直填旧实现）, ShapeBrushEngine（ADR-0005 形状笔引擎，2026-09-09 随尺子模型删——形状是尺不是引擎）
+把一笔落到 layer 像素上的东西（BrushEngine / ShapeBrushEngine / LiquifyEngine / FilterBrushEngine / LassoEngine；ShapeBrushEngine 2026-09-09 随 ADR-0013 删 → 2026-09-18 回滚复活）。统一节律 begin/extend/end/cancel。pixel-stroke 家族的成员判定与 begin 期策略 = `engine-registry.ts` 的纯数据表（加引擎 = 加一行）。
+_Avoid_: ShapesEngine（旧名——v257 删掉的 ctx.fillRect 直填旧实现）, 尺子 / 几何修饰模式（ADR-0013，2026-09-18 已回滚删除：形状是笔，不是辅助对象）
 
-**尺子（Ruler / ruler-ui）**:
-（**2026-09-10 晚插头已拔**：user「ui 问题非常大，先把几何尺拔了，代码留着」——`src/app.ts` 一行 import + 三行 init/set 注释掉，下面描述的是代码现状、不是线上行为；下礼拜研究。）
-几何 = 与动词正交的**修饰模式**，任何在册工具（画笔/橡皮/手指族/选区笔，`RULER_ROLES`）都能开（ADR-0013 修订 ③，2026-09-10；supersede ADR-0005 §2/§3 与 09-09 的左栏尺钮版）。状态 `desk.ruler`（per-doc，doc 变换 remap）：`use = off|drag|trace`，`on` = 吸尺。**拖画**（默认）= 旧形状笔手势活在任何工具上：`src/shape-stroke.ts` 的 decorator 把内引擎（BrushEngine / FilterBrushEngine / 选区笔借的 brush）包成「拖一下 = 整形」，每个输入事件批从头重驱，笔触本身就是预览；**留尺** = 拖出来的形留在画布当尺（五种：`src/ruler.ts` 平行线 / 透视 / 椭圆 / 矩形 / 格线，透视尺 = 透视框本身），关几何后各工具的徒手点在 `input.ts _move` 唯一切口过尺投影再进引擎，笔压/taper/间距归笔。input 只有两个可选 provider（`setRulerGuideProvider` / `setStrokeShaper`），不 import 任何几何脚本——几何脚本删掉程序最小修复照跑。入口 A = 几何条 `#rulerToolbar`（`src/ruler-ui.ts`，上下文条区固定尾位：右对齐 chip，有别的条挂它下面一行；关 = 一颗 chip）；S 键开关；overlay 走 `board._drawGuides`。左栏 = 两滑条 + 吸管，永远在。
-_Avoid_: 手势识别自动 snap（ADR-0005 §1，仍被否）, 尺子手柄/gizmo 编辑（Q2 默认无手柄）, 尺落像素（要参考线 = 用它当尺画一笔）, 第四个 stroke 引擎（形状笔引擎已删；decorator 不是引擎，它包引擎）, 旧 src/shapes.js 的直填路线, 左栏放工具钮 / 左栏按 context 显隐（2026-09-10 user 打回）, 放置态 transient + DOM 捕获层（吃手势、掌触能放尺，2026-09-10 撤）, 抬手才落 + 草稿预览（user「旧版本的是用不着预览」）
+**形状笔（ShapeBrushEngine / shape-toolbar）**:
+一个 shape = 一个 stroke 的**笔**（ADR-0005；2026-09-18 回滚复活，user「行为回滚到那时候。不当笔刷模式了」）：按下→拖动（live 预览 = 每 move 按当前几何整形重合成）→抬手落像素，恒压 0.5、无 taper，共享 brush 笔架。子工具 line / rect / circle(圆·弧拟合) / grid（头身比格），每种各自的约束槽（15° 吸附 / 正方 / 正圆；Shift 临时反转），透视 frame 下吸 VP / 平面正形。入口 = 顶栏独立动词位 `data-verb="shape"`（ADR-0012 修订 ⑦），S 键；形状条 = `src/shape-toolbar.ts` 工厂条；状态 `desk.shapeBrush`（per-doc）。
+_Avoid_: 手势识别自动 snap（ADR-0005 §1）, adjusting 态 / 手柄 / gizmo / 确认钮（§2）, 尺子 / 几何修饰模式（ADR-0013，已回滚）, 笔位子工具（ADR-0012 §2 旧案；形状是独立按钮）, 形状条私有定位（叠放归 context-toolbar 工厂）
 
-**透视 frame（PerspConfig / [[尺子（Ruler / ruler-ui）]] 的透视尺）**:
-尺子的几何参考系（ADR-0006；原形状笔全局 frame，2026-09-09 起 = 透视尺本身 + 其他尺放置时的平面）：align-to-viewport（默认）或透视平面。配置 per-ora（`desk.persp`）：VP 0-3（vp1/vp2 水平对按 x 排序 + lockHorizon 默认开；vp3 竖直族=三点透视，只有位置）+ 参考点 + 平面（地板/墙/左墙/右墙——按 VP 数动态过滤）。核心机制 = **两角定形→单位方 homography**（`src/perspective-frame.ts`）：透视矩形=四边形、透视椭圆=内切圆的像、grid 间距=cross-ratio；正方/正圆约束走 **planeMetric**（v0.6.10 经典约定重建视点→平面欧氏度量，推翻早期"不可定义"判决）。isometric 模式（v0.6.20）：PerspConfig.axes 三平行族（2:1 惯例固定轴），零奇点走仿射路径、度量解析仿射、编辑面 = box 独任（persp.iso.box）。地平线奇点：**无路径"结构性免疫"**（两角定形的导出角跨线即落奇点，v0.6.18 修"天空第二个矩形"）——quadFromCorners 跨线走 chart 平面坐标、越线角垂直回缩钉 ε 带；徒手拟合走 chart 的 **ε 规则**（pencil 枚举坐标 1/max(w,ε) 饱和、平行枚举坐标真发散 clamp +BIG 不翻负）。像素透视圆 = Zingl 有理二次 Bézier（`src/pixel-conic.ts`，权重解析零可调）。VP 编辑 = crop 同款 transient（`src/persp-edit.ts`，DOM 手柄画布外可拖、参考点射线只在编辑模式显示）。doc 裁剪/旋转/翻转/偏移 → `wp2.persp.remapForDocTransform`（PerspComponent，recorded；T4d——记账面刻意收窄=只有 doc 变换 remap，VP 编辑器仍 desk 直写不进栈，user 拍板「VP setting 不进 undo history」；旧 docTransform persp 信封退役）。
-_Avoid_: 尺笔自带透视模式（被全局 frame 吃掉）, 3D grid（弃案：两角点拖不出第三轴，手动画）, grid 最小间距护栏（弃案：不可控）, 把 VP 存 viewport/设备态（它是画的属性，跟 ora 走）
+**透视 frame（PerspConfig / [[形状笔（ShapeBrushEngine / shape-toolbar）]] 的全局 frame）**:
+形状笔的全局几何参考系（ADR-0006；2026-09-18 起随形状笔回滚复原）：align-to-viewport（默认）或透视平面。配置 per-ora（`desk.persp`）：VP 0-3（vp1/vp2 水平对按 x 排序 + lockHorizon 默认开；vp3 竖直族=三点透视，只有位置）+ 参考点 + 平面（地板/墙/左墙/右墙——按 VP 数动态过滤）。核心机制 = **两角定形→单位方 homography**（`src/perspective-frame.ts`）：透视矩形=四边形、透视椭圆=内切圆的像、grid 间距=cross-ratio；正方/正圆约束走 **planeMetric**（v0.6.10 经典约定重建视点→平面欧氏度量，推翻早期"不可定义"判决）。isometric 模式（v0.6.20）：PerspConfig.axes 三平行族（2:1 惯例固定轴），零奇点走仿射路径、度量解析仿射、编辑面 = box 独任（persp.iso.box）。地平线奇点：**无路径"结构性免疫"**（两角定形的导出角跨线即落奇点，v0.6.18 修"天空第二个矩形"）——quadFromCorners 跨线走 chart 平面坐标、越线角垂直回缩钉 ε 带；徒手拟合走 chart 的 **ε 规则**（pencil 枚举坐标 1/max(w,ε) 饱和、平行枚举坐标真发散 clamp +BIG 不翻负）。像素透视圆 = Zingl 有理二次 Bézier（`src/pixel-conic.ts`，权重解析零可调）。VP 编辑 = crop 同款 transient（`src/persp-edit.ts`，DOM 手柄画布外可拖、参考点射线只在编辑模式显示）。doc 裁剪/旋转/翻转/偏移 → `wp2.persp.remapForDocTransform`（PerspComponent，recorded；T4d——记账面刻意收窄=只有 doc 变换 remap，VP 编辑器仍 desk 直写不进栈，user 拍板「VP setting 不进 undo history」；旧 docTransform persp 信封退役）。
+_Avoid_: 形状笔子工具自带透视模式（被全局 frame 吃掉）, 3D grid（弃案：两角点拖不出第三轴，手动画）, grid 最小间距护栏（弃案：不可控）, 把 VP 存 viewport/设备态（它是画的属性，跟 ora 走）
 _Avoid_: tool (tool 是 UI 层的工具选择), brush (brush 专指圆笔引擎)
 
 **Stroke smoother**:

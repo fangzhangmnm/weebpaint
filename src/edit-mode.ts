@@ -46,6 +46,8 @@ const CAPS: Record<string, Cap> = {
   // filterBrush allowsColor:true（2026-09-05）：手指的「带颜料」变体吃 state.color；液化/模糊不吃但禁用色板
   //   按钮误导（同 eraser 那条 2026-06-06 的理由）。
   filterBrush: { canDraw: true,  allowsColor: true,  cursor: "brush", ctrlZ: "history",         transient: false }, // liquify/色彩笔/手指 = payload
+  // 形状笔（ADR-0005）：一个 shape = 一个 stroke 的笔（对标滤镜笔），非 gizmo 对象——本行=克隆 brush（2026-09-18 回滚复活，ADR-0013 已回滚）
+  shapeBrush:  { canDraw: true,  allowsColor: true,  cursor: "brush", ctrlZ: "history",         transient: false },
   // 非绘画持久工具
   picker:      { canDraw: false, allowsColor: true,  cursor: "none",  ctrlZ: "history",         transient: false },
   lasso:       { canDraw: false, allowsColor: true,  cursor: "none",  ctrlZ: "history",         transient: false },
@@ -62,7 +64,6 @@ const CAPS: Record<string, Cap> = {
   // ADR-0006 VP 编辑（crop 同款半模态）：拖消失点/参考 box gizmo；v0.8.29 ctrl-z=history
   //   （user 2026-08-10「拖一次可以undo一次」——每拖一步入栈，undo 逐拖回退；点工具=apply）
   perspEdit:   { canDraw: false, allowsColor: false, cursor: "none",  ctrlZ: "history",         transient: true, onToolSwitch: "apply", returnTo: null },
-  // （ADR-0013 的 rulerPlace 半模态 2026-09-10 退役：放尺 = 几何修饰模式下的一笔正常手势，不再是 transient；修订 ③）
   crop:        { canDraw: false, allowsColor: false, cursor: "none",  ctrlZ: "abort-transient", transient: true, onToolSwitch: "apply", returnTo: null },
   adjust:      { canDraw: false, allowsColor: false, cursor: "none",  ctrlZ: "abort-transient", transient: true, onToolSwitch: "apply", returnTo: null },
 };

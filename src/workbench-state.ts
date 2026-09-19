@@ -18,7 +18,6 @@
 //   （全局 pressureToSize/Opacity 已 deprecate 2026-07-14 → 每笔自带的 sizeCoeff/opaCoeff，见 brush.ts:397。）
 
 import { reactive } from "../vendor/vue/vue.esm-browser.prod.js";
-import { remapRuler, sanitizeRuler } from "./ruler.ts";   // ADR-0013 尺子 remap / 载入校验
 import type { EditorRuntimeState, DialReactive, ToolDial } from "./app-context.ts";
 
 // 编辑器 RAM 态的形状契约见 AppContext（EditorRuntimeState / DialReactive）——本模块是其唯一构造者。
@@ -176,16 +175,14 @@ function freshGroups() {
     lassoTool:     { sub: "freehand" as string, setOp: "new" as string, constrainSquare: false, algo: "classic" as string, showAnts: true },
     fillTool:      { sub: "magic" as string, setOp: "union" as string, constrainSquare: false, algo: "lineart" as string, showAnts: true },
     // 2026-09-06 ADR-0012 动词位的当前子工具（顶栏钮面图标随之换；user 批准 per-doc 持久化）：
-    //   brush: freehand|shape · eraser: pixel · smudge: smear|dull|blur|sharpen|liquify · lasso: select|fill（表 = common/verbs.ts）
-    subTool:       { brush: "freehand" as string, eraser: "pixel" as string, smudge: "smear" as string, lasso: "select" as string },
+    //   brush: freehand · eraser: pixel · smudge: smear|dull|blur|sharpen|liquify · lasso: select|fill · shape: shape（表 = common/verbs.ts）
+    subTool:       { brush: "freehand" as string, eraser: "pixel" as string, smudge: "smear" as string, lasso: "select" as string, shape: "shape" as string },
     // （v0.7.25 曾有 desk.selPen 变体/笔径组，v0.7.26 笔架化后退役——配置归 toolStates.selPen
     //   + 笔架 collection；老 doc 里的 stale 键被 mergeInto 静默忽略）
-    // ADR-0013 几何 / 尺子（2026-09-09，user「先做」= 持久化同意；ADR-0005 形状笔组 shapeBrush 随引擎退役，老 doc 的 stale 键 mergeInto 静默忽略）：
-    //   per-doc 跟画走。use = 几何修饰模式（2026-09-10 修订 ③）："off" 关 | "drag" 拖画（任何工具拖一下 = 整形，旧形状笔手势）| "trace" 留尺
-    //   （拖出来的形留在画布当尺）。on = 吸尺开关（画笔/橡皮/手指/选区笔沿已放的尺走）；kind = 尺种（ruler.ts RulerKind）；constrain = 约束
-    //   （15°/正方/正圆）；geo = 放好的尺（ruler.ts Ruler，doc 系；persp 尺无 geo）；gridNu/gridNv = 格线行列（默认 2×6 = 6 头身 + 中线）。
-    //   （09-09 的 use 只有 drag|trace 且默认 trace；09-10 起 off 是默认——老 dev doc 里存的 drag/trace 会以「几何开着」打开，条上一键关。）
-    ruler:         { on: false, kind: "parallel" as string, constrain: false, geo: null as unknown, gridNu: 2, gridNv: 6, use: "off" as string },
+    // ADR-0005 形状笔（per-doc 跟画走）：sub = 当前子工具（line / rect / circle / grid）；constrain* = 每种图形各自的约束（15° 吸附 / 正方 / 正圆，
+    //   user 2026-07-25：分槽持久化，默认全不锁）；gridNu/gridNv/gridBorder = 格线列/行/外框（默认 2×6 = 6 头身 + 中线，外框关）。
+    //   （2026-09-09 随 ADR-0013 尺子模型退役、组名改 ruler → 2026-09-18 回滚复活；老 dev doc 里的 stale ruler 键被 mergeInto 静默忽略。）
+    shapeBrush:    { sub: "line" as string, constrainLine: false, constrainRect: false, constrainCircle: false, gridNu: 2, gridNv: 6, gridBorder: false },
     // ADR-0006 透视 frame（形状笔全局、per-ora）：VP 0-3 + 锁地平线（默认开）+ 参考点 + 当前平面。
     //   坐标 doc 空间、snap 像素中线 +0.5。裁剪/旋转/翻转/偏移画布时必须过 remapShapePersp（doc-ops 挂钩）。
     persp: {
@@ -323,6 +320,7 @@ export const desk = {
     get eraser(): string { return S.g.subTool.eraser; }, set eraser(v: string) { S.g.subTool.eraser = v; },
     get smudge(): string { return S.g.subTool.smudge; }, set smudge(v: string) { S.g.subTool.smudge = v; },
     get lasso(): string { return S.g.subTool.lasso; }, set lasso(v: string) { S.g.subTool.lasso = v; },
+    get shape(): string { return S.g.subTool.shape; }, set shape(v: string) { S.g.subTool.shape = v; },
   },
   lassoTool: {
     get sub(): string { return S.g.lassoTool.sub; }, set sub(v: string) { S.g.lassoTool.sub = v; },
@@ -354,15 +352,14 @@ export const desk = {
     get lineartTipSens(): number { return S.g.magicWand.lineartTipSens; }, set lineartTipSens(v: number) { S.g.magicWand.lineartTipSens = v; },
     get lineartBleed(): number { return S.g.magicWand.lineartBleed; }, set lineartBleed(v: number) { S.g.magicWand.lineartBleed = v; },
   },
-  ruler: {
-    get on(): boolean { return S.g.ruler.on; }, set on(v: boolean) { S.g.ruler.on = v; },
-    get kind(): string { return S.g.ruler.kind; }, set kind(v: string) { S.g.ruler.kind = v; },
-    get constrain(): boolean { return S.g.ruler.constrain; }, set constrain(v: boolean) { S.g.ruler.constrain = v; },
-    /** 放好的尺（ruler.ts Ruler | null）。读方经 sanitizeRuler 校验（文件来的 JSON）。 */
-    get geo(): unknown { return S.g.ruler.geo; }, set geo(v: unknown) { S.g.ruler.geo = v; },
-    get gridNu(): number { return S.g.ruler.gridNu; }, set gridNu(v: number) { S.g.ruler.gridNu = v; },
-    get gridNv(): number { return S.g.ruler.gridNv; }, set gridNv(v: number) { S.g.ruler.gridNv = v; },
-    get use(): string { return S.g.ruler.use; }, set use(v: string) { S.g.ruler.use = v; },
+  shapeBrush: {
+    get sub(): string { return S.g.shapeBrush.sub; }, set sub(v: string) { S.g.shapeBrush.sub = v; },
+    get constrainLine(): boolean { return S.g.shapeBrush.constrainLine; }, set constrainLine(v: boolean) { S.g.shapeBrush.constrainLine = v; },
+    get constrainRect(): boolean { return S.g.shapeBrush.constrainRect; }, set constrainRect(v: boolean) { S.g.shapeBrush.constrainRect = v; },
+    get constrainCircle(): boolean { return S.g.shapeBrush.constrainCircle; }, set constrainCircle(v: boolean) { S.g.shapeBrush.constrainCircle = v; },
+    get gridNu(): number { return S.g.shapeBrush.gridNu; }, set gridNu(v: number) { S.g.shapeBrush.gridNu = v; },
+    get gridNv(): number { return S.g.shapeBrush.gridNv; }, set gridNv(v: number) { S.g.shapeBrush.gridNv = v; },
+    get gridBorder(): boolean { return S.g.shapeBrush.gridBorder; }, set gridBorder(v: boolean) { S.g.shapeBrush.gridBorder = v; },
   },
   persp: {
     get mode(): string { return S.g.persp.mode; }, set mode(v: string) { S.g.persp.mode = v; },
@@ -447,12 +444,6 @@ export function remapShapePersp(f: (p: { x: number; y: number }) => { x: number;
     if (slot.box) slot.box = { A: f(slot.box.A), t: slot.box.t };
   }
   if (opts.unlockHorizon && (g.p2.vp1 || g.p3.vp1)) g.lockHorizon = false;
-}
-
-// ADR-0013 尺子随 doc 几何变换走（同 remapShapePersp；desk 直写，不进 undo——放置本身也不进 undo，重拖即换）。
-export function remapDeskRuler(f: (p: { x: number; y: number }) => { x: number; y: number }): void {
-  const r = sanitizeRuler(S.g.ruler.geo);
-  if (r) S.g.ruler.geo = remapRuler(r, f);
 }
 
 // 透视配置快照/还原（docTransform undo 信封用；深拷贝，desk 无自身 undo 所以只随 doc 变换走）
