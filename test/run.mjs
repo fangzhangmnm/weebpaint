@@ -163,6 +163,7 @@ import "./color-mix.test.ts";               // 2026-09-05 混色空间（srgb / 
 import "./smudge-engine.test.mjs";          // 2026-09-05 手指/涂抹引擎（smear/dull/paint，premult，夹 doc，选区，lockAlpha）
 import "./smudge-plugin.test.mjs";          // 2026-09-05 手指插件：ResolvedBrush→设置映射 + Filter brush 契约跑一笔
 import "./smudge-wet.test.mjs";              // 2026-09-06 湿画笔补全（稀释/压感反向/多分辨率/记忆解耦；handoff 20260906-wet-brush）
+import "./smudge-golden.test.mjs";          // 2026-09-18 手指 GPU 化轮：旧 CPU 引擎录的 golden 锚（fixtures/smudge-golden.json），新引擎 ±2/255 对拍
 import "./color-brush-premul.test.mjs";     // 2026-09-05 滤镜笔混回图层末步预乘（模糊黑边残留回归）
 import "./color-brush-spacing.test.mjs";    // 2026-09-05 晚 模糊/锐化间距地板 10%（user「有模糊的话改回10%」；大滤镜笔性能）
 import "./color-brush-wash.test.mjs";       // 2026-09-06 模糊/锐化 wash 幂等：来回描 = 描一遍 / 满覆盖处 = 一次滤波 / 密疏间距同值（议程 §E）
