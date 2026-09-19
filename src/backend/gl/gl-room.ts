@@ -65,7 +65,8 @@ export interface FillOverlayInput {
   lockAlpha: boolean;
   selMask: { data: Uint8Array; ox: number; oy: number; ow: number; oh: number };
 }
-export type OverlayInput = StampOverlayInput | FillOverlayInput | RegionOverlayInput;   // region（2026-09-18）：W 当 overlay，replace 合成
+export type OverlayInput = StampOverlayInput | FillOverlayInput | RegionOverlayInput;
+type OverlayEntry = { tex: Gl2TexSource; layerId: number; opacity: number; erase: boolean; blendMode: string; ox: number; oy: number; ow: number; oh: number; lockAlpha: boolean; selMask: { tex: Gl2Texture; ox: number; oy: number; ow: number; oh: number } | null; replace: boolean };   // region（2026-09-18）：W 当 overlay，replace 合成
 
 // overlay 空判据（kind-aware——fill 没有 stamps，旧 stamps.length 守卫会把 fill 静默早退成 false）。
 export function overlayEmpty(ov: OverlayInput): boolean {
@@ -88,8 +89,9 @@ export class GlRoom {
   readonly leaves = new Map<number, LeafRec>();
 
   // pseudo 装置（overlay/float/选区 mask/fill 色）——live 预览与一次性合成（吸管 WYSIWYG）共用。
-  private _overlay: { tex: Gl2TexSource; layerId: number; opacity: number; erase: boolean; blendMode: string; ox: number; oy: number; ow: number; oh: number; lockAlpha: boolean; selMask: { tex: Gl2Texture; ox: number; oy: number; ow: number; oh: number } | null; replace: boolean } | null = null;
-  private _overlayOwnedFBO: PooledFBO | null = null;
+  // overlay 装置（2026-09-19 多 overlay：组液化 = N 叶各一张 W；原单槽 _overlay 升成按叶的表，语义不变：一叶最多一个 overlay）
+  private _overlays = new Map<number, OverlayEntry>();
+  private _overlayOwnedFBOs: PooledFBO[] = [];   // stamp 分支借的 straight 转换 FBO（帧末 / commit 后归还）
   private _selTex: Gl2Texture | null = null;
   private _selTexSrc: Uint8Array | null = null;
   private _fillTex: Gl2Texture | null = null;    // fill-mode：1×1 填色纹理（颜色变才重传）
@@ -99,7 +101,7 @@ export class GlRoom {
   private _floats = new Map<number, FloatDesc>();
 
   // v0.4.11：live 描边中给 clip-above 用的 merged(base⊕stroke) 整幅纹理（帧内缓存，帧末归还）。
-  private _liveMergedClip: PooledFBO | null = null;
+  private _liveMergedClips = new Map<number, PooledFBO>();   // 按 clip 基底叶（多 overlay 时各自一张 merged）
 
   // 内容失效信号：RasterService.bakeStamps 落了新像素 → RenderTree 置脏重算树（facade 互不知晓）。
   private _invalidateListeners: (() => void)[] = [];
@@ -141,7 +143,7 @@ export class GlRoom {
     if (this._fillTex) { this.glctx.deleteTexture(this._fillTex); this._fillTex = null; this._fillTexColor = -1; }
     for (const e of this._floatTex.values()) this.glctx.deleteTexture(e.tex);
     this._floatTex.clear(); this._floats.clear();
-    this._overlay = null;
+    this._overlays.clear();
     this._invalidateListeners = [];
     this.arena.dispose();
   }
@@ -154,8 +156,8 @@ export class GlRoom {
     this._selTex = null; this._selTexSrc = null;
     this._fillTex = null; this._fillTexColor = -1;
     this._floatTex.clear(); this._floats.clear();
-    this._overlay = null; this._overlayOwnedFBO = null;
-    this._liveMergedClip = null;   // GL 句柄已随 context 死
+    this._overlays.clear(); this._overlayOwnedFBOs = [];
+    this._liveMergedClips.clear();   // GL 句柄已随 context 死
   }
 
   // ---- sync：CPU tile → GPU 驻留（原 RenderTreeGL._syncPixels 族） ----
@@ -231,21 +233,21 @@ export class GlRoom {
   }
 
   // ---- plan 翻译（读 pseudo 装置旗） ----
-  toPlanNodes(nodes: DocNode[], updated: Set<number>, overlayLeafId: number | null, leafById: Map<number, DocLeaf>): PlanNode[] {
+  toPlanNodes(nodes: DocNode[], updated: Set<number>, overlayLeafIds: ReadonlySet<number>, leafById: Map<number, DocLeaf>): PlanNode[] {
     return nodes.map((n): PlanNode => {
       if (!n.isGroup) {
         leafById.set(n.id, n);
         return {
           kind: "leaf", id: n.id, opacity: n.opacity, mode: safeMode(n.mode), clip: !!n.clippingMask,
           visible: !!n.visible, hasContent: n.pixels.tileCount > 0,
-          float: this._floats.has(n.id), overlay: overlayLeafId === n.id && !!this._overlay,
+          float: this._floats.has(n.id), overlay: overlayLeafIds.has(n.id) && this._overlays.has(n.id),
         };
       }
       return {
         kind: "group", id: n.id, opacity: n.opacity,
         mode: n.mode === "pass-through" ? "pass-through" : safeMode(n.mode),
         clip: !!n.clippingMask, visible: !!n.visible,
-        children: this.toPlanNodes(n.children, updated, overlayLeafId, leafById),
+        children: this.toPlanNodes(n.children, updated, overlayLeafIds, leafById),
       };
     });
   }
@@ -260,7 +262,7 @@ export class GlRoom {
         if (!rec) continue;   // sync 降级（超 quota）→ 跳层（自愈后回来）
         const clipIdx = step.clipBaseId !== null ? this.leaves.get(step.clipBaseId)?.index ?? null : null;
         const clipTex = this.liveClipTexFor(step.clipBaseId, docW, docH);
-        const ov = step.overlay && this._overlay && this._overlay.layerId === step.id ? this.overlayDesc() : null;
+        const ov = step.overlay ? this.overlayDescFor(step.id) : null;
         this.comp.pass(arena, ov ? "overlay" : "tiled", rec.index, null, step.mode as BlendMode, step.opacity, clipIdx, acc, docW, docH, ov, clipTex);
       } else if (step.t === "seg") {
         // transient 优先（v0.4.11）：compositeOnce 把所有段都现算进 transient——若先查段缓存
@@ -305,46 +307,67 @@ export class GlRoom {
   //   现算一张、帧内缓存。修「clip 层不实时跟随基底 live 笔迹」（真机 2026-07-22）。
   //   基底非活动叶 / 无描边 → null（走原 tile-index 路径）。
   liveClipTexFor(clipBaseId: number | null, docW: number, docH: number): Gl2TexSource | null {
-    if (clipBaseId === null || !this._overlay || this._overlay.layerId !== clipBaseId) return null;
-    if (!this._liveMergedClip) {
+    if (clipBaseId === null) return null;
+    const ovDesc = this.overlayDescFor(clipBaseId);
+    if (!ovDesc) return null;
+    let cached = this._liveMergedClips.get(clipBaseId);
+    if (!cached) {
       const rec = this.leaves.get(clipBaseId);
-      const ovDesc = this.overlayDesc();
-      if (!rec || !ovDesc) return null;
+      if (!rec) return null;
       const acc = this.comp.newAcc(docW, docH);
       this.comp.pass(this.arena, "overlay", rec.index, null, "source-over", 1, null, acc, docW, docH, ovDesc);
-      this._liveMergedClip = this.comp.finishAcc(acc);
+      cached = this.comp.finishAcc(acc);
+      this._liveMergedClips.set(clipBaseId, cached);
     }
-    return this._liveMergedClip;
+    return cached;
   }
 
   // 帧末/一次性合成收尾：归还 liveMergedClip 帧内缓存。
   releaseLiveClip(): void {
-    if (this._liveMergedClip) { this.glctx.returnFBO(this._liveMergedClip); this._liveMergedClip = null; }
+    for (const f of this._liveMergedClips.values()) this.glctx.returnFBO(f);
+    this._liveMergedClips.clear();
   }
 
   // ---- pseudo 装置（原 RenderTreeGL 迁入，行为不变） ----
-  get hasOverlay(): boolean { return !!this._overlay; }
-  get overlayLayerId(): number | null { return this._overlay?.layerId ?? null; }
+  get hasOverlay(): boolean { return this._overlays.size > 0; }
+  get overlayLayerId(): number | null { for (const id of this._overlays.keys()) return id; return null; }
 
+  /** 任一 overlay（bakeStamps 单 overlay 场景用）；多 overlay 时 = 第一个。 */
   overlayDesc(): OverlayDesc | null {
-    const ov = this._overlay;
-    if (!ov) return null;
+    for (const ov of this._overlays.values()) return this._descOf(ov);
+    return null;
+  }
+  /** 某叶的 overlay（合成 leaf pass / clip 基底用）；没有 = null。 */
+  overlayDescFor(layerId: number): OverlayDesc | null {
+    const ov = this._overlays.get(layerId);
+    return ov ? this._descOf(ov) : null;
+  }
+  private _descOf(ov: OverlayEntry): OverlayDesc {
     return { tex: ov.tex, opacity: ov.opacity, erase: ov.erase, blendMode: safeMode(ov.blendMode), ox: ov.ox, oy: ov.oy, ow: ov.ow, oh: ov.oh, lockAlpha: ov.lockAlpha, selMask: ov.selMask, replace: ov.replace };
   }
 
-  clearOverlay(): void { this._overlay = null; }
+  clearOverlay(): void { this._overlays.clear(); }
   // overlay 自有 FBO（stamp 分支借的 straight 转换结果）归还。commit/一次性合成用完即还；
   // renderFrame 帧末还（_overlay 引用下帧重灌）。
   releaseOverlayFBO(): void {
-    if (this._overlayOwnedFBO) { this.glctx.returnFBO(this._overlayOwnedFBO); this._overlayOwnedFBO = null; }
+    for (const f of this._overlayOwnedFBOs) this.glctx.returnFBO(f);
+    this._overlayOwnedFBOs = [];
   }
 
-  setStampOverlay(ov: OverlayInput, docW: number, docH: number): void {
-    if (overlayEmpty(ov)) { this._overlay = null; return; }
+  /** 单 overlay 便利口（bakeStamps / 旧调用点）= setStampOverlays([ov])。 */
+  setStampOverlay(ov: OverlayInput, docW: number, docH: number): void { this.setStampOverlays([ov], docW, docH); }
+  /** 装一帧的全部 overlay（每叶最多一个；空的跳过）。上一帧 stamp 分支借的 FBO 在此归还（与旧单槽「换新时还旧」同序）。 */
+  setStampOverlays(list: readonly OverlayInput[], docW: number, docH: number): void {
+    this.releaseOverlayFBO();
+    this._overlays.clear();
+    for (const ov of list) this._addOverlay(ov, docW, docH);
+  }
+  private _addOverlay(ov: OverlayInput, docW: number, docH: number): void {
+    if (overlayEmpty(ov)) return;
     if ("kind" in ov && ov.kind === "region") {
       // 区域程序（2026-09-18）：W（doc 尺寸 straight u8，RegionStroke 持有）直接当 overlay，合成 replace——bbox 内 = W 直值。
       //   不借 FBO（纹理归 RegionStroke，dispose 归它）；opacity/erase/lockAlpha/选区都已在 W 里，这里全关。
-      this._overlay = { tex: ov.tex, layerId: ov.layerId, opacity: 1, erase: false, blendMode: "source-over", ox: 0, oy: 0, ow: docW, oh: docH, lockAlpha: false, selMask: null, replace: true };
+      this._overlays.set(ov.layerId, { tex: ov.tex, layerId: ov.layerId, opacity: 1, erase: false, blendMode: "source-over", ox: 0, oy: 0, ow: docW, oh: docH, lockAlpha: false, selMask: null, replace: true });
       return;
     }
     if ("kind" in ov && ov.kind === "fill") {
@@ -358,7 +381,7 @@ export class GlRoom {
         this._fillTexColor = colorKey;
       }
       const selMask = this._uploadSelMask(ov.selMask);
-      this._overlay = { tex: this._fillTex, layerId: ov.layerId, opacity: 1, erase: false, blendMode: "source-over", ox: ov.bx, oy: ov.by, ow: ov.bw, oh: ov.bh, lockAlpha: ov.lockAlpha, selMask, replace: false };
+      this._overlays.set(ov.layerId, { tex: this._fillTex, layerId: ov.layerId, opacity: 1, erase: false, blendMode: "source-over", ox: ov.bx, oy: ov.by, ow: ov.bw, oh: ov.bh, lockAlpha: ov.lockAlpha, selMask, replace: false });
       return;
     }
     // 整屏 doc FBO + scissor（池每帧同尺寸命中零 malloc)；着色靠 scissor 限回 stamp bbox。
@@ -366,10 +389,9 @@ export class GlRoom {
     const fboS = this.glctx.borrowFBO(docW, docH, "u8");
     this.comp.presentTo(fboP, fboS, docW, docH, true);   // 栅格器预乘 → straight
     this.glctx.returnFBO(fboP);
-    if (this._overlayOwnedFBO) this.glctx.returnFBO(this._overlayOwnedFBO);
-    this._overlayOwnedFBO = fboS;
+    this._overlayOwnedFBOs.push(fboS);
     const selMask = ov.selMask ? this._uploadSelMask(ov.selMask) : null;
-    this._overlay = { tex: fboS, layerId: ov.layerId, opacity: ov.opacity, erase: ov.erase, blendMode: ov.blendMode, ox: 0, oy: 0, ow: docW, oh: docH, lockAlpha: ov.lockAlpha, selMask, replace: false };
+    this._overlays.set(ov.layerId, { tex: fboS, layerId: ov.layerId, opacity: ov.opacity, erase: ov.erase, blendMode: ov.blendMode, ox: 0, oy: 0, ow: docW, oh: docH, lockAlpha: ov.lockAlpha, selMask, replace: false });
   }
 
   // 选区 mask 上传（stamp/fill 两分支共用）：单张复用纹理，buffer 身份即内容（Selection 不可变）。

@@ -671,13 +671,14 @@ export class Board {
     //   （执行器 contentVersion 快路径每帧只重传变更 tile）。液化/filterBrush/形状笔 pixelMode
     //   改走 _glSurrogates 的影子变体（C6 stroke 替身叶，同一条增量 sync 路）。
     const liveSync = this._liveSyncProvider?.() ?? null;
-    const stampOverlay = this._glStampOverlay();
-    this._lastStampCount = this._showFps ? ((stampOverlay && !("kind" in stampOverlay)) ? stampOverlay.stamps.length : 0) : 0;   // HUD only（fill overlay 无 stamps）
+    const overlays = this._glOverlays();
+    const brushOv = overlays.find((o) => !("kind" in o)) as StampOverlayInput | undefined;
+    this._lastStampCount = this._showFps ? (brushOv ? brushOv.stamps.length : 0) : 0;   // HUD only（fill/region overlay 无 stamps）
     this._glBoard!.render(
       this.doc as unknown as GLDoc,
       this._docTransformParams(),
       W, H, this.viewport.scale, this._voidColor, docBg,
-      this._glFloatInputs(), stampOverlay,
+      this._glFloatInputs(), overlays,
       liveSync as unknown as GLLeaf | null, this._glSurrogates(),
       // 点网格恒开（user 2026-08-30「没有transparency也应该有小点」）：白纸模式 doc 自身不透明，
       //   点只露在画布外的 void 区；透明显示时照旧透进 doc 内。
@@ -770,7 +771,7 @@ export class Board {
   _stampProvider: (() => StampCollect) | null = null;
   // 2026-09-18 区域程序：描边期的 GPU 驻留写靶（手指 / 模糊 / 锐化）。open 记住叶（commit 要 pixels + applyRegionDiff），
   //   set 挂成 overlay 源（每帧 region.overlay() 现取，dirty 会长）。与 stamp/fill overlay 互斥（单令牌墙）。
-  _strokeRegion: RegionStroke | null = null;
+  _strokeRegions: RegionStroke[] = [];   // 描边中的 GPU 写靶（单叶 1 个；组液化 N 个）→ 每帧各自 overlay()
   _regionLayers = new Map<RegionStroke, ViewLeaf>();
   setStampProvider(fn: () => StampCollect) { this._stampProvider = fn; }
 
@@ -790,20 +791,22 @@ export class Board {
 
   // GPU brush stamp overlay（live 每帧；替 CPU overlayCanvas）。
   //   v0.5.11：同一 overlay 槽复用给 fill 预览（brush 优先；lasso 模式下 brush 必空 → 结构上互斥）。
-  _glStampOverlay(): OverlayInput | null {
-    if (this._strokeRegion) return this._strokeRegion.overlay();   // 区域程序描边中：W 当 overlay（replace）
+  // 本帧的全部 overlay（2026-09-19 多 overlay）：区域程序描边中 = 每个 RegionStroke 的 W（replace）；否则 brush stamp / fill 预览（互斥，至多一个）。
+  _glOverlays(): OverlayInput[] {
+    if (this._strokeRegions.length) return this._strokeRegions.map((r) => r.overlay());
     const cs = this._stampProvider?.();
     const brush = (cs && cs.stamps.length) ? this._overlayInputFrom(cs) : null;
     const fill = this._glFillOverlay();
     if (brush && fill) {
       // v0.7.25：fill 工具里用选区笔（有选区 → fill 预览 active）时两者合法共存——色带优先，
       //   抬笔选区并入后 fill 预览自然跟上。非色带撞车仍是接线坏了，响亮报错。
-      if ((cs as { selPenBand?: boolean } | null)?.selPenBand) return brush;
+      if ((cs as { selPenBand?: boolean } | null)?.selPenBand) return [brush];
       reportError(new Error("[board] stamp overlay and fill overlay both non-empty — edit-mode exclusivity broken"), "warning");
-      return brush;
+      return [brush];
     }
-    return brush ?? fill;
+    return brush ? [brush] : fill ? [fill] : [];
   }
+  _glFillOverlays(): OverlayInput[] { const f = this._glFillOverlay(); return f ? [f] : []; }
 
   // v0.7.25 选区笔抬笔出口：stamps → GPU 光栅 → α≥128 二值 gray8（选区恒二值不变量）。
   //   GL 不可用 → null（调用方走 CPU disc 回退）。
@@ -853,9 +856,9 @@ export class Board {
     this._regionLayers.set(region, layer);
     return region;
   }
-  setStrokeRegion(region: RegionStroke | null) {
-    this._strokeRegion = region;
-    if (!region) this._regionLayers.forEach((_l, r) => { if (r !== region) { /* 收口后忘记映射（commit 已删；cancel 路径在此清） */ } });
+  setStrokeRegion(region: RegionStroke | null) { this.setStrokeRegions(region ? [region] : []); }
+  setStrokeRegions(regions: readonly RegionStroke[]) {
+    this._strokeRegions = regions.slice();
     this.requestRender();
   }
   commitRegionStroke(region: RegionStroke): boolean {
@@ -964,7 +967,7 @@ export class Board {
   compositeDisplayBytes(nodes: readonly unknown[], docW: number, docH: number): { data: Uint8ClampedArray; w: number; h: number } | null {
     if (!this._glBoard) return null;
     return this._glBoard.compositeToBytes(nodes as unknown as Parameters<GLBoard["compositeToBytes"]>[0], docW, docH,
-      this._glSurrogates(), this._glFillOverlay());
+      this._glSurrogates(), this._glFillOverlays());
   }
 
   // 吸管 composite 取色（S8c，spec:243-244）：GL 一次性合成（compositeOnce，不建缓存）+ 1px readback。
@@ -975,7 +978,7 @@ export class Board {
     const docBg = this._showCheckerboard ? this._voidColor : "#ffffff";   // 白纸=显示常量；透明显示=主题底色（吸到的≈眼睛看到的，点网格忽略）
     // v0.4.11（拍板#8）：调整预览开着时取替身（WYSIWYG——吸到的=眼睛看到的）。
     // v0.5.11（user 拍板）：fill 预览挂着时同款待遇——吸到的=预览色，不是底下真实像素。
-    return this._glBoard.pickColor(this.doc as unknown as GLDoc, docBg, ix, iy, this._glSurrogates(), this._glFillOverlay());
+    return this._glBoard.pickColor(this.doc as unknown as GLDoc, docBg, ix, iy, this._glSurrogates(), this._glFillOverlays());
   }
   // 套索 overlay：
   //   drawing 期间：画 polyline overlay

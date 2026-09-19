@@ -524,7 +524,7 @@ function rendertreeParity(glctx: BrowserGl2Port, add: Add): void {
   };
   // renderFrame → 读 canvas backbuffer（默认 FB 行序自下而上 → 翻回 doc 行序）。
   const renderAndRead = (liveId: number | null): Uint8Array => {
-    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], null, [], liveId);
+    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], [], [], liveId);
     const raw = new Uint8Array(N * N * 4);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.readPixels(0, 0, N, N, gl.RGBA, gl.UNSIGNED_BYTE, raw);
@@ -648,7 +648,7 @@ function commitParity(glctx: BrowserGl2Port, add: Add): void {
       lockAlpha: c.lockAlpha, selMask: c.sel ? { data: selData, ox: bx, oy: by, ow: bw, oh: bh } : null,
     };
     // live 帧（overlay 在 shader 内合成显示）
-    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], ov as never, [], null);
+    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], [ov] as never, [], null);
     const live = readBack();
     // 远处 tile 句柄：commit 后必须不动（tile-diff 不背未变 tile）。bbox ⊂ 左上 → tile(1,1) 在外。
     const farBefore = pixels.getTileHandle(1, 1);
@@ -658,7 +658,7 @@ function commitParity(glctx: BrowserGl2Port, add: Add): void {
     // eslint 类似场合：私有 stats 只在 smoke 里窥（断言收养生效 = 下一帧零上传）。
     const bridge = room.bridge;
     const upBefore = bridge.stats.uploads;
-    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], null, [], null);
+    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], [], [], null);
     const committed = readBack();
     let md = 0, ai = -1;
     for (let i = 0; i < live.length; i++) { const d = Math.abs(live[i] - committed[i]); if (d > md) { md = d; ai = i; } }
@@ -742,14 +742,14 @@ function fillParity(glctx: BrowserGl2Port, add: Add): void {
     // golden 对比走 compositeOnce（透明底 FBO——屏幕 backbuffer 会被 void 清屏压掉透明度，不能当 golden 对比面）。
     //   这条路径同时就是吸管 pickColor 的合成面（一石二鸟）。
     {
-      const once = raster.compositeOnce(nodes as never, N, N, undefined, [], ov as never);
+      const once = raster.compositeOnce(nodes as never, N, N, undefined, [], [ov] as never);
       const px = glctx.readPixels(once, 0, 0, N, N);
       glctx.returnFBO(once);
       const { md, at } = maxPremulDiff(ref, px, N);
       add(`fill:overlay 合成${lockAlpha ? "+lockAlpha" : ""} vs CPU fillOnLayer golden`, md <= 4, `maxΔ=${md} ${md > 4 ? at : ""}`);
     }
     // live 帧（commit ≡ live 用；屏幕面）
-    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], ov as never, [], null);
+    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], [ov] as never, [], null);
     const live = readBack();
     // 导出安全：compositeOnce 不带 overlay = 预览不漏进导出（等于未填的 base 合成）。
     {
@@ -766,7 +766,7 @@ function fillParity(glctx: BrowserGl2Port, add: Add): void {
     // 吸管 WYSIWYG：带 overlay 在 mask=255 带内 = golden 所见（透明底直值，与 CPU ref 同面）。
     {
       const sx = bx + 150, sy = by + 80;   // mask=255 带
-      const pOv = raster.pickColor(nodes as never, N, N, undefined, sx, sy, [], ov as never);
+      const pOv = raster.pickColor(nodes as never, N, N, undefined, sx, sy, [], [ov] as never);
       let dOv = 0; const o = (sy * N + sx) * 4;
       for (let k = 0; k < 4; k++) dOv = Math.max(dOv, Math.abs(pOv[k] - ref[o + k]));
       add(`fill:${lockAlpha ? "lockAlpha " : ""}pickColor 带 overlay = golden 所见`, dOv <= 4, `maxΔ=${dOv}`);
@@ -794,7 +794,7 @@ function fillParity(glctx: BrowserGl2Port, add: Add): void {
     }
     const bridge = room.bridge;
     const upBefore = bridge.stats.uploads;
-    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], null, [], null);
+    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], [], [], null);
     const committed = readBack();
     let md2 = 0, ai = -1;
     for (let i = 0; i < live.length; i++) { const d = Math.abs(live[i] - committed[i]); if (d > md2) { md2 = d; ai = i; } }
@@ -841,11 +841,11 @@ function clipLiveParity(glctx: BrowserGl2Port, add: Add): void {
       stamps, shape: { hardness: 0.7, color: [0.2, 0.8, 0.3] as [number, number, number], buildup: false },
       bx, by, bw, bh, layerId: B.id, opacity: 1, erase, blendMode: "source-over", lockAlpha: false, selMask: null,
     };
-    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], ov as never, [], null);
+    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], [ov] as never, [], null);
     const live = readBack();
     const ok = raster.bakeStamps(B.id, basePx, ov as never, N, N, (px, x, y, w, h) => basePx.applyRegionDiff(x, y, w, h, px));
     add(`clipLive:${erase ? "erase" : "draw"} 提交成功`, ok);
-    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], null, [], null);
+    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], [], [], null);
     const committed = readBack();
     let md = 0, ai = -1;
     for (let i = 0; i < live.length; i++) { const d = Math.abs(live[i] - committed[i]); if (d > md) { md = d; ai = i; } }

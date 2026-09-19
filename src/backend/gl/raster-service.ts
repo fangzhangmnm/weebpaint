@@ -102,11 +102,11 @@ export class RasterService {
   //   surrogates（v0.4.11，拍板#8）：调整预览的替身叶换源——吸管 WYSIWYG（导出路径不传，仍取真像素）。
   //     复数（2026-08-28 组液化）：一次可挂 N 个 stroke 影子叶。
   //   overlay（v0.5.11）：fill 预览挂着时吸管也要 WYSIWYG——同款待遇；导出路径不传，预览不漏进导出。
-  compositeOnce(nodes: DocNode[], docW: number, docH: number, bg?: Background, surrogates: readonly SurrogateInput[] = [], overlay: OverlayInput | null = null): PooledFBO {
+  compositeOnce(nodes: DocNode[], docW: number, docH: number, bg?: Background, surrogates: readonly SurrogateInput[] = [], overlays: readonly OverlayInput[] = []): PooledFBO {
     const room = this._room;
-    if (overlay) room.setStampOverlay(overlay, docW, docH);   // 须在 toPlanNodes 前（plan 的 overlay 标记读 room 装置）
+    room.setStampOverlays(overlays, docW, docH);   // 须在 toPlanNodes 前（plan 的 overlay 标记读 room 装置）
     const leafById = new Map<number, DocLeaf>();
-    const planNodes = room.toPlanNodes(nodes, new Set(), overlay?.layerId ?? null, leafById);
+    const planNodes = room.toPlanNodes(nodes, new Set(), new Set(overlays.map((o) => o.layerId)), leafById);
     const plan = buildPlan(planNodes, new Set(), bg === "checker" ? "checker" : bg ? "color" : "none");
     // 驻留准入（v0.10.8，与 renderFrame 同口径，病史见 frame-demand.ts）：一次性合成全走
     //   transient（零拷贝目标），需求 = miss 上传数。旧版**完全没有 reserve**——冷池（64 slot）
@@ -143,7 +143,7 @@ export class RasterService {
     for (const f of transient.values()) room.glctx.returnFBO(f);
     room.releaseLiveClip();   // 防御：一次性合成不留帧内缓存
     room.comp.end();
-    if (overlay) {   // 一次性合成不留 overlay 状态（下一 renderFrame 会重灌；stamp 分支还占着借来的 FBO）
+    if (overlays.length) {   // 一次性合成不留 overlay 状态（下一 renderFrame 会重灌；stamp 分支还占着借来的 FBO）
       room.clearOverlay();
       room.releaseOverlayFBO();
     }
@@ -155,8 +155,8 @@ export class RasterService {
   //   surrogates/overlay（v0.9.18 timelapse 采帧 WYSIWYG）：与 pickColor 同款待遇——调整替身/fill 预览
   //   显示什么就合成什么。**save/export 路径不传**（预览不漏进落盘物，原语义零变化）。
   compositeToBytes(nodes: DocNode[], docW: number, docH: number,
-                   surrogates: readonly SurrogateInput[] = [], overlay: OverlayInput | null = null): { data: Uint8ClampedArray; w: number; h: number } {
-    const fbo = this.compositeOnce(nodes, docW, docH, undefined, surrogates, overlay);
+                   surrogates: readonly SurrogateInput[] = [], overlays: readonly OverlayInput[] = []): { data: Uint8ClampedArray; w: number; h: number } {
+    const fbo = this.compositeOnce(nodes, docW, docH, undefined, surrogates, overlays);
     const px = this._room.glctx.readPixels(fbo, 0, 0, docW, docH);
     this._room.glctx.returnFBO(fbo);
     return { data: new Uint8ClampedArray(px.buffer), w: docW, h: docH };
@@ -164,8 +164,8 @@ export class RasterService {
 
   // S8 吸管（spec:243-244）：一次性合成 + 单像素 readPixels（合成组无 CPU tile → 必须走 GPU 读）。
   //   surrogates 非空 = 调整预览中取替身（WYSIWYG，拍板#8）。
-  pickColor(nodes: DocNode[], docW: number, docH: number, bg: Background | undefined, x: number, y: number, surrogates: readonly SurrogateInput[] = [], overlay: OverlayInput | null = null): [number, number, number, number] {
-    const fbo = this.compositeOnce(nodes, docW, docH, bg, surrogates, overlay);
+  pickColor(nodes: DocNode[], docW: number, docH: number, bg: Background | undefined, x: number, y: number, surrogates: readonly SurrogateInput[] = [], overlays: readonly OverlayInput[] = []): [number, number, number, number] {
+    const fbo = this.compositeOnce(nodes, docW, docH, bg, surrogates, overlays);
     const px = this._room.glctx.readPixels(fbo, x, y, 1, 1);
     this._room.glctx.returnFBO(fbo);
     return [px[0], px[1], px[2], px[3]];

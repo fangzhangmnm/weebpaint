@@ -74,7 +74,7 @@ export class RenderTree {
   renderFrame(
     nodes: DocNode[], docW: number, docH: number, bg: Background | undefined,
     affine6: number[], canvasW: number, canvasH: number, scale: number, voidRgb: [number, number, number],
-    floats: FloatInput[], stampOverlay: OverlayInput | null, surrogates: readonly SurrogateInput[],
+    floats: FloatInput[], stampOverlays: readonly OverlayInput[], surrogates: readonly SurrogateInput[],
     liveSyncLeafId: number | null, screenGrid: ScreenGridBg | null = null,
   ): void {
     const room = this._room;
@@ -94,12 +94,11 @@ export class RenderTree {
 
     // pseudo 装置
     room.setFloats(floats);
-    if (stampOverlay) room.setStampOverlay(stampOverlay, docW, docH);
-    else room.clearOverlay();
+    room.setStampOverlays(stampOverlays, docW, docH);   // 2026-09-19 多 overlay（组液化 N 叶各一张 W）
 
     const updated = new Set<number>();
     for (const f of floats) updated.add(f.layerId);
-    if (stampOverlay) updated.add(stampOverlay.layerId);
+    for (const ov of stampOverlays) updated.add(ov.layerId);
     // 替身（adjust 平面 / stroke 影子叶；组液化 = N 个影子叶）恒 live，逐个标 updated。
     const surrogateById = new Map<number, SurrogateInput>();
     for (const s of surrogates) { surrogateById.set(s.layerId, s); updated.add(s.layerId); }
@@ -107,7 +106,7 @@ export class RenderTree {
 
     const bgKind: BgKind = bg === "checker" ? "checker" : bg ? "color" : "none";
     const leafById = new Map<number, DocLeaf>();
-    const planNodes = room.toPlanNodes(nodes, updated, stampOverlay?.layerId ?? null, leafById);
+    const planNodes = room.toPlanNodes(nodes, updated, new Set(stampOverlays.map((o) => o.layerId)), leafById);
     const plan = buildPlan(planNodes, updated, bgKind);
     const sig = this._planSig(plan, docW, docH, bg);
 
