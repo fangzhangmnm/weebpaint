@@ -449,8 +449,8 @@ const regionLoad: CpuDraw = (c) => {
   });
 };
 
-// ---- region-window（镜像 REGION_WINDOW_FRAG）----
-const regionWindow: CpuDraw = (c) => {
+// ---- region-crop（镜像 REGION_CROP_FRAG）----
+const regionCrop: CpuDraw = (c) => {
   const [ox, oy] = uv2(c, "u_origin");
   const [docW, docH] = uv2(c, "u_docSize");
   const W = c.tex("u_W");
@@ -805,7 +805,7 @@ export function resolveCpuProgram(name: string): CpuDraw | "gpu-only" | null {
   if (name === "warpbake") return warpbake;
   // 区域程序（region-programs.ts；2026-09-18）
   if (name === "region-load") return regionLoad;
-  if (name === "region-window") return regionWindow;
+  if (name === "region-crop") return regionCrop;
   if (name === "smudge-mask") return smudgeMask;
   if (name === "smudge-absorb") return smudgeAbsorb;
   if (name === "reduce-weighted") return reduceWeighted;

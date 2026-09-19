@@ -14,7 +14,7 @@
 //   footprint 夹 doc 边界（颜料可拖出内容框）。全程 premult：透明像素 RGB 永不参与。
 //
 // GPU 落法（program 名见 backend/gl/region-programs.ts；每个都有 CPU 孪生，SoftGl2Port 上可全量跑）：
-//   region-window → cur；smudge-mask → mask；[reduce-weighted×2 → reduce-sum×2 → divide → avg]（dull>0 或稀释）；
+//   region-crop → cur；smudge-mask → mask；[reduce-weighted×2 → reduce-sum×2 → divide → avg]（dull>0 或稀释）；
 //   [smudge-absorb 1×1 → accumColor]（dull>0）；[smudge-absorb B×B → accum]（dull<1 且 ρ<1）；
 //   [reduce-weighted×2 k×k → box3 → upsample-bilinear → release]（0<dull<1）；smudge-deposit → W（scissor = 裁过 doc 的窗口）。
 //   状态纹理全 f32（ρ≈1 时 f16 会冻住记忆），W u8。写靶 = RegionStroke（一笔一个，session 造、session 销）。
@@ -187,7 +187,7 @@ export class SmudgeEngine {
     if (x1 <= x0 || y1 <= y0) return;   // 整块在 doc 外：手指悬空，什么都不发生（Accum 保持）
     const win: RegionUniforms = { u_size: [B, B], u_origin: [ox, oy], u_docSize: [docW, docH] };
     // 读块（premult f32）+ 算 mask
-    rs.run("region-window", st.cur, { u_W: "W" }, win);
+    rs.run("region-crop", st.cur, { u_W: "W" }, win);
     const innerR = Math.max(0, Math.min(0.999, s0.hardness)) * r;
     const sel = rs.selection;
     rs.run("smudge-mask", st.mask, sel ? { u_sel: "selection" } : {}, {
@@ -200,7 +200,7 @@ export class SmudgeEngine {
     const dullK = clamp01(Number.isFinite(s0.dull) ? s0.dull : (mode === "dull" ? 1 : 0));
     if (!st.primed) {
       // 首颗：沾色，不上色（两份记忆都沾：块 + 平均色，旋钮中途拧也有料）
-      rs.run("region-window", st.accum[st.ai], { u_W: "W" }, win);
+      rs.run("region-crop", st.accum[st.ai], { u_W: "W" }, win);
       this._average(st, st.cur, st.color[st.ci]);
       st.primed = true;
       return;

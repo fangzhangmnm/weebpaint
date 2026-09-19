@@ -28,15 +28,15 @@ describe("region-programs · 注册表", () => {
   });
 });
 
-describe("region-programs · region-window / smudge-mask / smudge-absorb", () => {
-  it("region-window：W 直值 → premult；doc 外 = 0", () => {
+describe("region-programs · region-crop / smudge-mask / smudge-absorb", () => {
+  it("region-crop：W 直值 → premult；doc 外 = 0", () => {
     const p = port();
     const W = p.borrowFBO(8, 8, "u8"); fill(W, [0, 0, 0, 0]); setTexel(W, 3, 3, [0.5, 0.25, 0.125, 0.5]);
     const cur = p.borrowFBO(4, 4, "f32");
-    p.draw({ program: "region-window", target: cur, uniforms: { u_size: [4, 4], u_origin: [2, 2], u_docSize: [8, 8] }, textures: { u_W: W } });
+    p.draw({ program: "region-crop", target: cur, uniforms: { u_size: [4, 4], u_origin: [2, 2], u_docSize: [8, 8] }, textures: { u_W: W } });
     const t = texel(cur, 1, 1);
     assert(near(t[0], 0.25) && near(t[1], 0.125) && near(t[2], 0.0625) && near(t[3], 0.5), `premult (${t})`);
-    p.draw({ program: "region-window", target: cur, uniforms: { u_size: [4, 4], u_origin: [-2, -2], u_docSize: [8, 8] }, textures: { u_W: W } });
+    p.draw({ program: "region-crop", target: cur, uniforms: { u_size: [4, 4], u_origin: [-2, -2], u_docSize: [8, 8] }, textures: { u_W: W } });
     eqArr(texel(cur, 0, 0), [0, 0, 0, 0], "doc 外 0");
     assert(near(texel(cur, 3, 3)[3], 0), "(-2,-2)+(3,3)=(1,1) 是透明像素");
   });
@@ -155,7 +155,7 @@ describe("region-programs · smudge-deposit", () => {
     const W = p.borrowFBO(8, 8, "u8"); fill(W, [0, 0, 0, 0]); setTexel(W, 3, 3, [0.5, 0.25, 0.125, 0.5]); setTexel(W, 6, 6, [1, 1, 1, 1]);
     const B = 4, origin = [2, 2];
     const cur = p.borrowFBO(B, B, "f32");
-    p.draw({ program: "region-window", target: cur, uniforms: { u_size: [B, B], u_origin: origin, u_docSize: [8, 8] }, textures: { u_W: W } });
+    p.draw({ program: "region-crop", target: cur, uniforms: { u_size: [B, B], u_origin: origin, u_docSize: [8, 8] }, textures: { u_W: W } });
     const mask = p.borrowFBO(B, B, "f32"); fill(mask, [1, 0, 0, 1]);
     const P = p.borrowFBO(B, B, "f32"); fill(P, [0, 1, 0, 1]);
     const avg = p.borrowFBO(1, 1, "f32"); fill(avg, [0, 0, 0, 0]);
@@ -166,7 +166,7 @@ describe("region-programs · smudge-deposit", () => {
     eqArr(texel(W, 6, 6), [1, 1, 1, 1], "scissor 外不动");
     // lockAlpha：重来一遍
     fill(W, [0, 0, 0, 0]); setTexel(W, 3, 3, [0.5, 0.25, 0.125, 0.5]);
-    p.draw({ program: "region-window", target: cur, uniforms: { u_size: [B, B], u_origin: origin, u_docSize: [8, 8] }, textures: { u_W: W } });
+    p.draw({ program: "region-crop", target: cur, uniforms: { u_size: [B, B], u_origin: origin, u_docSize: [8, 8] }, textures: { u_W: W } });
     p.draw({ program: "smudge-deposit", target: W, scissor: { x: 2, y: 2, w: 4, h: 4 }, uniforms: { ...uni, u_lock: 1 }, textures: { u_cur: cur, u_mask: mask, u_P: P, u_avg: avg } });
     const t = texel(W, 3, 3);
     assert(near(t[3], 0.5, 1 / 255) && near(t[1], 1, 1 / 255) && near(t[0], 0, 1 / 255), `lock：α 不动、色变绿 (${t})`);
@@ -176,7 +176,7 @@ describe("region-programs · smudge-deposit", () => {
     const p = port();
     const W = p.borrowFBO(4, 4, "u8"); fill(W, [1, 0, 0, 1]);
     const cur = p.borrowFBO(4, 4, "f32");
-    p.draw({ program: "region-window", target: cur, uniforms: { u_size: [4, 4], u_origin: [0, 0], u_docSize: [4, 4] }, textures: { u_W: W } });
+    p.draw({ program: "region-crop", target: cur, uniforms: { u_size: [4, 4], u_origin: [0, 0], u_docSize: [4, 4] }, textures: { u_W: W } });
     const mask = p.borrowFBO(4, 4, "f32"); fill(mask, [1, 0, 0, 1]);
     const P = p.borrowFBO(4, 4, "f32"); fill(P, [0, 0, 1, 1]);
     const avg = p.borrowFBO(1, 1, "f32");

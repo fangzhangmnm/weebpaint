@@ -11,7 +11,7 @@
 //
 // 第一批（手指三 variant）：
 //   region-load        叶 tile-index + arena（straight u8）→ W 整幅
-//   region-window      W 窗口 → cur（premult f32；doc 外 = 0）——也用来给 accum 沾色（首 dab）
+//   region-crop      W 窗口 → cur（premult f32；doc 外 = 0）——也用来给 accum 沾色（首 dab）
 //   smudge-mask        falloff(dist, r, hardness) × 选区 → mask.r（与 gl-stamp 同式）
 //   smudge-absorb      A' = mix(cur, A, ρ)（u_clip=1 时 doc 外像素保持 A）；1×1 时即 accumColor 更新
 //   reduce-weighted    (src, mask) → k×k：which=0 Σ m·src(rgba) / which=1 Σ m(.r)；格子归属 = min(k−1, floor(x·k/B))
@@ -27,7 +27,7 @@ import type { Gl2Port } from "../../common/gl2-port.ts";
 import { COMPOSITE_VERT } from "./blend-glsl.ts";
 
 export const REGION_PROGRAM_IDS = [
-  "region-load", "region-window", "smudge-mask", "smudge-absorb",
+  "region-load", "region-crop", "smudge-mask", "smudge-absorb",
   "reduce-weighted", "reduce-sum", "divide", "box3", "upsample-bilinear", "smudge-deposit",
   // 第二批（模糊 / 锐化 wash，2026-09-18 同轮；镜像 filters.ts 旧 attachColorBrushBehavior + sharpen-blur.ts bake）
   "wash-coverage", "wash-premult", "wash-box3", "wash-unpremult", "wash-sharpen", "wash-lerp",
@@ -132,8 +132,8 @@ vec4 sampleTiled(highp sampler2D index, vec2 docPos){
 }
 void main(){ o = sampleTiled(u_srcIndex, v_uv * u_docSize); }`;
 
-// ---- region-window：W 窗口 → cur（premult f32；doc 外 0）----
-const REGION_WINDOW_FRAG = HEAD + `
+// ---- region-crop：W 窗口 → cur（premult f32；doc 外 0）----
+const REGION_CROP_FRAG = HEAD + `
 uniform vec2 u_size;      // (B,B)
 uniform vec2 u_origin;    // (ox,oy) 整数
 uniform vec2 u_docSize;
@@ -475,7 +475,7 @@ void main(){
 
 const FRAGS: Record<RegionProgramId, string> = {
   "region-load": REGION_LOAD_FRAG,
-  "region-window": REGION_WINDOW_FRAG,
+  "region-crop": REGION_CROP_FRAG,
   "smudge-mask": SMUDGE_MASK_FRAG,
   "smudge-absorb": SMUDGE_ABSORB_FRAG,
   "reduce-weighted": REDUCE_WEIGHTED_FRAG,

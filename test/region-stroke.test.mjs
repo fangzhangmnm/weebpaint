@@ -40,13 +40,13 @@ describe("region-stroke · 装载 / 快照 / 空叶", () => {
     const dep = { u_docSize: [w, h], u_origin: origin, u_strength: 1, u_colorRate: 0, u_dilEff: 0, u_lock: 0, u_space: 0, u_Psel: 0, u_paint: [0, 0, 0, 1] };
     rs.run("smudge-mask", mask, {}, { u_size: [B, B], u_origin: origin, u_docSize: [w, h], u_center: [12, 12], u_r: 100, u_innerR: 100, u_hasSel: 0, u_selOrigin: [0, 0], u_selSize: [1, 1] });
     // 1) 把 W 的窗口抹成透明（P = zero）
-    rs.run("region-window", cur, { u_W: "W" }, { u_size: [B, B], u_origin: origin, u_docSize: [w, h] });
+    rs.run("region-crop", cur, { u_W: "W" }, { u_size: [B, B], u_origin: origin, u_docSize: [w, h] });
     rs.run("smudge-deposit", "W", { u_cur: cur, u_mask: mask, u_P: zero, u_avg: avg }, dep, { x: 10, y: 10, w: B, h: B });
     assert(rs.readPixels(10, 10, B, B).every((v) => v === 0), "W 窗口已抹透明");
     // 2) 从 W0 取原窗口当 P 放回 → W 恢复原像素（证明 W0 没被 1) 动过）
     const fromW0 = rs.alloc(B, B, "rgba-f32");
-    rs.run("region-window", fromW0, { u_W: "W0" }, { u_size: [B, B], u_origin: origin, u_docSize: [w, h] });
-    rs.run("region-window", cur, { u_W: "W" }, { u_size: [B, B], u_origin: origin, u_docSize: [w, h] });
+    rs.run("region-crop", fromW0, { u_W: "W0" }, { u_size: [B, B], u_origin: origin, u_docSize: [w, h] });
+    rs.run("region-crop", cur, { u_W: "W" }, { u_size: [B, B], u_origin: origin, u_docSize: [w, h] });
     rs.run("smudge-deposit", "W", { u_cur: cur, u_mask: mask, u_P: fromW0, u_avg: avg }, dep, { x: 10, y: 10, w: B, h: B });
     const got = rs.readPixels(10, 10, B, B);
     for (let j = 0; j < B; j++) for (let i = 0; i < B; i++) for (let c = 0; c < 4; c++) {
@@ -57,7 +57,7 @@ describe("region-stroke · 装载 / 快照 / 空叶", () => {
     rs.dispose();
     const { rs: rs2 } = setup(20, 20);
     let threw = false;
-    try { rs2.run("region-window", rs2.alloc(2, 2, "rgba-f32"), { u_W: "W0" }, { u_size: [2, 2], u_origin: [0, 0], u_docSize: [20, 20] }); } catch (e) { threw = /REGION_NO_SNAPSHOT/.test(String(e)); }
+    try { rs2.run("region-crop", rs2.alloc(2, 2, "rgba-f32"), { u_W: "W0" }, { u_size: [2, 2], u_origin: [0, 0], u_docSize: [20, 20] }); } catch (e) { threw = /REGION_NO_SNAPSHOT/.test(String(e)); }
     assert(threw, "W0 未开快照应 throw");
     rs2.dispose();
   });
@@ -83,7 +83,7 @@ describe("region-stroke · 选区 / dirty / overlay / 守卫", () => {
       u_size: [30, 30], u_origin: [0, 0], u_docSize: [w, h], u_center: [10, 10], u_r: 100, u_innerR: 100,
       u_hasSel: 1, u_selOrigin: [rs.selection.ox, rs.selection.oy], u_selSize: [rs.selection.ow, rs.selection.oh],
     });
-    rs.run("region-window", cur, { u_W: "W" }, { u_size: [30, 30], u_origin: [0, 0], u_docSize: [w, h] });
+    rs.run("region-crop", cur, { u_W: "W" }, { u_size: [30, 30], u_origin: [0, 0], u_docSize: [w, h] });
     rs.run("smudge-deposit", "W", { u_cur: cur, u_mask: mask, u_P: zero, u_avg: avg },
       { u_docSize: [w, h], u_origin: [0, 0], u_strength: 1, u_colorRate: 0, u_dilEff: 0, u_lock: 0, u_space: 0, u_Psel: 0, u_paint: [0, 0, 0, 1] },
       { x: 0, y: 0, w: 30, h: 30 });
@@ -104,7 +104,7 @@ describe("region-stroke · 选区 / dirty / overlay / 守卫", () => {
     const ov0 = rs.overlay();
     eq(ov0.kind, "region"); eq(ov0.layerId, 7); eq(ov0.bw, 0); eq(ov0.bh, 0);
     const cur = rs.alloc(8, 8, "rgba-f32"), mask = rs.alloc(8, 8, "rgba-f32"), P = rs.alloc(8, 8, "rgba-f32"), avg = rs.alloc(1, 1, "rgba-f32");
-    rs.run("region-window", cur, { u_W: "W" }, { u_size: [8, 8], u_origin: [10, 10], u_docSize: [w, h] });
+    rs.run("region-crop", cur, { u_W: "W" }, { u_size: [8, 8], u_origin: [10, 10], u_docSize: [w, h] });
     rs.run("smudge-mask", mask, {}, { u_size: [8, 8], u_origin: [10, 10], u_docSize: [w, h], u_center: [14, 14], u_r: 10, u_innerR: 10, u_hasSel: 0, u_selOrigin: [0, 0], u_selSize: [1, 1] });
     rs.run("smudge-deposit", "W", { u_cur: cur, u_mask: mask, u_P: P, u_avg: avg },
       { u_docSize: [w, h], u_origin: [10, 10], u_strength: 1, u_colorRate: 0, u_dilEff: 0, u_lock: 0, u_space: 0, u_Psel: 0, u_paint: [0, 0, 0, 1] },

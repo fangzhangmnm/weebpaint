@@ -28,9 +28,9 @@ describe("region-commit · RegionStroke → bakeStamps → 叶像素", () => {
     const rs = new RegionStroke(room, 5, pixels, W, H, null);
     const B = 8;
     const cur = rs.alloc(B, B, "rgba-f32"), mask = rs.alloc(B, B, "rgba-f32"), P = rs.alloc(B, B, "rgba-f32"), avg = rs.alloc(1, 1, "rgba-f32");
-    rs.run("region-window", P, { u_W: "W" }, { u_size: [B, B], u_origin: [41, 31], u_docSize: [W, H] });   // 绿块当出料
+    rs.run("region-crop", P, { u_W: "W" }, { u_size: [B, B], u_origin: [41, 31], u_docSize: [W, H] });   // 绿块当出料
     const origin = [260, 250];   // 跨 tile (256) 边界的窗口
-    rs.run("region-window", cur, { u_W: "W" }, { u_size: [B, B], u_origin: origin, u_docSize: [W, H] });
+    rs.run("region-crop", cur, { u_W: "W" }, { u_size: [B, B], u_origin: origin, u_docSize: [W, H] });
     rs.run("smudge-mask", mask, {}, { u_size: [B, B], u_origin: origin, u_docSize: [W, H], u_center: [264, 254], u_r: 100, u_innerR: 100, u_hasSel: 0, u_selOrigin: [0, 0], u_selSize: [1, 1] });
     rs.run("smudge-deposit", "W", { u_cur: cur, u_mask: mask, u_P: P, u_avg: avg },
       { u_docSize: [W, H], u_origin: origin, u_strength: 1, u_colorRate: 0, u_dilEff: 0, u_lock: 0, u_space: 0, u_Psel: 0, u_paint: [0, 0, 0, 1] },
