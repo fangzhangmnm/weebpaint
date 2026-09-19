@@ -164,6 +164,7 @@ import "./smudge-engine.test.mjs";          // 2026-09-05 手指/涂抹引擎（
 import "./smudge-plugin.test.mjs";          // 2026-09-05 手指插件：ResolvedBrush→设置映射 + Filter brush 契约跑一笔
 import "./smudge-wet.test.mjs";              // 2026-09-06 湿画笔补全（稀释/压感反向/多分辨率/记忆解耦；handoff 20260906-wet-brush）
 import "./smudge-golden.test.mjs";          // 2026-09-18 手指 GPU 化轮：旧 CPU 引擎录的 golden 锚（fixtures/smudge-golden.json），新引擎 ±2/255 对拍
+import "./liquify-golden.test.mjs";         // 2026-09-19 液化 golden 锚（fixtures/liquify-golden.json，旧 CPU 引擎录）；GPU 版 ±2/255 对同一张表
 import "./region-programs.test.mjs";        // 2026-09-18 区域程序 GLSL ↔ CPU 孪生：注册表全覆盖 + 各 program 语义单测（SoftGl2Port）
 import "./region-stroke.test.mjs";          // 2026-09-18 RegionStroke：装载 W 往返精确 / 空叶 / 选区 / dirty→overlay / caps 守卫 / 读写冲突 / dispose
 import "./region-commit.test.mjs";          // 2026-09-18 区域程序提交链：RegionStroke → bakeStamps(replace overlay) → applyRegionDiff → 叶像素往返逐字节
