@@ -22,7 +22,7 @@ export type RegionProgramSmudge =
   | "box3"                 // 3×3 盒滤波（dull 中段；第二批模糊 ×N 同一 program）
   | "upsample-bilinear"    // k×k → B×B
   | "smudge-deposit";      // W 窗口 = straight(mix(cur, P, M·s))；P ∈ {accum, accumColor, release} ⊕ 掺色 ⊕ 稀释；lockAlpha
-/** 第二批（模糊 / 锐化 wash，§4 问 1 待批）。 */
+/** 第二批（模糊 / 锐化 wash；本轮，user 09-18 yes）。 */
 export type RegionProgramWash = "wash-coverage" | "unsharp" | "wash-lerp";
 /** 第三批（液化，另案）。 */
 export type RegionProgramLiquify = "disp-accumulate" | "warp-disp";
@@ -59,7 +59,7 @@ export interface RegionOverlayInput {
   selMask: null;             // 选区已在 smudge-mask 吃过；replace 不再裁
 }
 
-export declare class RegionStroke {
+export declare class RegionStroke implements StrokeTarget {
   /** 一笔一个。selMask = 选区 gray8 平面（同 StampOverlayInput.selMask 形），null = 无选区。 */
   constructor(room: GlRoom, leafId: number, pixels: LayerPixels, docW: number, docH: number,
               selMask: { data: Uint8Array; ox: number; oy: number; ow: number; oh: number } | null);
@@ -78,11 +78,31 @@ export declare class RegionStroke {
   overlay(): RegionOverlayInput;
   /** 归还全部 FBO / 纹理；之后任何调用 throw。 */
   dispose(): void;
-  // ---- Filter 笔契约的 BrushLayer 面（CPU 滤镜笔并存期用；GPU 手指不调这两个方法）----
+  // ---- StrokeTarget 面（§2b；液化并存期用；GPU 手指 / wash 不调这两个 ImageData 方法）----
   readonly bboxX: number; readonly bboxY: number; readonly bboxW: number; readonly bboxH: number;
   getImageData(docX: number, docY: number, w: number, h: number): ImageData;   // readPixels 慢路径，仅兼容
   putImageData(docX: number, docY: number, img: ImageData): void;              // upload 慢路径，仅兼容
 }
+
+// ============================================================================
+// 2b. filters.ts / smudge-engine.ts —— 写靶改名 + 预览宿声明
+//     user 2026-09-18：「反正别叫Layer, brushlayer也改名，如果语义一样那么改一样的名字」
+//     BrushLayer（filters.ts）与 SmudgeLayer（smudge-engine.ts）语义相同 = 一笔期间的像素写靶（运行时 = StrokeShadow 替身，
+//     不是图层树节点）→ 合并为 StrokeTarget，字段取并集；StrokeShadow 已全部实现。
+// ============================================================================
+
+export interface StrokeTarget {
+  readonly docW: number;
+  readonly docH: number;
+  readonly bboxX: number; readonly bboxY: number; readonly bboxW: number; readonly bboxH: number;
+  getImageData(docX: number, docY: number, w: number, h: number): ImageData;
+  putImageData(docX: number, docY: number, img: ImageData): void;
+}
+// Filter 笔契约（filters.ts）改动只此三行：
+//   strokePreview?: "shadow" | "region";        // 缺省 shadow（液化现状）；手指 / 模糊 / 锐化 声明 "region"
+//   beginBrushStroke?(targets: readonly StrokeTarget[], params, brushSettings, selection, x, y, p): ColorBrushState;   // layers → targets
+//   （BrushLayer 类型删除；SmudgeLayer 类型删除）
+// filter-brush.ts BrushFilter.beginBrushStroke(targets: readonly ViewLeaf[] …) 同步改 targets；stroke-session.ts 的 `targets` 字段已是这个名。
 
 // ============================================================================
 // 3. backend/gl/gl-room.ts / blend-glsl.ts —— overlay 第三成员 + replace 模式（改动只此两处）
@@ -127,4 +147,7 @@ export declare class SmudgeEngine {
 // 6. 明确不动
 // ============================================================================
 // Gl2Port（含 FBOPrec / TexUploadFormat）、GlRoom 其余、RasterService.bakeStamps 签名、GLStampRasterizer、
-// Filter 笔契约（beginBrushStroke 四件）、FilterBrushEngine、SmudgeSettings、liquify-engine.ts（第三批另案）。
+// Filter 笔契约的四个方法形状（只改名 layers→targets + 加 strokePreview，见 §2b）、FilterBrushEngine、SmudgeSettings、
+// liquify-engine.ts（第三批另案；只跟着吃 StrokeTarget 改名）。
+// 浮点 FBO：要求 caps.floatColorBuffer（EXT_color_buffer_float）；缺席 = 手指族动词提示不可用（一条 caps 守卫，不做 SoftGl 回退；
+//   逃生口 = f32 打包 RGBA8，记录在案不做）——**待 user 点头**（doc §3.7）。
