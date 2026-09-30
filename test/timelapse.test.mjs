@@ -8,6 +8,7 @@ import {
 } from "../src/backend/timelapse/timelapse-core.ts";
 import { muxTimelapse, demuxTimelapse, avcCodecString } from "../src/backend/timelapse/timelapse-mux.ts";
 import { TimelapseDocState } from "../src/backend/timelapse/timelapse-state.ts";
+import { SUBSTRUCTURE_VERSIONS } from "../src/backend/format/migrate.ts";
 import {
   setTimelapseEncoderCtor, timelapseProbeSupport, TimelapseMotionEncoder, encodeTailFrame,
 } from "../src/backend/timelapse/timelapse-encoder.ts";
@@ -216,6 +217,24 @@ describe("timelapse · 录制态", () => {
     eq(TimelapseDocState.restore(out.json, null).restoreIssue, "mp4-missing");
     eq(TimelapseDocState.restore(out.json, out.mp4.slice(0, 40)).restoreIssue, "corrupt-mp4");
     eq(TimelapseDocState.restore(null, null).restoreIssue, null);   // 从没开过录=健康
+  });
+
+  it("持久化立宪（2026-09-30，user「旧的数据当然要能救」）：v1 照读；v 比 app 新 → too-new 进检疫区、保存原样带回；缺 v 视为首版", () => {
+    const st = mkState();
+    const out = st.serializeForSave({ bytes: nalu(9), key: true }, 512, 512);
+    // 未来版本写的：不猜不降级，字节原样带回（护栏 E），issue 单独定性（壳层说「新版本写的」不是「损坏」）
+    const future = JSON.stringify({ ...JSON.parse(out.json), v: 2, holo: true });
+    const back = TimelapseDocState.restore(future, out.mp4);
+    eq(back.restoreIssue, "too-new"); eq(back.settings, null);
+    const saved = back.serializeForSave(null, 512, 512);
+    eq(saved.json, future, "保存时原样写回未来版本的 json");
+    eq(saved.mp4.length, out.mp4.length, "mp4 原样带回");
+    // 缺 v = 首版（立宪：缺版本键视为 1）——形状对就照读
+    const noV = JSON.parse(out.json); delete noV.v;
+    const back2 = TimelapseDocState.restore(JSON.stringify(noV), out.mp4);
+    assert(back2.restoreIssue !== "too-new" && back2.restoreIssue !== "corrupt-json", `缺 v 不该当损坏或太新：${back2.restoreIssue}`);
+    // 表里登记了 timelapse，且版本键是 v
+    eq(SUBSTRUCTURE_VERSIONS.timelapse, 1);
   });
 });
 

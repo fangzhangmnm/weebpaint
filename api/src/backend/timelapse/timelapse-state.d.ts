@@ -9,7 +9,8 @@ export interface TimelapseJsonV1 {
     n: number;
     motionSamples: number;
 }
-export type TimelapseRestoreIssue = "corrupt-json" | "corrupt-mp4" | "mp4-missing" | "sample-count-mismatch";
+/** too-new = 清单是更新的 WeebPaint 写的（持久化立宪：不猜不降级，字节进检疫区原样带回；壳层说「新版本写的」而不是「损坏」）。 */
+export type TimelapseRestoreIssue = "corrupt-json" | "corrupt-mp4" | "mp4-missing" | "sample-count-mismatch" | "too-new";
 /**
  * 一份文档的录制态。生命周期：
  *   无录像 → startRecording(settings) → (pause/resume)* → clear() 回到无录像

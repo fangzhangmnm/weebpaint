@@ -3,6 +3,7 @@
 //   timelapse.mp4            全部样本 mux 成的直接可播 mp4（中部大块区，thumbnail 保持最后）
 //   .weebpaint/timelapse.json 录制状态（开关 sticky / pin 的取景框 / n / motionSamples）
 // 自愈原则（spec §3）：任何回读失败 = 止损——录像作废、画照画、ora 照存，绝不 throw 出保存/加载路径。
+import { migrateSubstructure, FormatTooNewError } from "../format/migrate.ts";
 import type { TimelapseSettings } from "./timelapse-core.ts";
 import { TIMELAPSE_LONG_EDGES, TIMELAPSE_ASPECTS, TimelapseSampler } from "./timelapse-core.ts";
 import type { TimelapseSample } from "./timelapse-mux.ts";
@@ -17,7 +18,8 @@ export interface TimelapseJsonV1 {
   motionSamples: number;    // mp4 里前多少个样本是运动帧（其余=尾帧，回读时截掉）
 }
 
-export type TimelapseRestoreIssue = "corrupt-json" | "corrupt-mp4" | "mp4-missing" | "sample-count-mismatch";
+/** too-new = 清单是更新的 WeebPaint 写的（持久化立宪：不猜不降级，字节进检疫区原样带回；壳层说「新版本写的」而不是「损坏」）。 */
+export type TimelapseRestoreIssue = "corrupt-json" | "corrupt-mp4" | "mp4-missing" | "sample-count-mismatch" | "too-new";
 
 /**
  * 一份文档的录制态。生命周期：
@@ -131,12 +133,13 @@ export class TimelapseDocState {
     if (json == null) return st;   // 从没开过录：健康空态
     let j: TimelapseJsonV1;
     try {
-      j = JSON.parse(json) as TimelapseJsonV1;
+      // 持久化立宪：先走版本链（v 键；缺 = 1），比 app 新 → FormatTooNewError（下面单独定性）；旧版链式升到当前版。
+      j = migrateSubstructure("timelapse", JSON.parse(json)) as TimelapseJsonV1;
       if (j.v !== 1 || !Array.isArray(j.aspect) || typeof j.longEdge !== "number"
           || typeof j.n !== "number" || typeof j.motionSamples !== "number") throw new Error("shape");
-    } catch {
-      st.restoreIssue = "corrupt-json";
-      st.quarantineJson = json; st.quarantineMp4 = mp4Bytes;
+    } catch (e) {
+      st.restoreIssue = e instanceof FormatTooNewError ? "too-new" : "corrupt-json";
+      st.quarantineJson = json; st.quarantineMp4 = mp4Bytes;   // 两种都进检疫区：字节原样带回，不删证据（护栏 E）
       return st;
     }
     st.settings = { aspectW: j.aspect[0], aspectH: j.aspect[1], longEdge: j.longEdge };

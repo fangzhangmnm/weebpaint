@@ -570,6 +570,11 @@ export declare const S: {
         readonly en: "Timelapse footage partially damaged; continuing with the readable part (artwork unaffected)";
         readonly ja: "タイムラプスの映像が一部破損していたため、読める部分から録画を継続します（作品は無事です）";
     };
+    readonly "tl.restoreTooNew": {
+        readonly zh: "过程录像是更新版本的 WeebPaint 写的，本版本不读也不改（原始数据已保留在文件里，画作不受影响）";
+        readonly en: "The timelapse was written by a newer WeebPaint; this version leaves it untouched (raw data kept in file, artwork unaffected)";
+        readonly ja: "タイムラプスは新しいバージョンの WeebPaint で書かれたため、このバージョンでは読まず変更もしません（元データはファイル内に保持・作品は無事です）";
+    };
     readonly "tl.pauseConfirmTitle": {
         readonly zh: "停止录制";
         readonly en: "Stop recording";

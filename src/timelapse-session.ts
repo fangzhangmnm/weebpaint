@@ -60,7 +60,7 @@ export function timelapseAdopt(loaded: { _timelapseJson?: string; _timelapseMp4?
   _st = TimelapseDocState.restore(loaded._timelapseJson ?? null, loaded._timelapseMp4 ?? null);
   // 回读问题报 warning（护栏 B，2026-08-25：info 状态栏一闪即逝，静默关闭案的帮凶）。
   // 按 issue 分文案：mp4-missing/mismatch 是「素材受损但录制还活着」，corrupt 是「录像读不懂已停录（字节已检疫保留）」。
-  if (_st.restoreIssue) reportError(t(_st.settings ? "tl.restoreDegraded" : "tl.restoreLost"), "warning");
+  if (_st.restoreIssue) reportError(t(_st.restoreIssue === "too-new" ? "tl.restoreTooNew" : _st.settings ? "tl.restoreDegraded" : "tl.restoreLost"), "warning");
   _detached = false;
   _needKey = true; _frameSeq = 0; _encoderStrikes = 0;
   _notifyUi();
