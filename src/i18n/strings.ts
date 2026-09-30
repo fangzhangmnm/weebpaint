@@ -584,6 +584,11 @@ export const S = {
   "ref.menu":        { zh: "参考菜单", en: "Reference menu", ja: "参考メニュー", tok: "lipu wile" },
   "ref.move":        { zh: "拖动窗口", en: "Drag to move window", ja: "ドラッグでウィンドウ移動", tok: "luka la o tawa e lupa" },
   "ref.oneToOne":    { zh: "1:1 像素", en: "1:1 pixels", ja: "1:1 ピクセル", tok: "suli lon: wan sama wan" },
+  // 2026-09-29（参考窗抽库第 3 步，Claude Fable 5.1）：挪动顺序 / 按名字跳转。user「reorder也需要有逃生口」
+  "ref.moveEarlier": { zh: "往前挪一位", en: "Move earlier", ja: "前へ移動", tok: "o tawa e ni tawa open" },
+  "ref.moveLater":   { zh: "往后挪一位", en: "Move later", ja: "後ろへ移動", tok: "o tawa e ni tawa pini" },
+  "ref.jump":        { zh: "跳到某一张", en: "Jump to a reference", ja: "参考へジャンプ", tok: "o tawa sitelen ante" },
+  "ref.kindImage":   { zh: "图片", en: "Image", ja: "画像", tok: "sitelen" },
 
   // ── 云盘图片 picker（<wp-cloud-picker>，spec 20260820）─────────────────────
   "cp.title":        { zh: "从图库选图", en: "Pick an image from the gallery", ja: "ギャラリーから画像を選ぶ", tok: "o kama jo e sitelen tan poki sitelen" },

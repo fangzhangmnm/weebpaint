@@ -3004,6 +3004,30 @@ export declare const S: {
         readonly ja: "1:1 ピクセル";
         readonly tok: "suli lon: wan sama wan";
     };
+    readonly "ref.moveEarlier": {
+        readonly zh: "往前挪一位";
+        readonly en: "Move earlier";
+        readonly ja: "前へ移動";
+        readonly tok: "o tawa e ni tawa open";
+    };
+    readonly "ref.moveLater": {
+        readonly zh: "往后挪一位";
+        readonly en: "Move later";
+        readonly ja: "後ろへ移動";
+        readonly tok: "o tawa e ni tawa pini";
+    };
+    readonly "ref.jump": {
+        readonly zh: "跳到某一张";
+        readonly en: "Jump to a reference";
+        readonly ja: "参考へジャンプ";
+        readonly tok: "o tawa sitelen ante";
+    };
+    readonly "ref.kindImage": {
+        readonly zh: "图片";
+        readonly en: "Image";
+        readonly ja: "画像";
+        readonly tok: "sitelen";
+    };
     readonly "cp.title": {
         readonly zh: "从图库选图";
         readonly en: "Pick an image from the gallery";

@@ -225,6 +225,8 @@ export function initSideWindows(ctx: AppContext) {
     del: t("ref.delete"), delConfirm: t("ref.deleteConfirm"), closeWin: t("ref.closeWin"),
     prev: t("ref.prevRef"), next: t("ref.nextRef"), menu: t("ref.menu"), move: t("ref.move"),
     resize: t("ref.resize"), resizeAria: t("ref.resizeAria"),
+    moveEarlier: t("ref.moveEarlier"), moveLater: t("ref.moveLater"), jump: t("ref.jump"),
+    kindNames: { image: t("ref.kindImage"), live: t("ref.live") },
   };
 
   els.menuReference.addEventListener("click", () => {
