@@ -19,6 +19,7 @@ import "./engine-registry.test.mjs";
 import "./registry.test.mjs";
 import "./resolved-brush.test.mjs";
 import "./pointer-gesture.test.mjs";
+import "./pointer-gesture-parity.test.mjs";   // 2026-09-29 参考窗抽库后手势三角有两份：对拍守漂移
 import "./crop-geometry.test.mjs";
 import "./canvas-templates.test.ts";  // 画布尺寸模板 json SSoT：契约 + 「一份表喂新建和裁切两个面」
 import "./deploy-assets.test.mjs";    // runtime fetch 的根 asset 必须同时进 SW 预缓存和 deploy.yml 白名单
@@ -59,7 +60,7 @@ import "./timelapse.test.mjs";       // 宣发轮：取景框/平采样闸门/�
 import "./timelapse-ora.test.mjs";   // timelapse×ora：entry 进出/顺序契约（thumbnail 恒最后）/DocState 整链 round-trip
 import "./ora-references.test.mjs";       // 0830 多参考 format 2：manifest round-trip/兜底链/停写非点 weebpaint/
 import "./reference-transcode.test.mjs";  // 0830 参考图压缩政策纯函数（1024² 面积/豁免/拍平白底）
-import "./reference-icons.test.mjs";      // 0830 参考窗图标 SSoT：id 全在 sprite + 组件零自绘几何
+import "./reference-icons.test.mjs";      // 0830 参考窗图标 SSoT：id 全在 sprite（零自绘几何那条 2026-09-29 随组件搬进库仓）
 import "./resample-bytes.test.mjs"; // 字节重采样：面积平均严格box/alpha加权/限幅
 import "./png-codec.test.mjs"; // PNG 接缝（UPNG 内脏）：低α无损roundtrip/pHYs
 import "./password-verifier.test.mjs";

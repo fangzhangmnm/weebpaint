@@ -1,4 +1,4 @@
-import { WpReferenceWindow } from "./frontend/reference-window.ts";
+import { WpReferenceWindow } from "@internal/reference-window";
 import { PaletteWindow } from "./palette.ts";
 import type { DecodedReference } from "./backend/ora.ts";
 import type { AppContext } from "./app-context.ts";

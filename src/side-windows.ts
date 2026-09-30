@@ -1,6 +1,6 @@
 // 职责（单一）：浮动辅助窗——参考小窗（<wp-reference-window> 组件的**宿主适配层**）+ 调色板小窗。
 // C9（家族组件试点）后参考窗分两半：
-//   组件（frontend/reference-window.ts）= chrome/手势/渲染/多页模型，宿主 store 零知识；
+//   组件（@internal/reference-window 包，2026-09-29 从 src/frontend/reference-window.ts 抽出）= chrome/手势/渲染/多页模型，宿主 store 零知识；
 //   这里 = 全部宿主接线：desk.refPanel(s) 持久化、wp: 事件通道、live 合成（backend 知识）、
 //   i18n labels、吸色 → 主 setColor + pin、导入漏斗（decode/转码 = backend/政策模块）。
 // referenceWindow 导出 = 组件元素本身；app.ts 晚绑 Object.assign(ctx, {...}) 与 session-state 直接读。
@@ -10,8 +10,8 @@
 //   导入唯一漏斗 = addReferenceImage（文件/剪贴板/云盘/未来 genai 全走它；1024² 拍平 jpeg 政策）。
 
 import { t } from "./i18n/index.ts";
-import { WpReferenceWindow } from "./frontend/reference-window.ts";
-import type { RefItem, RefLiveSource, RefPanelRect, RefViewport } from "./frontend/reference-window.ts";
+import { WpReferenceWindow } from "@internal/reference-window";
+import type { RefItem, RefLiveSource, RefPanelRect, RefViewport } from "@internal/reference-window";
 import { PaletteWindow } from "./palette.ts";
 import { els } from "./els.ts";
 import { decodeImageFile, imageSourceToBytes } from "./shell/image-io.ts";
@@ -26,7 +26,7 @@ import { humanSize } from "@internal/gallery";
 import { setColor } from "./color-panel.ts";
 import { setMenuOpen, setMenuItem } from "./settings-menu.ts";
 import { registerFloatingWindow, floatingTopFloor, type FloatingWindowHandle } from "./ui/floating-window.ts";   // 2026-09-02 C2 浮窗深模块
-import { togglePopupMenu } from "./ui/popup-menu.ts";   // 参考窗 ＋ 菜单端口（挂 body；组件 frontend/ 不得 import ui/）
+import { togglePopupMenu } from "./ui/popup-menu.ts";   // 参考窗 ＋ 菜单端口（挂 body；组件在包里，菜单由宿主注入）
 import { desk } from "./workbench-state.ts";
 import { renderNodesToCanvas } from "./backend/doc-render.ts";
 import { pickCloudImage } from "./cloud-picker-host.ts";

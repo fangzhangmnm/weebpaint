@@ -34,7 +34,7 @@ import { prefilterToSplinePlane, sampleSplinePremult } from "../../src/backend/a
 import type { SplinePlane } from "../../src/backend/algorithms/bspline.ts";
 import { rotspriteUpscale } from "../../src/backend/algorithms/rotsprite.ts";
 import type { U8Plane } from "../../src/backend/algorithms/rotsprite.ts";
-import { WpReferenceWindow } from "../../src/frontend/reference-window.ts";
+import { WpReferenceWindow } from "@internal/reference-window";
 // 2026-09-18 区域程序（手指 / wash）三方 golden 的第三方：真 GL vs SoftGl（第一方 = 旧 CPU 引擎 fixture，在 node 的 smudge-golden.test）。
 import { SmudgeEngine } from "../../src/plugins/smudge-engine.ts";
 import { SharpenBlurFilter } from "../../src/plugins/sharpen-blur.ts";

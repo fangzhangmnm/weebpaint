@@ -41,7 +41,7 @@ dist/main-tmp.mjs.map
 test/gl-smoke/harness.js
 test/gl-smoke/preview.js
 
-# C9 家族组件 vendor 导出件（scripts/gen-component.sh 产物；兄弟项目拷走用，本仓不跑它）
+# C9 家族组件 vendor 导出件（旧 scripts/gen-component.sh 产物；2026-09-29 该脚本随参考窗抽成 @internal/reference-window 包而退役，目录名留着忽略以防旧产物残留）
 dist-components/
 
 # SVG 图标工作台（本地预览工具，不入库）
