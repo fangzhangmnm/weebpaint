@@ -87,7 +87,40 @@ await page.waitForTimeout(200);
 const s2 = await ref();
 add("点第一行 → 跳到第一张", s2.index === 0 && s2.count === "1/3", JSON.stringify(s2));
 
-// ⑤
+// ⑤ 持久化整条路（2026-09-29 format 3）：画一笔 → 导出 hub「存为本地 .ora」（去掉 OS 保存框 → 走下载兜底）
+//    → 拿到字节（与 Ctrl+S 同源：session.encodeCurrentOra）→ 从文件框导回来 → 参考原样回来。
+//    这条路经过 side-windows.collectReferenceFilesForSave / ora encode / ora decode（布局归一化）/ applyLoadedReferences（库解清单）。
+{
+  const canvas = await page.$("canvas"); const box = await canvas.boundingBox();
+  await page.mouse.move(box.x + box.width / 2 - 30, box.y + box.height / 2); await page.mouse.down();
+  for (let i = 1; i <= 12; i++) await page.mouse.move(box.x + box.width / 2 - 30 + i * 5, box.y + box.height / 2 + (i % 3));
+  await page.mouse.up(); await page.waitForTimeout(300);
+  await page.evaluate(() => { try { delete globalThis.showSaveFilePicker; } catch {} });
+  const dlPromise = page.waitForEvent("download", { timeout: 15000 });
+  await page.evaluate(() => document.getElementById("menuExportImage").click());
+  await page.waitForTimeout(300);
+  const clicked = await page.evaluate(() => {
+    const btns = [...document.querySelectorAll(".sheet-action")].filter((b) => b.offsetParent !== null);
+    const b = btns.find((x) => /\.ora/.test(x.textContent));
+    if (!b) return btns.map((x) => x.textContent);
+    b.click(); return "ok";
+  });
+  const download = await dlPromise;
+  const oraPath = await download.path();
+  add("导出 hub「存为本地 .ora」→ 拿到字节", clicked === "ok" && !!oraPath, `${JSON.stringify(clicked)} ${download.suggestedFilename()}`);
+
+  // 导回来（intake hub：.ora → 开成新 doc）
+  await page.setInputFiles("#oraFileInput", oraPath);
+  await page.waitForTimeout(2500);
+  const back = await page.evaluate(() => {
+    const el = document.getElementById("referencePanel");
+    return { size: el.deck.size, index: el.deck.index, names: el.deck.cards().map((c) => c.name), order: el.deck.cards().map((c) => c.bytes?.size ?? 0), vp: el.deck.cards().map((c) => !!c.vp), open: el.open };
+  });
+  add("导回来 → 参考原样回来（张数、顺序、名字、当前页、视口、窗开着）",
+    back.size === 3 && back.index === 0 && JSON.stringify(back.order) === JSON.stringify(s2.order) && back.names.join(",") === "probe-1.png,probe-3.png,probe-2.png" && back.vp.every(Boolean) && back.open === true,
+    JSON.stringify(back));
+}
+// ⑥
 add("全程零报错", errors.length === 0, errors.join(" ; ").slice(0, 400));
 
 await browser.close();

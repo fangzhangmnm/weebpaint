@@ -74,7 +74,7 @@ export interface BackendInject {
 export interface BackendOpenResult {
   backend: WeebPaintBackend;
   /** open 解出的壳 sidecar（backend 不解释，原样交壳）。 */
-  sidecar: { editorState?: unknown; legacyState?: unknown; references?: ({ bytes: Uint8Array; mime: string } | null)[]; wroteWith: string | null };
+  sidecar: { editorState?: unknown; legacyState?: unknown; referenceFiles: { path: string; bytes: Uint8Array }[]; wroteWith: string | null };
 }
 
 // ---- 魔数嗅探（open 路由归 backend）----
@@ -182,10 +182,7 @@ export class WeebPaintBackend implements WeebPaintBackendInterface {
         backend,
         sidecar: {
           editorState: dec._editorState, legacyState: dec._weebpaintState,
-          references: dec._references
-            ? await Promise.all(dec._references.map(async (r) =>
-                r.kind === "image" ? { bytes: new Uint8Array(await r.blob.arrayBuffer()), mime: r.blob.type } : null))
-            : undefined,
+          referenceFiles: [...dec._referenceFiles].map(([path, bytes]) => ({ path, bytes })),
           wroteWith: dec._wroteWith,
         },
       };
@@ -199,7 +196,7 @@ export class WeebPaintBackend implements WeebPaintBackendInterface {
       ? await decodePngToBytes(bytes)
       : await (inject.imageDecoder ?? (() => { throw new Error("WeebPaintBackend.open: non-png bitmaps need an injected imageDecoder"); }))(bytes);
     const backend = new WeebPaintBackend(singleImageData(plane), inject);
-    return { backend, sidecar: { wroteWith: null } };
+    return { backend, sidecar: { referenceFiles: [], wroteWith: null } };
   }
 
   // ── 生命周期 ──
@@ -228,7 +225,7 @@ export class WeebPaintBackend implements WeebPaintBackendInterface {
 
   // ── 字节面 ──
 
-  async encodeOra(opts: { editorSidecar?: object; references?: ({ bytes: Uint8Array; mime: string } | null)[];
+  async encodeOra(opts: { editorSidecar?: object; referenceFiles?: { path: string; bytes: Uint8Array }[];
                           timelapse?: { json: string; mp4: Uint8Array } | null } = {}): Promise<Uint8Array> {
     this._guard();
     // merged 合成（mergedimage/缩略图）：合成面可用则渲（per-tenant 注入，缺省全局接缝），GL 缺席 →
@@ -239,7 +236,7 @@ export class WeebPaintBackend implements WeebPaintBackendInterface {
       wroteWith: this._inject.appVersion ?? "",
       mergedBytes: merged,
       desk: opts.editorSidecar,
-      references: opts.references?.map((r) => r ? new Blob([r.bytes as unknown as BlobPart], { type: r.mime }) : null),
+      referenceFiles: opts.referenceFiles ? new Map(opts.referenceFiles.map((f) => [f.path, f.bytes])) : undefined,
       timelapse: opts.timelapse,
     }) as Blob;
     return new Uint8Array(await blob.arrayBuffer());

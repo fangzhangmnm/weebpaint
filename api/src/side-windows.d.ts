@@ -1,14 +1,13 @@
 import { WpReferenceWindow } from "@internal/reference-window";
 import { PaletteWindow } from "./palette.ts";
-import type { DecodedReference } from "./backend/ora.ts";
+import type { ReferenceFiles } from "./backend/ora.ts";
 import type { AppContext } from "./app-context.ts";
 export declare const referenceWindow: WpReferenceWindow;
-/** 保存收集（session-state _buildOraMeta 调）：先同步 desk manifest，再交出与 manifest **位置对齐**
- *  的 blob 列表（live 占位 null，encode 跳过但保索引）。 */
-export declare function collectReferenceBlobsForSave(): (Blob | null)[];
-/** 载入恢复（session-state 在 desk.Unserialize **之后**调）：decode 的 _references（manifest 顺序）
- *  → bitmap → 组件整表灌入；vp 按 desk.refPanels 对位取（旧文件单张 → desk.refPanel.viewport）。 */
-export declare function applyLoadedReferences(refs: DecodedReference[]): Promise<void>;
+/** 保存收集（session-state _buildOraMeta 调）：库编好的目录文件表，原样进 ora。 */
+export declare function collectReferenceFilesForSave(): Map<string, Uint8Array | Blob>;
+/** 载入恢复（session-state adopt 时调）：ora 交来的参考目录 → 库解清单（含它自己的版本迁移）→ 牌组整副换掉。
+ *  库解不了（清单比库新）→ 目录原样带着、状态行如实说。 */
+export declare function applyLoadedReferences(files: ReferenceFiles): Promise<void>;
 export declare const paletteWindow: PaletteWindow;
 export declare function initSideWindows(ctx: AppContext): void;
 /** 导入唯一漏斗（spec §5；genai era 同入口）：转码政策（1024² / 小图原样豁免 / 拍平白底 jpeg /

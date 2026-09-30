@@ -36,14 +36,8 @@ type EncodeDoc = {
 /** exportData 冻结快照 → encode 消费面（保存路径的 freezeDocForEncode 后继；bytes 已当场拷出，
  *  getImageData = 纯切片，无 canvas、无追写风险）。 */
 export declare function paintingDataToEncodeDoc(data: PaintingData): EncodeDoc;
-export declare function refEntryName(i: number, mime: string): string;
-/** decode 产出的参考项（manifest 顺序）。live=零字节标记（宿主重绑合成 provider）。 */
-export type DecodedReference = {
-    kind: "image";
-    blob: Blob;
-} | {
-    kind: "live";
-};
+/** 参考目录的文件表：路径 → 字节（路径全在 REFERENCES_DIR 下）。 */
+export type ReferenceFiles = Map<string, Uint8Array>;
 interface EncodeOpts {
     wroteWith: string;
     mergedBytes?: {
@@ -51,7 +45,8 @@ interface EncodeOpts {
         w: number;
         h: number;
     } | null;
-    references?: (Blob | null)[];
+    /** 参考目录（format 3）：路径 → 字节，原样写入；路径必须在 .weebpaint/references/ 下（不透明，codec 不解释）。 */
+    referenceFiles?: Map<string, Uint8Array | Blob>;
     desk?: object;
     timelapse?: {
         json: string;
@@ -60,7 +55,10 @@ interface EncodeOpts {
 }
 export interface DecodedPainting {
     data: PaintingData;
-    _references?: DecodedReference[];
+    /** 参考目录原样（布局归一化之后的路径）；没有参考 → 空表。壳层交给 @internal/reference-window 解。 */
+    _referenceFiles: ReferenceFiles;
+    /** 读端做了哪些布局搬动（人话；空 = 文件本来就是当前布局）。壳层记日志用。 */
+    _layoutMigrated: string[];
     _weebpaintState?: unknown;
     _editorState?: unknown;
     _timelapseJson?: string;
@@ -70,15 +68,16 @@ export interface DecodedPainting {
 }
 /** doc → Blob (.ora)
  *
- * ══ zip 布局契约（format 2，2026-08-30 user 拍板；动布局必须上报+附目录表 = CLAUDE.md 纪律）══
+ * ══ zip 布局契约（format 3，2026-09-29 持久化立宪；format 2 = 2026-08-30 user 拍板；动布局必须上报+附目录表 = CLAUDE.md 纪律）══
  * 终态目录表（写端唯一形状）：
  *   mimetype                              ← ORA spec 强制第一
  *   stack.xml                             ← 结构 + wrote-with / weebpaint:format
  *   mergedimage.png                       ← spec
  *   data/layer<id>.png × N                ← spec
- *   .weebpaint/editor-state.json          ← desk（含 refPanels manifest）
- *   .weebpaint/references/r<i>.<ext>      ← 多参考（refEntryName；manifest 驱动，扩展名说真话）
- *   .weebpaint/timelapse.json / .mp4      ← 录像（format 2 起 mp4 与 json 团圆）
+ *   .weebpaint/timelapse.mp4 / .json      ← 录像（format 2 起 mp4 与 json 团圆）
+ *   .weebpaint/references/manifest.json   ← 参考窗清单（format 3；契约归 @internal/reference-window）
+ *   .weebpaint/references/r<i>.<ext>      ← 参考窗的每张卡（同上，本 codec 不解释）
+ *   .weebpaint/editor-state.json          ← desk（format 3 起不再含 refPanels）
  *   Thumbnails/thumbnail.png              ← spec 强制，恒最后（byte-range 尾窗契约）
  * 心智模型：根目录 = ORA spec 领土；`.weebpaint/` = 全部 WP 私货（与云端 store `.weebpaint/` 同义）。
  * **非点 `weebpaint/` 已停写**（format 2）；读端兜底链见 decode 尾部路由表——只读不写、保存即自愈。

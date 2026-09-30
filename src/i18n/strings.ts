@@ -589,6 +589,7 @@ export const S = {
   "ref.moveLater":   { zh: "往后挪一位", en: "Move later", ja: "後ろへ移動", tok: "o tawa e ni tawa pini" },
   "ref.jump":        { zh: "跳到某一张", en: "Jump to a reference", ja: "参考へジャンプ", tok: "o tawa sitelen ante" },
   "ref.kindImage":   { zh: "图片", en: "Image", ja: "画像", tok: "sitelen" },
+  "ref.tooNew":      { zh: "参考清单是更新的版本写的（v{file}，本版只懂到 v{lib}）——先原样保留，请刷新升级后再看", en: "References were written by a newer version (v{file}; this build reads up to v{lib}) — kept untouched, refresh to upgrade", ja: "参考リストは新しいバージョンで書かれています（v{file}、この版は v{lib} まで）——そのまま保持、更新してください", tok: "lipu lukin li tan ilo sin (v{file}; ilo ni li sona e v{lib} taso) — mi awen e ona, o sin e ilo" },
 
   // ── 云盘图片 picker（<wp-cloud-picker>，spec 20260820）─────────────────────
   "cp.title":        { zh: "从图库选图", en: "Pick an image from the gallery", ja: "ギャラリーから画像を選ぶ", tok: "o kama jo e sitelen tan poki sitelen" },

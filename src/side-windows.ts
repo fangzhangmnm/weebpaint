@@ -6,20 +6,23 @@
 // referenceWindow 导出 = 组件元素本身；app.ts 晚绑 Object.assign(ctx, {...}) 与 session-state 直接读。
 //
 // ══ 0830 整改批（spec=ai-docs/20260830-reference-window-rework-spec.md）══
-//   多参考：desk.refPanels manifest（index+items[kind/src/vp]，src=refEntryName 与 encode 同函数同索引）；
 //   导入唯一漏斗 = addReferenceImage（文件/剪贴板/云盘/未来 genai 全走它；1024² 拍平 jpeg 政策）。
+// ══ 2026-09-29 持久化立宪（format 3）══
+//   参考的持久化契约归 @internal/reference-window：整个 `.weebpaint/references/` 目录（manifest.json + 字节）由库
+//   encodeDeck / decodeDeck 进出，本文件只搬字节、不解释清单（desk 不再持有 refPanels）。
+//   清单比库新（DeckManifestTooNewError）→ 目录原样带着、保存时原样写回、状态行如实说；不吞、不猜。
 
 import { t } from "./i18n/index.ts";
 import { WpReferenceWindow } from "@internal/reference-window";
-import type { RefItem, RefLiveSource, RefPanelRect, RefViewport } from "@internal/reference-window";
+import type { RefLiveSource, RefPanelRect } from "@internal/reference-window";
+import { encodeDeck, decodeDeck, mimeForName, DeckManifestTooNewError } from "@internal/reference-window/deck";
 import { PaletteWindow } from "./palette.ts";
 import { els } from "./els.ts";
 import { decodeImageFile, imageSourceToBytes } from "./shell/image-io.ts";
 import { withBusy } from "./fullscreen-busy.ts";
 import { areaResampleBytes } from "./backend/algorithms/resample-bytes.ts";
 import { encodeJpegFromBytes } from "./backend/jpeg-codec.ts";
-import { refEntryName } from "./backend/ora.ts";
-import type { DecodedReference } from "./backend/ora.ts";
+import type { ReferenceFiles } from "./backend/ora.ts";
 import { planRefImport, flattenWhiteInPlace, REF_JPEG_QUALITY } from "./reference-transcode.ts";
 import { readImageFromClipboard } from "./session.ts";
 import { humanSize } from "@internal/gallery";
@@ -75,55 +78,41 @@ function composeLiveFrame(): RefLiveSource | null {
   return _liveCanvas;
 }
 
-// ---- desk 同步（组件状态 → refPanels manifest；src 与 encode 同函数同索引 = 防漂移）----
-const _DEFAULT_VP: RefViewport = { tx: 0, ty: 0, scale: 1, rot: 0 };
-function syncRefsToDesk(): void {
-  const st = referenceWindow.getRefState?.();
-  if (!st) return;   // 无 CE 环境（boot smoke dom-shim）：组件未升级，desk 保持现状
-  desk.refPanels = {
-    index: st.index,
-    items: st.items.map((it, i) => it.kind === "image"
-      ? { kind: "image" as const, src: refEntryName(i, it.blob?.type || ""), vp: it.vp ?? { ..._DEFAULT_VP } }
-      : { kind: "live" as const, vp: it.vp ?? { ..._DEFAULT_VP } }),
-  };
-  const cur = st.items[st.index];
-  if (cur?.vp) desk.refPanel.viewport = { ...cur.vp };   // 旧字段镜像当前页（读端兼容/心智延续）
+// ---- 参考目录进出（format 3；契约归 @internal/reference-window）----
+const REF_APP = "weebpaint";                          // 目录 = .weebpaint/references/（库按 app 名算）
+const REF_KINDS = ["image", "live"] as const;         // 这个宿主画得出来的种类；其余的库原样带着
+/** 清单比库新时整个目录原样带着（读时装下、存时原样写回），直到用户在新版里打开。null = 正常态。 */
+let _carriedRefFiles: ReferenceFiles | null = null;
+
+/** 保存收集（session-state _buildOraMeta 调）：库编好的目录文件表，原样进 ora。 */
+export function collectReferenceFilesForSave(): Map<string, Uint8Array | Blob> {
+  if (_carriedRefFiles) return _carriedRefFiles;
+  if (!referenceWindow.deck) return new Map();   // 无 CE 环境（boot smoke dom-shim）：组件未升级
+  return encodeDeck(referenceWindow.deck.snapshot(), { app: REF_APP });
 }
 
-/** 保存收集（session-state _buildOraMeta 调）：先同步 desk manifest，再交出与 manifest **位置对齐**
- *  的 blob 列表（live 占位 null，encode 跳过但保索引）。 */
-export function collectReferenceBlobsForSave(): (Blob | null)[] {
-  syncRefsToDesk();
-  const st = referenceWindow.getRefState?.();
-  if (!st) return [];
-  return st.items.map((it) => (it.kind === "image" ? it.blob : null));
-}
-
-/** 载入恢复（session-state 在 desk.Unserialize **之后**调）：decode 的 _references（manifest 顺序）
- *  → bitmap → 组件整表灌入；vp 按 desk.refPanels 对位取（旧文件单张 → desk.refPanel.viewport）。 */
-export async function applyLoadedReferences(refs: DecodedReference[]): Promise<void> {
-  const manifest = desk.refPanels;
-  const legacySingle = manifest.items.length === 0;
-  const items: RefItem[] = [];
-  for (let i = 0; i < refs.length; i++) {
-    const r = refs[i];
-    const vp = legacySingle
-      ? (legacyVpOrNull())
-      : (manifest.items[i]?.vp ? { ...manifest.items[i].vp } : null);
-    if (r.kind === "live") { items.push({ kind: "live", vp }); continue; }
-    try {
-      const bitmap = await createImageBitmap(r.blob);
-      items.push({ kind: "image", bitmap, blob: r.blob, vp });
-    } catch (e) {
-      reportError(new Error("[side-windows] reference bitmap decode failed (item skipped): " + String(e)), "log");
+/** 载入恢复（session-state adopt 时调）：ora 交来的参考目录 → 库解清单（含它自己的版本迁移）→ 牌组整副换掉。
+ *  库解不了（清单比库新）→ 目录原样带着、状态行如实说。 */
+export async function applyLoadedReferences(files: ReferenceFiles): Promise<void> {
+  _carriedRefFiles = null;
+  const deck = referenceWindow.deck;
+  if (!deck) return;
+  try {
+    const decoded = await decodeDeck({
+      app: REF_APP, knownKinds: REF_KINDS,
+      getFile: (path) => { const b = files.get(path); return b ? new Blob([b as unknown as BlobPart], { type: mimeForName(path) }) : null; },
+    });
+    deck.restore(decoded);
+  } catch (e) {
+    if (e instanceof DeckManifestTooNewError) {
+      _carriedRefFiles = files;
+      deck.clear();
+      setStatus(t("ref.tooNew", { file: String(e.fileVersion), lib: String(e.libVersion) }), true);
+      reportError(new Error(`[side-windows] ${e.message}; carrying the references directory untouched`), "warning");
+      return;
     }
+    throw e;
   }
-  referenceWindow.setItems?.(items, legacySingle ? 0 : manifest.index);
-}
-function legacyVpOrNull(): RefViewport | null {
-  const v = desk.refPanel.viewport;
-  // 默认单位 vp = 从没动过（旧文件也可能真是单位 vp——fit 一下无损）
-  return (v && (v.tx !== 0 || v.ty !== 0 || v.scale !== 1 || v.rot !== 0)) ? { ...v } : null;
 }
 
 // ---- 调色板小窗（v87）----
@@ -147,10 +136,9 @@ export function initSideWindows(ctx: AppContext) {
   ref.menuPort = (o) => togglePopupMenu(o);
 
   // ---- 组件事件 → desk 持久化（宿主 store 解耦：组件不认识 desk）----
-  ref.addEventListener("viewportchange", () => syncRefsToDesk());
+  // 视口变化住在牌组里，保存时随手带走（不标脏）。
   ref.addEventListener("itemschange", () => {
-    syncRefsToDesk();
-    // 参考集合变（翻页/删除/加 live 页）= sidecar 变（S5·ADR-0007：跟 ora 走 ∧ 不进 undo）
+    // 参考集合变（翻页/删除/加 live 页/挪动）= sidecar 变（S5·ADR-0007：跟 ora 走 ∧ 不进 undo）
     window.dispatchEvent(new CustomEvent("wp:sidecarchange", { detail: { kind: "reference" } }));
   });
   ref.addEventListener("rectchange", (e) => {
@@ -275,8 +263,7 @@ export async function addReferenceImage(file: File | Blob): Promise<void> {
     },
   );
   refSetOpen(true);
-  referenceWindow.addImage?.(r.bitmap as ImageBitmap, r.blob);
-  syncRefsToDesk();
+  referenceWindow.addImage?.(r.bitmap as ImageBitmap, r.blob, { name: (file as File).name || "" });   // #74：文件名进卡（跳转列表用）
   // v0.8.5（S5·ADR-0007）：参考图 = sidecar（跟 ora 走 ∧ 不进 undo）——走正名的 wp:sidecarchange 通道。
   window.dispatchEvent(new CustomEvent("wp:sidecarchange", { detail: { kind: "reference" } }));
   setStatus(t("mi.referenceLoaded", { name: (file as File).name || "", scaled: r.note }));

@@ -18,6 +18,7 @@ export interface EditorViewport {
     rot: number;
 }
 declare function freshGroups(): {
+    version: number;
     export: {
         format: string;
         target: string;
@@ -38,14 +39,6 @@ declare function freshGroups(): {
         enabled: boolean;
         position: PanelPos | null;
         viewport: EditorViewport;
-    };
-    refPanels: {
-        index: number;
-        items: Array<{
-            kind: "image" | "live";
-            src?: string;
-            vp: EditorViewport;
-        }>;
     };
     blenderPanel: {
         show: boolean;
@@ -221,22 +214,6 @@ export declare const desk: {
         enabled: boolean;
         position: PanelPos | null;
     };
-    get refPanels(): {
-        index: number;
-        items: Array<{
-            kind: "image" | "live";
-            src?: string;
-            vp: EditorViewport;
-        }>;
-    };
-    set refPanels(v: {
-        index: number;
-        items: Array<{
-            kind: "image" | "live";
-            src?: string;
-            vp: EditorViewport;
-        }>;
-    });
     refPanel: {
         enabled: boolean;
         position: PanelPos | null;

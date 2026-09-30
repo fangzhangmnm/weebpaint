@@ -58,7 +58,9 @@ import "./liquify-docspace-mask.test.mjs";
 import "./liquify-group.test.mjs";        // 2026-08-28 液化对图层组：共享位移场逐叶重采样 + 一步 undo + 组能力门
 import "./timelapse.test.mjs";       // 宣发轮：取景框/平采样闸门/帧合成/mux↔demux round-trip/录制态自愈/编码器注入槽（spec=ai-docs/20260819-timelapse-spec.md）
 import "./timelapse-ora.test.mjs";   // timelapse×ora：entry 进出/顺序契约（thumbnail 恒最后）/DocState 整链 round-trip
-import "./ora-references.test.mjs";       // 0830 多参考 format 2：manifest round-trip/兜底链/停写非点 weebpaint/
+import "./ora-references.test.mjs";       // 参考目录 × ora（format 3）：目录原样进出 / thumbnail 垫尾 / 停写非点 weebpaint/
+import "./format-layout.test.mjs";        // 2026-09-29 持久化立宪：布局归一化表 + 子结构版本链
+import "./format-samples.test.mjs";       // 2026-09-29 持久化立宪：冻结样本往返（老文件永远能开、语义无损、写成当前布局）
 import "./reference-transcode.test.mjs";  // 0830 参考图压缩政策纯函数（1024² 面积/豁免/拍平白底）
 import "./reference-icons.test.mjs";      // 0830 参考窗图标 SSoT：id 全在 sprite（零自绘几何那条 2026-09-29 随组件搬进库仓）
 import "./resample-bytes.test.mjs"; // 字节重采样：面积平均严格box/alpha加权/限幅

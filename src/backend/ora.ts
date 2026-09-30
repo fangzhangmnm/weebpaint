@@ -7,9 +7,12 @@
 //   stack.xml                XML 描述 <image><stack><layer .../></stack></image>
 //   data/layerN.png          每层的 PNG bitmap（任意尺寸，由 stack.xml 的 x/y 决定位置）
 //   mergedimage.png          整图合成预览（OneDrive 缩略图 / 其他 reader 兜底用）
-//   timelapse.mp4            可选：timelapse 录像（直接可播；spec=ai-docs/20260819-timelapse-spec.md）
+//   .weebpaint/timelapse.mp4 可选：timelapse 录像（直接可播；spec=ai-docs/20260819-timelapse-spec.md）
 //   .weebpaint/timelapse.json 可选：录制状态（开关 sticky/取景框 pin/n/motionSamples）
+//   .weebpaint/references/    参考窗（format 3 起独立目录：manifest.json + r<i>.<ext>；契约归 @internal/reference-window）
+//   .weebpaint/editor-state.json  desk
 //   Thumbnails/thumbnail.png 小缩略图（最长边 ≤ 256，规范要求）——**必须最后 entry**（云端 byte-range 尾窗契约）
+// 读端只认这一种布局：历史布局由 format/layout.ts 归一化（那张表是过去散在这里的全部兼容分支）。
 //
 // 我们的层 bbox 直接对应 spec 的 x / y / 自带尺寸 PNG —— 零转换。
 //
@@ -27,6 +30,7 @@ let _oraLog: (msg: string) => void = () => {};
 export function setOraLogReporter(fn: (msg: string) => void): void { _oraLog = fn; }
 const reportError = (err: unknown, _level?: string) => _oraLog(String(err instanceof Error ? err.message : err));
 import { zipPack, zipUnpack } from "./zip.ts";
+import { normalizeLayout, REFERENCES_DIR } from "./format/layout.ts";
 import { areaResampleBytes } from "./algorithms/resample-bytes.ts";
 import { encodePngFromBytes, decodePngToBytes } from "./png-codec.ts";
 // 纯树↔stack.xml 序列化（嵌套组 + id + active）抽到独立深模块（无 canvas 依赖，可纯 node 测）。
@@ -96,28 +100,17 @@ export function paintingDataToEncodeDoc(data: PaintingData): EncodeDoc {
     activeId: data.activeId ?? null, referenceLayerId: data.referenceLayerId ?? null,
   };
 }
-// ---- 多参考（format 2，spec=ai-docs/20260830-reference-window-rework-spec.md）----
-// entry 命名约定（encode 与 desk manifest 共用同一函数，防两侧漂移）：`.weebpaint/references/r<i>.<ext>`，
-//   扩展名说真话（按 blob mime）；i = manifest 顺序位。
-export function refEntryName(i: number, mime: string): string {
-  const ext = mime === "image/jpeg" ? "jpg" : mime === "image/png" ? "png"
-    : mime === "image/webp" ? "webp" : mime === "image/gif" ? "gif" : "img";
-  return `.weebpaint/references/r${i}.${ext}`;
-}
-function _mimeFromRefPath(path: string): string {
-  return path.endsWith(".jpg") ? "image/jpeg" : path.endsWith(".png") ? "image/png"
-    : path.endsWith(".webp") ? "image/webp" : path.endsWith(".gif") ? "image/gif" : "application/octet-stream";
-}
-/** decode 产出的参考项（manifest 顺序）。live=零字节标记（宿主重绑合成 provider）。 */
-export type DecodedReference = { kind: "image"; blob: Blob } | { kind: "live" };
+// ---- 参考窗（format 3）：本 codec 对参考目录**零知识**——整个 `.weebpaint/references/` 原样进出，
+//   命名 / 清单 / 版本 / 迁移全在 @internal/reference-window 库里（壳层 side-windows 调它）。
+/** 参考目录的文件表：路径 → 字节（路径全在 REFERENCES_DIR 下）。 */
+export type ReferenceFiles = Map<string, Uint8Array>;
 
 // encode opts：wroteWith 必填（C7：版本戳是壳知识，backend 不 import version.ts）+ 可选 WeebPaint 私有扩展。
 interface EncodeOpts {
   wroteWith: string;   // stack.xml weebpaint:wrote-with 版本戳（壳传 WEEBPAINT_VERSION；backend 装配传注入的 appVersion）
   mergedBytes?: { data: Uint8ClampedArray; w: number; h: number } | null;   // S9/C3：调用方渲好的合成字节（GL renderNodesToBytes）；缺省=透明占位
-  // 多参考（format 2）：**与 manifest 位置对齐**的 blob 列表（live 项占位 null，encode 跳过但保
-  //   位置 i）——entry 名 = refEntryName(i, blob.type)，与 desk.refPanels.items[i].src 同函数同索引。
-  references?: (Blob | null)[];
+  /** 参考目录（format 3）：路径 → 字节，原样写入；路径必须在 .weebpaint/references/ 下（不透明，codec 不解释）。 */
+  referenceFiles?: Map<string, Uint8Array | Blob>;
   desk?: object;   // desk.Serialize() → .weebpaint/editor-state.json（desk per-doc；不向后兼容旧轨 webpaint/state.json）
   // timelapse 录像（spec=ai-docs/20260819-timelapse-spec.md，ora entry consent 2026-08-19）：
   //   mp4 = 直接可播的完整录像（TimelapseDocState.serializeForSave 产物；空 Uint8Array=还没帧，只落 json）
@@ -127,7 +120,10 @@ interface EncodeOpts {
 // 字段名沿旧 DecodedDoc 下划线惯例——session-state 消费面零改名。
 export interface DecodedPainting {
   data: PaintingData;
-  _references?: DecodedReference[];   // manifest 顺序；旧文件单张兜底也走这（长度 1）
+  /** 参考目录原样（布局归一化之后的路径）；没有参考 → 空表。壳层交给 @internal/reference-window 解。 */
+  _referenceFiles: ReferenceFiles;
+  /** 读端做了哪些布局搬动（人话；空 = 文件本来就是当前布局）。壳层记日志用。 */
+  _layoutMigrated: string[];
   _weebpaintState?: unknown;
   _editorState?: unknown;   // .weebpaint/editor-state.json → desk.Unserialize()
   _timelapseJson?: string;      // .weebpaint/timelapse.json 原文（TimelapseDocState.restore 消费，含自愈）
@@ -173,15 +169,16 @@ async function renderThumbnailAdaptive(merged: { data: Uint8ClampedArray; w: num
 
 /** doc → Blob (.ora)
  *
- * ══ zip 布局契约（format 2，2026-08-30 user 拍板；动布局必须上报+附目录表 = CLAUDE.md 纪律）══
+ * ══ zip 布局契约（format 3，2026-09-29 持久化立宪；format 2 = 2026-08-30 user 拍板；动布局必须上报+附目录表 = CLAUDE.md 纪律）══
  * 终态目录表（写端唯一形状）：
  *   mimetype                              ← ORA spec 强制第一
  *   stack.xml                             ← 结构 + wrote-with / weebpaint:format
  *   mergedimage.png                       ← spec
  *   data/layer<id>.png × N                ← spec
- *   .weebpaint/editor-state.json          ← desk（含 refPanels manifest）
- *   .weebpaint/references/r<i>.<ext>      ← 多参考（refEntryName；manifest 驱动，扩展名说真话）
- *   .weebpaint/timelapse.json / .mp4      ← 录像（format 2 起 mp4 与 json 团圆）
+ *   .weebpaint/timelapse.mp4 / .json      ← 录像（format 2 起 mp4 与 json 团圆）
+ *   .weebpaint/references/manifest.json   ← 参考窗清单（format 3；契约归 @internal/reference-window）
+ *   .weebpaint/references/r<i>.<ext>      ← 参考窗的每张卡（同上，本 codec 不解释）
+ *   .weebpaint/editor-state.json          ← desk（format 3 起不再含 refPanels）
  *   Thumbnails/thumbnail.png              ← spec 强制，恒最后（byte-range 尾窗契约）
  * 心智模型：根目录 = ORA spec 领土；`.weebpaint/` = 全部 WP 私货（与云端 store `.weebpaint/` 同义）。
  * **非点 `weebpaint/` 已停写**（format 2）；读端兜底链见 decode 尾部路由表——只读不写、保存即自愈。
@@ -227,18 +224,16 @@ export async function encodeDocToOra(doc: EncodeDoc, opts: EncodeOpts) {
     entries.push({ path: ".weebpaint/timelapse.json", data: opts.timelapse.json });
   }
 
-  // 多参考（format 2）：有序 blob → .weebpaint/references/r<i>.<ext>；manifest 在 desk.refPanels
-  //   （同一次 Serialize 出的 editor-state.json）里，src 由同一个 refEntryName 生成——两侧同函数防漂移。
+  // 参考目录（format 3）：库编好的一组文件原样写入，顺序照库给的（manifest.json 在前）。
   // Thumbnails/thumbnail.png 放**最后一个 entry**：缩略图 byte-range 提取先拉尾片 80KB，thumbnail 在尾
   //   → 一发命中、零额外请求。故 references / editor-state.json 都排在它之前。
   //   历史：v398 前 reference.png 曾排在 thumbnail 之后，那时库靠「尾部硬扫最后一个 PNG」找缩略图 →
   //   缩略图错显成参考图。v399 起库**按文件名**解 CD 取 entry，位置不再决定对错，但 thumbnail 垫尾仍是
   //   最省 byte-range 的约定。
-  if (opts.references) {
-    for (let i = 0; i < opts.references.length; i++) {
-      const b = opts.references[i];
-      if (!(b instanceof Blob)) continue;
-      entries.push({ path: refEntryName(i, b.type), data: new Uint8Array(await b.arrayBuffer()) });
+  if (opts.referenceFiles) {
+    for (const [path, data] of opts.referenceFiles) {
+      if (!path.startsWith(REFERENCES_DIR + "/")) throw new Error(`[ora] reference file outside ${REFERENCES_DIR}/: ${path}`);
+      entries.push({ path, data: data instanceof Blob ? new Uint8Array(await data.arrayBuffer()) : data });
     }
   }
   // desk struct（desk per-doc）→ .weebpaint/editor-state.json（旧轨 webpaint/state.json v0.8.21 停写）。
@@ -258,7 +253,8 @@ export async function encodeDocToOra(doc: EncodeDoc, opts: EncodeOpts) {
 
 /** Blob (.ora 明文) → DecodedPainting（json 形 + 内联 tile 字节 + sidecar）。 */
 export async function decodeOraToPainting(blob: Blob): Promise<DecodedPainting> {
-  const files = await zipUnpack(blob);
+  // 布局归一化：任何历史布局 → 当前布局（format/layout.ts 那张表）。之后本函数只认一种形状。
+  const { files, migrated } = normalizeLayout(await zipUnpack(blob));
   if (!files["stack.xml"]) throw new Error(".ora missing stack.xml");
   // mimetype 检验（友好，不强制）
   if (files["mimetype"]) {
@@ -324,19 +320,17 @@ export async function decodeOraToPainting(blob: Blob): Promise<DecodedPainting> 
     activeId = leaves.length ? leaves[leaves.length - 1] : null;
   }
 
+  const referenceFiles: ReferenceFiles = new Map();
+  for (const p of Object.keys(files)) if (p.startsWith(REFERENCES_DIR + "/")) referenceFiles.set(p, files[p]);
   const out: DecodedPainting = {
     data: { width: meta.w, height: meta.h, activeId, referenceLayerId, nodes },
+    _referenceFiles: referenceFiles,
+    _layoutMigrated: migrated,
     _wroteWith: meta.wroteWith || null,
     _formatVersion: meta.formatVersion ?? 0,
   };
-  // WeebPaint 扩展：reference 小窗的图 + state JSON（可有可无）。
-  // ══ 读端兼容路由表（format 2；只读不写，保存即自愈；只在「布局上报」时更新此表）══
-  //   参考图          : `.weebpaint/references/`+refPanels manifest → weebpaint/reference.png → webpaint/reference.png
-  //   timelapse mp4   : .weebpaint/timelapse.mp4 → 根 timelapse.mp4
-  //   desk/tl json    : .weebpaint/… → .webpaint/…（改名双读，2026-08-20「新写旧读」）
-  //   旧轨 state.json : webpaint/state.json（v0.8.21 停写，只存在于旧名时代）
-  const dualRead = (path: string) => files[path] ?? files[path.replace(/(^|^\.)weebpaint\//, "$1webpaint/")];
-  // 旧轨 state.json：读旧名即可。
+  // WeebPaint 私货（可有可无）。历史布局已在上面归一化，这里只认当前路径。
+  // 旧轨 state.json（v0.8.21 停写，只读，原样留在文件里）。
   if (files["webpaint/state.json"]) {
     try {
       out._weebpaintState = JSON.parse(bytesToString(files["webpaint/state.json"]));
@@ -345,13 +339,12 @@ export async function decodeOraToPainting(blob: Blob): Promise<DecodedPainting> 
     }
   }
   // timelapse：原文/原字节随行（解析与自愈在 TimelapseDocState.restore，codec 不掺语义）。
-  const tlJson = dualRead(".weebpaint/timelapse.json");
+  const tlJson = files[".weebpaint/timelapse.json"];
   if (tlJson) out._timelapseJson = bytesToString(tlJson);
-  const tlMp4 = files[".weebpaint/timelapse.mp4"] ?? files["timelapse.mp4"];
+  const tlMp4 = files[".weebpaint/timelapse.mp4"];
   if (tlMp4) out._timelapseMp4 = tlMp4;
   // desk struct（desk per-doc）；缺失（老画作/不向后兼容）→ 留 undefined，adopt 时 reset 到默认。
-  //   先解 desk：references manifest（refPanels）住在里面。
-  const deskJson = dualRead(".weebpaint/editor-state.json");
+  const deskJson = files[".weebpaint/editor-state.json"];
   if (deskJson) {
     try {
       out._editorState = JSON.parse(bytesToString(deskJson));
@@ -359,26 +352,6 @@ export async function decodeOraToPainting(blob: Blob): Promise<DecodedPainting> 
       reportError(new Error("[ora] .weebpaint/editor-state.json parse failed: " + String(e)), "log");
     }
   }
-  // 多参考（format 2）：按 manifest 顺序装配；缺 entry 的 image 项响亮跳过（不吞：log）。
-  //   未知 kind → 丢该条（entry 级降级，文件照常开）。无 manifest → 旧文件单张兜底链。
-  const manifest = (out._editorState as { refPanels?: { items?: unknown[] } } | undefined)?.refPanels?.items;
-  const refs: DecodedReference[] = [];
-  if (Array.isArray(manifest)) {
-    for (const raw of manifest) {
-      const it = raw as { kind?: string; src?: string };
-      if (it?.kind === "live") { refs.push({ kind: "live" }); continue; }
-      if (it?.kind === "image" && typeof it.src === "string") {
-        const bytes = files[it.src];
-        if (bytes) refs.push({ kind: "image", blob: new Blob([bytes], { type: _mimeFromRefPath(it.src) }) });
-        else reportError(`[ora] reference entry missing (manifest src=${it.src}); item skipped`, "log");
-      }
-      // 其余 kind：未来格式，丢条不丢文件
-    }
-  } else {
-    const refPng = dualRead("weebpaint/reference.png");   // 旧单张（原样字节，名字叫 png 未必是 png——消费方 content-sniff）
-    if (refPng) refs.push({ kind: "image", blob: new Blob([refPng], { type: "image/png" }) });
-  }
-  if (refs.length) out._references = refs;
   return out;
 }
 

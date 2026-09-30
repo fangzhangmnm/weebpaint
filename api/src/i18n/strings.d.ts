@@ -3028,6 +3028,12 @@ export declare const S: {
         readonly ja: "画像";
         readonly tok: "sitelen";
     };
+    readonly "ref.tooNew": {
+        readonly zh: "参考清单是更新的版本写的（v{file}，本版只懂到 v{lib}）——先原样保留，请刷新升级后再看";
+        readonly en: "References were written by a newer version (v{file}; this build reads up to v{lib}) — kept untouched, refresh to upgrade";
+        readonly ja: "参考リストは新しいバージョンで書かれています（v{file}、この版は v{lib} まで）——そのまま保持、更新してください";
+        readonly tok: "lipu lukin li tan ilo sin (v{file}; ilo ni li sona e v{lib} taso) — mi awen e ona, o sin e ilo";
+    };
     readonly "cp.title": {
         readonly zh: "从图库选图";
         readonly en: "Pick an image from the gallery";

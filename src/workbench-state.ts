@@ -17,6 +17,7 @@
 //   反应式（Vue 组件 computed 自动追踪 → 当前笔重派生）。
 //   （全局 pressureToSize/Opacity 已 deprecate 2026-07-14 → 每笔自带的 sizeCoeff/opaCoeff，见 brush.ts:397。）
 
+import { migrateSubstructure } from "./backend/format/migrate.ts";   // 持久化立宪：desk 版本链（比 app 新 → 抛 FormatTooNewError，壳层接）
 import { reactive } from "../vendor/vue/vue.esm-browser.prod.js";
 import type { EditorRuntimeState, DialReactive, ToolDial } from "./app-context.ts";
 
@@ -135,6 +136,9 @@ export interface EditorViewport { tx: number; ty: number; scale: number; rot: nu
 // 序列化形状 = `.weebpaint/editor-state.json` 的内容（freshGroups() 即 defaults SSoT）。
 function freshGroups() {
   return {
+    // 持久化立宪（2026-09-29）：desk 这段 JSON 自己的版本戳（backend/format/migrate.ts SUBSTRUCTURE_VERSIONS.desk）。
+    //   读到比 app 新的 → session-state 走「新版本写的」警告 + 覆盖守卫；旧文件缺此键 = 1。
+    version:       1,
     // #8（user 2026-08-23「png导出默认defringe」）：键 defringe→defringePng、默认 false→true。
     //   键改名 = 存量 doc 里的旧 defringe（几乎全是老默认 false，正是这条要求要消灭的状态）被
     //   mergeInto 静默忽略、统一升级到默认开——precedent 同 v0.10.11 lineartInk→lineartInkTh。
@@ -142,11 +146,11 @@ function freshGroups() {
     export:        { format: "png" as string, target: "file" as string, layerMode: "merged" as string, clipSelection: false, defringePng: true, bg: "transparent" as string },   // layerMode=scope "merged"|"active"；clipSelection=#16 仅导出选区范围；defringePng=v0.9.13 贴图防黑边（PNG，#8 起默认开）；bg=v0.9.14 导出底色（"transparent"|"#rrggbb"，PNG 透明/JPG 白）
     colorPanel:    { enabled: false, position: null as PanelPos | null },
     layersPanel:   { enabled: false, position: null as PanelPos | null },
+    // refPanel.viewport：format ≤2 时代单张参考的视口；format 3 起参考的视口全在 .weebpaint/references/manifest.json，
+    //   这个键只为读旧文件时布局归一化取值而留（backend/format/layout.ts），写端照写但不再被消费。
     refPanel:      { enabled: false, position: null as PanelPos | null, viewport: { tx: 0, ty: 0, scale: 1, rot: 0 } as EditorViewport },
-    // 多参考 manifest（format 2，spec 20260830）：items 顺序 = ora `.weebpaint/references/` entry 顺序
-    //   （src 由 refEntryName 生成，encode 侧同函数）。⚠ 本键必须在此默认值表里（mergeInto 白名单），
-    //   否则 Unserialize 静默丢。数组走 mergeInto 的「整体替换」分支。
-    refPanels:     { index: 0, items: [] as Array<{ kind: "image" | "live"; src?: string; vp: EditorViewport }> },
+    // （refPanels 清单 2026-09-29 迁出 desk：独立成 .weebpaint/references/manifest.json，归 @internal/reference-window。
+    //   老文件里残留的 refPanels 键被读端布局归一化搬走；万一还有，mergeInto 静默忽略。）
     blenderPanel:  { show: false, position: null as PanelPos | null },
     brushTool:     { activeBrushId: null as string | null, size: 12, opacity: 1, color: "#1b1b1b" },
     // v0.5（user 拍板）：魔棒/主栅格配置**跟文件走**。expand 是 toggle（开了才用 expandPx，默认 1）。
@@ -261,7 +265,7 @@ function mergeInto<T extends object>(dst: T, src: unknown): void {
   for (const k of Object.keys(dst) as (keyof T & string)[]) {
     if (!(k in src) || src[k] === undefined) continue;
     const dv = dst[k], sv = src[k];
-    // 数组 = 值语义整体替换（refPanels.items）：默认 [] 没有键可递归，逐键 merge 会静默丢整个数组。
+    // 数组 = 值语义整体替换：默认 [] 没有键可递归，逐键 merge 会静默丢整个数组。
     if (Array.isArray(dv)) { if (Array.isArray(sv)) (dst as Record<string, unknown>)[k] = JSON.parse(JSON.stringify(sv)); continue; }
     if (isObj(dv) && isObj(sv)) mergeInto(dv as object, sv);
     else (dst as Record<string, unknown>)[k] = sv;
@@ -287,13 +291,6 @@ export const desk = {
   layersPanel: {
     get enabled(): boolean { return S.g.layersPanel.enabled; }, set enabled(v: boolean) { S.g.layersPanel.enabled = v; },
     get position(): PanelPos | null { return S.g.layersPanel.position; }, set position(v: PanelPos | null) { S.g.layersPanel.position = v; },
-  },
-  // 多参考 manifest（format 2）：整对象读写（适配层 syncRefsToDesk 一次成型；深拷隔离 live 引用）。
-  get refPanels(): { index: number; items: Array<{ kind: "image" | "live"; src?: string; vp: EditorViewport }> } {
-    return JSON.parse(JSON.stringify(S.g.refPanels));
-  },
-  set refPanels(v: { index: number; items: Array<{ kind: "image" | "live"; src?: string; vp: EditorViewport }> }) {
-    S.g.refPanels = JSON.parse(JSON.stringify(v));
   },
   refPanel: {
     get enabled(): boolean { return S.g.refPanel.enabled; }, set enabled(v: boolean) { S.g.refPanel.enabled = v; },
@@ -404,7 +401,7 @@ export const desk = {
     return out;
   },
   // 载入：合并进 S.g，再把绑定字段灌进反应式引擎。
-  Unserialize(json: unknown): void { const d = freshGroups(); mergeInto(d, json); S.g = d; applyBoundFromGroups(d); },
+  Unserialize(json: unknown): void { const d = freshGroups(); mergeInto(d, migrateSubstructure("desk", json)); S.g = d; applyBoundFromGroups(d); },
   // 开新文件必调：回默认 + 灌引擎。
   reset(): void { S.g = freshGroups(); applyBoundFromGroups(S.g); },
 

@@ -17,8 +17,9 @@ import { setBrushColor } from "./color-panel.ts";
 import { thumbBlobFromBytes, setCurrentSessionName, triggerDownload } from "./session.ts";
 import { renderNodesToBytes } from "./backend/doc-render.ts";
 import { encodeDocToOra, decodeOraToPainting, paintingDataToEncodeDoc, parseAppVersion, type DecodedPainting } from "./backend/ora.ts";
-import { applyLoadedReferences, collectReferenceBlobsForSave } from "./side-windows.ts";   // 多参考（format 2）：载入灌注/保存收集
+import { applyLoadedReferences, collectReferenceFilesForSave } from "./side-windows.ts";   // 参考目录（format 3）：载入灌注/保存收集
 import { ORA_FORMAT_VERSION } from "./backend/ora-stack-xml.ts";
+import { SUBSTRUCTURE_VERSIONS, FormatTooNewError } from "./backend/format/migrate.ts";   // 持久化立宪：子结构版本
 import { flattenViewLeaves } from "./backend/workpiece/painting-view.ts";
 import { tLatin } from "./i18n/index.ts";
 import { requireStore, galleryBackend } from "./app-store.ts";
@@ -406,10 +407,19 @@ function restoreEditorStateFromOra(loaded: LoadedDoc) {
   }
   // 新轨（desk per-doc）：载入 .weebpaint/editor-state.json（缺失=老画作 → resetEditorState 已回默认）。
   //   **后手赢**：它会用 brushTool 覆盖 toolStates.brush + color。
-  if (loaded._editorState != null) desk.Unserialize(loaded._editorState);
-  // 多参考（format 2）：必须排在 desk.Unserialize **之后**（vp/index 从 desk.refPanels 对位取）。
+  // 持久化立宪：desk 比 app 新 → FormatTooNewError。不猜不降级：desk 回默认，文档照开；上面的「新版本写的」
+  //   警告 + 覆盖守卫已经在 adoptModel 里按 version 立起来了，用户确认覆盖之前不会写回。
+  if (loaded._editorState != null) {
+    try { desk.Unserialize(loaded._editorState); }
+    catch (e) {
+      if (!(e instanceof FormatTooNewError)) throw e;
+      desk.reset();
+      reportError(new Error(`[session] ${e.message}; desk left at defaults`), "warning");
+    }
+  }
+  // 参考目录（format 3）：清单在目录里自带，不再依赖 desk；空目录也要调（清掉上一张画的牌组）。
   //   bitmap 异步 decode，fire-and-forget（窗 open/rect 由 wp:applyEditorState 同步恢复，不等图）。
-  if (loaded._references?.length) void applyLoadedReferences(loaded._references);
+  void applyLoadedReferences(loaded._referenceFiles ?? new Map());
   // T5（v0.8.21）：旧轨停写后三样的新家（desk 后手赢——覆盖上面旧轨灌的值；存量老 .ora 无这三组 = null 跳过）。
   if (loaded._editorState != null) {
     const dials = desk.toolDials;
@@ -435,9 +445,8 @@ function _buildOraMeta() {
     state.checkerboard,
     { toolDials: state.toolStates, palette: paletteWindow.getSerializedState(), blender: getBlenderSyncState() },
   );
-  // 多参考：collect 内部先 syncRefsToDesk（manifest src/index 落 desk）**再** Serialize——顺序即契约。
-  const references = collectReferenceBlobsForSave();
-  return { references, desk: desk.Serialize() };
+  const referenceFiles = collectReferenceFilesForSave();
+  return { referenceFiles, desk: desk.Serialize() };
 }
 // S8（spec:41 存档一致性）：encode 前**同步**冻结 {结构 + 每叶 tile 快照}（零拷贝），bytes 与 peek
 //   读同一冻结视图 → encode 的 await 间隙里任何编辑（描边 commit / 层结构操作）都不撕存档，
@@ -490,11 +499,15 @@ function adoptModel(loaded: LoadedDoc) {
     // 比本版认识的新 → 警告（守卫 saveNow/saveAndPush 覆盖）。
     _loadedDocIsNewer = false; _loadedDocNewerConfirmed = false;
     const writerN = parseAppVersion(loaded._wroteWith), selfN = parseAppVersion(WEEBPAINT_VERSION);
-    if ((writerN !== null && selfN !== null && writerN > selfN) || (loaded._formatVersion ?? 0) > ORA_FORMAT_VERSION) {
+    const deskVersion = (loaded._editorState as { version?: unknown } | undefined)?.version;
+    const deskNewer = typeof deskVersion === "number" && deskVersion > SUBSTRUCTURE_VERSIONS.desk;
+    if ((writerN !== null && selfN !== null && writerN > selfN) || (loaded._formatVersion ?? 0) > ORA_FORMAT_VERSION || deskNewer) {
       _loadedDocIsNewer = true; _loadedDocWriterVer = loaded._wroteWith ?? null;
       setStatus(t("ss.docNewerWarning", { writer: String(loaded._wroteWith), version: WEEBPAINT_VERSION }), true);
     } else { _loadedDocWriterVer = null; }
     updateNewerBanner();
+    // 持久化立宪：读端把历史布局归一化过的话记一行（黑匣子看得见；保存时自然写成当前布局 = 「保存即自愈」）。
+    if (loaded._layoutMigrated?.length) reportError(`[ora] layout normalized on read: ${loaded._layoutMigrated.join("; ")}`, "log");
     restoreEditorStateFromOra(loaded);
     const vp = desk.viewport;   // 视口从 desk（.weebpaint/editor-state.json）回灌 board
     // #27：必须经 setViewport（scale 夹取 + _clampPan），不许 Object.assign 裸灌——大屏存的
