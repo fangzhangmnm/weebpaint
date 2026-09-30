@@ -17,7 +17,7 @@
     "@internal/store": "file:./vendor-pkgs/internal-store-0.13.0.tgz",
     "@internal/workbench-elements": "file:./vendor-pkgs/internal-workbench-elements-0.1.0.tgz",
     "@internal/gallery": "file:./vendor-pkgs/internal-gallery-0.1.0.tgz",
-    "@internal/reference-window": "file:./vendor-pkgs/internal-reference-window-0.0.0.tgz"
+    "@internal/reference-window": "file:./vendor-pkgs/internal-reference-window-0.1.0.tgz"
   },
   "devDependencies": {
     "playwright": "^1.61.1",
