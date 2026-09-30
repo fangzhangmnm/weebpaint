@@ -120,6 +120,27 @@ add("点第一行 → 跳到第一张", s2.index === 0 && s2.count === "1/3", JS
     back.size === 3 && back.index === 0 && JSON.stringify(back.order) === JSON.stringify(s2.order) && back.names.join(",") === "probe-1.png,probe-3.png,probe-2.png" && back.vp.every(Boolean) && back.open === true,
     JSON.stringify(back));
 }
+// ⑦ 粘贴归焦点（库 0.3.1，user 2026-09-30「这个看 focus 吧」）：合成 paste 事件（file:// 下拿不到剪贴板权限，事件里带 DataTransfer 等价）
+{
+  const pasteText = (text) => page.evaluate((txt) => { const dt = new DataTransfer(); dt.setData("text/plain", txt); (document.activeElement ?? document.body).dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true })); }, text);
+  const pasteImage = () => page.evaluate(async () => { const c = document.createElement("canvas"); c.width = c.height = 24; c.getContext("2d").fillStyle = "#8e44ad"; c.getContext("2d").fillRect(0, 0, 24, 24); const blob = await new Promise((r) => c.toBlob(r, "image/png")); const dt = new DataTransfer(); dt.items.add(new File([blob], "clip.png", { type: "image/png" })); (document.activeElement ?? document.body).dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true })); });
+  const layerCount = () => page.evaluate(() => document.querySelectorAll("#layersList > *").length);
+  const deckKinds = () => page.evaluate(() => document.getElementById("referencePanel").deck.cards().map((c) => c.kind));
+  await page.evaluate(() => { const el = document.getElementById("referencePanel"); el.open = true; el.focus(); });
+  const hasFocus = await page.evaluate(() => document.getElementById("referencePanel").hasFocus);
+  add("参考窗 focus() → hasFocus", hasFocus);
+  const before = await deckKinds(); const l0 = await layerCount();
+  await pasteText("角色设定：夏音，东北规则。"); await page.waitForTimeout(500);
+  const afterText = await deckKinds();
+  add("窗有焦点 → 粘贴文字 = 文字卡（不动图层）", afterText.length === before.length + 1 && afterText.at(-1) === "text" && (await layerCount()) === l0, `${before.length}→${afterText.length} ${afterText.at(-1)} layers ${l0}→${await layerCount()}`);
+  await pasteImage(); await page.waitForTimeout(1500);
+  const afterImg = await deckKinds();
+  add("窗有焦点 → 粘贴图片 = 图片卡（不动图层）", afterImg.length === afterText.length + 1 && afterImg.at(-1) === "image" && (await layerCount()) === l0, `${afterImg.join(",")} layers ${await layerCount()}`);
+  await page.evaluate(() => { document.getElementById("referencePanel").blur(); document.body.focus(); });
+  add("blur 后 hasFocus=false", !(await page.evaluate(() => document.getElementById("referencePanel").hasFocus)));
+  await pasteImage(); await page.waitForTimeout(2500);
+  add("焦点不在窗 → 粘贴图片照旧贴成图层（参考窗不变）", (await layerCount()) === l0 + 1 && (await deckKinds()).length === afterImg.length, `layers ${l0}→${await layerCount()} deck ${(await deckKinds()).length}`);
+}
 // ⑥
 add("全程零报错", errors.length === 0, errors.join(" ; ").slice(0, 400));
 

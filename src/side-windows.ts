@@ -80,7 +80,7 @@ function composeLiveFrame(): RefLiveSource | null {
 
 // ---- 参考目录进出（format 3；契约归 @internal/reference-window）----
 const REF_APP = "weebpaint";                          // 目录 = .weebpaint/references/（库按 app 名算）
-const REF_KINDS = ["image", "live"] as const;         // 这个宿主画得出来的种类；其余的库原样带着
+const REF_KINDS = ["image", "live", "text"] as const;   // 这个宿主画得出来的种类（0.3.1 起文字卡：设定 / 台词贴进参考窗）；其余的库原样带着
 /** 清单比库新时整个目录原样带着（读时装下、存时原样写回），直到用户在新版里打开。null = 正常态。 */
 let _carriedRefFiles: ReferenceFiles | null = null;
 
@@ -214,25 +214,46 @@ export function initSideWindows(ctx: AppContext) {
     prev: t("ref.prevRef"), next: t("ref.nextRef"), menu: t("ref.menu"), move: t("ref.move"),
     resize: t("ref.resize"), resizeAria: t("ref.resizeAria"),
     moveEarlier: t("ref.moveEarlier"), moveLater: t("ref.moveLater"), jump: t("ref.jump"),
-    kindNames: { image: t("ref.kindImage"), live: t("ref.live") },
+    kindNames: { image: t("ref.kindImage"), live: t("ref.live"), text: t("ref.kindText") },
+    linkMissing: t("ref.linkMissing"),
   };
+  // 粘贴归焦点（库 0.3.1，user 2026-09-30「这个看 focus 吧」「ctrl v 文字 图片 或者 txt md 图片…是最高频的核心使用场景」）：
+  //   参考窗有焦点（点窗身 / 从菜单打开时自动给）→ Ctrl+V 的文字 / 图片 / txt·md 文件进参考窗；焦点在别处 → selection-ops 照旧贴成图层。
+  window.addEventListener("paste", (e) => {
+    if (!ref.hasFocus) return;
+    const cd = e.clipboardData; if (!cd) return;
+    e.preventDefault(); e.stopPropagation();
+    const files = [...cd.files];
+    if (files.length) { void importReferenceFiles(files); return; }
+    const text = cd.getData("text/plain");
+    if (text.trim()) { ref.addText(text, { name: "" }); refSetOpen(true); return; }
+    setStatus(t("se.clipboardNoImage"), true);
+  }, true);
+  ref.addEventListener("dragover", (e) => { if (e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files")) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } });
+  ref.addEventListener("drop", (e) => { const files = [...(e.dataTransfer?.files ?? [])]; if (!files.length) return; e.preventDefault(); e.stopPropagation(); void importReferenceFiles(files); });
 
   els.menuReference.addEventListener("click", () => {
     setMenuOpen(false);
     refSetOpen(!ref.open);   // toggle（2026-09-11；此前只能开不能关）
+    if (ref.open) ref.focus({ preventScroll: true });   // 用户主动开窗 = 顺手给焦点：「开窗 → Ctrl+V」一步到位（粘贴归焦点）
   });
   _syncRefMenuState();
   // 图层面板头 PiP shortcut（user 0830「同意图层加一个 pip」；心理学讨论落地：肌肉记忆落点接住）
-  document.getElementById("layersPanelRefBtn")?.addEventListener("click", () => refSetOpen(!ref.open));
-  els.referenceFileInput.addEventListener("change", async (e: Event) => {
-    const file = (e.target as HTMLInputElement).files?.[0];
-    if (!file) return;
-    try {
-      await addReferenceImage(file);
-    } catch (err) {
-      setStatus(t("mi.referenceLoadFailed", { err: errMsg(err) }));
-    }
+  document.getElementById("layersPanelRefBtn")?.addEventListener("click", () => { refSetOpen(!ref.open); if (ref.open) ref.focus({ preventScroll: true }); });
+  els.referenceFileInput.addEventListener("change", (e: Event) => {
+    const files = [...((e.target as HTMLInputElement).files ?? [])];
+    if (files.length) void importReferenceFiles(files);
   });
+}
+
+/** 文件进参考窗的分流（file input / 粘贴 / 拖放同一条）：txt·md / text/* → 文字卡；其余走 addReferenceImage 漏斗（图片政策不变）。 */
+async function importReferenceFiles(files: File[]): Promise<void> {
+  for (const f of files) {
+    try {
+      if (f.type.startsWith("text/") || /\.(txt|md)$/i.test(f.name)) { referenceWindow.addText(await f.text(), { name: f.name }); refSetOpen(true); }
+      else await addReferenceImage(f);
+    } catch (err) { setStatus(t("mi.referenceLoadFailed", { err: errMsg(err) })); }
+  }
 }
 
 /** 导入唯一漏斗（spec §5；genai era 同入口）：转码政策（1024² / 小图原样豁免 / 拍平白底 jpeg /

@@ -3033,6 +3033,18 @@ export declare const S: {
         readonly ja: "画像";
         readonly tok: "sitelen";
     };
+    readonly "ref.kindText": {
+        readonly zh: "文字";
+        readonly en: "Text";
+        readonly ja: "テキスト";
+        readonly tok: "nimi";
+    };
+    readonly "ref.linkMissing": {
+        readonly zh: "这条参考的来源已不在";
+        readonly en: "This reference's source is gone";
+        readonly ja: "この参考の元がありません";
+        readonly tok: "ijo pi sitelen ni li lon ala";
+    };
     readonly "ref.tooNew": {
         readonly zh: "参考清单是更新的版本写的（v{file}，本版只懂到 v{lib}）——先原样保留，请刷新升级后再看";
         readonly en: "References were written by a newer version (v{file}; this build reads up to v{lib}) — kept untouched, refresh to upgrade";
@@ -3106,10 +3118,10 @@ export declare const S: {
         readonly tok: "kama jo e kule (sitelen lukin)";
     };
     readonly "ref.pick": {
-        readonly zh: "选个图当参考";
-        readonly en: "Pick an image as reference";
-        readonly ja: "参考用の画像を選択";
-        readonly tok: "o wile e sitelen lukin";
+        readonly zh: "导入参考（图片 / 文字）";
+        readonly en: "Import a reference (image / text)";
+        readonly ja: "参考を読み込む（画像 / テキスト）";
+        readonly tok: "o kama jo e ijo lukin (sitelen / nimi)";
     };
     readonly "ref.hintPlus": {
         readonly zh: "＋ 导入 / 更多操作 · 左上角点阵 = 拖动窗口";

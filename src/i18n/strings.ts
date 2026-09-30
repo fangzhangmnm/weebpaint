@@ -592,6 +592,8 @@ export const S = {
   "ref.moveLater":   { zh: "往后挪一位", en: "Move later", ja: "後ろへ移動", tok: "o tawa e ni tawa pini" },
   "ref.jump":        { zh: "跳到某一张", en: "Jump to a reference", ja: "参考へジャンプ", tok: "o tawa sitelen ante" },
   "ref.kindImage":   { zh: "图片", en: "Image", ja: "画像", tok: "sitelen" },
+  "ref.kindText":    { zh: "文字", en: "Text", ja: "テキスト", tok: "nimi" },
+  "ref.linkMissing": { zh: "这条参考的来源已不在", en: "This reference's source is gone", ja: "この参考の元がありません", tok: "ijo pi sitelen ni li lon ala" },
   "ref.tooNew":      { zh: "参考清单是更新的版本写的（v{file}，本版只懂到 v{lib}）——先原样保留，请刷新升级后再看", en: "References were written by a newer version (v{file}; this build reads up to v{lib}) — kept untouched, refresh to upgrade", ja: "参考リストは新しいバージョンで書かれています（v{file}、この版は v{lib} まで）——そのまま保持、更新してください", tok: "lipu lukin li tan ilo sin (v{file}; ilo ni li sona e v{lib} taso) — mi awen e ona, o sin e ilo" },
 
   // ── 云盘图片 picker（<wp-cloud-picker>，spec 20260820）─────────────────────
@@ -606,7 +608,7 @@ export const S = {
   "ref.resizeAria":  { zh: "拖动调整窗口大小", en: "Drag to resize window", ja: "ドラッグでウィンドウサイズ変更", tok: "luka la suli li ante" }, 
   "ref.resize":      { zh: "拖动调整大小", en: "Drag to resize", ja: "ドラッグでサイズ変更", tok: "luka la suli li ante" }, 
   "ref.picking":     { zh: "吸色（参考）", en: "Picking color (reference)", ja: "スポイト（参考）", tok: "kama jo e kule (sitelen lukin)" }, // C9：原 reference.ts 硬编码中文 → 组件事件化后补 key
-  "ref.pick":        { zh: "选个图当参考", en: "Pick an image as reference", ja: "参考用の画像を選択", tok: "o wile e sitelen lukin" },
+  "ref.pick":        { zh: "导入参考（图片 / 文字）", en: "Import a reference (image / text)", ja: "参考を読み込む（画像 / テキスト）", tok: "o kama jo e ijo lukin (sitelen / nimi)" },
   "ref.hintPlus":    { zh: "＋ 导入 / 更多操作 · 左上角点阵 = 拖动窗口", en: "＋ import / more · top-left dots = drag window", ja: "＋ 読み込み / その他 · 左上のドット = ウィンドウ移動", tok: "＋: o kama jo · sike lili: o tawa e lupa" },
   "ref.hintGesture": { zh: "单指拖移 / 双指 pinch + 旋转 / 双击适应 / 长按吸色", en: "Drag / pinch + rotate / double-tap to fit / long-press to pick color", ja: "ドラッグ / ピンチ+回転 / ダブルタップでフィット / 長押しでスポイト", tok: "luka wan: tawa · luka tu: suli / sike · luka pi tenpo tu: suli pona · o awen la kama jo e kule" }, // ── index.html 静态 chrome（切片 5b-2：lasso icon tooltips + rack/settings 头 + 各对话框）──
   // 套索工具栏（icon 按钮 tooltip；文字按钮=glyph 切片 4 不在此）

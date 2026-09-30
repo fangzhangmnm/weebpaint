@@ -107,7 +107,7 @@
     <link rel="icon" href="./icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=da15b4e80081" />
+    <link rel="stylesheet" href="./styles.css?v=7d2735bf5c32" />
     <!-- zip.js UMD bundle：自挂 window.zip。必须在 module bundle 之前。
          defer（v417）：原来是 parser-blocking 的，硬刷新时 SW 被绕过 → 直奔网络 → 网络一卡整个
          文档解析就停住（浏览器标签页转圈）。defer 后它与下面的 type=module bundle 同属延迟脚本、
@@ -1106,7 +1106,7 @@
     <wp-reference-window id="referencePanel">
       <span slot="title" data-i18n="fp.reference">参考</span>
       <div slot="empty">
-        <p data-i18n="ref.pick">选个图当参考</p>
+        <p data-i18n="ref.pick">导入参考（图片 / 文字）</p>
         <p class="sheet-hint" data-i18n="ref.hintPlus">＋ 导入 / 更多操作 · 左上角点阵 = 拖动窗口</p>
         <p class="sheet-hint" data-i18n="ref.hintGesture">单指拖移 / 双指 pinch + 旋转 / 双击适应 / 长按吸色</p>
       </div>
@@ -1553,6 +1553,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-58ef30b2348a.mjs"></script>
+    <script type="module" src="./dist/weebpaint-abf6ebf21c6f.mjs"></script>
   </body>
 </html>
