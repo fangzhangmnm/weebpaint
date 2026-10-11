@@ -52,7 +52,12 @@ export declare class LayerTiles implements CollectorComponent {
     /** 有主实例离世（refs 归零/换血/record 驱逐）：先摘戳再 dispose——dispose 的逐格 notify
      *  发生在令牌外（record 驱逐/换文档清栈），摘了戳走「无主放行」路，不触发无令牌写硬化。 */
     private _disposeOwned;
-    /** 新 tileset 入册，refs=1 归调用方（json 收养 +1 后调用方 release——净移交）。 */
+    /** 新 tileset 入册，refs=1 归调用方（json 收养 +1 后调用方 release——净移交）。
+     *  入册 = 新实例的出生点：本令牌里它在入册前被暂扣的写（无主实例沿旧语义照收）一律作废——它在本步之前
+     *  不存在，「之前」由树 record 表达。不作废 → seal 时它已挂上树、解析到新 layerId → tiles 账先于树账入 step，
+     *  undo 倒序先撤树（新层消失）再撤 tiles → 「layer gone at undo swap」整栈清空（2026-10-10 user 真机 log：
+     *  按颜色拆分 / 组合并为图层后撤销；explodeLeaf / collapseGroupToLeaf 都是先写新实例再入册）。
+     *  调用方只许传新建实例（核过全部调用点）——已是某层底料的实例不得二次入册。 */
     createTileset(lp: LayerPixels): number;
     /** 零拷贝复制（句柄共享快照）：duplicateLayer 用。refs=1 归调用方。 */
     duplicateTileset(id: number): number | null;
