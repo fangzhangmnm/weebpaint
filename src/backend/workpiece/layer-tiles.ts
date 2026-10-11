@@ -91,8 +91,18 @@ export class LayerTiles implements CollectorComponent {
     lp.dispose();
   }
 
-  /** 新 tileset 入册，refs=1 归调用方（json 收养 +1 后调用方 release——净移交）。 */
+  /** 新 tileset 入册，refs=1 归调用方（json 收养 +1 后调用方 release——净移交）。
+   *  入册 = 新实例的出生点：本令牌里它在入册前被暂扣的写（无主实例沿旧语义照收）一律作废——它在本步之前
+   *  不存在，「之前」由树 record 表达。不作废 → seal 时它已挂上树、解析到新 layerId → tiles 账先于树账入 step，
+   *  undo 倒序先撤树（新层消失）再撤 tiles → 「layer gone at undo swap」整栈清空（2026-10-10 user 真机 log：
+   *  按颜色拆分 / 组合并为图层后撤销；explodeLeaf / collapseGroupToLeaf 都是先写新实例再入册）。
+   *  调用方只许传新建实例（核过全部调用点）——已是某层底料的实例不得二次入册。 */
   createTileset(lp: LayerPixels): number {
+    const pending = this._collected.get(lp);
+    if (pending) {
+      for (const [, h] of pending) if (h && !h.released) h.release();
+      this._collected.delete(lp);
+    }
     const id = this._nextTilesetId++;
     this._tilesets.set(id, { lp, refs: 1 });
     this._stampOwner(lp);

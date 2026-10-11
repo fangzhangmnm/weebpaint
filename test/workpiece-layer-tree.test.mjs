@@ -21,7 +21,9 @@ const _ctxs = [];
 function mk() {
   let unrec = 0;
   const statuses = [];
-  const h = new History({ maxQuotaBytes: 1 << 30, onUnrecoverable: () => { unrec++; } });
+  // 不可恢复 = 响亮失败（2026-10-10 Claude Opus 5.5）：原先只计数不断言，explode 用例撞「layer gone at undo swap」
+  //   整栈清空却照样绿（树账先撤完，层数/像素断言恰好都对）。本文件没有故意触发不可恢复的用例。
+  const h = new History({ maxQuotaBytes: 1 << 30, onUnrecoverable: (e) => { unrec++; throw new Error(`unrecoverable undo: ${e?.message ?? e}`); } });
   const wp2 = new PaintingWorkpiece({ undo: h.stack, tree: { width: 128, height: 128 } });
   const doc = new PaintingView(wp2);
   h.attach(wp2);
@@ -187,6 +189,35 @@ describe("workpiece-layer-tree · 组合动词 + hint 文案", () => {
     h.undo();
     eq(countViewLeaves(doc.layers), 1, "undo 回单叶");
     eq(readPx(doc.activeLayer, 0, 0), "200,0,0,255", "原叶像素还在");
+    h.redo();
+    eq(countViewLeaves(doc.layers), 2, "redo 再拆");
+    eq(readPx(flattenViewLeaves(doc.layers)[0], 0, 0), "200,0,0,255", "redo 后红分片像素在");
+  });
+  // 2026-10-10 user 真机 log「layer gone at undo swap」：新实例入册前在令牌里写的 tile 被当成「对新层的修改」记账，
+  //   tiles 账先于树账入 step → undo 倒序先撤树、新层没了再撤 tiles 就炸。修 = LayerTiles.createTileset 入册即作废暂扣。
+  it("explodeLayer：step 里没有新层的 tiles 账（新实例的出生由树账表达）", () => {
+    const { h, lt } = mk();
+    const st = lt.explodeLayer(1, [
+      { data: new Uint8ClampedArray([200, 0, 0, 255]), name: "红" },
+      { data: new Uint8ClampedArray([0, 0, 200, 255]), name: "蓝" },
+    ], { x: 0, y: 0, w: 1, h: 1 }, {});
+    assert(st.ok, "explode ok");
+    const step = h.stack._steps[h.stack._steps.length - 1];
+    eq(step.entries.map((e) => e.c.kind).join(","), "layerTree", "只有树账");
+  });
+  it("collapseGroup（有合成字节）：组烤成单叶，undo 组回来、redo 单叶像素在", () => {
+    const { doc, h, lt } = mk();
+    const leafId = doc.activeLayer.id;
+    const g = lt.addGroup("组");
+    assert(lt.moveIntoGroup(leafId, g.groupId, {}).ok, "移入");
+    assert(lt.collapseGroup(g.groupId, { bytes: px(9, 8, 7, 255), rect: { x: 0, y: 0, w: 1, h: 1 } }, {}).ok, "合并为图层 ok");
+    assert(!doc.layers.some((n) => n.isGroup), "组烤成叶");
+    eq(readPx(doc.activeLayer, 0, 0), "9,8,7,255", "合成字节落进新叶");
+    h.undo();
+    assert(doc.layers.some((n) => n.isGroup && n.id === g.groupId), "undo 组回来");
+    h.redo();
+    assert(!doc.layers.some((n) => n.isGroup), "redo 再烤");
+    eq(readPx(doc.activeLayer, 0, 0), "9,8,7,255", "redo 后像素在");
   });
   it("stampAll：新叶置顶 + 其余根级节点隐藏，一次 undo 全撤", () => {
     const { doc, h, lt } = mk();

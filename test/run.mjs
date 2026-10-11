@@ -50,6 +50,7 @@ import "./doc-resize.test.mjs";
 import "./float-ops.test.mjs";     // S6：float 入 workpiece（lift/transform/reject/accept 整链 + 所有权/驱逐）
 import "./undo-stack-integrity.test.mjs";   // v0.7.35 栈引用完整性（import 越狱病理钉子 + 合规形状 + v0.7.41 单整点）
 import "./workpiece-layer-tree.test.mjs";   // v0.8.1 S1 LayerTree 门面（写即记账/treeTx/装配纪律；≠ layer-tree.test 的 doc 树模型）
+import "./layer-ops-undo-fuzz.test.mjs";     // 2026-10-10 图层结构操作 × 撤销随机序列（拆分/组合并为图层后撤销炸「layer gone at undo swap」回归锚）
 import "./selection-preview.test.mjs";      // v0.8.2 S2 选区写面锚（T5 换纯 v2：预览 tx 收编组件 + withPoint 记账）
 import "./store-absent.test.mjs";           // v0.8.7 B 骑士：null-store/内存 collection/dormant auth + 子进程 nostore boot smoke
 import "./sw-strategy.test.mjs";
