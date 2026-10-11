@@ -1422,11 +1422,10 @@ input[type="range"].color-ramp::-moz-range-thumb {
 .layers-foot-btn svg { width: 16px; height: 16px; display: block; }
 .layers-foot-btn:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
 .layers-foot-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-/* v267 "+" 弹出菜单：浮在底栏上方、左对齐（layers-panel 是 position:fixed → 作绝对定位容器） */
+/* v267 "+" 弹出菜单。2026-09-02 C1 起搬到 body、坐标全由 positionPopup 写 inline（position/top/left）——
+   这里不许再写 top/bottom/position：旧的 bottom:48px 残留 + JS 写的 top = 上下同钉，菜单被拉到屏底（2026-10-10 user 真机报「高度不对」）。 */
 .layer-add-popup {
-  position: absolute;
-  bottom: 48px; left: 6px;
-  min-width: auto; right: auto; top: auto;
+  min-width: auto; right: auto;
   padding: 4px;
 }
 .layer-add-popup .menu-item { padding: 6px 14px; }
