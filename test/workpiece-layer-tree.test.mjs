@@ -266,6 +266,25 @@ describe("workpiece-layer-tree · 组合动词 + hint 文案", () => {
     try { wp2.layerTiles.createTileset(lp); } catch (e) { threw = e; }
     assert(threw && /already owned/.test(threw.message), `二次入册必须 throw（got: ${threw && threw.message}）`);
   });
+  // user 2026-10-13「tile id 是单调增的吗，会不会弄到别人身上了。然后 redo 的时候会恢复 tile id 吗」——两条都是按 tileset id 记账成立的前提。
+  it("tileset id 只增不复用；undo / redo 不换 id、不换实例（树根按引用交换，不重跑 verb）", () => {
+    const { h, lt, wp2 } = mk();
+    const a = lt.addLayer("甲"); assert(a.ok, "addLayer");
+    const refA = wp2.layerTree.leafById(a.layer.id).pixelsRef;
+    const lpA = wp2.layerTiles.tilesetPixels(refA);
+    h.undo();
+    eq(wp2.layerTree.leafById(a.layer.id), null, "undo 后树上没有甲");
+    assert(wp2.layerTiles.tilesetPixels(refA) === lpA, "注册表里甲的 tileset 还活着（树记录持引用）");
+    h.redo();
+    eq(wp2.layerTree.leafById(a.layer.id).pixelsRef, refA, "redo 回来是同一个 tileset id");
+    assert(wp2.layerTiles.tilesetPixels(refA) === lpA, "同一个实例");
+    assert(lt.removeLayer(a.layer.id, "甲").ok, "删甲");
+    h.clear();   // 记录驱逐 → 甲的 tileset 释放
+    eq(wp2.layerTiles.tilesetPixels(refA), null, "记录没了才释放");
+    const b = lt.addLayer("乙"); assert(b.ok);
+    const refB = wp2.layerTree.leafById(b.layer.id).pixelsRef;
+    assert(refB > refA, `新 id ${refB} > 已释放的旧 id ${refA}：计数器只增，不复用`);
+  });
   it("collapseGroup（有合成字节）：组烤成单叶，undo 组回来、redo 单叶像素在", () => {
     const { doc, h, lt } = mk();
     const leafId = doc.activeLayer.id;
