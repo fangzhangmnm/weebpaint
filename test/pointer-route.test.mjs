@@ -1,6 +1,6 @@
 // 指针路由决策验收（K3 live-dispatch 切片）。纯函数，过去内联在 _down 且 map 抄 3 份、零测。
 import { describe, it, eq, assert } from "./runner.mjs";
-import { effectiveTool, toolToRole, assignRole, strokeMode, eraserTapOnRelease, ERASER_HOLD_TAP_MS } from "../src/pointer-route.ts";
+import { effectiveTool, toolToRole, assignRole, strokeMode, eraserTapOnRelease, ERASER_HOLD_TAP_MS, penAutoOffSingleFingerDraw } from "../src/pointer-route.ts";
 
 describe("pointer-route · effectiveTool", () => {
   it("transform → lasso（抢画布路由走 gizmo）", () => eq(effectiveTool("transform", false), "lasso"));
@@ -25,7 +25,7 @@ describe("pointer-route · toolToRole", () => {
 });
 
 describe("pointer-route · assignRole", () => {
-  const base = { tool: "brush", pointerType: "mouse", button: 0, buttons: 1, spaceDown: false, altDown: false, penEverSeen: false };
+  const base = { tool: "brush", pointerType: "mouse", button: 0, buttons: 1, spaceDown: false, altDown: false, singleFingerDraw: false };
   const role = (o) => assignRole({ ...base, ...o });
 
   it("hand / space 优先 = pan（任何 pointer）", () => {
@@ -48,17 +48,21 @@ describe("pointer-route · assignRole", () => {
     eq(role({ pointerType: "pen", tool: "picker", button: 0, buttons: 1 }), "pick");
   });
 
-  it("touch：单指作画 ⟺ 无笔 + 开关ON；pen 路径恒 hold；开关默认OFF=hold", () => {
-    // 见过 pen 的设备：恒 hold，不论开关
-    eq(role({ pointerType: "touch", penEverSeen: true }), "hold");
-    eq(role({ pointerType: "touch", penEverSeen: true, singleFingerDraw: true }), "hold");
-    eq(role({ pointerType: "touch", penEverSeen: true, singleFingerDraw: true, tool: "brush" }), "hold");
-    // 无笔 + 开关 OFF（默认）：hold
-    eq(role({ pointerType: "touch", penEverSeen: false, tool: "brush" }), "hold");
-    eq(role({ pointerType: "touch", penEverSeen: false, singleFingerDraw: false, tool: "lasso" }), "hold");
-    // 无笔 + 开关 ON：toolToRole（作画）
-    eq(role({ pointerType: "touch", penEverSeen: false, singleFingerDraw: true, tool: "lasso" }), "lasso");
-    eq(role({ pointerType: "touch", penEverSeen: false, singleFingerDraw: true, tool: "brush" }), "draw");
+  it("touch：单指作画 ⟺ 开关 ON（总账 #85：开关说了算，见没见过笔不再进决策）", () => {
+    // 开关 OFF：hold
+    eq(role({ pointerType: "touch", tool: "brush" }), "hold");
+    eq(role({ pointerType: "touch", singleFingerDraw: false, tool: "lasso" }), "hold");
+    // 开关 ON：toolToRole（作画）
+    eq(role({ pointerType: "touch", singleFingerDraw: true, tool: "lasso" }), "lasso");
+    eq(role({ pointerType: "touch", singleFingerDraw: true, tool: "brush" }), "draw");
+    eq(role({ pointerType: "touch", singleFingerDraw: true, tool: "eraser" }), "erase");
+  });
+
+  it("penAutoOffSingleFingerDraw：第一次见到笔只在「user 没碰过开关 且 开着」时自动关一次（总账 #85）", () => {
+    assert(penAutoOffSingleFingerDraw(false, true), "默认开 + 没碰过开关 → 见笔自动关");
+    assert(!penAutoOffSingleFingerDraw(false, false), "已经是关的 → 没事可做");
+    assert(!penAutoOffSingleFingerDraw(true, true), "user 碰过开关、开着 → 按 user 的，笔不插手");
+    assert(!penAutoOffSingleFingerDraw(true, false), "user 碰过开关、关着 → 按 user 的");
   });
 
   it("transform → lasso；alt+brush → pick（经 effectiveTool）", () => {
@@ -71,7 +75,7 @@ describe("pointer-route · assignRole", () => {
       const expected = toolToRole(effectiveTool(t, false));
       eq(role({ tool: t, pointerType: "mouse", button: 0 }), expected, `mouse ${t}`);
       eq(role({ tool: t, pointerType: "pen", button: 0, buttons: 1 }), expected, `pen ${t}`);
-      eq(role({ tool: t, pointerType: "touch", penEverSeen: false, singleFingerDraw: true }), expected, `touch ${t}`);
+      eq(role({ tool: t, pointerType: "touch", singleFingerDraw: true }), expected, `touch ${t}`);
     }
   });
 });

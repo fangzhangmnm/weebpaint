@@ -205,6 +205,17 @@ describe("workpiece-layer-tree · 组合动词 + hint 文案", () => {
     const step = h.stack._steps[h.stack._steps.length - 1];
     eq(step.entries.map((e) => e.c.kind).join(","), "layerTree", "只有树账");
   });
+  // 2026-10-13 Claude Fable 5.1 复审补：createTileset「入册即作废暂扣」的前提是只收新建实例——已入册的实例二次入册会把
+  //   该层令牌前原件作废（撤销坏账），所以机械拒收（所有权戳）。
+  it("createTileset：已入册（带所有权戳）的实例二次入册 → throw", () => {
+    const { wp2 } = mk();
+    const ref = wp2.layerTree._json.nodes[0].pixelsRef;
+    const lp = wp2.layerTiles.tilesetPixels(ref);
+    assert(lp, "拿到首层实例");
+    let threw = null;
+    try { wp2.layerTiles.createTileset(lp); } catch (e) { threw = e; }
+    assert(threw && /already owned/.test(threw.message), `二次入册必须 throw（got: ${threw && threw.message}）`);
+  });
   it("collapseGroup（有合成字节）：组烤成单叶，undo 组回来、redo 单叶像素在", () => {
     const { doc, h, lt } = mk();
     const leafId = doc.activeLayer.id;

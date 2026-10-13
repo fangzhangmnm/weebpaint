@@ -42,7 +42,7 @@ import { initLayersPanel, renderLayersPanel, LAYER_MODE_LABEL } from "./layers-p
 import { initDocOps } from "./doc-ops.ts";
 import { initCloudAuthUI, updateCloudAuthUI } from "./gallery/cloud-auth-ui.ts";
 import { initGalleryManageUI, resumePendingOneDriveConnect } from "./gallery/gallery-manage-ui.ts";
-import { initSettingsMenu, applyCheckerboard, renderSettingsFromPrefs } from "./settings-menu.ts";   // setMenuOpen→各菜单模块
+import { initSettingsMenu, applyCheckerboard, renderSettingsFromPrefs, autoOffSingleFingerDrawOnPen } from "./settings-menu.ts";   // setMenuOpen→各菜单模块
 import { initReadmePanel } from "./readme-panel.ts";       // 2026-09-02 内置说明书（菜单「帮助」+ #help/<id> 深链）
 import { initPressureToast } from "./pressure-toast.ts";   // 2026-09-02 压感自诊 toast（input.ts 探针 → wp:pressure-doubt）
 import { initFiltersAdjust } from "./filters-adjust.ts";
@@ -257,6 +257,7 @@ const input = new InputController(board, doc, {
   getFilterBrushState: () => state.filterBrush || null,
   getLongPressPickEnabled: () => state.longPressPick,
   getSingleFingerDraw: () => state.singleFingerDraw,
+  onPenFirstSeen: autoOffSingleFingerDrawOnPen,   // 总账 #85：第一次见到数位笔 → 单指绘画自动关一次（user 碰过开关则不动）
   getPickMode: () => state.pickMode,
   isContentReplacing: () => session.loadingDoc,   // N10：adopt 换内容中 → 起笔降级（session._loadingDoc）
   onColorSampled: (hex) => setColor(hex),

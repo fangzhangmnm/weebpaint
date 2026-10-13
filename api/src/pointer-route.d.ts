@@ -7,10 +7,10 @@ export interface PointerDownInput {
     buttons: number;
     spaceDown: boolean;
     altDown: boolean;
-    penEverSeen: boolean;
     singleFingerDraw: boolean;
 }
-export declare function assignRole({ tool, pointerType, button, buttons, spaceDown, altDown, penEverSeen, singleFingerDraw }: PointerDownInput): string | null;
+export declare function assignRole({ tool, pointerType, button, buttons, spaceDown, altDown, singleFingerDraw }: PointerDownInput): string | null;
+export declare function penAutoOffSingleFingerDraw(userSet: boolean, currentlyOn: boolean): boolean;
 export declare const ERASER_HOLD_TAP_MS = 350;
 export declare function strokeMode(role: string, eraserHold: boolean): "erase" | "brush";
 export declare function eraserTapOnRelease(heldMs: number, holdUsed: boolean): boolean;

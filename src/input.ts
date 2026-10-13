@@ -113,6 +113,7 @@ interface InputOpts {
   getFilterBrushState?: () => FilterBrushState | null;
   getLongPressPickEnabled?: () => boolean;
   getSingleFingerDraw?: () => boolean;
+  onPenFirstSeen?: () => void;   // 本次会话第一次 pen down（总账 #85：单指绘画一次性自动关的触发点）
   getPickMode?: () => string;
   onColorSampled?: (hex: string) => void;
   status?: (msg: string) => void;
@@ -386,6 +387,7 @@ export class InputController {
   getFilterBrushState: () => FilterBrushState | null;
   getLongPressPickEnabled: () => boolean;
   getSingleFingerDraw: () => boolean;
+  onPenFirstSeen: () => void;
   getPickMode: () => string;
   isContentReplacing: () => boolean;   // N10：见 InputOpts
   onColorSampled: (hex: string) => void;
@@ -445,6 +447,7 @@ export class InputController {
     this.getFilterBrushState = opts.getFilterBrushState || (() => null);
     this.getLongPressPickEnabled = opts.getLongPressPickEnabled || (() => false);
     this.getSingleFingerDraw = opts.getSingleFingerDraw || (() => false);
+    this.onPenFirstSeen = opts.onPenFirstSeen || (() => {});
     this.getPickMode = opts.getPickMode || (() => "composite");   // 吸色取样：composite | layer
     this.isContentReplacing = opts.isContentReplacing || (() => false);   // N10：云端快进换内容中 → 起笔降级
     this.onColorSampled = opts.onColorSampled || (() => {});
@@ -542,7 +545,7 @@ export class InputController {
     // 这条比 stale purge 更激进：不管时间多久，pen down 就清。
     if (e.pointerType === "pen") {
       this._purgeAllTouches();
-      this.penEverSeen = true;
+      if (!this.penEverSeen) { this.penEverSeen = true; this.onPenFirstSeen(); }
       this._lastPenActivity = performance.now();
       this._lastTap = null;
     }
@@ -589,11 +592,11 @@ export class InputController {
       return;
     }
 
-    // 决定角色（纯决策抽到 pointer-route.js·可单测；含 hand/space=pan、设备分支、pen 副键=erase、
-    //   touch+penEverSeen=pan、transform→lasso、alt+brush→picker）
+    // 决定角色（纯决策抽到 pointer-route.ts·可单测；含 hand/space=pan、设备分支、pen 副键=erase、
+    //   touch 按「单指绘画」开关、transform→lasso、alt+brush→picker）
     const role = assignRole({
       tool, pointerType: e.pointerType, button: e.button, buttons: e.buttons,
-      spaceDown: this.spaceDown, altDown: this.altDown, penEverSeen: this.penEverSeen,
+      spaceDown: this.spaceDown, altDown: this.altDown,
       singleFingerDraw: this.getSingleFingerDraw(),
     });
     // 交互锁（2026-09-02 C8）：busy 期遮罩几何上挡 pointer，这里是结构性的第二道（遮罩下面/只读模式都不靠几何）

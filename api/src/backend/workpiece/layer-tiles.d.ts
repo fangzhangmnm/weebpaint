@@ -57,7 +57,8 @@ export declare class LayerTiles implements CollectorComponent {
      *  不存在，「之前」由树 record 表达。不作废 → seal 时它已挂上树、解析到新 layerId → tiles 账先于树账入 step，
      *  undo 倒序先撤树（新层消失）再撤 tiles → 「layer gone at undo swap」整栈清空（2026-10-10 user 真机 log：
      *  按颜色拆分 / 组合并为图层后撤销；explodeLeaf / collapseGroupToLeaf 都是先写新实例再入册）。
-     *  调用方只许传新建实例（核过全部调用点）——已是某层底料的实例不得二次入册。 */
+     *  调用方只许传新建实例（核过全部调用点）——已是某层底料的实例不得二次入册：机械守卫 = 带本 collector 所有权戳的
+     *  实例拒收（入册 / 换血 / 交换都盖戳；作废它的暂扣 = 丢掉某层令牌前原件 = 撤销坏账）。2026-10-13 Claude Fable 5.1 复审补。 */
     createTileset(lp: LayerPixels): number;
     /** 零拷贝复制（句柄共享快照）：duplicateLayer 用。refs=1 归调用方。 */
     duplicateTileset(id: number): number | null;

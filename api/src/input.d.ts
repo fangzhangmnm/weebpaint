@@ -70,6 +70,7 @@ interface InputOpts {
     getFilterBrushState?: () => FilterBrushState | null;
     getLongPressPickEnabled?: () => boolean;
     getSingleFingerDraw?: () => boolean;
+    onPenFirstSeen?: () => void;
     getPickMode?: () => string;
     onColorSampled?: (hex: string) => void;
     status?: (msg: string) => void;
@@ -100,6 +101,7 @@ export declare class InputController {
     getFilterBrushState: () => FilterBrushState | null;
     getLongPressPickEnabled: () => boolean;
     getSingleFingerDraw: () => boolean;
+    onPenFirstSeen: () => void;
     getPickMode: () => string;
     isContentReplacing: () => boolean;
     onColorSampled: (hex: string) => void;

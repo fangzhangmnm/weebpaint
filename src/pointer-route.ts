@@ -33,24 +33,31 @@ export interface PointerDownInput {
   buttons: number;
   spaceDown: boolean;
   altDown: boolean;
-  penEverSeen: boolean;
   singleFingerDraw: boolean;
 }
 
 // 完整 pointerdown 角色决策。输入位：
-//   tool, pointerType('mouse'|'pen'|'touch'), button, buttons, spaceDown, altDown, penEverSeen, singleFingerDraw
+//   tool, pointerType('mouse'|'pen'|'touch'), button, buttons, spaceDown, altDown, singleFingerDraw
 // 顺序与设备语义沿用原 _down：hand/space=pan 优先 → 按 pointerType 分支。
-// 单指语义（touch）：单指走当前工具作画 ⟺ 无笔路径(penEverSeen=false) 且「单指绘画」开关 ON；
-//   否则一律 hold（不画不 pan，仍计入双指手势 + 长按吸色）。开关默认 OFF → 单指永不作画。
-//   pen 路径永远屏蔽（见过 pen 的设备恒 hold），开关只影响无笔路径。
-export function assignRole({ tool, pointerType, button, buttons, spaceDown, altDown, penEverSeen, singleFingerDraw }: PointerDownInput): string | null {
+// 单指语义（touch）：单指走当前工具作画 ⟺「单指绘画」开关 ON；否则 hold（不画不 pan，仍计入双指手势 + 长按吸色）。
+//   开关说了算（总账 #85，user 2026-10-12「默认指绘开，第一次检测到数位笔的时候自动关。但是只要用户碰过那个按钮
+//   就按用户选项算」）：此前「见过笔的设备恒 hold、开关只影响无笔路径」改成一次性自动关（penAutoOffSingleFingerDraw），
+//   之后开关是什么就是什么。
+export function assignRole({ tool, pointerType, button, buttons, spaceDown, altDown, singleFingerDraw }: PointerDownInput): string | null {
   if (tool === "hand" || spaceDown) return "pan";
   const et = effectiveTool(tool, altDown);
   if (pointerType === "mouse") return button === 0 ? toolToRole(et) : "pan";          // 中/右键 = pan
   if (pointerType === "pen")   return (button === 2 || (buttons & 2)) ? "erase" : toolToRole(et);  // 副按钮强制橡皮
-  // touch：无笔 + 开关 ON 才作画；否则 hold（不画不 pan，双指才 pan/zoom/rotate；长按吸色仍生效）
-  if (pointerType === "touch") return (!penEverSeen && singleFingerDraw) ? toolToRole(et) : "hold";
+  // touch：开关 ON 才作画；否则 hold（不画不 pan，双指才 pan/zoom/rotate；长按吸色仍生效）
+  if (pointerType === "touch") return singleFingerDraw ? toolToRole(et) : "hold";
   return null;
+}
+
+// 第一次见到数位笔时要不要把「单指绘画」自动关掉（总账 #85）：开关默认 ON（B 站评论有人不知道有开关），
+//   见到笔 = 这台设备有笔，手指多半是托掌 → 自动关一次；user 碰过开关（userSet）之后永远按 user 的，笔不再插手。
+//   纯决策（settings-menu 调；input 在首次 pen down 时触发）。
+export function penAutoOffSingleFingerDraw(userSet: boolean, currentlyOn: boolean): boolean {
+  return !userSet && currentlyOn;
 }
 
 // ── 按住 E = 临时橡皮（spring-loaded，PS 惯例；2026-08-21 拍板取 hold 语义，Krita 的 E toggle 不取）──

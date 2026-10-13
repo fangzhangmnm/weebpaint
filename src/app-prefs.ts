@@ -19,7 +19,8 @@ import { deviceKvGetJson, deviceKvSetJson } from "./device-kv.ts";
 export const PREF_REGISTRY = {
   // device（跟机器走：硬件/环境耦合。兄妹共用电脑模型 §9.1 重判过）
   "color-theme":          { scope: "device", def: "auto" as string },            // 环境耦合（OLED/暗房），一键可切
-  "single-finger-draw":   { scope: "device", def: false as boolean },            // 硬件耦合：同人 iPad 开/台式关（VS Code machine-scope 先例）
+  "single-finger-draw":   { scope: "device", def: true as boolean },             // 硬件耦合：同人 iPad 开/台式关（VS Code machine-scope 先例）。总账 #85：默认开，第一次见到数位笔自动关一次
+  "single-finger-draw-user-set": { scope: "device", def: false as boolean },     // 总账 #85：user 碰过「单指绘画」开关 → 之后只按 user 的，笔不再自动关
   "stylus-smooth-params": { scope: "device", def: {} as Record<string, number> },// 数位板/笔硬件调参
   "pressure-level":       { scope: "device", def: "mid" as string },
   "curve-plot-size":      { scope: "device", def: 200 as number },              // 2026-09-06 曲线编辑器绘图区边长 px（屏幕/手指尺寸耦合 → 跟机器）；user「尾巴你都帮我做了」= 持久化点头            // 2026-09-05 压感四档 none/weak/mid/strong：跟板子/跟人，不跟画（common/pressure-level.ts）

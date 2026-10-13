@@ -798,6 +798,12 @@ export declare const S: {
         readonly ja: "一本指描画 · {s}";
         readonly tok: "luka wan li sitelen · {s}";
     };
+    readonly "status.singleFingerDrawPenOff": {
+        readonly zh: "检测到数位笔，单指绘画已自动关（设置里可再开）";
+        readonly en: "Pen detected — one-finger drawing turned off (turn it back on in settings)";
+        readonly ja: "ペンを検出：一本指描画をオフにしました（設定で再びオンにできます）";
+        readonly tok: "ilo sitelen li lon. luka wan li sitelen ala. sina ken open e ni lon lipu ilo.";
+    };
     readonly "status.pixelGrid": {
         readonly zh: "像素栅格 · {s}";
         readonly en: "Pixel grid · {s}";
@@ -1212,7 +1218,7 @@ export declare const S: {
         readonly tok: "o pini e kulupu";
     };
     readonly "lp.clippedTip": {
-        readonly zh: "已剪裁到下方第一颗非剪裁层";
+        readonly zh: "已剪贴到下方第一个非剪贴蒙版图层";
         readonly en: "Clipped to first non-clip layer below";
         readonly ja: "下の最初の非クリップ層にクリップ";
         readonly tok: "lipu ni li lon insa pi lipu anpa";
@@ -1296,13 +1302,13 @@ export declare const S: {
         readonly tok: "ma sitelen taso";
     };
     readonly "lp.clip": {
-        readonly zh: "剪裁";
+        readonly zh: "剪贴蒙版";
         readonly en: "Clip";
         readonly ja: "クリップ";
         readonly tok: "insa anpa";
     };
     readonly "lp.clipGroup": {
-        readonly zh: "剪裁组";
+        readonly zh: "剪贴蒙版（整组）";
         readonly en: "Clip group";
         readonly ja: "グループをクリップ";
         readonly tok: "insa anpa (kulupu)";
@@ -1572,7 +1578,7 @@ export declare const S: {
         readonly tok: "lipu ni li anpa ale la wan anpa li ken ala";
     };
     readonly "lp.st.mergeClipUnder": {
-        readonly zh: "下方是剪裁层，不能合到它上面（先取消下方的剪裁）";
+        readonly zh: "下方是剪贴蒙版，不能合到它上面（先取消下方的剪贴蒙版）";
         readonly en: "Layer below is a clip layer; cancel its clip first";
         readonly ja: "下がクリップ層です（先に下のクリップを解除）";
         readonly tok: "lipu anpa li lon insa pi lipu ante. o weka e nasin ni lon tenpo open.";

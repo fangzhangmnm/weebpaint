@@ -24,11 +24,12 @@ describe("preferences · scope 路由", () => {
   it("device 键：同步读写（无 hydrate 枷锁），不碰 collection", () => {
     const synced = fakeCollection();
     wirePreferences(synced);
-    eq(preferences.get("single-finger-draw"), false, "默认");
-    preferences.set("single-finger-draw", true);
-    eq(preferences.get("single-finger-draw"), true);
+    eq(preferences.get("single-finger-draw"), true, "默认开（总账 #85，user 2026-10-12「默认指绘开」）");
+    eq(preferences.get("single-finger-draw-user-set"), false, "默认没碰过开关");
+    preferences.set("single-finger-draw", false);
+    eq(preferences.get("single-finger-draw"), false);
     eq(synced._m.size, 0, "device 键零 collection 写");
-    preferences.set("single-finger-draw", false);   // 复位（module 级 device-kv 内存层跨测试共享）
+    preferences.set("single-finger-draw", true);   // 复位（module 级 device-kv 内存层跨测试共享）
   });
   it("gallery 键：走 collection；未注入前读返 default（boot 安全）", () => {
     wirePreferences(undefined);

@@ -125,3 +125,11 @@ const clipBaseId = base && base.kind === "leaf" ? base.id : null;
 
 - 分支 `fix-20261010-batch` → 合入 main 推 dev，版本 v0.14.24（bundle `weebpaint-b90c10bceb3b.mjs`）。构建产物 e2e：导入左红右蓝 PNG → 应用变换 → 按颜色拆分 → 撤销 → 重做，零错误；同一流程在 0.14.23 构建上原样复现 user log 的错误。提交：`1419c67`（＋ 菜单）、`1896d18`（撤销崩溃 + 测试）、`d0d9928`（总账 #79）、本 doc + 总账 #80、版本与 bundle 提交。
 - 本次 session 的临时脚本（压测 / 探针）在后台任务的 tmp 目录里，任务删除即清；需要的形状已经固化进上面两份测试。
+
+## 6. Fable 复审结论（2026-10-13，Claude Fable 5.1；总账 #80）
+
+1. **`createTileset` 入册即作废暂扣：对。** (a) 新实例在本令牌之前不存在，「之前」只有树账能表达；入册前扣押的句柄作废，和 seal 时「解析不到 layerId 就作废」是同一条规矩提前到出生点。(b) redo 没问题：树 record 按引用计数持有 tileset，undo 撤树只是摘引用不销毁实例，redo 挂回时像素原样。(c) 比「调用方各自 `_suspendCollect`」更该是规矩——纪律放在出生点一处，调用方忘了挂起不再是雷；`duplicateTileset` / `resizeAllLeaves` 的挂起是 verb 体内防双记账，另一回事，保留。补了一道机械守卫：带本 collector 所有权戳的实例二次入册 → throw（`test/workpiece-layer-tree.test.mjs` 守着）——修法的前提「只收新建实例」从此不靠调用方记得。
+2. **结构性残留**（同一步「先改旧层 → 建新层 → 写新层」仍炸）：建议根治 = **seal 时丢掉本令牌出生层的 tiles 记录**（`createTileset` 把实例记进「本令牌出生」集合，seal / cancel 清空；`sealRecord` 对集合内实例作废）。这是现修法同一原理的推广，约 10 行，不动 step 顺序模型，也不动调用方。没动手——表里写的是 user 拍板；现状已知路径安全，fuzz 守着。
+3. **5 个测试吞不可恢复**：建议 `History` 构造时 `onUnrecoverable` 缺省 = 抛，故意测不可恢复的用例显式传计数回调——改测试基建一处，S 级，随下次动 undo 的 session 带上。没动手。
+4. #79 / #81 / 进变换即清选区 / 取消选区当时场景：归 user，本次不动。
+5. **格式 3 第一次上正式版**（随 v0.14.25 推）：冻结样本测试绿（`real/v2` = 0.14.20 真写的 format 2 → 归一化到 format 3，往返逐字段一致）；万一回滚到 0.14.20，它读 format 3 文件会看不到参考窗清单（desk 里不再有 refPanels）、再存一次会丢参考卡，画本身无损。可接受。

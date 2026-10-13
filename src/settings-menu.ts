@@ -14,6 +14,7 @@ import { desk } from "./workbench-state.ts";   // checkboard = per-doc desk（�
 import { applyTheme, themeLabel, THEMES, currentTheme } from "./theme.ts";
 import { t, lang, setLang, LANGS, langDisplayName, type Key } from "./i18n/index.ts";
 import { KEYBOARD_SHORTCUTS } from "./input.ts";
+import { penAutoOffSingleFingerDraw } from "./pointer-route.ts";   // 总账 #85：第一次见到笔 → 单指绘画自动关一次（纯决策）
 import { _updateMenuCropLabel } from "./doc-ops.ts";
 import { openAdoptedPopup, closePopupMenuOf, isPopupOpen } from "./ui/popup-menu.ts";
 import { openSheet, closeSheet } from "./ui/sheet.ts";   // 2026-09-02 C3   // 2026-09-02 C1：主菜单收养进 popup-menu（外点关/Escape/栈/定位一处）
@@ -61,9 +62,16 @@ function renderSingleFingerDraw(on: boolean) {
   state.singleFingerDraw = !!on;
   setMenuItem(els.menuSingleFingerDraw, on);
 }
-function applySingleFingerDraw(on: boolean) {
+function applySingleFingerDraw(on: boolean, by: "user" | "pen") {
   renderSingleFingerDraw(on);
-  preferences.set("single-finger-draw", !!on);   // device 层（硬件耦合；默认关——不拦鼠标，见 pointer-route）
+  preferences.set("single-finger-draw", !!on);   // device 层（硬件耦合；默认开——不拦鼠标，见 pointer-route）
+  if (by === "user") preferences.set("single-finger-draw-user-set", true);   // 总账 #85：user 碰过开关 → 笔不再自动关
+}
+/** 本次会话第一次见到数位笔（input.onPenFirstSeen）：没碰过开关且开着 → 自动关一次并告知（总账 #85）。 */
+export function autoOffSingleFingerDrawOnPen(): void {
+  if (!penAutoOffSingleFingerDraw(preferences.get("single-finger-draw-user-set"), state.singleFingerDraw)) return;
+  applySingleFingerDraw(false, "pen");
+  setStatus(t("status.singleFingerDrawPenOff"));
 }
 export function applyCheckerboard(on: boolean) {
   // v125: checkerboard per-doc，不再写 localStorage
@@ -249,7 +257,7 @@ export function initSettingsMenu(ctx: AppContext) {
     setStatus(t("status.longPressPick", { s: state.longPressPick ? t("common.on") : t("common.off") }));
   });
   els.menuSingleFingerDraw.addEventListener("click", () => {
-    applySingleFingerDraw(!state.singleFingerDraw);
+    applySingleFingerDraw(!state.singleFingerDraw, "user");
     setStatus(t("status.singleFingerDraw", { s: state.singleFingerDraw ? t("common.on") : t("common.off") }));
   });
   // desk 载入：文档的 checkboard 回灌到 board（applyCheckerboard 只写 board+mirror，不写 desk→不标脏；守人类 2026-06-10 决定）。

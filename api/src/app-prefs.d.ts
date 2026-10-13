@@ -8,6 +8,10 @@ export declare const PREF_REGISTRY: {
         readonly scope: "device";
         readonly def: boolean;
     };
+    readonly "single-finger-draw-user-set": {
+        readonly scope: "device";
+        readonly def: boolean;
+    };
     readonly "stylus-smooth-params": {
         readonly scope: "device";
         readonly def: Record<string, number>;
