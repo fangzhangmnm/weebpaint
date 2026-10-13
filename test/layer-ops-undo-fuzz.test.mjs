@@ -3,12 +3,14 @@
 // 起因：user 2026-10-10 真机 log 两次「unrecoverable undo exception; history reset … LayerTiles: layer gone at undo swap
 //   (layerId=15 / 26 — stack-order bug)」，操作 = 图层组操作 + 按颜色拆分。根因：explodeLeaf / collapseGroupToLeaf
 //   在令牌里先往新 LayerPixels 写、再入册挂树 → 写时扣押把它当成「对新层的修改」记 tiles 账且先于树账入 step →
-//   undo 倒序先撤树（新层没了）再撤 tiles → throw → 整栈清空。修 = LayerTiles.createTileset 入册即作废该实例的暂扣。
-//   原 workpiece-layer-tree 的 explode 用例只数不断言 unrecoverable，所以一直绿。
+//   undo 倒序先撤树（新层没了）再撤 tiles → throw → 整栈清空。
+//   10-10 的修 = createTileset 入册即作废暂扣（只盖住这一种表现）；2026-10-13 Claude Fable 5.1 换成根治：像素账按 tileset id 记、
+//   record 持引用，和树账的先后无关（layer-tiles 头注 / ADR-0008 §6）。本文件加了两种**混序聚合步**（aggNew / aggDel）
+//   专门制造「像素账在树账前 / 后」两种顺序。原 workpiece-layer-tree 的 explode 用例只数不断言 unrecoverable，所以一直绿。
 //
 // 问题陈述：
 //   输入 = 固定种子生成的结构/像素操作序列（画一块 / 加层 / 加组 / 复制 / 删 / 上下移 / 向下合并 / 剪切开关 /
-//          清空 / 解组 / 组合并为图层 / 移入组 / 移出组 / 按颜色拆分 / 换活动层）。
+//          清空 / 解组 / 组合并为图层 / 移入组 / 移出组 / 按颜色拆分 / 换活动层 / 两种混序聚合步）。
 //   输出 = 全撤到底 → 结构 + 每叶像素回到初态；全重做到底 → 与操作完的终态逐字节一致；来回两轮；全程零不可恢复。
 //   修前同一套 94/100 组失败，修后 0。
 import { describe, it, assert } from "./runner.mjs";
@@ -54,6 +56,9 @@ function trial(seed, nOps) {
     out() { const n = pick(walk(doc.layers)); if (n) lt.moveOutOfGroup(n.id, ST); return `out ${n?.id}`; },
     explode() { const n = pick(leaves()); if (n) lt.explodeLayer(n.id, [{ data: solid(8, 8, [255, 0, 0, 255]), name: "a" }, { data: solid(8, 8, [0, 0, 255, 255]), name: "b" }], { x: 4, y: 4, w: 8, h: 8 }, ST); return `explode ${n?.id}`; },
     active() { const n = pick(walk(doc.layers)); if (n) lt.setActive(n.id); return `active ${n?.id}`; },
+    // 混序聚合步（2026-10-13）：像素账先触 + 出生层 / 树账先触 + 死亡层——两本账相对顺序的两个极端。
+    aggNew() { const L = pick(leaves()); if (!L) return; h.withPoint("agg-new", undefined, () => { L.applyRegionDiff(2, 2, 8, 8, solid(8, 8, [1, 2, 3, 255])); const a = lt.addLayer("agg", { checkpoint: false }); if (a.ok) a.layer.applyRegionDiff(6, 6, 8, 8, solid(8, 8, [4, 5, 6, 255])); }); return `aggNew ${L.id}`; },
+    aggDel() { const X = pick(leaves()); if (!X) return; h.withPoint("agg-del", undefined, () => { lt.addLayer("tmp", { checkpoint: false }); const X2 = leaves().find((l) => l.id === X.id); if (!X2) return; X2.applyRegionDiff(1, 1, 8, 8, solid(8, 8, [7, 8, 9, 255])); lt.removeLayer(X2.id, X2.name, { checkpoint: false }); }); return `aggDel ${X.id}`; },
   };
   const names = Object.keys(ops);
   const log = [];

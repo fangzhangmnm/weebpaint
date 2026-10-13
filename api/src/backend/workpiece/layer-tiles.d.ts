@@ -1,10 +1,10 @@
 import { LayerPixels } from "../tiles/tile-layer.ts";
 import type { RecordData } from "./undo-stack.ts";
 import type { Workpiece, CollectorComponent } from "./workpiece.ts";
-/** 实例↔身份解析 + 实例替换（computed 变换用）。T2 由 app 以 doc 树实现；T3 起归 LayerTree json。 */
+/** 层号 → 实例（verb / 读口 / computed 变换用）。T2 由 app 以 doc 树实现；T3 起归 LayerTree json。
+ *  注意：undo 账**不**经这里解析身份（按 tileset id 直取注册表，见文件头）。 */
 export interface TilesHost {
     getPixels(layerId: number): LayerPixels | null;
-    findLayerIdByPixels(lp: LayerPixels): number | null;
     eachLayer(cb: (layerId: number, lp: LayerPixels) => void): void;
     /** 换整个 tileset 实例（旧实例由 host 负责 dispose）。computed 变换 apply 用。 */
     replacePixels(layerId: number, np: LayerPixels): void;
@@ -47,18 +47,17 @@ export declare class LayerTiles implements CollectorComponent {
     /** 内部/装载协作面：自带记账的窗口挂起收集（exchange/computed verb 体内、load 灌入——收了=双记账）。 */
     _suspendCollect(on: boolean): void;
     private _tilesets;
+    private _idOf;
     private _nextTilesetId;
     private _stampOwner;
     /** 有主实例离世（refs 归零/换血/record 驱逐）：先摘戳再 dispose——dispose 的逐格 notify
      *  发生在令牌外（record 驱逐/换文档清栈），摘了戳走「无主放行」路，不触发无令牌写硬化。 */
     private _disposeOwned;
     /** 新 tileset 入册，refs=1 归调用方（json 收养 +1 后调用方 release——净移交）。
-     *  入册 = 新实例的出生点：本令牌里它在入册前被暂扣的写（无主实例沿旧语义照收）一律作废——它在本步之前
-     *  不存在，「之前」由树 record 表达。不作废 → seal 时它已挂上树、解析到新 layerId → tiles 账先于树账入 step，
-     *  undo 倒序先撤树（新层消失）再撤 tiles → 「layer gone at undo swap」整栈清空（2026-10-10 user 真机 log：
-     *  按颜色拆分 / 组合并为图层后撤销；explodeLeaf / collapseGroupToLeaf 都是先写新实例再入册）。
-     *  调用方只许传新建实例（核过全部调用点）——已是某层底料的实例不得二次入册：机械守卫 = 带本 collector 所有权戳的
-     *  实例拒收（入册 / 换血 / 交换都盖戳；作废它的暂扣 = 丢掉某层令牌前原件 = 撤销坏账）。2026-10-13 Claude Fable 5.1 复审补。 */
+     *  入册前在本令牌里被写过（explodeLeaf / collapseGroupToLeaf 都是先写新实例再入册）照常记账——账按 tileset id 记，
+     *  seal 时经 _idOf 定身份，undo 时树账先后无关（文件头）。
+     *  调用方只许传新建实例：带本 collector 所有权戳的实例（已入册 / 换血 / 交换过）拒收——同一实例两个 id = 注册表坏账。
+     *  2026-10-13 Claude Fable 5.1。 */
     createTileset(lp: LayerPixels): number;
     /** 零拷贝复制（句柄共享快照）：duplicateLayer 用。refs=1 归调用方。 */
     duplicateTileset(id: number): number | null;

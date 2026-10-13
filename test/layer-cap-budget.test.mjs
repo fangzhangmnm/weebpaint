@@ -12,7 +12,7 @@ import { LayersFace } from "../src/backend/layers-face.ts";
 // 测试卫生：统一释放（防 tile-pool FR 泄漏 assert 刷屏）
 const _ctxs = [];
 function mk(width = 512, height = 512) {
-  const h = new History({ maxQuotaBytes: 1 << 30, onUnrecoverable: () => {} });
+  const h = new History({ maxQuotaBytes: 1 << 30 })   // onUnrecoverable 缺省即抛（2026-10-13）;
   const wp2 = new PaintingWorkpiece({ undo: h.stack, tree: { width, height } });
   const doc = new PaintingView(wp2);
   h.attach(wp2);

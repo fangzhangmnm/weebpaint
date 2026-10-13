@@ -41,7 +41,7 @@ const useStub = () => setDocCompositorBytes(refCompositor);
 // 测试卫生：统一释放（防 tile-pool FR 泄漏 assert 刷屏；见 shape-brush.test.mjs 同款）
 const _ctxs = [];
 function mk() {
-  const h = new History({ maxQuotaBytes: 1 << 30, onUnrecoverable: () => {} });
+  const h = new History({ maxQuotaBytes: 1 << 30 })   // onUnrecoverable 缺省即抛（2026-10-13）;
   const wp2 = new PaintingWorkpiece({ undo: h.stack, tree: { width: 4, height: 2 } });
   const doc = new PaintingView(wp2);
   h.attach(wp2);

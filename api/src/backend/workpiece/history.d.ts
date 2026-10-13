@@ -2,8 +2,10 @@ import { UndoStack } from "./undo-stack.ts";
 import type { Workpiece } from "./workpiece.ts";
 export interface HistoryOpts {
     maxQuotaBytes: number;
-    /** 不可恢复失败（栈已被弃）。app 侧接：integrity 自愈 + 全量重绘 + error banner。 */
-    onUnrecoverable: (e: unknown) => void;
+    /** 不可恢复失败（栈已被弃）。app 侧接：integrity 自愈 + 全量重绘 + error banner。
+     *  **缺省 = 直接抛**（2026-10-13 Claude Fable 5.1）：不接就响亮红——10-10 案里 5 个测试文件把它接成空函数 / 只计数，
+     *  explode 用例撞「layer gone at undo swap」整栈清空却一直绿。故意测不可恢复协议的用例显式传回调。 */
+    onUnrecoverable?: (e: unknown) => void;
     /** 栈形状变化（push/undo/redo/clear/evict）。app 侧接 wp:histchange 派发。 */
     onChange?: () => void;
     /** 某步被应用（undo/redo；按 step entries 逐组件报）。app 侧接面板/画面刷新。 */

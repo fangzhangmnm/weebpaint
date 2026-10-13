@@ -6,25 +6,24 @@ import { UndoStack } from "../src/backend/workpiece/undo-stack.ts";
 import { PaintingWorkpiece } from "../src/backend/workpiece/painting-workpiece.ts";
 import { LayerPixels } from "../src/backend/tiles/tile-layer.ts";
 
-// 玩具 host：map 背 LayerPixels（T2 app 里是 doc 树；本测试关心组件本体）。
-function mkHost(docW = 96, docH = 96) {
-  const layers = new Map();   // id → LayerPixels
-  const host = {
-    getPixels: (id) => layers.get(id) ?? null,
-    findLayerIdByPixels: (lp) => { for (const [id, p] of layers) if (p === lp) return id; return null; },
-    eachLayer: (cb) => { for (const [id, p] of layers) cb(id, p); },
-    replacePixels: (id, np) => { const old = layers.get(id); layers.set(id, np); old?.dispose(); },
-    add: (id) => { const lp = new LayerPixels(docW, docH); layers.set(id, lp); return lp; },
-    dispose: () => { for (const [, p] of layers) p.dispose(); layers.clear(); },
-  };
-  return host;
-}
-
+// 玩具 host：层号 → tileset id（app 里是 LayerTree json 的 pixelsRef；本测试关心组件本体）。
+//   实例一律经 createTileset 入注册表——账按 tileset id 记（2026-10-13，layer-tiles 头注），不入册的写不成账。
 function mk(opts = {}) {
   const undo = new UndoStack({ maxQuotaBytes: opts.maxQuotaBytes ?? (1 << 30) });
-  const host = mkHost();
+  const docW = 96, docH = 96;
+  const refs = new Map();   // 层号 → tileset id
+  let tiles = null;
+  const host = {
+    getPixels: (id) => (refs.has(id) ? tiles.tilesetPixels(refs.get(id)) : null),
+    eachLayer: (cb) => { for (const [id, ref] of refs) { const lp = tiles.tilesetPixels(ref); if (lp) cb(id, lp); } },
+    replacePixels: (id, np) => tiles.swapTilesetPixels(refs.get(id), np),
+    exchangePixels: (id, np) => tiles.exchangeTilesetPixels(refs.get(id), np),
+    add: (id) => { const lp = new LayerPixels(docW, docH); refs.set(id, tiles.createTileset(lp)); return lp; },
+    dispose: () => { for (const [, ref] of refs) tiles.releaseTileset(ref); refs.clear(); },   // record 持的引用由 undo.clear() 归还
+  };
   const wp = new PaintingWorkpiece({ undo, host, onTokenLeak: () => {} });
-  return { undo, host, wp, tiles: wp.layerTiles };
+  tiles = wp.layerTiles;
+  return { undo, host, wp, tiles };
 }
 
 const solid = (w, h, v) => new Uint8ClampedArray(w * h * 4).fill(v);
@@ -87,12 +86,17 @@ describe("LayerTiles · 写时扣押", () => {
     host.dispose(); undo.clear();
   });
 
-  it("无令牌直写：不收集不记账（T2 迁移期合法；旧 operator 自带快照）", () => {
+  it("无令牌直写：有主 substrate → throw（C7 硬化）；无主临时件照旧放行不记账", () => {
     const { undo, host } = mk();
-    const lp = host.add(1);
-    lp.putRegion(0, 0, 4, 4, solid(4, 4, 99));   // 令牌关着 → 观察者忽略
+    const lp = host.add(1);   // 入册 = 有主
+    let threw = false;
+    try { lp.putRegion(0, 0, 4, 4, solid(4, 4, 99)); } catch (e) { threw = /tokenless pixel write/.test(String(e)); }
+    assert(threw, "令牌关着写 substrate → 响亮 throw");
+    const scratch = new LayerPixels(96, 96);   // 无主：合法
+    scratch.putRegion(0, 0, 4, 4, solid(4, 4, 99));
     eq(undo.depth(), 0);
-    eq(lp.sampleAt(0, 0)[0], 99);
+    eq(scratch.sampleAt(0, 0)[0], 99);
+    scratch.dispose();
     host.dispose(); undo.clear();
   });
 

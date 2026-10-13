@@ -18,7 +18,7 @@ import { FloatingTransform } from "../src/floating-transform.ts";
 const _ctxs = [];
 function mk() {
   let unrec = 0;
-  const h = new History({ maxQuotaBytes: 1 << 30, onUnrecoverable: () => { unrec++; } });
+  const h = new History({ maxQuotaBytes: 1 << 30, onUnrecoverable: (e) => { unrec++; throw new Error(`unrecoverable undo: ${e?.message ?? e}`); } });
   const wp2 = new PaintingWorkpiece({ undo: h.stack, tree: { width: 512, height: 512 } });
   const doc = new PaintingView(wp2);
   h.attach(wp2);

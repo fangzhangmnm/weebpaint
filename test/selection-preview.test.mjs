@@ -15,7 +15,7 @@ import { History } from "../src/backend/workpiece/history.ts";
 
 const _ctxs = [];
 function mk() {
-  const h = new History({ maxQuotaBytes: 1 << 30, onUnrecoverable: () => {} });
+  const h = new History({ maxQuotaBytes: 1 << 30 })   // onUnrecoverable 缺省即抛（2026-10-13）;
   const wp2 = new PaintingWorkpiece({ undo: h.stack, tree: { width: 64, height: 64 }, onTokenLeak: () => {} });
   const doc = new PaintingView(wp2);
   h.attach(wp2);

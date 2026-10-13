@@ -193,20 +193,70 @@ describe("workpiece-layer-tree · 组合动词 + hint 文案", () => {
     eq(countViewLeaves(doc.layers), 2, "redo 再拆");
     eq(readPx(flattenViewLeaves(doc.layers)[0], 0, 0), "200,0,0,255", "redo 后红分片像素在");
   });
-  // 2026-10-10 user 真机 log「layer gone at undo swap」：新实例入册前在令牌里写的 tile 被当成「对新层的修改」记账，
-  //   tiles 账先于树账入 step → undo 倒序先撤树、新层没了再撤 tiles 就炸。修 = LayerTiles.createTileset 入册即作废暂扣。
-  it("explodeLayer：step 里没有新层的 tiles 账（新实例的出生由树账表达）", () => {
-    const { h, lt } = mk();
+  // 2026-10-10 user 真机 log「layer gone at undo swap」：像素账按**层号**记、swap 时经树找实例 → 出生层（像素账先触）/
+  //   死亡层（树账先触）撤销必炸其一，顺序怎么排都补不全。2026-10-13 Claude Fable 5.1：像素账改按 tileset id 记、record 持引用
+  //   （layer-tiles 头注 / ADR-0008 §6 可交换性契约）；Opus 10-10 的「createTileset 入册即作废」撤掉（只盖住一种表现）。
+  //   下面三条 = 两本账三种相对顺序，都要 undo / redo 干净。
+  it("explodeLayer：像素账排在树账前面（新实例入册前就被写）照样 undo / redo", () => {
+    const { doc, h, lt } = mk();
     const st = lt.explodeLayer(1, [
       { data: new Uint8ClampedArray([200, 0, 0, 255]), name: "红" },
       { data: new Uint8ClampedArray([0, 0, 200, 255]), name: "蓝" },
     ], { x: 0, y: 0, w: 1, h: 1 }, {});
     assert(st.ok, "explode ok");
     const step = h.stack._steps[h.stack._steps.length - 1];
-    eq(step.entries.map((e) => e.c.kind).join(","), "layerTree", "只有树账");
+    eq(step.entries.map((e) => e.c.kind).join(","), "layerTiles,layerTree", "像素账先触、指着出生层——账按 tileset 记，不问树");
+    h.undo();
+    eq(countViewLeaves(doc.layers), 1, "undo 回单叶");
+    h.redo();
+    eq(countViewLeaves(doc.layers), 2, "redo 再拆");
+    eq(readPx(flattenViewLeaves(doc.layers)[0], 0, 0), "200,0,0,255", "redo 后分片像素在");
   });
-  // 2026-10-13 Claude Fable 5.1 复审补：createTileset「入册即作废暂扣」的前提是只收新建实例——已入册的实例二次入册会把
-  //   该层令牌前原件作废（撤销坏账），所以机械拒收（所有权戳）。
+  it("同一步：先改旧层 → 建新层 → 写新层：undo 回初态、redo 两层像素都对", () => {
+    const { doc, h, lt } = mk();
+    const base = doc.activeLayer;
+    let newId = null;
+    const r = h.withPoint("agg", {}, () => {
+      base.pixels.putRegion(1, 1, 1, 1, px(5, 5, 5, 255));
+      const a = lt.addLayer("新", { checkpoint: false });
+      assert(a.ok, "addLayer ok"); newId = a.layer.id;
+      a.layer.pixels.putRegion(2, 2, 1, 1, px(7, 7, 7, 255));
+    });
+    assert(r.ok, "聚合步 ok");
+    const step = h.stack._steps[h.stack._steps.length - 1];
+    eq(step.entries.map((e) => e.c.kind).join(","), "layerTiles,layerTree", "像素账先触（旧层）");
+    h.undo();
+    eq(countViewLeaves(doc.layers), 1, "undo 新层消失");
+    eq(readPx(doc.activeLayer, 1, 1), "0,0,0,0", "旧层像素回初态");
+    h.redo();
+    eq(countViewLeaves(doc.layers), 2, "redo 新层回来");
+    const leaves = flattenViewLeaves(doc.layers);
+    eq(readPx(leaves.find((l) => l.id === base.id), 1, 1), "5,5,5,255", "旧层像素");
+    eq(readPx(leaves.find((l) => l.id === newId), 2, 2), "7,7,7,255", "新层像素");
+  });
+  it("同一步：先建别的层 → 写 X → 删 X：undo X 带本步前像素回来、redo X 消失、再 undo 仍对", () => {
+    const { doc, h, lt } = mk();
+    const X = doc.activeLayer;
+    assert(h.withPoint("pre", {}, () => X.pixels.putRegion(3, 3, 1, 1, px(1, 2, 3, 255))).ok, "前置步");
+    const r = h.withPoint("agg", {}, () => {
+      assert(lt.addLayer("别的", { checkpoint: false }).ok, "addLayer ok");
+      flattenViewLeaves(doc.layers).find((l) => l.id === X.id).pixels.putRegion(3, 3, 1, 1, px(9, 9, 9, 255));
+      assert(lt.removeLayer(X.id, X.name, { checkpoint: false }).ok, "removeLayer ok");
+    });
+    assert(r.ok, "聚合步 ok");
+    const step = h.stack._steps[h.stack._steps.length - 1];
+    eq(step.entries.map((e) => e.c.kind).join(","), "layerTree,layerTiles", "树账先触、像素账指着一个已不在树上的层");
+    assert(!flattenViewLeaves(doc.layers).some((l) => l.id === X.id), "X 已删");
+    h.undo();
+    const back = flattenViewLeaves(doc.layers).find((l) => l.id === X.id);
+    assert(back, "undo：X 回来");
+    eq(readPx(back, 3, 3), "1,2,3,255", "X 像素 = 本步之前");
+    h.redo();
+    assert(!flattenViewLeaves(doc.layers).some((l) => l.id === X.id), "redo：X 再消失");
+    h.undo();
+    eq(readPx(flattenViewLeaves(doc.layers).find((l) => l.id === X.id), 3, 3), "1,2,3,255", "二次 undo 仍对");
+  });
+  // createTileset 只收新建实例：已入册实例二次入册 = 同一实例两个 id = 注册表坏账 → 机械拒收（所有权戳）。
   it("createTileset：已入册（带所有权戳）的实例二次入册 → throw", () => {
     const { wp2 } = mk();
     const ref = wp2.layerTree._json.nodes[0].pixelsRef;

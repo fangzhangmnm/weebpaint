@@ -68,11 +68,6 @@ export class PaintingWorkpiece extends Workpiece {
           const leaf = this.layerTree?.leafById(layerId);
           return leaf ? this.layerTiles.tilesetPixels(leaf.pixelsRef) : null;
         },
-        findLayerIdByPixels: (lp) => {
-          let f: number | null = null;
-          this.layerTree?.eachLeaf((leaf) => { if (this.layerTiles.tilesetPixels(leaf.pixelsRef) === lp) f = leaf.id; });
-          return f;
-        },
         eachLayer: (cb) => {
           this.layerTree?.eachLeaf((leaf) => {
             const lp = this.layerTiles.tilesetPixels(leaf.pixelsRef);

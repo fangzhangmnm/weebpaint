@@ -139,3 +139,29 @@ Tx=transaction 词义保留，三个 Tx 类溶解（PixelTx/SelectionPreviewTx/t
   > SelectionPreviewPort 最小口）。三户清账完毕。
 - .h ritual 见家族总 CLAUDE.md（`scripts/gen-api.sh` → `api/`）。
 - 目标 API 全签名：`ai-docs/20260807-workpiece-v2-proposal-h.md`；施工序：`ai-docs/20260807-workpiece-v2-handoff.md`。
+
+## 修订 2026-10-13（Claude Fable 5.1）：§6 部件记录两两可交换 = 本体系成立的前提
+
+**起因**：2026-10-10 user 真机「layer gone at undo swap」整栈清空（按颜色拆分 / 组合并为图层后撤销）。10-10 的应急修
+（`createTileset` 入册即作废该实例在本令牌的暂扣）只盖住一种表现；user 10-13 追问「为什么不是把顺序改对」「是不是子步体系的本质缺陷」，
+重审结论如下。
+
+**体系的本质**：一步 = 一个令牌里**每个部件各一条**「令牌前 ↔ 令牌后」差量（memento 压缩：同一块 tile 多次换手只留令牌前原件），
+**不是**子动作的序列——子动作在令牌里的交错顺序封账时被故意抹掉。回放只能按「部件首次被碰的顺序」倒放，这只是近似。
+**因此它成立的前提是：各部件的记录两两可交换**——任一条记录放回去时不依赖别的部件此刻的状态。前提成立时顺序随便排；
+一条记录偷偷依赖别的部件（旧像素账按**层号**记、swap 时经树找实例 = 依赖树账的现状），顺序就成了定时炸弹：
+出生层要树账先放回、死亡层要像素账先放回，同一步可能两种都有，undo / redo 方向还相反——补顺序补不全。
+
+**决定（出路 ①，已落地 v0.14.27）**：让记录真正可交换。像素账按**注册表的 tileset id** 记（不按树上的层号）、record 对该 tileset
+持一个引用（seal acquire / disposeRecord release）；seal 时注册表里查不到的实例（从未入册的临时件 / 替身；同一步出生又死亡）作废——
+这是唯一一条「丢了也没事」的判断，机械、不看树、不猜顺序。`createTileset` 的入册即作废撤掉；「已入册实例拒绝二次入册」守卫保留。
+守卫测试：`test/workpiece-layer-tree.test.mjs` 三种相对顺序 + `test/layer-ops-undo-fuzz.test.mjs` 两种混序聚合步。
+
+**契约**：以后任何新部件 / 新 record 形态，必须回答「我的 swap 依赖别的部件此刻的状态吗」——答案必须是「不」。
+现存部件核过：树账持根（根里是 tileset id，不依赖像素账）；选区 / 浮层 / pendingFill / persp 各自自持；
+exchange（整幅改尺寸）与 computed（翻转 / 旋转 / 平移）靠「同令牌排他」断言，不与像素扣押并存。
+**可交换性没有机械执法**——靠本节 + fuzz。这是已知的软肋。
+
+**没走的出路 ②（记为远景，总账 #86）**：令牌里一换部件就封一个子记录，一步 = 有序子记录列表，倒放 = 真实顺序之逆。更一般，但要动
+workpiece / history 的令牌结构，并打破 `tokenBeforeImage`「整段令牌只有一份扣押」的读口假设与 computed / exchange 的双捕获断言。
+现在没有第二个需要顺序的部件；等出现再做。
