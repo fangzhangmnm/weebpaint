@@ -157,7 +157,9 @@ const backend = WeebPaintBackend.blank({ width: 1024, height: 1024 }, {
       renderLayersPanel(); board.invalidateAll(); board.requestRender();
     },
     // 栈形状变化 → wp:histchange（session-state 编辑门 / topbar undo 按钮态 都吃这个事件，契约不变）。
-    onHistChange: (canUndo, canRedo) => window.dispatchEvent(new CustomEvent("wp:histchange", { detail: { canUndo, canRedo } })),
+    //   同时刷图层面板（总账 #81，2026-10-13）：每一步入栈都可能改层的内容边界（hasPx → ⋯ 菜单「按颜色拆分 / 清空」可点与否），
+    //   以前只在 undo / redo（onApplied）刷——导入图片浮着时渲染的面板把那层记成空，应用变换落层后菜单一直灰到面板重开。
+    onHistChange: (canUndo, canRedo) => { window.dispatchEvent(new CustomEvent("wp:histchange", { detail: { canUndo, canRedo } })); renderLayersPanel(); },
     // undo/redo 应用后统一刷新（旧 handler 里散落的 _afterDocChange 收拢到这一处；
     // 状态栏文案走 step.hint（o.statuses），不再经 onApplied）。
     onApplied: () => { renderLayersPanel(); board.invalidateAll(); board.requestRender(); },

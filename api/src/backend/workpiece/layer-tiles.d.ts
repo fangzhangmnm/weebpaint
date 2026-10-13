@@ -8,9 +8,6 @@ export interface TilesHost {
     eachLayer(cb: (layerId: number, lp: LayerPixels) => void): void;
     /** 换整个 tileset 实例（旧实例由 host 负责 dispose）。computed 变换 apply 用。 */
     replacePixels(layerId: number, np: LayerPixels): void;
-    /** 实例交换**不 dispose**（replacePixels 的非销毁变体）：旧实例所有权交还调用方。
-     *  resize exchange record（crop/resample 的 undo 包持另一侧实例）用。T5 收编 DocResizeOp。 */
-    exchangePixels(layerId: number, np: LayerPixels): LayerPixels | null;
 }
 /** applyMaskPostStroke 的 preSnap 形状（原 pixel-tx PreSnapImage；selection.ts LayerSnapLike 同构）。 */
 export interface PreSnapImage {

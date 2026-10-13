@@ -33,9 +33,6 @@ export interface TilesHost {
   eachLayer(cb: (layerId: number, lp: LayerPixels) => void): void;
   /** 换整个 tileset 实例（旧实例由 host 负责 dispose）。computed 变换 apply 用。 */
   replacePixels(layerId: number, np: LayerPixels): void;
-  /** 实例交换**不 dispose**（replacePixels 的非销毁变体）：旧实例所有权交还调用方。
-   *  resize exchange record（crop/resample 的 undo 包持另一侧实例）用。T5 收编 DocResizeOp。 */
-  exchangePixels(layerId: number, np: LayerPixels): LayerPixels | null;
 }
 
 interface TilesetDiff { tilesetId: number; across: number; tiles: [number, TileHandle | null][] }   // record 对 tilesetId 持一个 acquire
@@ -44,7 +41,7 @@ type TilesRecord =
   | { t: "flip" }
   | { t: "rot"; dir: 1 | -1 }               // 1 = CCW（LayerPixels.rotated90CCW 的方向）
   | { t: "offset"; dx: number; dy: number }
-  | { t: "exchange"; leaves: { layerId: number; lp: LayerPixels }[] };   // lp = 另一侧实例（所有权归 record）
+  | { t: "exchange"; leaves: { tilesetId: number; lp: LayerPixels }[] };   // lp = 另一侧实例（所有权归 record）；按 tileset id 记 + 持引用，同 tiles 账
 
 /** applyMaskPostStroke 的 preSnap 形状（原 pixel-tx PreSnapImage；selection.ts LayerSnapLike 同构）。 */
 export interface PreSnapImage { bboxX: number; bboxY: number; bboxW: number; bboxH: number; imageData: ImageData | null }
@@ -223,14 +220,20 @@ export class LayerTiles implements CollectorComponent {
     if (this._exchange) throw new Error("LayerTiles: only one exchange record per token");
     if (this._computed) throw new Error("LayerTiles: exchange and computed record coexist on one token (multiple-parallel-path violation)");
     if (this._collectedCount() > 0) throw new Error("LayerTiles: token already collected tiles before exchange verb (double-capture assertion)");
-    const leaves: { layerId: number; lp: LayerPixels }[] = [];
+    const leaves: { tilesetId: number; lp: LayerPixels }[] = [];
     this._suspendCollect(true);
     try {
+      // 枚举仍按树（「改整幅」= 树上每一叶）；记账按 tileset id（swap 时不再经树找层——同 tiles 账的可交换性契约）。
       const jobs: [number, LayerPixels][] = [];
-      this._host.eachLayer((id, lp) => jobs.push([id, map(id, lp)]));
-      for (const [id, np] of jobs) {
-        const old = this._host.exchangePixels(id, np);
-        if (old) leaves.push({ layerId: id, lp: old });
+      this._host.eachLayer((id, lp) => {
+        const tid = this._idOf.get(lp);
+        if (tid === undefined) throw new Error(`LayerTiles: resize of an unregistered instance (layerId=${id})`);
+        jobs.push([tid, map(id, lp)]);
+      });
+      for (const [tid, np] of jobs) {
+        const old = this.exchangeTilesetPixels(tid, np);
+        this.acquireTileset(tid);   // record 持引用（disposeRecord 归还）
+        leaves.push({ tilesetId: tid, lp: old });
       }
     } finally {
       this._suspendCollect(false);
@@ -324,16 +327,12 @@ export class LayerTiles implements CollectorComponent {
       return r;
     }
     if (r.t === "exchange") {
-      // 自反：逐叶实例互换（所有权互换，零拷贝）；层不在 = 栈序 bug（先于本步的删层步必先被 undo 穿过）。
+      // 自反：逐 tileset 实例互换（所有权互换，零拷贝）。按 id 直取注册表，record 持引用 → 不存在 = 引用计数被绕过（exchangeTilesetPixels 自会 throw）。
       this._suspendCollect(true);
       try {
         return {
           t: "exchange",
-          leaves: r.leaves.map((e) => {
-            const cur = this._host.exchangePixels(e.layerId, e.lp);
-            if (!cur) throw new Error(`LayerTiles: layer gone at exchange swap (layerId=${e.layerId} — stack-order bug)`);
-            return { layerId: e.layerId, lp: cur };
-          }),
+          leaves: r.leaves.map((e) => ({ tilesetId: e.tilesetId, lp: this.exchangeTilesetPixels(e.tilesetId, e.lp) })),
         } satisfies TilesRecord;
       } finally {
         this._suspendCollect(false);
@@ -377,7 +376,10 @@ export class LayerTiles implements CollectorComponent {
   disposeRecord(data: RecordData): void {
     const r = data as TilesRecord;
     if (r.t === "exchange") {
-      for (const e of r.leaves) this._disposeOwned(e.lp);   // record 持有侧可能仍带戳（exchange 交还路）
+      for (const e of r.leaves) {
+        this._disposeOwned(e.lp);   // record 持有侧（另一侧实例）可能仍带戳（exchange 交还路）
+        this.releaseTileset(e.tilesetId);   // 归还 verb 时持的引用
+      }
       r.leaves = [];
       return;
     }

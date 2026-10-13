@@ -89,6 +89,40 @@ describe("S6 · lift（整点：清选区 + float tiles + 挖洞）", () => {
     eq(doc.selection, null, "redo：选区再次清空");
   });
 
+  // 2026-10-13 Claude Fable 5.1（user 10-10「取消选区为什么没了」→ 应急补丁 doc §4「进变换即清选区」处置）：选区不再随变换消失——
+  //   lift 时留底，commit 按同一变换放回（整数刚体 = 置换；一般变换 = 同采样器 warp 蒙版），cancel 原样放回。浮着期间仍无选区。
+  it("lift(rect) → 整数平移 (5,3) → commit(null)：选区跟着走；undo 回 lift 后空态；redo 又回来", () => {
+    const { doc, h, ft } = mk();
+    const L = doc.activeLayer;
+    paintRect(L, 20, 20, 40, 40);
+    doc.selection = rectSel(30, 30, 16, 16);
+    eq(ft.lift(L), true, "lift 成功");
+    eq(doc.selection, null, "浮着期间无选区");
+    ft.beginDrag({ kind: "translate" }, 0, 0); ft.extendDrag(5, 3); ft.endDrag();
+    eq(ft.commit(null), true, "整数平移 commit（CPU 置换快路，无需 bakeFn）");
+    const s = doc.selection;
+    assert(s, "commit 后有选区");
+    eq([s.bboxX, s.bboxY, s.bboxW, s.bboxH].join(","), "35,33,16,16", "选区 bbox 随平移");
+    eq(s.sampleAt(40, 40), 255, "新位置内满选");
+    eq(s.sampleAt(31, 31), 0, "旧位置不在选区");
+    h.undo();
+    eq(doc.selection, null, "undo commit → 回到浮着的空选区态");
+    h.redo();
+    assert(doc.selection && doc.selection.bboxX === 35, "redo → 选区又回来");
+  });
+  it("lift(rect) → 拖过 → cancel：选区原样放回（bbox 不变）", () => {
+    const { doc, ft } = mk();
+    const L = doc.activeLayer;
+    paintRect(L, 20, 20, 40, 40);
+    doc.selection = rectSel(30, 30, 16, 16);
+    eq(ft.lift(L), true, "lift 成功");
+    ft.beginDrag({ kind: "translate" }, 0, 0); ft.extendDrag(9, 9); ft.endDrag();
+    eq(ft.cancel(), true, "cancel");
+    const s = doc.selection;
+    assert(s, "cancel 后有选区");
+    eq([s.bboxX, s.bboxY, s.bboxW, s.bboxH].join(","), "30,30,16,16", "原样放回");
+  });
+
   it("lift(cut:false)（Ctrl+D 复制为浮层）：源层不动", () => {
     const { doc, ft, float } = mk();
     const L = doc.activeLayer;
@@ -246,10 +280,12 @@ describe("S6 · reject（cancel = identity 写回，非 undo）", () => {
     eq(float.view(), null, "浮层收摊");
     const after = L.pixels.getRegion(0, 0, 100, 100);
     assert(origBytes.every((v, i) => v === after[i]), "identity 写回：binary mask 逐字节精确");
-    eq(doc.selection, null, "选区保持 lift 后的空态（reject ≠ undo）");
+    const s = doc.selection;
+    assert(s && [s.bboxX, s.bboxY, s.bboxW, s.bboxH].join(",") === "30,30,16,16", "选区原样放回（2026-10-13；此前保持 lift 后的空态）");
 
     h.undo();                                   // 撤销 reject
     assert(float.view(), "undo reject：浮层回来");
+    eq(doc.selection, null, "undo reject → 回到浮着的空选区态");
     eq(L.sampleAt(35, 35)[3], 0, "洞也回来");
     h.undo();                                   // 再撤销 lift
     eq(float.view(), null);

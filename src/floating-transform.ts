@@ -27,6 +27,7 @@ import type { ViewLeaf, ViewGroup, PaintingView } from "./backend/workpiece/pain
 import { cloneFloatMeta } from "./backend/workpiece/float-component.ts";
 import type { FloatFrame, FloatTransformMeta, WorkpieceFloat, FloatState, TransformClass, FloatLayerComponent } from "./backend/workpiece/float-component.ts";
 import type { SelectionComponent } from "./backend/workpiece/selection-component.ts";
+import { Selection } from "./backend/selection.ts";   // 变换后选区跟着走（2026-10-13）
 import { extractFloatPixels, makeFloatFromBytes, composeCutHole, composeIdentityWriteback, composeRigidWriteback, composeOverWriteback, applyRegionBuf } from "./backend/workpiece/float-ops.ts";
 import type { RigidMap } from "./backend/workpiece/float-ops.ts";
 import type { History } from "./backend/workpiece/history.ts";
@@ -156,6 +157,9 @@ export class FloatingTransform {
   private _history: History | null = null;
   private _float: FloatLayerComponent | null = null;
   private _sel: SelectionComponent | null = null;
+  // lift 时选区的留底（clone，本对象持有）：commit 把它按同一变换放回、cancel 原样放回；浮层没了（undo 掉 lift / 换文档）就丢。
+  //   2026-10-13 Claude Fable 5.1（user 10-10「取消选区为什么没了」；应急补丁 doc §4「进变换即清选区」处置）。
+  private _liftedSel: Selection | null = null;
 
   // onChange 晚绑定（LassoEngine 构造时传 () => this.onChange()，因为 input.js 之后才赋 onChange）。
   constructor(onChange: () => void = () => {}) {
@@ -167,6 +171,7 @@ export class FloatingTransform {
 
   // workpiece/undo 接线（input.ts 构造后注入；lift/stamp/commit/cancel 全走令牌编排）。
   attach(doc: PaintingView, history: History, float: FloatLayerComponent, sel: SelectionComponent) {
+    this._dropLiftedSel();
     this._doc = doc;
     this._history = history;
     this._float = float;
@@ -209,7 +214,7 @@ export class FloatingTransform {
   syncFromWorkpiece() {
     if (this._drag) return;
     const fs = this._float?.view();
-    if (!fs) { this._live = null; return; }
+    if (!fs) { this._live = null; this._dropLiftedSel(); return; }   // 浮层没了（undo 掉 lift 等）→ 留底作废
     const t = cloneFloatMeta(fs.transform);
     this._live = { gizmoFrame: t.gizmoFrame, mesh: t.mesh as Mesh, meshN: t.meshN, mode: t.mode, uniformAspect: t.uniformAspect, usedClass: t.usedClass };
   }
@@ -234,6 +239,7 @@ export class FloatingTransform {
       if (f) baked.push({ leaf, float: f });
     }
     if (!baked.length) return false;
+    const keep = sel ? sel.clone() : null;   // 留底（零拷贝 acquire）——selection record 拿走的是原对象
     const r = this._history.withPoint("liftFloat", {}, () => {
       if (opts.cut !== false) {
         for (const b of baked) {
@@ -253,8 +259,11 @@ export class FloatingTransform {
     if (!r.ok) {
       // install 是令牌内最后一步：失败 = 浮层从未上台（cancel 已回滚挖洞/选区）→ 提取物归本函数释放
       for (const b of baked) b.float.pixels.dispose();
+      keep?.dispose();
       return false;
     }
+    this._dropLiftedSel();
+    this._liftedSel = keep;
     this.syncFromWorkpiece();
     this.onChange();
     return true;
@@ -273,7 +282,7 @@ export class FloatingTransform {
       if (rc.y + rc.h > gy1) gy1 = rc.y + rc.h;
     }
     const gw = gx1 - gx0, gh = gy1 - gy0;
-    this._sel!.set(null);   // 旧选区进 selection record（ignoreSelection 也照清——旧 lift 语义）
+    this._sel!.set(null);   // 旧选区进 selection record（ignoreSelection 也照清）；lift() 另持一份 clone（_liftedSel）供 commit 变换后放回 / cancel 原样放回
     this._float!.install({
       floats: baked.map((b) => b.float),
       transform: {
@@ -303,6 +312,7 @@ export class FloatingTransform {
     const baked = [{ leaf, float }];
     const r = this._history.withPoint("liftFloat", {}, () => { this._installBaked(baked); });
     if (!r.ok) { float.pixels.dispose(); return false; }
+    this._dropLiftedSel();   // 粘贴上台：没有「随内容走」的选区
     this.syncFromWorkpiece();
     this.onChange();
     return true;
@@ -540,6 +550,60 @@ export class FloatingTransform {
     applyRegionBuf(leaf, composeOverWriteback(leaf, rendered.dstX, rendered.dstY, rendered.w, rendered.h, rendered.data));
   }
 
+  private _dropLiftedSel(): void {
+    if (this._liftedSel) { this._liftedSel.dispose(); this._liftedSel = null; }
+  }
+
+  // lift 的留底选区按当前 live 变换映到目标位置 → 新 Selection（夹到 doc 内；空 → null）。
+  //   与 _bakeDown 同一套路：整数刚体 = gray8 置换（无重采样）；一般变换 = 同一个 warp 采样器（蒙版当 alpha，bilinear / nearest）。
+  //   非刚体且 bakeFn 缺席（GL 不可用）→ null：选区不放回，和像素一样不出半个结果。
+  private _transformedSelection(bakeFn: WarpBakeFn | null): Selection | null {
+    const sel = this._liftedSel;
+    if (!sel || !this._live || !this._doc) return null;
+    const lv = this._live;
+    const rect: Rect = { x: sel.bboxX, y: sel.bboxY, w: sel.bboxW, h: sel.bboxH };
+    if (rect.w <= 0 || rect.h <= 0) return null;
+    const gray = sel.materializeMaskRegion(rect.x, rect.y, rect.w, rect.h);
+    let out: { x: number; y: number; w: number; h: number; data: Uint8Array };
+    const dq = sourceDestQuad(rect, lv.gizmoFrame, lv.mesh);
+    const rigid = dq ? integerRigidOf(rect, dq) : null;
+    if (rigid) {
+      if (rigid.dw <= 0 || rigid.dh <= 0) return null;
+      const data = new Uint8Array(rigid.dw * rigid.dh);
+      for (let v = 0; v < rigid.dh; v++) {
+        for (let u = 0; u < rigid.dw; u++) {
+          const sx = rigid.m11 * u + rigid.m12 * v + rigid.s0x;
+          const sy = rigid.m21 * u + rigid.m22 * v + rigid.s0y;
+          if (sx < 0 || sx >= rect.w || sy < 0 || sy >= rect.h) continue;
+          data[v * rigid.dw + u] = gray[sy * rect.w + sx];
+        }
+      }
+      out = { x: rigid.dx0, y: rigid.dy0, w: rigid.dw, h: rigid.dh, data };
+    } else {
+      if (!bakeFn) return null;
+      const wp = sourceWarpMatrix({ rect }, lv.gizmoFrame, lv.mesh);
+      if (!wp || wp.bw <= 0 || wp.bh <= 0) return null;
+      const rgba = new Uint8ClampedArray(rect.w * rect.h * 4);
+      for (let i = 0; i < gray.length; i++) { rgba[i * 4] = 255; rgba[i * 4 + 1] = 255; rgba[i * 4 + 2] = 255; rgba[i * 4 + 3] = gray[i]; }
+      const rendered = bakeFn({ data: rgba, w: rect.w, h: rect.h }, rect.w, rect.h, wp.hinv, this._sampleMode === "nearest" ? 0 : 1, wp.bx, wp.by, wp.bw, wp.bh);
+      if (!rendered || rendered.w <= 0 || rendered.h <= 0) return null;
+      const data = new Uint8Array(rendered.w * rendered.h);
+      for (let i = 0; i < data.length; i++) data[i] = rendered.data[i * 4 + 3];
+      out = { x: rendered.dstX, y: rendered.dstY, w: rendered.w, h: rendered.h, data };
+    }
+    // 夹到 doc 内（Selection 的网格恒对齐 doc 原点，tx/ty ≥ 0；越出画布的那部分选区随内容一起裁掉）
+    const docW = this._doc.width, docH = this._doc.height;
+    const x0 = Math.max(0, out.x), y0 = Math.max(0, out.y), x1 = Math.min(docW, out.x + out.w), y1 = Math.min(docH, out.y + out.h);
+    if (x1 <= x0 || y1 <= y0) return null;
+    if (x0 === out.x && y0 === out.y && x1 === out.x + out.w && y1 === out.y + out.h) return Selection.fromGray8Region(out.x, out.y, out.w, out.h, out.data);
+    const cw = x1 - x0, ch = y1 - y0, cropped = new Uint8Array(cw * ch);
+    for (let v = 0; v < ch; v++) {
+      const from = (v + y0 - out.y) * out.w + (x0 - out.x);
+      cropped.set(out.data.subarray(from, from + cw), v * cw);
+    }
+    return Selection.fromGray8Region(x0, y0, cw, ch, cropped);
+  }
+
   // 源层 id → 活叶（消失容忍：跳过该 float，别的照常）。
   private _leafFor(f: WorkpieceFloat): ViewLeaf | null {
     const n = findViewNodeById(this._doc!.layers, f.sourceLayerId);
@@ -632,8 +696,9 @@ export class FloatingTransform {
   }
 
   // -------- accept / reject --------
-  // accept（commit）：各 float 烤进源层 + FloatLayerComponent.drop 收摊，一个令牌整点。
-  //   选区在 lift 时已清（spec:213）——accept 不再碰 selection（现状「清」保持，UX 待人类拍板）。
+  // accept（commit）：各 float 烤进源层 + 选区按同一变换放回 + FloatLayerComponent.drop 收摊，一个令牌整点。
+  //   选区在 lift 时清空（浮着期间不显旧形状的蚂蚁线）；commit 时 lift 的留底经同一刚体置换 / warp 采样器变成新选区
+  //   （PS / Krita 同款：变换后选区跟着内容走）。2026-10-13 取代「现状「清」保持，UX 待人类拍板」。
   commit(bakeFn?: WarpBakeFn | null): boolean {
     const fs = this._float?.view();
     if (!fs || !this._history) return false;
@@ -642,8 +707,11 @@ export class FloatingTransform {
         const leaf = this._leafFor(f);
         if (leaf) this._bakeDown(f, leaf, bakeFn ?? null);
       }
+      const next = this._transformedSelection(bakeFn ?? null);
+      if (next) this._sel!.set(next);   // 所有权移交 substrate；selection record 自会记
       this._float!.drop();
     });
+    if (r.ok) this._dropLiftedSel();
     this._drag = null;
     this.syncFromWorkpiece();
     this.onChange();
@@ -651,7 +719,7 @@ export class FloatingTransform {
   }
   // reject（cancel）：**不是 undo**（spec:220-225）——identity 写回：float 像素在原 rect
   //   source-over 落到当前内容上（stamp 保留、float 在其上），不走 warp 采样器（无重采样）。
-  //   本身是一个可撤销整点（Ctrl+Z 可把 reject 撤回来）。选区保持 lift 后的空态。
+  //   本身是一个可撤销整点（Ctrl+Z 可把 reject 撤回来）。选区 = lift 的留底原样放回（2026-10-13；此前保持空态）。
   cancel(): boolean {
     const fs = this._float?.view();
     if (!fs || !this._history) return false;
@@ -660,6 +728,7 @@ export class FloatingTransform {
         const leaf = this._leafFor(f);
         if (leaf) applyRegionBuf(leaf, composeIdentityWriteback(leaf, f));
       }
+      if (this._liftedSel) { this._sel!.set(this._liftedSel); this._liftedSel = null; }   // 所有权移交 substrate
       this._float!.drop();
     });
     this._drag = null;

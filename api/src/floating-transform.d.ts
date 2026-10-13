@@ -77,6 +77,7 @@ export declare class FloatingTransform {
     private _history;
     private _float;
     private _sel;
+    private _liftedSel;
     constructor(onChange?: () => void);
     attach(doc: PaintingView, history: History, float: FloatLayerComponent, sel: SelectionComponent): void;
     setSampleMode(m: string): void;
@@ -104,6 +105,8 @@ export declare class FloatingTransform {
     resetToCenterOriginal(): boolean;
     private _pushTransformCheckpoint;
     private _bakeDown;
+    private _dropLiftedSel;
+    private _transformedSelection;
     private _leafFor;
     stamp(bakeFn?: WarpBakeFn | null): boolean;
     bakeStandalone(bakeFn: WarpBakeFn | null): {
