@@ -58,3 +58,5 @@ v277 是**从 mode/opacity/clip 推导**隔离，没有独立的「穿透 vs 正
 - 序列化：`src/ora-stack-xml.js`（组写/读标准 `isolation`；穿透/正常/混合模式三态往返，node 测覆盖）。
 - 面板：`src/layers-panel.ts`（组模式下拉 = `GROUP_MODE_LABEL` 穿透置顶）。
 - 状态文档：`ai-docs/20260614-layer-groups.md`。
+
+> 落地注 2026-10-13（Claude Fable 5.1，总账 #79）：GPU 渲染此前只支持**叶**当底（render-plan 把组底解析成 null → 剪贴层整层照画），2D 参照一直支持组底。v0.14.29 起规划器给组底的剪贴步骤 `clipKey`（组体合成段：组内可见子项合成到透明底，不带组自身 opacity / mode，浮层不进蒙版），执行器以缓存段 tile-index 或每帧现算的整幅纹理当蒙版，显示与导出同一条路。user 2026-10-10「图层组逻辑上就是一个图层」。

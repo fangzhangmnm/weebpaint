@@ -26,6 +26,7 @@ export interface LeafStep {
     mode: string;
     opacity: number;
     clipBaseId: number | null;
+    clipKey: string | null;
     overlay: boolean;
 }
 export interface FloatStep {
@@ -39,6 +40,7 @@ export interface SegStep {
     mode: string;
     opacity: number;
     clipBaseId: number | null;
+    clipKey: string | null;
 }
 export interface GroupStep {
     t: "group";
@@ -46,6 +48,7 @@ export interface GroupStep {
     mode: string;
     opacity: number;
     clipBaseId: number | null;
+    clipKey: string | null;
     body: PlanStep[];
 }
 export type PlanStep = LeafStep | FloatStep | SegStep | GroupStep;
@@ -60,6 +63,7 @@ export interface Plan {
     rootBgLive: boolean;
     builds: Map<string, SegBuild>;
     cacheKeys: Set<string>;
+    transientKeys: Set<string>;
     liveLeaves: Set<number>;
 }
 export declare function buildPlan(nodes: PlanNode[], updated: Set<number>, bg: BgKind): Plan;

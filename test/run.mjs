@@ -172,6 +172,7 @@ import "./liquify-golden.test.mjs";         // 2026-09-19 液化 golden 锚（fi
 import "./region-programs.test.mjs";        // 2026-09-18 区域程序 GLSL ↔ CPU 孪生：注册表全覆盖 + 各 program 语义单测（SoftGl2Port）
 import "./region-stroke.test.mjs";          // 2026-09-18 RegionStroke：装载 W 往返精确 / 空叶 / 选区 / dirty→overlay / caps 守卫 / 读写冲突 / dispose
 import "./region-commit.test.mjs";          // 2026-09-18 区域程序提交链：RegionStroke → bakeStamps(replace overlay) → applyRegionDiff → 叶像素往返逐字节
+import "./gl-group-clip.test.mjs";         // 2026-10-13 #79 剪贴蒙版以组为底：组体合成段当蒙版，组底 == 叶底逐字节、隔离组、两叶并集、空组无基底
 import "./stroke-session-region.test.mjs";  // 2026-09-18 StrokeSession preview="region" 生命周期（fake deps）：open/setRegion/commit/dispose/cancel/失败路径
 import "./color-brush-premul.test.mjs";     // 2026-09-05 滤镜笔混回图层末步预乘（模糊黑边残留回归）
 import "./color-brush-spacing.test.mjs";    // 2026-09-05 晚 模糊/锐化间距地板 10%（user「有模糊的话改回10%」；大滤镜笔性能）

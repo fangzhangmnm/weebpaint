@@ -171,14 +171,21 @@ export class RenderTree {
     //   （驱逐窗口=0；准入被拒时后段的 sync 只可能驱逐**已合成完**的前段成员，正确性不受损）。
     //   live 叶 tile 由 pin provider 保 required 档，不会被段成员上传挤掉。
     room.comp.begin(docW, docH);
-    const transient = new Map<string, PooledFBO>();   // 建不了的段本帧的临时合成结果（复用，别重算）
+    const transient = new Map<string, PooledFBO>();   // 建不了的段本帧的临时合成结果（复用，别重算）+ 每帧现算的动态组体 clip 基底
+    const segLookup = (key: string) => this._segCache.get(key)?.index;
+    // 动态的组体 clip 基底（#79）：组里有 updated / float / overlay 叶 → 每帧现算一张整幅，不进缓存。先于一切段建（引用者在后）。
+    for (const key of plan.transientKeys) {
+      const b = plan.builds.get(key)!;
+      for (const id of b.members) syncOne(id);
+      transient.set(key, room.composeSegTransient(b, docW, docH, bg, transient, segLookup));
+    }
     for (const b of missing) {
       for (const id of b.members) syncOne(id);
-      if (cachingEnabled) this._buildSeg(b, docW, docH, bg, transient);
-      else transient.set(b.key, room.composeSegTransient(b, docW, docH, bg));
+      if (cachingEnabled) this._buildSeg(b, docW, docH, bg, transient, segLookup);
+      else transient.set(b.key, room.composeSegTransient(b, docW, docH, bg, transient, segLookup));
     }
     const acc = room.comp.newAcc(docW, docH, plan.rootBgLive ? bg : undefined);
-    room.composeSteps(plan.rootSteps, acc, docW, docH, transient, (key) => this._segCache.get(key)?.index);
+    room.composeSteps(plan.rootSteps, acc, docW, docH, transient, segLookup);
     const fresh = room.comp.finishAcc(acc);
     for (const f of transient.values()) room.glctx.returnFBO(f);
     room.comp.end();
@@ -194,10 +201,10 @@ export class RenderTree {
   // ---- 内部：签名 / 段有效性 ----
   private _planSig(plan: Plan, docW: number, docH: number, bg: Background | undefined): string {
     const steps = (ss: PlanStep[]): string => ss.map((s) =>
-      s.t === "seg" ? `s(${s.key},${s.mode},${s.opacity},${s.clipBaseId})`
-      : s.t === "leaf" ? `l(${s.id},${s.mode},${s.opacity},${s.clipBaseId},${s.overlay})`
+      s.t === "seg" ? `s(${s.key},${s.mode},${s.opacity},${s.clipBaseId},${s.clipKey})`
+      : s.t === "leaf" ? `l(${s.id},${s.mode},${s.opacity},${s.clipBaseId},${s.clipKey},${s.overlay})`
       : s.t === "float" ? `f(${s.id})`
-      : `g(${s.id},${s.mode},${s.opacity},${s.clipBaseId},[${steps(s.body)}])`).join("|");
+      : `g(${s.id},${s.mode},${s.opacity},${s.clipBaseId},${s.clipKey},[${steps(s.body)}])`).join("|");
     return `${docW}x${docH};bg=${JSON.stringify(bg)};${steps(plan.rootSteps)}`;
   }
 
@@ -213,9 +220,9 @@ export class RenderTree {
   }
 
   // ---- 内部：段建造 ----
-  private _buildSeg(b: SegBuild, docW: number, docH: number, bg: Background | undefined, transient: Map<string, PooledFBO>): void {
+  private _buildSeg(b: SegBuild, docW: number, docH: number, bg: Background | undefined, transient: Map<string, PooledFBO>, segLookup: (key: string) => IndexTexture | undefined): void {
     const room = this._room;
-    const res = room.composeSegTransient(b, docW, docH, bg);
+    const res = room.composeSegTransient(b, docW, docH, bg, transient, segLookup);
     // coverage = 成员叶 tile 键并集；withBg（不透明底）= 全 doc tiles。
     const across = tilesAcross(docW), down = tilesDown(docH);
     const cover = new Set<number>();

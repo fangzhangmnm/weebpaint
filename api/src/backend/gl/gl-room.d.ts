@@ -140,7 +140,7 @@ export declare class GlRoom {
     cpuAlive(): (id: number) => boolean;
     toPlanNodes(nodes: DocNode[], updated: Set<number>, overlayLeafIds: ReadonlySet<number>, leafById: Map<number, DocLeaf>): PlanNode[];
     composeSteps(steps: PlanStep[], acc: Acc, docW: number, docH: number, transient: Map<string, PooledFBO>, segLookup: ((key: string) => IndexTexture | undefined) | null): void;
-    composeSegTransient(b: SegBuild, docW: number, docH: number, bg: Parameters<GLCompositor["newAcc"]>[2]): PooledFBO;
+    composeSegTransient(b: SegBuild, docW: number, docH: number, bg: Parameters<GLCompositor["newAcc"]>[2], transient?: Map<string, PooledFBO>, segLookup?: ((key: string) => IndexTexture | undefined) | null): PooledFBO;
     liveClipTexFor(clipBaseId: number | null, docW: number, docH: number): Gl2TexSource | null;
     releaseLiveClip(): void;
     get hasOverlay(): boolean;

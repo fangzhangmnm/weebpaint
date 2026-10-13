@@ -133,9 +133,9 @@ export class RasterService {
     for (const id of plan.liveLeaves) syncOne(id);
     room.comp.begin(docW, docH);
     const transient = new Map<string, PooledFBO>();
-    for (const b of builds) {
+    for (const b of builds) {   // 插入序 = 依赖序（组体 clip 基底段先于引用它的段，#79）
       for (const id of b.members) syncOne(id);
-      transient.set(b.key, room.composeSegTransient(b, docW, docH, bg));
+      transient.set(b.key, room.composeSegTransient(b, docW, docH, bg, transient, null));
     }
     const acc = room.comp.newAcc(docW, docH, plan.rootBgLive ? bg : undefined);
     room.composeSteps(plan.rootSteps, acc, docW, docH, transient, null);

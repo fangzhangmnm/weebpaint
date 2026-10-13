@@ -256,12 +256,24 @@ export class GlRoom {
   // segLookup = RenderTree 的段缓存读口（一次性合成传 null——所有段都在 transient）。
   composeSteps(steps: PlanStep[], acc: Acc, docW: number, docH: number, transient: Map<string, PooledFBO>, segLookup: ((key: string) => IndexTexture | undefined) | null): void {
     const arena = this.arena;
+    // clip 蒙版两路（总账 #79）：底是叶 → 该叶 tile-index（或 live 描边中的 merged 整幅）；底是组 → 组体合成段
+    //   （transient 整幅 FBO 优先——compositeOnce / 动态组体都在 transient；否则段缓存的 tile-index）。
+    //   组体段找不到（规划保证它先于引用者建好；真找不到 = 执行器 bug）→ 当「没有基底」：剪贴层不画，与规划器 clipNoBase 同语义，不画错东西。
+    const clipOf = (clipBaseId: number | null, clipKey: string | null): { clipIdx: IndexTexture | null; clipTex: Gl2TexSource | null; missing: boolean } => {
+      if (clipKey !== null) {
+        const f = transient.get(clipKey);
+        if (f) return { clipIdx: null, clipTex: f, missing: false };
+        const idx = segLookup?.(clipKey);
+        return idx ? { clipIdx: idx, clipTex: null, missing: false } : { clipIdx: null, clipTex: null, missing: true };
+      }
+      return { clipIdx: clipBaseId !== null ? this.leaves.get(clipBaseId)?.index ?? null : null, clipTex: this.liveClipTexFor(clipBaseId, docW, docH), missing: false };
+    };
     for (const step of steps) {
       if (step.t === "leaf") {
         const rec = this.leaves.get(step.id);
         if (!rec) continue;   // sync 降级（超 quota）→ 跳层（自愈后回来）
-        const clipIdx = step.clipBaseId !== null ? this.leaves.get(step.clipBaseId)?.index ?? null : null;
-        const clipTex = this.liveClipTexFor(step.clipBaseId, docW, docH);
+        const { clipIdx, clipTex, missing } = clipOf(step.clipBaseId, step.clipKey);
+        if (missing) continue;
         const ov = step.overlay ? this.overlayDescFor(step.id) : null;
         this.comp.pass(arena, ov ? "overlay" : "tiled", rec.index, null, step.mode as BlendMode, step.opacity, clipIdx, acc, docW, docH, ov, clipTex);
       } else if (step.t === "seg") {
@@ -269,8 +281,8 @@ export class GlRoom {
         //   会命中上帧真内容、绕过替身换源（吸管 WYSIWYG 取不到替身的病根）。renderFrame 路径
         //   transient 只装建段失败的 key，先查它无副作用。
         const f = transient.get(step.key);
-        const clipIdx = step.clipBaseId !== null ? this.leaves.get(step.clipBaseId)?.index ?? null : null;
-        const clipTex = this.liveClipTexFor(step.clipBaseId, docW, docH);
+        const { clipIdx, clipTex, missing } = clipOf(step.clipBaseId, step.clipKey);
+        if (missing) continue;
         if (f) {
           this.comp.pass(arena, "group", null, f, step.mode as BlendMode, step.opacity, clipIdx, acc, docW, docH, null, clipTex);
         } else {
@@ -279,11 +291,11 @@ export class GlRoom {
           this.comp.pass(arena, "tiled", segIdx, null, step.mode as BlendMode, step.opacity, clipIdx, acc, docW, docH, null, clipTex);
         }
       } else if (step.t === "group") {
+        const { clipIdx, clipTex, missing } = clipOf(step.clipBaseId, step.clipKey);
+        if (missing) continue;
         const sub = this.comp.newAcc(docW, docH);
         this.composeSteps(step.body, sub, docW, docH, transient, segLookup);
         const res = this.comp.finishAcc(sub);
-        const clipIdx = step.clipBaseId !== null ? this.leaves.get(step.clipBaseId)?.index ?? null : null;
-        const clipTex = this.liveClipTexFor(step.clipBaseId, docW, docH);
         this.comp.pass(arena, "group", null, res, step.mode as BlendMode, step.opacity, clipIdx, acc, docW, docH, null, clipTex);
         this.glctx.returnFBO(res);
       } else {   // float
@@ -296,9 +308,11 @@ export class GlRoom {
   }
 
   // 段的临时合成（不入池）：fresh acc（prefix 段带 bg）→ steps → FBO。
-  composeSegTransient(b: SegBuild, docW: number, docH: number, bg: Parameters<GLCompositor["newAcc"]>[2]): PooledFBO {
+  //   transient / segLookup 透传：段内的剪贴步骤可能以**组体段**为蒙版（#79），要能查到已建好的那段（规划保证组体段先建）。
+  composeSegTransient(b: SegBuild, docW: number, docH: number, bg: Parameters<GLCompositor["newAcc"]>[2],
+                      transient: Map<string, PooledFBO> = new Map(), segLookup: ((key: string) => IndexTexture | undefined) | null = null): PooledFBO {
     const acc = this.comp.newAcc(docW, docH, b.withBg ? bg : undefined);
-    this.composeSteps(b.steps, acc, docW, docH, new Map(), null);
+    this.composeSteps(b.steps, acc, docW, docH, transient, segLookup);
     return this.comp.finishAcc(acc);
   }
 

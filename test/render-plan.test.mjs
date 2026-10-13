@@ -16,7 +16,7 @@ const G = (id, children, o = {}) => ({
 function sig(steps) {
   return steps.map((s) =>
     s.t === "seg" ? `seg(${s.key.split(":").slice(-1)[0] === "pre" || s.key.includes(":pre") ? "pre" : "iso"},${s.mode},${s.opacity})`
-    : s.t === "leaf" ? `leaf${s.id}${s.clipBaseId !== null ? `^${s.clipBaseId}` : ""}`
+    : s.t === "leaf" ? `leaf${s.id}${s.clipBaseId !== null ? `^${s.clipBaseId}` : ""}${s.clipKey !== null ? `^${s.clipKey.split(":")[0]}` : ""}`
     : s.t === "float" ? `float${s.id}`
     : `group${s.id}[${sig(s.body)}]`).join(" ");
 }
@@ -215,5 +215,49 @@ describe("render-plan · fuzz 永不崩", () => {
       buildPlan(nodes, upd, ["none", "checker", "color"][Math.floor(rnd() * 3)]);   // throw = fail
     }
     assert(true, "2000 棵树全部规划成功");
+  });
+});
+
+// 总账 #79（2026-10-13 Claude Fable 5.1）：底是组 → 剪贴步骤带 clipKey（组体合成段），不再 clipBaseId=null 当没蒙版画。
+describe("render-plan · clip 基底是组（#79）", () => {
+  it("静止：组体段进 builds（withBg=false、members=组内叶）；剪贴叶 clipKey 指它；父段 members 并入组体成员", () => {
+    const p = buildPlan([G(5, [L(1)]), L(2, { clip: true })], new Set(), "none");
+    const base = [...p.builds.values()].find((b) => b.key.startsWith("c5:"));
+    assert(base, "有组体段 c5:…");
+    eq(base.withBg, false); eq(base.members.join(","), "1", "组体成员 = 叶 1");
+    eq(base.steps.map((s) => s.t + s.id).join(","), "leaf1", "组体 = 叶 1 直画（不带组 opacity / mode）");
+    assert(p.cacheKeys.has(base.key) && !p.transientKeys.has(base.key), "静止 → 可缓存");
+    // 根：1 与 2 都静止、source-over → 并成一段；段内 leaf2 的 clipKey 指组体段，父段 members 含 1
+    eq(p.rootSteps.length, 1); eq(p.rootSteps[0].t, "seg");
+    const parent = p.builds.get(p.rootSteps[0].key);
+    const leaf2 = parent.steps.find((s) => s.t === "leaf" && s.id === 2);
+    eq(leaf2.clipKey, base.key, "剪贴叶 clipKey = 组体段"); eq(leaf2.clipBaseId, null);
+    assert(parent.members.includes(1) && parent.members.includes(2), "父段成员含组体成员");
+    // 依赖序：组体段先插入
+    eq([...p.builds.keys()][0], base.key, "组体段先于引用它的段");
+  });
+  it("动态：组里有 updated 叶 → 组体段进 transientKeys（每帧现算）、剪贴叶 dynamic 不进段", () => {
+    const p = buildPlan([G(5, [L(1)]), L(2, { clip: true })], new Set([1]), "none");
+    const base = [...p.builds.values()].find((b) => b.key.startsWith("c5:"));
+    assert(base && p.transientKeys.has(base.key) && !p.cacheKeys.has(base.key), "动态组体 → transient");
+    eq(sig(p.rootSteps), "leaf1 leaf2^c5", "两叶都 live 直画，leaf2 带组体 clipKey");
+  });
+  it("隔离组（normal 模式）当底：组体段只合子项，组自身 mode / opacity 不进蒙版", () => {
+    const p = buildPlan([G(5, [L(1)], { mode: "multiply", opacity: 0.5 }), L(2, { clip: true })], new Set(), "none");
+    const base = [...p.builds.values()].find((b) => b.key.startsWith("c5:"));
+    assert(base, "有组体段");
+    eq(base.steps.map((s) => `${s.t}${s.id}:${s.mode}:${s.opacity}`).join(","), "leaf1:source-over:1", "子项照自己的参数合成");
+  });
+  it("空组（无可见子项）当底 = 没有基底：剪贴叶不画；组体段不建", () => {
+    const p = buildPlan([G(5, [L(1, { visible: false })]), L(2, { clip: true }), L(3)], new Set(), "none");
+    assert(![...p.builds.keys()].some((k) => k.startsWith("c5:")), "不建组体段");
+    eq(sig(p.rootSteps), "leaf3", "叶 2 不画（无基底）；叶 3 单叶直画");
+  });
+  it("组体里的浮层不进蒙版（与叶底「tile 里没有浮层像素」同语义）", () => {
+    const p = buildPlan([G(5, [L(1, { float: true })]), L(2, { clip: true })], new Set(), "none");
+    const base = [...p.builds.values()].find((b) => b.key.startsWith("c5:"));
+    assert(base, "有组体段（叶 1 本体仍是子项）");
+    assert(!base.steps.some((s) => s.t === "float"), "组体段无 float 步骤");
+    assert(p.transientKeys.has(base.key), "有浮层的叶 = 动态 → 组体每帧现算");
   });
 });
