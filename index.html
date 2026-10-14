@@ -51,14 +51,16 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="WeebPaint" />
-    <title>WeebPaint — free drawing app for iPad, PC &amp; phone</title>
+    <title>WeebPaint</title>
     <!-- SEO/分享卡片元数据（文案 SSoT=「20260821 WeebPaint宣发」的
          writings-human-edit-only/20260828 writings.md，user 2026-08-30 拍板；动文案须 user 过目。
          edited by Claude Opus 5 (claude-opus-5[1m]) 2026-08-30）。
          · lang 静态值=en（宣发阶段英文 default；boot 后 i18n 会按用户语言改写 <html lang>，真用户不受影响）。
          · canonical 写死 prod 绝对地址：同一份 index.html 部署到 / 和 /dev/ 两处，
            /dev/ 上这行自动变成「正主在 /」的声明——dev 不隐瞒但不当 SSoT，不必 robots 屏蔽。
-         · <title> 与 og:title 同文。运行时 src/save-status.ts 会把 document.title 覆写成
+         · <title> 与 og:title = app 名字「WeebPaint」，不为 SEO 让路（user 2026-10-14「标题，就叫MoonSinger，不要有别的干扰。
+           这里不应该为seo让路。 WeebPaint也叫WeebPaint，全家族兄弟项目都需要按照这个标准」；edited by Claude Opus 5.5）。
+           之前是「WeebPaint — free drawing app for iPad, PC & phone」。description 仍是 08-30 那句。运行时 src/save-status.ts 会把 document.title 覆写成
            「● 画名 — WeebPaint」，所以这里的静态值只对爬虫和启动前那一瞬生效——改它对 app 零影响。
          · og:image = og-card-1200x630.jpg（满幅 UI 截图；**图上刻意不写字**——品名与域名由各平台的
            卡片外壳自己渲，图里再写一遍是重复还白吃一条画面）。出图脚本 = 宣发仓 20260828-make-social-images.py
@@ -74,7 +76,7 @@
     <meta name="description" content="Free, open-source drawing app for anime and illustration on iPad, PC, and phone. No account, no install, and a cloud-synced gallery you control." />
     <link rel="canonical" href="https://weebpaint.com/" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="WeebPaint — free drawing app for iPad, PC &amp; phone" />
+    <meta property="og:title" content="WeebPaint" />
     <meta property="og:description" content="Free, open-source drawing app for anime and illustration on iPad, PC, and phone. No account, no install, and a cloud-synced gallery you control." />
     <meta property="og:url" content="https://weebpaint.com/" />
     <meta property="og:image" content="https://weebpaint.com/og-card-1200x630.jpg" />
@@ -1553,6 +1555,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-949f0a948fbe.mjs"></script>
+    <script type="module" src="./dist/weebpaint-d80eceb0dbf0.mjs"></script>
   </body>
 </html>
