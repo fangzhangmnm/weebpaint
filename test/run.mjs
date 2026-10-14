@@ -202,3 +202,4 @@ if (globalThis.gc) {
   }
   console.log("  [leak-gate] 0 leaks");
 }
+import "./sw-redirect.test.mjs";   // 2026-10-14 离线壳：跳转响应原样交回（家族周账 F-28）

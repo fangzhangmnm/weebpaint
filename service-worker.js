@@ -128,6 +128,7 @@ self.addEventListener("fetch", (event) => {
 async function withNoStore(p) {
   const r = await p;
   if (!(r instanceof Response)) return r;
+  if (r.type === "opaqueredirect" || r.status < 200 || r.status > 599) return r;   // 跳转响应（301 / 302 → type opaqueredirect、status 0）原样交回，浏览器自己跟着跳——拿 status 0 重建 Response 抛 RangeError = 搬子域名后旧地址整次导航打不开（家族周账 F-28；2026-10-14 Claude Fable 5.1，同 MoonSinger v0.11.4）
   const h = new Headers();
   if (r.headers && typeof r.headers.forEach === "function") r.headers.forEach((v, k) => h.set(k, v));
   h.set("Cache-Control", "no-store");
