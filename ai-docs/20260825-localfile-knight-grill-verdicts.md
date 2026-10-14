@@ -57,7 +57,7 @@
 - 一画一家 + 导出永不清 dirty ✅。下载开始 = 责任移交用户 + 「已下载」toast（「download只要浏览器开始下了责任就在用户啦」）。
 - **同一按钮静默 fallback**：保存/打开各一个按钮，FSA 优先，不可用落 input/download；AbortError（用户取消）≠ 环境不支持，不许降级重弹。主菜单随之干净。
 - 命名三粒度：**画 = `yyyymmdd-hex4`**（日粒度+消歧码，v217 惯例沿用）；**下载版本 = `名-YYYYMMDD-HHMM`** 撞名补 `-1/-2`（复用 `export-import-menu.ts:40` 现成代码提拔为全局命名器官）；项目=月粒度。禁「未命名」。谥号模式兼容（日期名顶着，毕业 rename）。
-- 标题栏显示画名+dirty 点（`document.title` 不产生历史记录，零 spam）。
+- ~~标题栏显示画名+dirty 点（`document.title` 不产生历史记录，零 spam）。~~ → **2026-10-14 取代**：不产生新条目是对的，但那个地址的历史标题会被改成画名，地址栏下拉按画名记（user 截图「20261010-月读和团子 — WeebPaint」、「weebpaint也有这个问题」「就放一个自己的名字，不解释，google也这么干的」）；标题永远只是「WeebPaint」（v0.14.31）。edited by Claude Opus 5.5
 - 大图/psd/格式队列等沿用 spec 20260819 不动。
 
 ### 2.2 T-crash（灾难恢复尾）

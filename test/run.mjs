@@ -33,6 +33,7 @@ import "./ramp-seg.test.mjs";          // v0.7.22 ramp-slider 分段步长模式
 import "./sel-pen.test.mjs";           // v0.7.25 选区笔：变体装配 + disc 同核光栅 + 引擎动力学全链
 import "./iso-frame.test.mjs";         // isometric 透视模式：纯平行三轴/仿射度量/box
 import "./app-version.test.mjs";
+import "./page-title.test.mjs";        // 网页标题只是 WeebPaint（user 2026-10-14）
 import "./cpu-tile-pool.test.mjs";
 import "./soft-gl2-port.test.mjs";   // C8 SoftGl2Port：真消费类（栅格/合成/烤定）无 GL 跑通 + 对表纪律
 import "./fill-lockalpha.test.mjs";  // v0.9.12 lockAlpha 真 atop：α 不动/α=0 不写隐形色/erase 不受锁（fill 像素路径首次进 npm test）
