@@ -85,9 +85,10 @@ export const storeUI: StoreUI = {
           message: t("cf.body.push", { name: n }),
           note: t("cf.note.keptSafe"),
           showSpinner: false,
+          // v0.14.32：主按钮 = 云端覆盖本地（user 2026-10-16「默认云端才是 authority」「一切对齐」，与 gallery 0.7.1 同步）
           actions: [
-            { label: t("cf.act.localWins"), value: "keepMine", primary: true },
-            { label: t("cf.act.cloudWins"), value: "takeCloud" },
+            { label: t("cf.act.cloudWins"), value: "takeCloud", primary: true },
+            { label: t("cf.act.localWins"), value: "keepMine" },
             { label: t("common.cancel"), value: "cancel" },
           ],
         });
