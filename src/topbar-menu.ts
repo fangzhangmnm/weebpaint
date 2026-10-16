@@ -348,15 +348,18 @@ export function initTopbarMenu(ctx: AppContext) {
     );
     if (!ok) return;
     try {
-      // 1. 注销所有 SW
+      // 只动自己的（家族 2026-10-01 规矩，WeebPaint 10-16 补上）：缓存和 service worker 按域名算——weebpaint.com 的 `/`（正式版）和 `/dev/` 同源，
+      //   「全部注销 / 全部删除」会把另一边的离线壳一起清掉。自己的 = 管着当前页面的那一个 service worker + 名字以 `weebpaint-` 开头的缓存
+      //   （service-worker.js 的 CACHE_NAME 前缀）。IDB 一律不碰。user 2026-10-16「随手修」。
+      // 1. 注销管着当前页面的 SW
       if (navigator.serviceWorker) {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        for (const r of regs) await r.unregister().catch(() => {});
+        const r = await navigator.serviceWorker.getRegistration();
+        if (r) await r.unregister().catch(() => {});
       }
-      // 2. 清 Cache Storage（不动 IDB）
+      // 2. 清自己前缀的 Cache Storage（不动 IDB）
       if (typeof caches !== "undefined") {
         const keys = await caches.keys();
-        for (const k of keys) await caches.delete(k).catch(() => {});
+        for (const k of keys) if (k.startsWith("weebpaint-")) await caches.delete(k).catch(() => {});
       }
       setStatus(t("tm.cacheClearedReloading"), true);
       setTimeout(() => location.reload(), 200);
