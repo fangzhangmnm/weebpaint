@@ -3,11 +3,11 @@
 import { describe, it, eq, assert } from "./runner.mjs";
 const { createPasswordKeeper } = await import("@internal/encryption");
 const { setPassword, lock, getPassword } = await import("../src/crypto-state.ts");
-const { wireRememberPassword, restoreRemembered, forgetRemembered, rememberedUntil, setRememberChoice } = await import("../src/remember-password.ts");
+const { wireRememberPassword, restoreRemembered, forgetRemembered, rememberedUntil, setRememberChoice, rememberAvailable } = await import("../src/remember-password.ts");
 
 const DAY = 86400_000;
 function memStore() { let rec; return { get: async () => rec, put: async (r) => { rec = r; }, delete: async () => { rec = undefined; }, peek: () => rec }; }
-function setup({ verifierPw = "real pw" } = {}) {
+function setup({ verifierPw = "real pw", enabled = true } = {}) {
   const clock = { t: 1_700_000_000_000 }; const now = () => clock.t;
   const store = memStore();
   const keeper = createPasswordKeeper({ dbName: "test", store, now });
@@ -15,7 +15,7 @@ function setup({ verifierPw = "real pw" } = {}) {
   const remembered = [], errors = [];
   lock();
   wireRememberPassword({
-    keeper: () => keeper, now,
+    enabled, keeper: () => keeper, now,
     hasVerifier: () => v.pw != null,
     checkVerifier: async (pw) => (v.pw == null ? "none" : pw === v.pw ? "ok" : "bad"),
     setPassword: (pw) => setPassword(pw),
@@ -75,5 +75,21 @@ describe("remember-password · 跟着统一密码走", () => {
     await until(async () => rememberedUntil() != null);
     setPassword("imported file pw"); await tick(); await tick();
     eq(await s.keeper.recall(), "real pw"); eq(s.errors.length, 0);
+  });
+});
+
+describe("remember-password · 单文件 html / itch 关掉（同源的不只我们）", () => {
+  it("enabled:false → 不给勾、不恢复、不跟、不碰存储（keeper 一碰就炸）", async () => {
+    const touched = [];
+    const bomb = new Proxy({}, { get: (_, k) => () => { touched.push(String(k)); throw new Error("keeper touched"); } });
+    lock();
+    wireRememberPassword({ enabled: false, keeper: () => bomb, hasVerifier: () => true, checkVerifier: async () => "ok", setPassword: (pw) => setPassword(pw), onError: (e) => touched.push("onError:" + e) });
+    eq(rememberAvailable(), false);
+    eq(await restoreRemembered(), "none");
+    setRememberChoice(true); setPassword("real pw"); await tick();
+    await forgetRemembered();
+    lock(); await tick();
+    eq(JSON.stringify(touched), "[]", "storage never touched");
+    eq(rememberedUntil(), null);
   });
 });

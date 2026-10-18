@@ -11,6 +11,7 @@
 - **开页**：`prefsReady` 之后、`bootRestoreSession`（开上次那幅画）之前：记着 → 先过 verifier 再 `setPassword`；对不上 → 忘掉、状态栏说一句；没 verifier → 忘掉。
 - **跟着统一密码走**（`crypto-state.onCurrentPasswordChange`）：锁定 / 首次密码撤销（null）→ 忘；被换成一把**过得了 verifier** 的（改密码先写 verifier 再换）→ 记新的、过期日不变；过不了的（session-state 打开一张别的密码的本地加密文件时把那把设成会话密码）→ 不跟，记着的那把留着。
 - **入口**：图库菜单「锁定」= 锁 + 忘；记着时菜单多一项「忘记这台设备记着的密码（X 到期）」；断开连接（退出登录）= 忘；忘记密码重置 = 忘。清缓存 / 强制更新不碰。
+- **单文件 html / itch 形态不提供**（v0.14.34；user 2026-10-17「做」）：file:// 在 Chromium 里所有本地 html 共一个存储桶，itch 所有网页游戏共 `html-classic.itch.zone` 一个 origin（`20260825-localfile-knight-survey.md` §3.3、`20260827-p6-single-html-landing.md`）——同源的别人能拿库里那把不可导出的钥匙**直接解**出密码。`isStandaloneHtml()` → `enabled: false`：不给勾、不恢复、不跟、不碰存储（单测「keeper 一碰就炸」+ `tools/standalone-smoke.mjs` 在真包上塞记录、重开、必须原样不动）。
 - 接缝：建 = `src/encryption.ts`（`@internal/encryption` 唯一值级 import 点，build.sh lint 守）；递 = `src/app.ts`；用 = `src/remember-password.ts`。
 
 ## CSP

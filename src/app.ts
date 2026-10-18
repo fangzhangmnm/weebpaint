@@ -34,8 +34,9 @@ import { openInputSheet, openInputSheetEx, openConfirmSheet, lockSyncGate } from
 import { setPasswordPrompt, setPassword } from "./crypto-state.ts";   // 加密：密码弹窗注入（ADR-0012）
 import { passwordKeeper } from "./encryption.ts";
 import { hasVerifier, checkVerifier } from "./password-verifier.ts";
-import { wireRememberPassword, restoreRemembered, rememberChoice, setRememberChoice } from "./remember-password.ts";   // 2026-10-17 在这台设备上记住密码（≤ 30 天）
+import { wireRememberPassword, restoreRemembered, rememberChoice, setRememberChoice, rememberAvailable } from "./remember-password.ts";   // 2026-10-17 在这台设备上记住密码（≤ 30 天）
 import { rememberDayText } from "./remember-day.ts";
+import { isStandaloneHtml } from "./standalone-html.ts";
 import { sessionFileName } from "./config.ts";   // 边界：裸 session 名 → 库全名（薄库身份=X.ora）
 import { ensureUnlocked } from "./enc-thumbs.ts";   // 交互解锁（busy 外）——图库 host.unlock 用
 import { els } from "./els.ts";
@@ -129,12 +130,13 @@ const prefsReady: Promise<unknown> = bootAttachFromRegistry()
 // 输入 sheet 注入进去（守「无系统对话框」红线）。必须在任何 decode 之前（boot load 可能是加密作品）。
 setPasswordPrompt(async ({ title, message, offerRemember }) => {
   const r = await openInputSheetEx(title || t("mi.enterPassword"), "", { placeholder: t("mi.galleryPassword"), password: true, message: message || "",
-    checkbox: offerRemember ? { label: t("enc.rememberDevice"), checked: rememberChoice() } : undefined });   // 2026-10-17：验得了的统一密码面板给勾，默认不勾
-  setRememberChoice(offerRemember ? !!r?.checked : false);   // 不给勾的面板一律清掉勾态（流程里只有最后一个面板给勾）
+    checkbox: offerRemember && rememberAvailable() ? { label: t("enc.rememberDevice"), checked: rememberChoice() } : undefined });   // 2026-10-17：验得了的统一密码面板给勾，默认不勾
+  setRememberChoice(offerRemember && rememberAvailable() ? !!r?.checked : false);   // 不给勾的面板一律清掉勾态（流程里只有最后一个面板给勾）
   return r ? r.value : null;
 });
 // 「在这台设备上记住密码」（src/remember-password.ts；user 2026-10-17，≤ 30 天）。keeper 只在这里递进去。
 wireRememberPassword({
+  enabled: !isStandaloneHtml(),   // 单文件 html / itch 不提供：同源的不只我们（file:// 共桶、itch 所有游戏共一个域）
   keeper: passwordKeeper, hasVerifier, checkVerifier, setPassword: (pw) => setPassword(pw),
   onError: (e) => reportError(e instanceof Error ? e : new Error(String(e)), "warning"),
   onRemembered: (until) => setStatus(t("enc.rememberedToast", { date: rememberDayText(until) })),
