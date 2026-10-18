@@ -3028,10 +3028,10 @@ export declare const S: {
         readonly tok: "lipu wile";
     };
     readonly "ref.move": {
-        readonly zh: "拖动窗口";
-        readonly en: "Drag to move window";
-        readonly ja: "ドラッグでウィンドウ移動";
-        readonly tok: "luka la o tawa e lupa";
+        readonly zh: "点一下缩成小图标，按住拖动挪位置";
+        readonly en: "Tap to minimize, drag to move";
+        readonly ja: "タップで最小化、ドラッグで移動";
+        readonly tok: "luka la o lili e lupa. luka awen la o tawa e lupa";
     };
     readonly "ref.oneToOne": {
         readonly zh: "1:1 像素";
