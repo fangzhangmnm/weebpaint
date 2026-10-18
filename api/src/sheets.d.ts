@@ -1,8 +1,21 @@
-export declare function openInputSheet(title: string, defaultValue?: string, { placeholder, password, message }?: {
-    placeholder?: string | undefined;
-    password?: boolean | undefined;
-    message?: string | undefined;
+export declare function openInputSheet(title: string, defaultValue?: string, opts?: {
+    placeholder?: string;
+    password?: boolean;
+    message?: string;
 }): Promise<string | null>;
+/** 同上，多一个可选的勾（2026-10-17「在这台设备上记住密码」）：勾态随结果返回；取消 = null。 */
+export declare function openInputSheetEx(title: string, defaultValue?: string, { placeholder, password, message, checkbox }?: {
+    placeholder?: string;
+    password?: boolean;
+    message?: string;
+    checkbox?: {
+        label: string;
+        checked?: boolean;
+    };
+}): Promise<{
+    value: string;
+    checked: boolean;
+} | null>;
 export declare function openConfirmSheet(title: string, message: string): Promise<boolean>;
 export declare function openChoiceSheet<T>(title: string, message: string, choices: {
     label: string;

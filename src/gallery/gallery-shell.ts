@@ -41,6 +41,8 @@ import { openInputSheet, openConfirmSheet } from "../sheets.ts";
 import { pathJoin } from "@internal/gallery";
 import { setAddImportAsNewDoc, importImageAsNewDoc } from "../import-image.ts";
 import { isUnlocked, lock, setPassword, promptPassword, setFilePassword, forgetFilePassword } from "../crypto-state.ts";
+import { rememberedUntil, forgetRemembered } from "../remember-password.ts";   // 2026-10-17 在这台设备上记住密码
+import { rememberDayText } from "../remember-day.ts";
 import { hasVerifier, checkVerifier, clearVerifier, createVerifier } from "../password-verifier.ts";
 import { runChangePassword, type ChangePasswordReport } from "@internal/gallery";   // 2026-09-09 换密码编排（纯）
 import { invalidateCachedThumb } from "./cloud-thumb-cache.ts";
@@ -388,6 +390,11 @@ export function initGalleryShell(ctx: AppContext) {
     // 解锁/锁定按钮的标签随锁态（每次开菜单刷一次即可）
     const lockLabel = els.galleryMenuLock?.querySelector(".menu-item-label");
     if (lockLabel) lockLabel.textContent = isUnlocked() ? t("gs.lockLabel") : t("gs.unlockLabel");
+    // 2026-10-17：记着密码才露「忘记这台设备记着的密码（X 到期）」
+    const until = rememberedUntil();
+    els.galleryMenuForgetPw?.classList.toggle("hidden", until == null);
+    const forgetLabel = els.galleryMenuForgetPw?.querySelector(".menu-item-label");
+    if (forgetLabel && until != null) forgetLabel.textContent = t("gs.forgetRememberedLabel", { date: rememberDayText(until) });
   });
 
   // v0.9.26 PWA 安装入口（user 2026-08-20；capture 在 settings-menu init 挂，这里只绑图库那颗按钮）
@@ -397,8 +404,10 @@ export function initGalleryShell(ctx: AppContext) {
   els.galleryMenuLock?.addEventListener("click", async () => {
     closePopupMenuOf(els.galleryMenuPopup);
     if (isUnlocked()) {
+      const wasRemembered = rememberedUntil() != null;
       lock();
-      setStatus(t("gs.locked"));
+      try { await forgetRemembered(); } catch (e) { reportError(e instanceof Error ? e : new Error(String(e)), "warning"); }   // 锁定 = 这台设备也忘掉（订阅里已在忘，这里等它落地）
+      setStatus(t(wasRemembered ? "gs.lockedForgot" : "gs.locked"));
       gallery.refresh();
       return;
     }
@@ -413,15 +422,20 @@ export function initGalleryShell(ctx: AppContext) {
     //   旧病：本夹无本地加密件时未验证密码被直接坐实成全局——错密码随后被 encrypt 复用 = 两套密码 softlock。
     if (hasVerifier()) {
       for (let attempt = 0; attempt < 3; attempt++) {
-        const pw = await promptPassword({ title: t("gs.unlockTitle"), message: attempt > 0 ? t("gs.pwWrongRetry") : t("gs.unlockVerifierMsg") });
+        const pw = await promptPassword({ title: t("gs.unlockTitle"), message: attempt > 0 ? t("gs.pwWrongRetry") : t("gs.unlockVerifierMsg"), offerRemember: true });
         if (pw == null) return;
         if ((await checkVerifier(pw)) === "ok") { setPassword(pw); setStatus(t("gs.unlocked")); gallery.refresh(); return; }
       }
-      if (await openConfirmSheet(t("gs.resetPwTitle"), t("gs.resetPwMsg"))) { clearVerifier(); setStatus(t("gs.pwResetDone")); }
+      if (await openConfirmSheet(t("gs.resetPwTitle"), t("gs.resetPwMsg"))) { clearVerifier(); await forgetRemembered().catch(() => {}); setStatus(t("gs.pwResetDone")); }
       return;
     }
     const pw = await promptPassword({ title: t("gs.unlockTitle"), message: t("gs.unlockNoLocalMsg") });
     if (pw != null) { setPassword(pw); setStatus(t("gs.pwRecorded")); gallery.refresh(); }
+  });
+
+  els.galleryMenuForgetPw?.addEventListener("click", () => {
+    closePopupMenuOf(els.galleryMenuPopup);
+    forgetRemembered().then(() => setStatus(t("gs.forgotRemembered")), (e) => reportError(e instanceof Error ? e : new Error(String(e)), "warning"));
   });
 
   // 换密码（2026-09-09，user「还是加一个换密码ui吧，不然还是容易泄密」）：编排 = ./change-password.ts；store 0.12.0 rekey 密文→密文不经明文。

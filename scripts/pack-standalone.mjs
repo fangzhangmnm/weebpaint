@@ -37,6 +37,13 @@ css = css.replace(/url\("?(vendor\/[^")]+)"?\)/g, (_, p) => {
 if (css.includes("url(\"vendor") || css.includes("url(vendor")) die("styles.css 还有未内联的 vendor url()");
 html = html.replace(/<link rel="stylesheet" href="\.\/styles\.css[^"]*" \/>/, () => `<style>\n${css}\n</style>`);
 
+// ---- 2½. CSP 去掉 + theme guard 内联回去（2026-10-17，Claude Opus 5.5）：网页版头上有一条 CSP（不放行内联脚本），单文件版全是内联脚本，
+//   留着它 = 自己的脚本全被拦；theme-guard.js 在网页版是外链（同样因为 CSP），这里原样内联回 <head>，首帧前落主题不变。
+html = html.replace(/\s*<!-- CSP（[\s\S]*?-->\s*<meta http-equiv="Content-Security-Policy" content="[^"]*" \/>/, "");
+if (html.includes("Content-Security-Policy")) die("CSP meta 没去掉（单文件版全是内联脚本，留着会全被拦）");
+html = html.replace(/<script src="\.\/theme-guard\.js"><\/script>/, () => `<script>\n${escScript(readText("theme-guard.js"))}\n</script>`);
+if (html.includes("theme-guard.js\"")) die("theme-guard.js 没内联");
+
 // ---- 3. zip-js 内联（classic script；defer 去掉=就地执行，只定义全局，顺序无关）----
 html = html.replace(/<script defer src="\.\/vendor\/zip-js\/zip-full\.min\.js"><\/script>/,
   () => `<script>\n${escScript(readText("vendor/zip-js/zip-full.min.js"))}\n</script>`);

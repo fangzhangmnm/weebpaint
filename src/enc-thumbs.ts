@@ -37,6 +37,7 @@ export async function ensureUnlocked(name: string): Promise<boolean> {
     const pw = await promptPassword({
       title: t("enc.unlockTitle"),
       message: attempt > 0 ? t("enc.wrongRetry") : t("enc.enterGalleryPw"),
+      offerRemember: getPassword(null) == null,   // 2026-10-17：全局还空着 = 这次问的就是统一密码，给勾；全局已有 = 问的是这一件自己的密码，不给
     });
     if (pw == null) return false;
     if (await encFile(name).verifyPassword(pw)) {
@@ -89,6 +90,7 @@ export async function ensureNewPassword() {
       const pw = await promptPassword({
         title: t("enc.enterPwTitle"),
         message: attempt > 0 ? t("enc.wrongRetry") : t("enc.enterPwMsg"),
+        offerRemember: true,   // 2026-10-17：验 verifier 的统一密码面板
       });
       if (pw == null) return null;
       if ((await checkVerifier(pw)) === "ok") return pw;
@@ -103,7 +105,7 @@ export async function ensureNewPassword() {
         : t("enc.setPwMsg"),
     });
     if (p1 == null) return null;
-    const p2 = await promptPassword({ title: t("enc.confirmTitle"), message: t("enc.confirmMsg") });
+    const p2 = await promptPassword({ title: t("enc.confirmTitle"), message: t("enc.confirmMsg"), offerRemember: true });   // 勾放在流程的最后一个面板（2026-10-17）
     if (p2 == null) return null;
     if (p1 === p2) { await createVerifier(p1); return p1; }   // v0.4.11：创建即落 verifier（跟账号走）
   }

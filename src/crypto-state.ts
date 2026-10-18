@@ -2,12 +2,14 @@
 // store 对密码非交互（seam 只要 getPassword）；本模块持有内存密码 + 弹窗 + 记忆政策。
 //   getPassword(name)        → store seam 唯一接口：统一图库密码（per-name 覆盖兜底）
 //   promptPassword(opts)     → in-app 输入 sheet（弹窗实现由 composition root 注入，无 DOM 依赖）
+//   onCurrentPasswordChange  → 统一密码变了（含锁定 = null）：只给 remember-password.ts 用（2026-10-17「在这台设备上记住」，≤ 30 天）
 //   onPasswordVerified(name) → UI 解锁循环验证通过后调（全局空着就上位为全局；否则记 per-name）
 // 「弹框 + 验证 + 重试」的循环在 enc-thumbs.ensureUnlocked（**必须在 withBusy 之外**——busy 遮罩盖
-//   密码框会死锁，sheets 护栏也会 throw）。**密码永不持久化**：只活内存，关 tab / 锁定即忘。
+//   密码框会死锁，sheets 护栏也会 throw）。**本模块自己永不持久化**：只活内存，关 tab / 锁定即忘。
+//   「在这台设备上记住」（user 2026-10-17 批，最多一个月）住 remember-password.ts：它经 setPassword 把验过的密码送进来、经 onCurrentPasswordChange 跟着锁定 / 改密码走。edited by Claude Opus 5.5 2026-10-17
 
 /** 密码输入弹窗的注入形状（由 composition root 提供，无 DOM 依赖）。 */
-export interface PromptOpts { title?: string; message?: string; }
+export interface PromptOpts { title?: string; message?: string; /** 验得了的统一密码面板 = true：给「在这台设备上记住」的勾（导入件 / 换密码的旧密码不给）。 */ offerRemember?: boolean; }
 type PasswordPrompt = (opts: PromptOpts) => Promise<string | null>;
 type LockChangeSub = (unlocked: boolean) => void;
 
@@ -16,7 +18,11 @@ const _perName = new Map<string, string>();          // 别的密码的文件（
 let _prompt: PasswordPrompt | null = null;           // async ({title, message}) => string | null（取消）
 const _subs = new Set<LockChangeSub>();
 
-function _notify() { for (const cb of _subs) { try { cb(_password != null); } catch (_) {} } }
+const _pwSubs = new Set<(pw: string | null) => void>();
+function _notify() {
+  for (const cb of _subs) { try { cb(_password != null); } catch (_) {} }
+  for (const cb of _pwSubs) { try { cb(_password); } catch (_) {} }
+}
 
 export function setPasswordPrompt(fn: PasswordPrompt) { _prompt = fn; }
 export function isUnlocked() { return _password != null; }
@@ -25,6 +31,8 @@ export function setPassword(pw: string | null) { _password = pw || null; _notify
 export function lock() { _password = null; _perName.clear(); _notify(); }
 /** 锁态变化订阅（图库刷新用）。返回退订函数。 */
 export function onLockChange(cb: LockChangeSub) { _subs.add(cb); return () => _subs.delete(cb); }
+/** 统一密码变了（设 / 换 / 锁定 = null）。只给 remember-password.ts 用。 */
+export function onCurrentPasswordChange(cb: (pw: string | null) => void) { _pwSubs.add(cb); return () => _pwSubs.delete(cb); }
 
 /** 弹一次密码输入（不入库、不验证）。app 没注入 prompt → throw（组装错误，早炸）。 */
 export async function promptPassword(opts: PromptOpts = {}) {

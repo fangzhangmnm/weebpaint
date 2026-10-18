@@ -79,6 +79,7 @@ export declare const els: {
     menuGenAI: HTMLElement;
     galleryMenuLock: HTMLElement;
     galleryMenuChangePw: HTMLElement;
+    galleryMenuForgetPw: HTMLElement;
     galleryMenuBackup: HTMLElement;
     newDocSheet: HTMLElement;
     newDocName: HTMLInputElement;

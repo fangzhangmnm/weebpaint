@@ -30,8 +30,12 @@ import { initDevConsole } from "./dev-console.ts";   // window.WeebPaint 调试�
 import { mountGallery } from "./gallery/gallery.ts";          // candidate 1 · 图库深模块
 import { BrushRackController } from "./brush-rack-controller.ts";
 import { PwaShell } from "./pwa-shell.ts";
-import { openInputSheet, openConfirmSheet, lockSyncGate } from "./sheets.ts";   // settleSyncGate→cloud-freshness
-import { setPasswordPrompt } from "./crypto-state.ts";   // 加密：密码弹窗注入（ADR-0012）
+import { openInputSheet, openInputSheetEx, openConfirmSheet, lockSyncGate } from "./sheets.ts";   // settleSyncGate→cloud-freshness
+import { setPasswordPrompt, setPassword } from "./crypto-state.ts";   // 加密：密码弹窗注入（ADR-0012）
+import { passwordKeeper } from "./encryption.ts";
+import { hasVerifier, checkVerifier } from "./password-verifier.ts";
+import { wireRememberPassword, restoreRemembered, rememberChoice, setRememberChoice } from "./remember-password.ts";   // 2026-10-17 在这台设备上记住密码（≤ 30 天）
+import { rememberDayText } from "./remember-day.ts";
 import { sessionFileName } from "./config.ts";   // 边界：裸 session 名 → 库全名（薄库身份=X.ora）
 import { ensureUnlocked } from "./enc-thumbs.ts";   // 交互解锁（busy 外）——图库 host.unlock 用
 import { els } from "./els.ts";
@@ -123,8 +127,20 @@ const prefsReady: Promise<unknown> = bootAttachFromRegistry()
 // ---- 启动 ----
 // 加密（ADR-0012）：密码弹窗接线 —— crypto-state 无 DOM，composition root 把 in-app
 // 输入 sheet 注入进去（守「无系统对话框」红线）。必须在任何 decode 之前（boot load 可能是加密作品）。
-setPasswordPrompt(({ title, message }) =>
-  openInputSheet(title || t("mi.enterPassword"), "", { placeholder: t("mi.galleryPassword"), password: true, message: message || "" }));
+setPasswordPrompt(async ({ title, message, offerRemember }) => {
+  const r = await openInputSheetEx(title || t("mi.enterPassword"), "", { placeholder: t("mi.galleryPassword"), password: true, message: message || "",
+    checkbox: offerRemember ? { label: t("enc.rememberDevice"), checked: rememberChoice() } : undefined });   // 2026-10-17：验得了的统一密码面板给勾，默认不勾
+  setRememberChoice(offerRemember ? !!r?.checked : false);   // 不给勾的面板一律清掉勾态（流程里只有最后一个面板给勾）
+  return r ? r.value : null;
+});
+// 「在这台设备上记住密码」（src/remember-password.ts；user 2026-10-17，≤ 30 天）。keeper 只在这里递进去。
+wireRememberPassword({
+  keeper: passwordKeeper, hasVerifier, checkVerifier, setPassword: (pw) => setPassword(pw),
+  onError: (e) => reportError(e instanceof Error ? e : new Error(String(e)), "warning"),
+  onRemembered: (until) => setStatus(t("enc.rememberedToast", { date: rememberDayText(until) })),
+});
+// CSP（index.html 的 meta，2026-10-17）拦下的东西进 funnel（log 级）：真机上某个功能突然不灵时，先看这里是不是策略挡了它。
+document.addEventListener("securitypolicyviolation", (e) => reportError(new Error(`[csp] blocked ${e.effectiveDirective} ${String(e.blockedURI).slice(0, 120)} (${e.sourceFile ? e.sourceFile.split("/").pop() : "?"}:${e.lineNumber})`), "log"));
 
 // C7 backend 纯化的三个壳注入（backend 零 DOM/navigator；同 setTilePoolLeakReporter 模式）。
 // 必须在任何 decode 之前（boot load 可能撞 iCCP PNG 回退路）。
@@ -588,7 +604,10 @@ void prefsReady.then(() => {
 // ⑦ 三态启动恢复（P5 起读 resume-slate 回执条：doc→自动开 / gallery→图库 / null→新画布）= boot.ts。
 //   仍 await prefsReady：只为 legacy→回执条播种（幂等一次）；播种期过后可拆。
 //   排在 fixup 之后（同一个 promise 的 then 按注册顺序跑）→ 开画时 desk/设置已就位。
-void prefsReady.then(() => bootRestoreSession(ctx)).catch((e) => reportError(new Error("[boot] restore failed: " + String(e)), "log"));
+// 2026-10-17：这台设备记着密码 → 先和 verifier 比、对了就解锁（要在开上次那幅画之前，不然加密作品先开成锁着的）。没记 = 一次 IDB 读。
+void prefsReady
+  .then(() => restoreRemembered().then((r) => { if (r === "stale") setStatus(t("enc.rememberedStale"), true); }, (e) => reportError(new Error("[remember] restore failed: " + String(e)), "log")))
+  .then(() => bootRestoreSession(ctx)).catch((e) => reportError(new Error("[boot] restore failed: " + String(e)), "log"));
 // T-crash 恢复横幅（P2 2026-08-26）：扫 crash 库，有崩溃快照 → 非模态浮卡叠画布（不挡 boot、不 await）。
 initCrashBanner(ctx);
 // N3：启动时若在线+已登录，排空上次离线攒下的删除队列（fresh boot 不触发 online 事件，故此处补一刀）。

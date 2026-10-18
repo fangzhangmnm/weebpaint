@@ -17,6 +17,9 @@ const g = {
   title: () => $("genericSheetTitle"),
   message: () => $("genericSheetMessage"),
   input: () => $("genericSheetInput") as HTMLInputElement,
+  check: () => $("genericSheetCheck"),
+  checkInput: () => $("genericSheetCheckInput") as HTMLInputElement,
+  checkLabel: () => $("genericSheetCheckLabel"),
   choices: () => $("genericSheetChoices"),
   confirm: () => $("genericSheetConfirm"),
   cancel: () => $("genericSheetCancel"),
@@ -30,7 +33,12 @@ function resolveAndClose<T>(resolve: (v: T) => void, value: T, cleanup: () => vo
 
 // 输入框对话框 → Promise<string|null>（取消 = null）。
 // opts.password：输入框打码（type=password，关闭时还原）；opts.message：输入框上方说明行。
-export function openInputSheet(title: string, defaultValue = "", { placeholder = "", password = false, message = "" } = {}): Promise<string | null> {
+export function openInputSheet(title: string, defaultValue = "", opts: { placeholder?: string; password?: boolean; message?: string } = {}): Promise<string | null> {
+  return openInputSheetEx(title, defaultValue, opts).then((r) => (r ? r.value : null));
+}
+
+/** 同上，多一个可选的勾（2026-10-17「在这台设备上记住密码」）：勾态随结果返回；取消 = null。 */
+export function openInputSheetEx(title: string, defaultValue = "", { placeholder = "", password = false, message = "", checkbox }: { placeholder?: string; password?: boolean; message?: string; checkbox?: { label: string; checked?: boolean } } = {}): Promise<{ value: string; checked: boolean } | null> {
   return new Promise((resolve) => {
     g.title().textContent = title;
     if (message) { g.message().classList.remove("hidden"); g.message().textContent = message; }
@@ -44,9 +52,10 @@ export function openInputSheet(title: string, defaultValue = "", { placeholder =
     g.input().autocomplete = "off";
     g.input().value = defaultValue;
     g.input().placeholder = placeholder;
+    if (checkbox) { g.checkLabel().textContent = checkbox.label; g.checkInput().checked = !!checkbox.checked; g.check().classList.remove("hidden"); }
     openModalSheet(g.sheet(), { onDismiss: () => onCancel() });
     setTimeout(() => { g.input().focus(); g.input().select(); }, 0);
-    const onConfirm = () => resolveAndClose(resolve, g.input().value, cleanup);
+    const onConfirm = () => resolveAndClose(resolve, { value: g.input().value, checked: !!checkbox && g.checkInput().checked }, cleanup);
     const onCancel = () => resolveAndClose(resolve, null, cleanup);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Enter") { e.preventDefault(); onConfirm(); }
@@ -59,6 +68,7 @@ export function openInputSheet(title: string, defaultValue = "", { placeholder =
       g.input().type = "text";
       g.input().style.setProperty("-webkit-text-security", "");   // 打码态不残留到下一个输入框
       g.input().value = "";
+      g.check().classList.add("hidden"); g.checkInput().checked = false;   // 勾不残留到下一个输入框
     };
     g.confirm().addEventListener("click", onConfirm);
     g.cancel().addEventListener("click", onCancel);

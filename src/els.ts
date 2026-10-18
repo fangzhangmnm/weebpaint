@@ -97,6 +97,7 @@ export const els = {
   menuGenAI: byId("menuGenAI"),
   galleryMenuLock: byId("galleryMenuLock"),
   galleryMenuChangePw: byId("galleryMenuChangePw"),   // 2026-09-09 换密码入口
+  galleryMenuForgetPw: byId("galleryMenuForgetPw"),   // 2026-10-17 忘记这台设备记着的密码
   galleryMenuBackup: byId("galleryMenuBackup"),   // #18 全库备份入口（2026-08-28）
   newDocSheet: byId("newDocSheet"),
   newDocName: byId<HTMLInputElement>("newDocName"),

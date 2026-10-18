@@ -1306,6 +1306,10 @@ input[type="range"].color-ramp::-moz-range-thumb {
   box-sizing: border-box;
 }
 
+/* 输入 sheet 里的一个勾（2026-10-17「在这台设备上记住密码」）：勾 + 一句实话，文字可折行 */
+.generic-sheet-check { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; font-size: 13px; line-height: 1.45; color: var(--ink); cursor: pointer; }
+.generic-sheet-check input { flex: none; margin-top: 2px; }
+
 /* 内联重命名输入框。**必须与 .layer-name 等高**（2026-08-28）：行高由 .layer-vis 的 24px 撑着
    （24 + row padding 3×2 + border 1×2 = 32px）。原先 `font: inherit` + padding + border 把 input
    撑到 25.6px → 每次进出改名整行 32↔33.6 跳动、下方所有行跟着位移（实测 headless Chromium）。

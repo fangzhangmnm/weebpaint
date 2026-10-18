@@ -6054,6 +6054,48 @@ export declare const S: {
         readonly ja: "暗号化作品をロックしました（パスワードをメモリから消去）";
         readonly tok: "sitelen len li pini. nimi len li weka tan lawa mi.";
     };
+    readonly "enc.rememberDevice": {
+        readonly zh: "在这台设备上记住 30 天（能解锁这台设备的人就能打开你的加密作品）";
+        readonly en: "Remember on this device for 30 days (anyone who can unlock this device can open your encrypted works)";
+        readonly ja: "この端末で30日間記憶する（この端末のロックを解除できる人は暗号化作品を開けます）";
+        readonly tok: "o awen e nimi len lon ilo ni lon tenpo mun wan. jan li ken open e ilo ni la ona li ken lukin e sitelen len sina.";
+    };
+    readonly "enc.rememberedToast": {
+        readonly zh: "这台设备会记住密码到 {date}（图库菜单里能忘记）";
+        readonly en: "This device remembers the password until {date} (forget it from the gallery menu)";
+        readonly ja: "この端末は {date} までパスワードを記憶します（ギャラリーメニューで消せます）";
+        readonly tok: "ilo ni li awen e nimi len. ona li weka lon tenpo {date}. sina ken weka e ona lon lipu pi poki sitelen.";
+    };
+    readonly "enc.rememberedStale": {
+        readonly zh: "这台设备记着的密码对不上（别的设备改过？），已经忘掉；要用时再输一次";
+        readonly en: "The password remembered on this device no longer matches (changed on another device?) and was forgotten; enter it again when needed";
+        readonly ja: "この端末が記憶していたパスワードが一致しません（別の端末で変更？）。記憶を消しました。必要なときにもう一度入力してください";
+        readonly tok: "nimi len awen li pona ala. ilo ante li ante e ona anu seme? mi weka e ona. o pana sin e ona.";
+    };
+    readonly "gs.lockedForgot": {
+        readonly zh: "已锁定加密作品，这台设备也不再记着密码";
+        readonly en: "Encrypted works locked; this device no longer remembers the password";
+        readonly ja: "暗号化作品をロックしました。この端末もパスワードを記憶しなくなりました";
+        readonly tok: "sitelen len li pini. ilo ni li awen ala e nimi len.";
+    };
+    readonly "gs.forgetRememberedShort": {
+        readonly zh: "忘记这台设备记着的密码";
+        readonly en: "Forget the password remembered on this device";
+        readonly ja: "この端末が記憶したパスワードを消す";
+        readonly tok: "o weka e nimi len awen lon ilo ni";
+    };
+    readonly "gs.forgetRememberedLabel": {
+        readonly zh: "忘记这台设备记着的密码（{date} 到期）";
+        readonly en: "Forget the password remembered on this device (expires {date})";
+        readonly ja: "この端末が記憶したパスワードを消す（{date} まで）";
+        readonly tok: "o weka e nimi len awen lon ilo ni (ona li weka lon tenpo {date})";
+    };
+    readonly "gs.forgotRemembered": {
+        readonly zh: "这台设备不再记着密码（这次仍解锁，关页后要重输）";
+        readonly en: "This device no longer remembers the password (still unlocked for now; enter it again next time)";
+        readonly ja: "この端末はパスワードを記憶しなくなりました（今はロック解除のまま。次回は再入力）";
+        readonly tok: "ilo ni li awen ala e nimi len. tenpo ni la sitelen len li open. tenpo kama la o pana sin e ona.";
+    };
     readonly "gs.unlocked": {
         readonly zh: "已解锁加密作品（密码只在内存，关页即忘）";
         readonly en: "Encrypted works unlocked (password stays in memory only, forgotten on page close)";

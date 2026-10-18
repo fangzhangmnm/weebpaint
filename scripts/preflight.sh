@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # created 2026-08-28 by Claude Fable 5
 # wave 6 上传前 ritual（清单=ai-docs/20260828-wave6-redline-qa-fixtures.md §2）：
-#   单元硬线（本仓 + store 仓）一遍 → 构建两档 → 浏览器夹具批 F1-F7 连跑 N 轮（默认 3；
+#   单元硬线（本仓 + store 仓）一遍 → 构建两档 → 浏览器夹具批 F1-F8 连跑 N 轮（默认 3；
 #   F2/F3 本质是竞态夹具，单轮绿不算数）。任何一步红 = 不上传。
 # 用法：bash scripts/preflight.sh [轮数]
 # 长跑纪律：实时 flush 每步耗时；日志落 tmp/preflight-<时间戳>.log（tee，人类可随时看）。
@@ -37,6 +37,7 @@ for r in $(seq 1 "$ROUNDS"); do
   step "F4 factory-reset (round $r)" node tools/preflight/f4-factory-reset.mjs
   step "F6 standalone-html (round $r)"   node tools/standalone-smoke.mjs
   step "F7 export (round $r)"        node tools/preflight/f7-export.mjs
+  step "F8 remember-csp (round $r)"  node tools/preflight/f8-remember-csp.mjs   # 2026-10-17 记住密码 + CSP 零拦截
 done
 
 say "ALL GREEN（$ROUNDS 轮）→ 夹具批通过。log=$LOG"

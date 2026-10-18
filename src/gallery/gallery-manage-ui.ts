@@ -14,6 +14,7 @@
 //   （一键手势：OneDrive=已登录翻牌/未登录 signIn / folder=requestPermission），可关闭。
 
 import { t } from "../i18n/index.ts";
+import { forgetRemembered } from "../remember-password.ts";
 import { els } from "../els.ts";
 import { openChoiceSheet, openConfirmSheet } from "../sheets.ts";
 import { openAdoptedPopup, closePopupMenuOf } from "../ui/popup-menu.ts";   // 2026-09-02 C1
@@ -351,6 +352,7 @@ async function disconnectFlow(): Promise<void> {
     if (!(await closeCurrentStoreWithGates())) return;
     if (att.entry.kind === "onedrive") {
       try { await signOut(); } catch (e) { reportError(new Error("[gallery-manage] signOut on disconnect failed (库已卸下): " + String(e)), "log"); }
+      await forgetRemembered().catch((e) => reportError(new Error("[gallery-manage] forget remembered password on disconnect failed: " + String(e)), "warning"));   // 退出登录 = 这台设备也忘掉记着的密码（2026-10-17，家族同一条）
     }
     _status(t("gm.disconnected"), true);
     try { _ctx?.gallery.refresh(); } catch { /* noop */ }

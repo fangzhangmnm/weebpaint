@@ -15,6 +15,7 @@
 const STATIC_PRECACHE = [
   "./",
   "./index.html",
+  "./theme-guard.js",   // 2026-10-17 主题防闪白（原 index.html 内联脚本；CSP）
   "./manifest.webmanifest",
   "./icon.svg",
   "./icon-32.png",
