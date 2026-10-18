@@ -583,6 +583,10 @@ export const S = {
   "ref.delete":      { zh: "删除这张参考", en: "Delete this reference", ja: "この参考を削除", tok: "o weka e sitelen lukin ni" },
   "ref.deleteConfirm": { zh: "再点一下确认删除", en: "Tap again to confirm", ja: "もう一度タップで確認", tok: "o luka sin la weka" },
   "ref.closeWin":    { zh: "关闭参考窗", en: "Close reference window", ja: "参考ウィンドウを閉じる", tok: "o pini e lupa lukin" },
+  "ref.minimize":    { zh: "缩成小图标", en: "Minimize to icon", ja: "アイコンに縮小", tok: "o lili e lupa" },   // 参考窗 0.4.1（2026-10-18）
+  "ref.restore":     { zh: "点一下恢复，按住拖动挪位置", en: "Tap to restore, drag to move", ja: "タップで元に戻す・ドラッグで移動", tok: "luka la lupa li kama sin" },
+  "ref.ram":         { zh: "只放内存（不存进画里）", en: "Keep in memory only (not saved in the painting)", ja: "メモリのみ（絵に保存しない）", tok: "o awen ala e ni lon sitelen" },   // 参考窗 0.4.0
+  "ref.ramMissing":  { zh: "只在内存里，没存进画里——把这个文件拖进来，或者点 ＋ 重新导入，就补回这里", en: "Kept in memory only, not saved — drop the file in or re-import with ＋ to put it back here", ja: "メモリのみで保存されていません — ファイルをドロップするか ＋ で読み込み直すと戻ります", tok: "ni li awen ala lon sitelen. o pana sin e lipu ni" },
   "ref.prevRef":     { zh: "上一张参考", en: "Previous reference", ja: "前の参考", tok: "sitelen pi tenpo pini" },
   "ref.nextRef":     { zh: "下一张参考", en: "Next reference", ja: "次の参考", tok: "sitelen kama" },
   "ref.menu":        { zh: "参考菜单", en: "Reference menu", ja: "参考メニュー", tok: "lipu wile" },

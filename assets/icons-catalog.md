@@ -1,6 +1,6 @@
 # 本 app 的图标
 
-151 icons · 提取自家族图标库 `../20260708 SVG Icons/icons.svg` · 由 `extract-icons.py` 生成，别手改。
+153 icons · 提取自家族图标库 `../20260708 SVG Icons/icons.svg` · 由 `extract-icons.py` 生成，别手改。
 
 用法：把 sprite 整段内联到 `<body>` 顶部，然后按 id 引用；
 ⚠ sprite 根自带的隐藏样式（1×1 + `opacity:0`）别换成 `display:none`——
@@ -150,6 +150,8 @@
 | `replay` | 回放:ccw 回绕环箭头(rotate-ccw 同弧)+中心实心小三角(描边同色圆角); 与 refresh(cw)镜向区分, 语义=看回放非刷新; WebPaint timelapse 全屏回放钮(TODO 20260819); 20260819 甲方拍板候选1号入库 |
 | `stop` | 停止:实心圆角方块 ⏹; WebPaint timelapse「暂停录制」也用它(record-pause 已驳回, stop 停段+record 续录=磁带机语义); 20260819 media 批入库 |
 | `timelapse-record` | 过程录像(WebPaint timelapse 菜单入口, 语义=延时过程回放非拍摄):表盘外圈与实心录点同心+单针+右下双 chevron 快进, chevron 压表盘处 mask 留白; 甲方配方=表盘案的钟+录点案的同心圆点; 录点+chevron/表盘+角标/录点+加速弧三案落选; 20260819 拍板入库 |
+| `play` | 播放:实心右向三角 ▶(IEC 60417 磁带机惯例统一实心, 描边同色叠加得圆角); 20260819 media 批入库 |
+| `pause` | 暂停:双竖杠 ⏸(粗 3.2 圆帽, brush-width 同款加粗手法); 20260819 media 批入库 |
 
 ## file
 

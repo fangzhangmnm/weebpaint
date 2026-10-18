@@ -2985,6 +2985,30 @@ export declare const S: {
         readonly ja: "参考ウィンドウを閉じる";
         readonly tok: "o pini e lupa lukin";
     };
+    readonly "ref.minimize": {
+        readonly zh: "缩成小图标";
+        readonly en: "Minimize to icon";
+        readonly ja: "アイコンに縮小";
+        readonly tok: "o lili e lupa";
+    };
+    readonly "ref.restore": {
+        readonly zh: "点一下恢复，按住拖动挪位置";
+        readonly en: "Tap to restore, drag to move";
+        readonly ja: "タップで元に戻す・ドラッグで移動";
+        readonly tok: "luka la lupa li kama sin";
+    };
+    readonly "ref.ram": {
+        readonly zh: "只放内存（不存进画里）";
+        readonly en: "Keep in memory only (not saved in the painting)";
+        readonly ja: "メモリのみ（絵に保存しない）";
+        readonly tok: "o awen ala e ni lon sitelen";
+    };
+    readonly "ref.ramMissing": {
+        readonly zh: "只在内存里，没存进画里——把这个文件拖进来，或者点 ＋ 重新导入，就补回这里";
+        readonly en: "Kept in memory only, not saved — drop the file in or re-import with ＋ to put it back here";
+        readonly ja: "メモリのみで保存されていません — ファイルをドロップするか ＋ で読み込み直すと戻ります";
+        readonly tok: "ni li awen ala lon sitelen. o pana sin e lipu ni";
+    };
     readonly "ref.prevRef": {
         readonly zh: "上一张参考";
         readonly en: "Previous reference";

@@ -1,5 +1,7 @@
 import type { PasswordKeeper } from "@internal/encryption";
 export interface RememberDeps {
+    /** false = 这个形态不提供（单文件 html / itch：同源的不只我们）。 */
+    enabled: boolean;
     keeper: () => PasswordKeeper;
     /** verifier 在不在（跟账号走的 synced collection）。 */
     hasVerifier: () => boolean;
@@ -15,6 +17,8 @@ export interface RememberDeps {
 /** 组装点调一次；测试再调一次换成内存版（会清掉状态）。 */
 export declare function wireRememberPassword(deps: RememberDeps): void;
 export declare function rememberedUntil(): number | null;
+/** 这个形态提不提供「在这台设备上记住」（面板要不要给勾）。 */
+export declare function rememberAvailable(): boolean;
 export declare function onRememberChange(cb: () => void): () => void;
 /** 密码面板交回勾态（取消 = false）；重开面板时按它预勾。 */
 export declare function setRememberChoice(v: boolean): void;

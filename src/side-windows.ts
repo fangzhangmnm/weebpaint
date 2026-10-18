@@ -211,6 +211,7 @@ export function initSideWindows(ctx: AppContext) {
     load: t("ref.load"), paste: t("ref.paste"), cloud: t("ref.cloud"), live: t("ref.live"),
     oneToOne: t("ref.oneToOne"),
     del: t("ref.delete"), delConfirm: t("ref.deleteConfirm"), closeWin: t("ref.closeWin"),
+    minimize: t("ref.minimize"), restore: t("ref.restore"), ram: t("ref.ram"), ramMissing: t("ref.ramMissing"),   // 参考窗 0.4.x（2026-10-18）
     prev: t("ref.prevRef"), next: t("ref.nextRef"), menu: t("ref.menu"), move: t("ref.move"),
     resize: t("ref.resize"), resizeAria: t("ref.resizeAria"),
     moveEarlier: t("ref.moveEarlier"), moveLater: t("ref.moveLater"), jump: t("ref.jump"),
