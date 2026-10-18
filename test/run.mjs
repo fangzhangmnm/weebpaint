@@ -70,6 +70,7 @@ import "./png-codec.test.mjs"; // PNG 接缝（UPNG 内脏）：低α无损round
 import "./password-verifier.test.mjs";
 import "./remember-password.test.mjs";   // 2026-10-17 在这台设备上记住密码（≤ 30 天）
 import "./csp-guard.test.mjs";           // 2026-10-17 CSP 逐条钉死
+import "./deploy-list.test.mjs";           // 2026-10-17 新根文件要进部署清单
 import "./liquify-bilinear.test.mjs";
 import "./liquify-bicubic.test.mjs";
 // ── 新引擎红线对抗 battery（2026-07-12 从 JRP 按模块测试移植；旧 store-flow/store-p0-batch 等 import 已删的
