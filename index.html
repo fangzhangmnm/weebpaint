@@ -2,51 +2,15 @@
 <html lang="en" data-theme="auto">
   <head>
     <meta charset="UTF-8" />
+    <!-- CSP（2026-10-17，user「csp…一起上」，和「在这台设备上记住密码」一起）：脚本只准本站文件（不放行内联脚本）；iframe 只准微软登录（MSAL 后台续登录）；
+         connect-src 放 https:（OneDrive 下载 / 上传主机不固定、Blender 远程地址人能填）+ 本机 127.0.0.1 / localhost（Blender 同步默认 http://127.0.0.1:18765）。
+         ⚠ 'unsafe-eval' 是过渡：本 app 的 Vue 组件（十几处 template:）和 gallery 0.1.0 在运行时编译模板，要 eval；退场条件 = 构建时预编译（gallery 0.8.4 已有，F-19 迁过去 + 本仓组件预编译后去掉）。
+         test/csp-guard.test.mjs 钉着；standalone 单文件版（全是内联脚本）由 pack-standalone.mjs 去掉这条。 -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' https: blob: data: http://127.0.0.1:* http://localhost:*; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; frame-src 'self' https://login.microsoftonline.com https://login.live.com; object-src 'none'; base-uri 'self'; form-action 'self'; manifest-src 'self'" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
     <meta name="theme-color" content="#F6F4EF" />
     <meta name="theme-color" content="#121110" media="(prefers-color-scheme: dark)" />
-    <script>
-      // Theme guard：在样式表生效前把 [data-theme] 落上去，避免 FOUC。
-      // 键 = device-kv 的 pref:color-theme（P5 2026-08-27：theme SSoT=device-kv 单源——本 guard 与
-      //   theme.ts 运行时读**同一个键**，JSON 存储所以剥引号；旧 weebpaint.boot.theme 只作升级兜底读）。
-      //   ⚠ 改键名时**务必**同步改 device-kv.ts 的 PREFIX / app-prefs 的 _dk，否则 guard 静默失效、
-      //     夜间冷启动闪白（v406-v408 的 webpaint.theme 哑巴回归同款）。
-      (function () {
-        try {
-          var saved = localStorage.getItem("weebpaint-bd6cece69075d759:pref:color-theme")
-                   || localStorage.getItem("weebpaint.boot.theme");
-          if (saved) saved = saved.replace(/"/g, "");
-          if (saved === "day" || saved === "night" || saved === "auto") {
-            document.documentElement.setAttribute("data-theme", saved);
-          }
-        } catch (_) {}
-      })();
-      // iPad 没 devtools — 任何脚本错误糊一张底部红色浮卡，方便远程诊断
-      //   （v0.9.4 从顶部通栏挪到底部浮卡，别压无框顶栏；样式和 src/error-badge.ts BANNER_CSS 保持同步）
-      (function () {
-        function show(text) {
-          var bar = document.getElementById("__errBar");
-          if (!bar) {
-            bar = document.createElement("div");
-            bar.id = "__errBar";
-            bar.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:max(env(safe-area-inset-bottom,0px), 12px);z-index:9999;width:calc(100% - 24px);max-width:640px;box-sizing:border-box;padding:10px 14px;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.35);background:#c0392b;color:#fff;font:13px/1.4 system-ui;white-space:pre-wrap;word-break:break-word;max-height:50vh;overflow:auto";
-            bar.addEventListener("click", function () { bar.remove(); });
-            (document.body || document.documentElement).appendChild(bar);
-          }
-          bar.textContent = text + "  (点击关闭)";
-        }
-        window.__wp_showFatal = show;
-        window.addEventListener("error", function (e) {
-          var m = (e && e.message) || (e && e.error && (e.error.message || String(e.error))) || "脚本错误";
-          var src = e && e.filename ? " (" + e.filename.split("/").pop() + ":" + e.lineno + ")" : "";
-          show(m + src);
-        });
-        window.addEventListener("unhandledrejection", function (e) {
-          var r = e && e.reason;
-          show((r && r.message) || String(r || "promise rejection"));
-        });
-      })();
-    </script>
+    <script src="./theme-guard.js"></script>
     <meta name="color-scheme" content="light dark" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -109,7 +73,7 @@
     <link rel="icon" href="./icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=a59db8089180" />
+    <link rel="stylesheet" href="./styles.css?v=2870613bae37" />
     <!-- zip.js UMD bundle：自挂 window.zip。必须在 module bundle 之前。
          defer（v417）：原来是 parser-blocking 的，硬刷新时 SW 被绕过 → 直奔网络 → 网络一卡整个
          文档解析就停住（浏览器标签页转圈）。defer 后它与下面的 type=module bundle 同属延迟脚本、
@@ -623,6 +587,10 @@
       <button class="menu-item menu-item-with-icon" id="galleryMenuLock" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#unlock"/></svg>
         <span class="menu-item-label" data-i18n="gal.menu.unlock">解锁加密作品…</span>
       </button>
+      <!-- 2026-10-17 在这台设备上记住密码：只在记着时出现，标签带到期日（gallery-shell 开菜单时刷） -->
+      <button class="menu-item menu-item-with-icon hidden" id="galleryMenuForgetPw" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#device"/></svg>
+        <span class="menu-item-label" data-i18n="gs.forgetRememberedShort">忘记这台设备记着的密码</span>
+      </button>
       <!-- 2026-09-09 换密码（store 0.12.0 rekey：密文→密文不经明文；编排 = src/gallery/change-password.ts） -->
       <button class="menu-item menu-item-with-icon" id="galleryMenuChangePw" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#lock"/></svg>
         <span class="menu-item-label" data-i18n="gs.changePwLabel">更改图库密码…</span>
@@ -1013,6 +981,8 @@
       <h3 id="genericSheetTitle" data-i18n="common.notice">提示</h3>
       <p id="genericSheetMessage" class="sheet-hint hidden"></p>
       <input id="genericSheetInput" type="text" class="generic-sheet-input hidden" />
+      <!-- 2026-10-17「在这台设备上记住密码」的勾（openInputSheetEx 的 checkbox；默认隐藏） -->
+      <label id="genericSheetCheck" class="generic-sheet-check hidden"><input type="checkbox" id="genericSheetCheckInput" /><span id="genericSheetCheckLabel"></span></label>
       <!-- #19（v0.5）：多选项容器（openChoiceSheet 动态填按钮；空=隐藏，不影响确认/输入两态） -->
       <div id="genericSheetChoices" class="hidden"></div>
       <button class="sheet-action" id="genericSheetConfirm" type="button" data-i18n="common.ok">确定</button>
@@ -1555,6 +1525,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-f1baa1869a4e.mjs"></script>
+    <script type="module" src="./dist/weebpaint-fda73c888f0c.mjs"></script>
   </body>
 </html>
