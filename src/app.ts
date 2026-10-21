@@ -554,7 +554,7 @@ async function offerPushLocalOnly(): Promise<void> {
   const n = await be.store.files.dirty.count().catch((e: unknown) => { reportError(new Error("[pushAll] dirty.count failed: " + String(e)), "log"); return 0; });
   if (n <= 0) return;
   askedPushLocalOnly = true;
-  diagNote("sync", `local-only paintings after sign-in/online: ${n} → ask`);
+  diagNote("sync", `unpushed paintings after sign-in/online: ${n} → ask`);
   const pick = await openChoiceSheet<"push">(t("pushAll.askTitle", { n: String(n) }), t("pushAll.askMsg"), [{ label: t("pushAll.ok"), value: "push", primary: true }]);
   if (pick !== "push") { diagNote("sync", "local-only paintings: user said not now"); return; }
   try {

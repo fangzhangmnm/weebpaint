@@ -1103,8 +1103,9 @@ export const S = {
   "gm.offlineSuffix": { zh: " · 已离线", en: " · offline", ja: " · オフライン", tok: " · weka" },
   "gm.closeDocFirst": { zh: "先关闭当前画，再切换或卸下图库", en: "Close the current painting before switching or detaching the gallery", ja: "ギャラリーを切り替える前に、現在の絵を閉じてください", tok: "o pini e sitelen ni. o ante e poki sitelen lon tenpo kama" },
   // 登录 / 回线 / 挂上库后问一次再补推（2026-10-21 user 答问题 3，全家同款 JRB v0.2.20；app.ts offerPushLocalOnly）
-  "pushAll.askTitle": { zh: "有 {n} 张画只在本机", en: "{n} painting(s) exist only on this device", ja: "この端末にしかない絵が {n} 枚あります", tok: "sitelen {n} li lon ilo ni taso" },
-  "pushAll.askMsg": { zh: "传上云端吗？传了别的设备也能看到。撞上云端已有的同名文件不会覆盖，会留在图库里让你处理。", en: "Upload them now? Other devices will see them. If a cloud file with the same name already exists it will not be overwritten; it stays in the gallery for you to resolve.", ja: "クラウドに送信しますか？他の端末でも見られるようになります。同名のファイルがクラウドにある場合は上書きせず、ギャラリーに残して処理を待ちます。", tok: "sina wile ala wile pana e ona tawa poki sewi? ilo ante li ken lukin e ona. nimi sama li lon poki sewi la mi awen ala e ona lon ona. ona li awen lon tomo sitelen la sina pona e ona." },
+  //   措辞（统筹 10-21 纠正，家族「不许谎报」）：库的 dirty.count() 是合计数——从没传过的 + 传过又改了没推的，分不出来；「只在本机」比事实重，改说「还没传上去」= pushAll 推的正是这一整批
+  "pushAll.askTitle": { zh: "有 {n} 张画还没传上去，现在传吗？", en: "{n} painting(s) not uploaded yet — upload now?", ja: "まだ送信していない絵が {n} 枚あります。今送信しますか？", tok: "sitelen {n} li lon ala poki sewi. sina wile ala wile pana e ona lon tenpo ni?" },
+  "pushAll.askMsg": { zh: "传了别的设备也能看到。撞上云端已有的同名文件不会覆盖，会留在图库里让你处理。", en: "Other devices will see them afterwards. If a cloud file with the same name already exists it will not be overwritten; it stays in the gallery for you to resolve.", ja: "送信すると他の端末でも見られるようになります。同名のファイルがクラウドにある場合は上書きせず、ギャラリーに残して処理を待ちます。", tok: "ilo ante li ken lukin e ona. nimi sama li lon poki sewi la mi awen ala e ona lon ona. ona li awen lon tomo sitelen la sina pona e ona." },
   "pushAll.ok": { zh: "传上去", en: "Upload", ja: "送信する", tok: "o pana" },
   "pushAll.done": { zh: "已传上 {n} 张", en: "Uploaded {n}", ja: "{n} 枚を送信しました", tok: "sitelen {n} li lon poki sewi" },
   "pushAll.failed": { zh: "{n} 张没传上（离线或撞名），在图库里「处理…」", en: "{n} not uploaded (offline or name clash) — use “Resolve…” in the gallery", ja: "{n} 枚は送信できませんでした（オフラインまたは同名）。ギャラリーの「処理…」で対応してください", tok: "sitelen {n} li lon ala poki sewi. o pona e ona lon tomo sitelen." },
