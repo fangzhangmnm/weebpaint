@@ -6,6 +6,7 @@
 //     rack 回种子态、GUID 库清光后按需重建）。
 //   ④ 出厂态 = F1 同款探针绿（处女 boot）。
 import { chromium } from "playwright";
+import { readFileSync } from "node:fs";
 import { CTX_ZH, startServer, bootPage, makeChecker, evClick, drawStroke, rackSlotCount } from "./harness.mjs";
 
 const srv = await startServer();
@@ -22,7 +23,8 @@ trace("boot done, set theme");
 await evClick(page, "menuButton");
 await evClick(page, "menuThemeBtn");
 await page.waitForTimeout(200);
-await page.evaluate(() => { [...document.querySelectorAll("#menuThemeMenu button")].find((x) => x.textContent.includes("夜"))?.click(); });
+// 2026-10-21（总账 #90 夹具漂移）：主题下拉 2026-09-02 C6 起是 popup-menu 标准件（挂 body、按 data-id），旧的 #menuThemeMenu 早没了 → 主题从没设上，①② 两条恒红
+await page.evaluate(() => { const b = document.querySelector('.popup-menu-item[data-id="night"]'); if (!b) throw new Error("theme popup item night not found"); b.click(); });
 await page.waitForTimeout(300);
 await evClick(page, "menuButton");
 
@@ -85,7 +87,9 @@ const virgin = await page.evaluate(() => ({
 c.expect("theme 归 auto", virgin.theme !== "night", String(virgin.theme));
 c.expect("处女 boot=无库", virgin.noGalleryAttr && virgin.connectVisible);
 const rackAfter = await rackSlotCount(page);
-c.expect("rack 回种子态（无用户新笔）", rackAfter === -1 || rackAfter <= 17, `count=${rackAfter}`);
+// 种子态 = 出厂笔刷 + 1 条 .meta（builtin-brushes.json 是 SSoT，别再写死数字——2026-10-21 #90：写死 17 时出厂笔是 16 支，现在 18 支 → 恒红）
+const builtinN = JSON.parse(readFileSync(new URL("../../builtin-brushes.json", import.meta.url), "utf8")).length;
+c.expect("rack 回种子态（无用户新笔）", rackAfter === -1 || rackAfter <= builtinN + 1, `count=${rackAfter}, builtin=${builtinN}`);
 
 await browser.close(); await srv.close();
 c.finish(errors);
