@@ -1102,6 +1102,12 @@ export const S = {
   "gm.current": { zh: "当前图库：{label}（{src}）", en: "Current gallery: {label} ({src})", ja: "現在のギャラリー：{label}（{src}）", tok: "poki sitelen lon tenpo ni: {label} ({src})" },
   "gm.offlineSuffix": { zh: " · 已离线", en: " · offline", ja: " · オフライン", tok: " · weka" },
   "gm.closeDocFirst": { zh: "先关闭当前画，再切换或卸下图库", en: "Close the current painting before switching or detaching the gallery", ja: "ギャラリーを切り替える前に、現在の絵を閉じてください", tok: "o pini e sitelen ni. o ante e poki sitelen lon tenpo kama" },
+  // 登录 / 回线 / 挂上库后问一次再补推（2026-10-21 user 答问题 3，全家同款 JRB v0.2.20；app.ts offerPushLocalOnly）
+  "pushAll.askTitle": { zh: "有 {n} 张画只在本机", en: "{n} painting(s) exist only on this device", ja: "この端末にしかない絵が {n} 枚あります", tok: "sitelen {n} li lon ilo ni taso" },
+  "pushAll.askMsg": { zh: "传上云端吗？传了别的设备也能看到。撞上云端已有的同名文件不会覆盖，会留在图库里让你处理。", en: "Upload them now? Other devices will see them. If a cloud file with the same name already exists it will not be overwritten; it stays in the gallery for you to resolve.", ja: "クラウドに送信しますか？他の端末でも見られるようになります。同名のファイルがクラウドにある場合は上書きせず、ギャラリーに残して処理を待ちます。", tok: "sina wile ala wile pana e ona tawa poki sewi? ilo ante li ken lukin e ona. nimi sama li lon poki sewi la mi awen ala e ona lon ona. ona li awen lon tomo sitelen la sina pona e ona." },
+  "pushAll.ok": { zh: "传上去", en: "Upload", ja: "送信する", tok: "o pana" },
+  "pushAll.done": { zh: "已传上 {n} 张", en: "Uploaded {n}", ja: "{n} 枚を送信しました", tok: "sitelen {n} li lon poki sewi" },
+  "pushAll.failed": { zh: "{n} 张没传上（离线或撞名），在图库里「处理…」", en: "{n} not uploaded (offline or name clash) — use “Resolve…” in the gallery", ja: "{n} 枚は送信できませんでした（オフラインまたは同名）。ギャラリーの「処理…」で対応してください", tok: "sitelen {n} li lon ala poki sewi. o pona e ona lon tomo sitelen." },
   "gm.dirtyTitle": { zh: "有 {n} 张画未上云", en: "{n} paintings not yet uploaded", ja: "未アップロードの絵が {n} 枚あります", tok: "sitelen {n} li lon poki sewi ala" },
   "gm.dirtyMsg": { zh: "切换后它们留在本机缓存，回到此图库时继续上传。注意：浏览器可能清除本机缓存，缓存不是保险箱——建议先下载备份。", en: "They stay in this device's cache and upload when you return. Note: the browser may evict local cache — it is not a safe. Consider downloading backups first.", ja: "この端末のキャッシュに残り、戻ったときにアップロードされます。注意：ブラウザはキャッシュを削除することがあります。先にバックアップのダウンロードをおすすめします。", tok: "ona li awen lon ilo ni. taso ilo li ken weka e ona. o kama jo e ona lon lipu awen" },
   "gm.dirtyBackup": { zh: "下载备份", en: "Download backups", ja: "バックアップをダウンロード", tok: "o kama jo e lipu awen" },

@@ -5844,6 +5844,36 @@ export declare const S: {
         readonly ja: "ギャラリーを切り替える前に、現在の絵を閉じてください";
         readonly tok: "o pini e sitelen ni. o ante e poki sitelen lon tenpo kama";
     };
+    readonly "pushAll.askTitle": {
+        readonly zh: "有 {n} 张画只在本机";
+        readonly en: "{n} painting(s) exist only on this device";
+        readonly ja: "この端末にしかない絵が {n} 枚あります";
+        readonly tok: "sitelen {n} li lon ilo ni taso";
+    };
+    readonly "pushAll.askMsg": {
+        readonly zh: "传上云端吗？传了别的设备也能看到。撞上云端已有的同名文件不会覆盖，会留在图库里让你处理。";
+        readonly en: "Upload them now? Other devices will see them. If a cloud file with the same name already exists it will not be overwritten; it stays in the gallery for you to resolve.";
+        readonly ja: "クラウドに送信しますか？他の端末でも見られるようになります。同名のファイルがクラウドにある場合は上書きせず、ギャラリーに残して処理を待ちます。";
+        readonly tok: "sina wile ala wile pana e ona tawa poki sewi? ilo ante li ken lukin e ona. nimi sama li lon poki sewi la mi awen ala e ona lon ona. ona li awen lon tomo sitelen la sina pona e ona.";
+    };
+    readonly "pushAll.ok": {
+        readonly zh: "传上去";
+        readonly en: "Upload";
+        readonly ja: "送信する";
+        readonly tok: "o pana";
+    };
+    readonly "pushAll.done": {
+        readonly zh: "已传上 {n} 张";
+        readonly en: "Uploaded {n}";
+        readonly ja: "{n} 枚を送信しました";
+        readonly tok: "sitelen {n} li lon poki sewi";
+    };
+    readonly "pushAll.failed": {
+        readonly zh: "{n} 张没传上（离线或撞名），在图库里「处理…」";
+        readonly en: "{n} not uploaded (offline or name clash) — use “Resolve…” in the gallery";
+        readonly ja: "{n} 枚は送信できませんでした（オフラインまたは同名）。ギャラリーの「処理…」で対応してください";
+        readonly tok: "sitelen {n} li lon ala poki sewi. o pona e ona lon tomo sitelen.";
+    };
     readonly "gm.dirtyTitle": {
         readonly zh: "有 {n} 张画未上云";
         readonly en: "{n} paintings not yet uploaded";

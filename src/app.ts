@@ -31,7 +31,7 @@ import { initDevConsole } from "./dev-console.ts";   // window.WeebPaint 调试�
 import { mountGallery } from "./gallery/gallery.ts";          // candidate 1 · 图库深模块
 import { BrushRackController } from "./brush-rack-controller.ts";
 import { PwaShell } from "./pwa-shell.ts";
-import { openInputSheet, openInputSheetEx, openConfirmSheet, lockSyncGate } from "./sheets.ts";   // settleSyncGate→cloud-freshness
+import { openInputSheet, openInputSheetEx, openConfirmSheet, openChoiceSheet, lockSyncGate } from "./sheets.ts";   // settleSyncGate→cloud-freshness
 import { setPasswordPrompt, setPassword } from "./crypto-state.ts";   // 加密：密码弹窗注入（ADR-0012）
 import { passwordKeeper } from "./encryption.ts";
 import { hasVerifier, checkVerifier } from "./password-verifier.ts";
@@ -216,6 +216,7 @@ const rack = new BrushRackController({
 //   收口开画 gate = doc 的家是 gallery 就拒卸（挂载器官未接线时默认保守拒卸）。
 setAttachmentGate(() => docHome()?.kind === "gallery");
 window.addEventListener("wp:gallery-changed", () => {
+  if (isSignedIn()) void offerPushLocalOnly();   // 挂上库（boot 领养 / 连接 / 切库）：只在本机的画问一次（登录在前、店在后的那种顺序靠这刀）
   rack.rebind(brushRackCollection).catch((e) => reportError(new Error("[brush-rack] rebind after gallery swap failed: " + String(e)), "error"));
 });
 
@@ -539,6 +540,30 @@ function _seedGalleryRegistry(): void {
     }).catch((e) => reportError(new Error("[gallery-registry] seed failed (soft): " + String(e)), "log"));
   } catch (e) { reportError(new Error("[gallery-registry] seed failed (soft): " + String(e)), "log"); }
 }
+// ── 只在本机的画：登录后 / 回线 / 挂上库后问一次再补推（2026-10-21 user 答统筹稿问题 3「登录 / 回线后问一次」，全家同款 = JRB v0.2.20 offerPushLocalOnly）──
+//   为什么要它：WeebPaint 的推云只在退出 / 换稿 / 显式保存；崩溃、关标签页、离线时存下的画会一直留脏，以前靠图库卡片「推送到云端」，那个钮 v0.14.37 起
+//   不在词汇表上了。这里 = 把 consent 接到这批画上：问一次、人点了才 files.dirty.pushAll()（If-Match / 撞名不覆盖；撞上的留在图库「处理…」）。
+//   每次打开 app 最多问一次（「先不传」= 这次不再问，下次打开再问）；不上遮罩（库推送的 busy 键 sync.pushing 走安静通知条）。
+//   库只有 dirty.count()（标量、不列名）：数的是全部没传上去的，含「传过但又改了」的那批——那批本来也该推，If-Match 守着。
+let askedPushLocalOnly = false;
+async function offerPushLocalOnly(): Promise<void> {
+  if (askedPushLocalOnly || !isSignedIn() || navigator.onLine === false) return;
+  const be = galleryBackend();
+  if (be.kind !== "live") return;
+  const n = await be.store.files.dirty.count().catch((e: unknown) => { reportError(new Error("[pushAll] dirty.count failed: " + String(e)), "log"); return 0; });
+  if (n <= 0) return;
+  askedPushLocalOnly = true;
+  diagNote("sync", `local-only paintings after sign-in/online: ${n} → ask`);
+  const pick = await openChoiceSheet<"push">(t("pushAll.askTitle", { n: String(n) }), t("pushAll.askMsg"), [{ label: t("pushAll.ok"), value: "push", primary: true }]);
+  if (pick !== "push") { diagNote("sync", "local-only paintings: user said not now"); return; }
+  try {
+    const r = await be.store.files.dirty.pushAll();
+    diagNote("sync", `dirty.pushAll: pushed=${r.pushed} failed=${r.failed.length}${r.failed.length ? " [" + r.failed.join(", ") + "]" : ""}`);
+    if (r.failed.length) setStatus(t("pushAll.failed", { n: String(r.failed.length) }), true);
+    else if (r.pushed) setStatus(t("pushAll.done", { n: String(r.pushed) }));
+  } catch (e) { reportError(e instanceof Error ? e : new Error(String(e)), "warning"); }
+  if (!els.galleryFull.classList.contains("hidden")) gallery.refresh();
+}
 // auth 可观察 seam（候选1）：接缝 app-store 在**每个** auth 转变（登录回来/后台silent/登出/过期F2）fire wp:auth-changed（库 0.1.0 起不碰 window 事件，接缝订阅 onAuthChanged 转发）。
 // UI 订阅一次 → 按钮蓝/灰、save 图标、云列表 全自动同步，永不漂移、不再靠散落手 poke。
 window.addEventListener("wp:auth-changed", () => {
@@ -551,6 +576,7 @@ window.addEventListener("wp:auth-changed", () => {
   if (att.kind === "attached" && att.entry.kind === "onedrive") galleryAttachment.setOnline(isSignedIn());
   void resumePendingOneDriveConnect();                      // iPad redirect 回程：把跳转前没办完的首次连接续办掉（幂等）
   if (!els.galleryFull.classList.contains("hidden")) gallery.refresh();
+  if (isSignedIn()) void offerPushLocalOnly();              // 登录回来：只在本机的画问一次（店还没挂上就等 wp:gallery-changed 那一刀）
 });
 // 在线 / 离线变化时刷新云端 UI（标签 / 按钮可见性）。
 // online 时尝试 silent re-auth：boot 离线 → activeAccount 为 null；有网了主动 retry 一次
@@ -558,7 +584,7 @@ window.addEventListener("online", async () => {
   if (!isSignedIn()) await retrySilentSignIn();
   pullSettingsAndState();                                    // 回线：拉 4 库 settings/state 对齐
   updateCloudAuthUI();
-  { const be = galleryBackend(); if (be.kind === "live" && isSignedIn()) be.store.files.drainOfflineQueue().catch((e) => reportError(new Error("drainOfflineQueue: " + String(e)), "log")); }   // N3：重连重放离线删队列（无库=无队列）
+  { const be = galleryBackend(); if (be.kind === "live" && isSignedIn()) be.store.files.drainOfflineQueue().catch((e) => reportError(new Error("drainOfflineQueue: " + String(e)), "log")).then(() => offerPushLocalOnly()); }   // N3：重连重放离线删队列（无库=无队列）→ 队列回放之后再问「只在本机的画」
   if (!els.galleryFull.classList.contains("hidden")) gallery.refresh();
   if (isSignedIn() && session.home?.kind === "gallery") void session.refreshOpenDoc();   // 回线：显式快进（P1 2026-08-25——裸 pullIfClean 不接结果=画布陈旧的第二案，禁用回）
 });
@@ -614,7 +640,7 @@ void prefsReady
 // T-crash 恢复横幅（P2 2026-08-26）：扫 crash 库，有崩溃快照 → 非模态浮卡叠画布（不挡 boot、不 await）。
 initCrashBanner(ctx);
 // N3：启动时若在线+已登录，排空上次离线攒下的删除队列（fresh boot 不触发 online 事件，故此处补一刀）。
-{ const be = galleryBackend(); if (be.kind === "live" && navigator.onLine && isSignedIn()) be.store.files.drainOfflineQueue().catch((e: unknown) => reportError(new Error("drainOfflineQueue: " + String(e)), "log")); }
+{ const be = galleryBackend(); if (be.kind === "live" && navigator.onLine && isSignedIn()) be.store.files.drainOfflineQueue().catch((e: unknown) => reportError(new Error("drainOfflineQueue: " + String(e)), "log")).then(() => offerPushLocalOnly()); }
 
 // 笔架深模块装配：mount sheet/settings 组件 + 注册 panel + 绑 DOM 事件 + 订阅 collection.onChange。
 rack.init({
