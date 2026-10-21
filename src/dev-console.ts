@@ -3,6 +3,7 @@
 //   非业务逻辑，所有依赖直接 import（无 ctx），由 app 启动时调一次 initDevConsole()。
 import { fetchOraThumbnail } from "./gallery/cloud-thumbs.ts";
 import { requireStore } from "./app-store.ts";
+import { promptPassword } from "./crypto-state.ts";   // 探针用：F8 走一遍口令真表单（type=password / autocomplete / 账号字段 / 表单提交）
 import { registerFilter, listFilters } from "./filters.ts";
 import { setColor } from "./color-panel.ts";
 import { registerExporter, listExporters } from "./exporters.ts";
@@ -23,6 +24,7 @@ declare global {
       cloudThumbResetStats?: () => void;
       cloudThumbSkipCache?: (on?: boolean) => void;
       clearCloudThumbCache?: () => Promise<number>;
+      promptPassword?: (o?: Parameters<typeof promptPassword>[0]) => Promise<string | null>;
       pocFetchThumb?: (name?: string) => Promise<Blob>;
       registerFilter?: typeof registerFilter;
       listFilters?: typeof listFilters;
@@ -50,6 +52,7 @@ export function initDevConsole() {
     return n;
   };
   // 云盘图片 picker 的缩略图缓存（image-thumbs store，与 ora 缩略图分开；无损可再生）
+  WP.promptPassword = (o?: Parameters<typeof promptPassword>[0]) => promptPassword(o);   // 2026-10-21 真表单探针入口（不入库、不验证）
   WP.clearImageThumbCache = async () => {
     const n = await clearImageThumbCache();
     console.log(`[image-thumbs] cleared ${n} cached thumbnails`);

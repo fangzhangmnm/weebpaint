@@ -2,7 +2,8 @@
 export interface PromptOpts {
     title?: string;
     message?: string; /** 验得了的统一密码面板 = true：给「在这台设备上记住」的勾（导入件 / 换密码的旧密码不给）。 */
-    offerRemember?: boolean;
+    offerRemember?: boolean; /** 2026-10-21 真表单：设 / 换口令的面板 = "new"（autocomplete=new-password）；缺省 = 输入已有口令（current-password）。 */
+    purpose?: "current" | "new";
 }
 type PasswordPrompt = (opts: PromptOpts) => Promise<string | null>;
 type LockChangeSub = (unlocked: boolean) => void;

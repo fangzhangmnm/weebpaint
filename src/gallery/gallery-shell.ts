@@ -238,9 +238,9 @@ async function changePasswordFlow(): Promise<void> {
   if (oldPw == null) return;
   let newPw: string | null = null;
   for (let round = 0; round < 3 && newPw == null; round++) {
-    const p1 = await promptPassword({ title: t("enc.setPwTitle"), message: round > 0 ? t("enc.setPwMismatch") : t("gs.changePwNewMsg") });
+    const p1 = await promptPassword({ title: t("enc.setPwTitle"), message: round > 0 ? t("enc.setPwMismatch") : t("gs.changePwNewMsg"), purpose: "new" });
     if (p1 == null) return;
-    const p2 = await promptPassword({ title: t("enc.confirmTitle"), message: t("enc.confirmMsg") });
+    const p2 = await promptPassword({ title: t("enc.confirmTitle"), message: t("enc.confirmMsg"), purpose: "new" });
     if (p2 == null) return;
     if (p1 === p2) newPw = p1;
   }

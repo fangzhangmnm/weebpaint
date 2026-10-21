@@ -1,17 +1,21 @@
 export declare function openInputSheet(title: string, defaultValue?: string, opts?: {
     placeholder?: string;
-    password?: boolean;
+    password?: PasswordMode;
     message?: string;
+    account?: string;
 }): Promise<string | null>;
 /** 同上，多一个可选的勾（2026-10-17「在这台设备上记住密码」）：勾态随结果返回；取消 = null。 */
-export declare function openInputSheetEx(title: string, defaultValue?: string, { placeholder, password, message, checkbox }?: {
+/** 密码态：true / "current" = 输入已有口令（autocomplete=current-password）；"new" = 设 / 换口令（new-password，密码管理器问「更新？」）。 */
+export type PasswordMode = boolean | "current" | "new";
+export declare function openInputSheetEx(title: string, defaultValue?: string, { placeholder, password, message, checkbox, account }?: {
     placeholder?: string;
-    password?: boolean;
+    password?: PasswordMode;
     message?: string;
     checkbox?: {
         label: string;
         checked?: boolean;
     };
+    account?: string;
 }): Promise<{
     value: string;
     checked: boolean;

@@ -50,6 +50,24 @@ const left = await page.evaluate((db) => new Promise((resolve) => {
   req.onerror = () => resolve("open-failed");
 }), DB);
 c.expect("remembered record without a verifier is dropped on boot", left == null, JSON.stringify(left));
+
+// 口令真表单（2026-10-21 总账 #97，user「口令面板改成真表单让 Edge 密码管理器记住 做，全家做」）：type=password + autocomplete + 账号字段 + 走表单提交，不跳页
+await page.evaluate(() => { window.__pw = undefined; window.WeebPaint.promptPassword({ title: "f8", purpose: "current" }).then((v) => { window.__pw = v; }); });
+await page.waitForTimeout(300);
+const pwForm = await page.evaluate(() => {
+  const i = document.getElementById("genericSheetInput"), u = document.getElementById("genericSheetUser"), f = document.getElementById("genericSheetForm");
+  return { type: i.type, ac: i.getAttribute("autocomplete"), inForm: !!f && f.contains(i) && f.contains(u), userAc: u?.getAttribute("autocomplete"), userVal: u?.value, confirmType: document.getElementById("genericSheetConfirm").type, formAc: f?.getAttribute("autocomplete") };
+});
+c.expect("password sheet = real form: type=password / current-password / username field / submit button / form autocomplete not off", pwForm.type === "password" && pwForm.ac === "current-password" && pwForm.inForm && pwForm.userAc === "username" && pwForm.confirmType === "submit" && pwForm.formAc !== "off", JSON.stringify(pwForm));
+await page.evaluate(() => { document.getElementById("genericSheetInput").value = "f8-secret"; document.getElementById("genericSheetForm").requestSubmit(); });
+await page.waitForTimeout(400);
+c.expect("form submit resolves the prompt with the typed value, sheet closes (data-open gone), no navigation", await page.evaluate(() => window.__pw === "f8-secret" && !document.getElementById("genericSheet").hasAttribute("data-open") && !!document.getElementById("board")));
+c.expect("input restored to text after close", await page.evaluate(() => document.getElementById("genericSheetInput").type === "text" && !document.getElementById("genericSheetInput").hasAttribute("autocomplete")));
+await page.evaluate(() => { window.WeebPaint.promptPassword({ title: "f8-new", purpose: "new" }).then((v) => { window.__pw2 = v; }); });
+await page.waitForTimeout(300);
+c.expect("set / change password sheet uses new-password", await page.evaluate(() => document.getElementById("genericSheetInput").getAttribute("autocomplete") === "new-password"));
+await page.keyboard.press("Escape"); await page.waitForTimeout(300);
+c.expect("Escape cancels (null)", await page.evaluate(() => window.__pw2 === null));
 await collect();
 c.expect("zero CSP violations", csp.length === 0, csp.join(" | "));
 

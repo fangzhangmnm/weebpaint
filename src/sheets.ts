@@ -17,6 +17,8 @@ const g = {
   title: () => $("genericSheetTitle"),
   message: () => $("genericSheetMessage"),
   input: () => $("genericSheetInput") as HTMLInputElement,
+  form: () => $("genericSheetForm") as HTMLFormElement,
+  user: () => $("genericSheetUser") as HTMLInputElement,
   check: () => $("genericSheetCheck"),
   checkInput: () => $("genericSheetCheckInput") as HTMLInputElement,
   checkLabel: () => $("genericSheetCheckLabel"),
@@ -31,46 +33,63 @@ function resolveAndClose<T>(resolve: (v: T) => void, value: T, cleanup: () => vo
   resolve(value);
 }
 
+// 真表单（2026-10-21）：这张 form **永远不真的提交**——submit 事件一律 preventDefault；输入态的「确定 / Enter」= requestSubmit → onSubmit。
+//   确认态（没有输入框）点「确定」= 同一颗 submit 钮，也只走 click，不会跳页。
+let _formGuarded = false;
+function ensureFormGuard(): void {
+  if (_formGuarded) return;
+  _formGuarded = true;
+  g.form().addEventListener("submit", (e) => e.preventDefault());
+}
+
 // 输入框对话框 → Promise<string|null>（取消 = null）。
 // opts.password：输入框打码（type=password，关闭时还原）；opts.message：输入框上方说明行。
-export function openInputSheet(title: string, defaultValue = "", opts: { placeholder?: string; password?: boolean; message?: string } = {}): Promise<string | null> {
+export function openInputSheet(title: string, defaultValue = "", opts: { placeholder?: string; password?: PasswordMode; message?: string; account?: string } = {}): Promise<string | null> {
   return openInputSheetEx(title, defaultValue, opts).then((r) => (r ? r.value : null));
 }
 
 /** 同上，多一个可选的勾（2026-10-17「在这台设备上记住密码」）：勾态随结果返回；取消 = null。 */
-export function openInputSheetEx(title: string, defaultValue = "", { placeholder = "", password = false, message = "", checkbox }: { placeholder?: string; password?: boolean; message?: string; checkbox?: { label: string; checked?: boolean } } = {}): Promise<{ value: string; checked: boolean } | null> {
+/** 密码态：true / "current" = 输入已有口令（autocomplete=current-password）；"new" = 设 / 换口令（new-password，密码管理器问「更新？」）。 */
+export type PasswordMode = boolean | "current" | "new";
+export function openInputSheetEx(title: string, defaultValue = "", { placeholder = "", password = false, message = "", checkbox, account }: { placeholder?: string; password?: PasswordMode; message?: string; checkbox?: { label: string; checked?: boolean }; account?: string } = {}): Promise<{ value: string; checked: boolean } | null> {
   return new Promise((resolve) => {
+    ensureFormGuard();
     g.title().textContent = title;
     if (message) { g.message().classList.remove("hidden"); g.message().textContent = message; }
     else g.message().classList.add("hidden");
     g.input().classList.remove("hidden");
-    // 密码态**不用** type=password —— 兄弟项目各 shared-file 各密码，浏览器「记住/更新密码」
-    //   弹窗会把它们串味、误填。改用 type=text + -webkit-text-security 打码（Safari/Chrome/新版
-    //   Firefox 都支持），绕开浏览器密码管理器的启发式探测，从根上不触发记密码弹窗。
-    g.input().type = "text";
-    g.input().style.setProperty("-webkit-text-security", password ? "disc" : "");
-    g.input().autocomplete = "off";
+    // 密码态 = 真的 type=password + autocomplete（2026-10-21 user「口令面板改成真表单让 Edge 密码管理器记住 做，全家做」；此前为了躲密码管理器用
+    //   type=text + -webkit-text-security 打码，那条 2026-10-21 吃书）。账号字段 = 图库 id，给密码管理器当 key（没有就空着，字段仍在）。
+    //   绝不 autocomplete="off"、不禁粘贴。文本态（新建画名等）照旧 type=text、不带 autocomplete。
+    const pwMode: "current" | "new" | null = password === "new" ? "new" : password ? "current" : null;
+    g.input().type = pwMode ? "password" : "text";
+    if (pwMode) g.input().setAttribute("autocomplete", pwMode === "new" ? "new-password" : "current-password");
+    else g.input().removeAttribute("autocomplete");
+    g.user().value = pwMode ? (account ?? "") : "";
     g.input().value = defaultValue;
     g.input().placeholder = placeholder;
     if (checkbox) { g.checkLabel().textContent = checkbox.label; g.checkInput().checked = !!checkbox.checked; g.check().classList.remove("hidden"); }
     openModalSheet(g.sheet(), { onDismiss: () => onCancel() });
     setTimeout(() => { g.input().focus(); g.input().select(); }, 0);
-    const onConfirm = () => resolveAndClose(resolve, { value: g.input().value, checked: !!checkbox && g.checkInput().checked }, cleanup);
-    const onCancel = () => resolveAndClose(resolve, null, cleanup);
+    let done = false;   // submit 与 click 同时到也只结一次账
+    const onConfirm = () => { if (done) return; done = true; resolveAndClose(resolve, { value: g.input().value, checked: !!checkbox && g.checkInput().checked }, cleanup); };
+    const onCancel = () => { if (done) return; done = true; resolveAndClose(resolve, null, cleanup); };
+    const onSubmit = (e: Event) => { e.preventDefault(); onConfirm(); };   // 确定钮 = submit；密码管理器看的就是这次提交
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Enter") { e.preventDefault(); onConfirm(); }
+      if (e.key === "Enter") { e.preventDefault(); g.form().requestSubmit(); }
       else if (e.key === "Escape") { e.preventDefault(); onCancel(); }
     };
     const cleanup = () => {
-      g.confirm().removeEventListener("click", onConfirm);
+      g.form().removeEventListener("submit", onSubmit);
       g.cancel().removeEventListener("click", onCancel);
       g.input().removeEventListener("keydown", onKey);
       g.input().type = "text";
-      g.input().style.setProperty("-webkit-text-security", "");   // 打码态不残留到下一个输入框
+      g.input().removeAttribute("autocomplete");
       g.input().value = "";
+      g.user().value = "";
       g.check().classList.add("hidden"); g.checkInput().checked = false;   // 勾不残留到下一个输入框
     };
-    g.confirm().addEventListener("click", onConfirm);
+    g.form().addEventListener("submit", onSubmit);
     g.cancel().addEventListener("click", onCancel);
     g.input().addEventListener("keydown", onKey);
   });
@@ -79,6 +98,7 @@ export function openInputSheetEx(title: string, defaultValue = "", { placeholder
 // 确认对话框 → Promise<boolean>。
 export function openConfirmSheet(title: string, message: string): Promise<boolean> {
   return new Promise((resolve) => {
+    ensureFormGuard();
     g.title().textContent = title;
     g.input().classList.add("hidden");
     g.message().classList.remove("hidden");
@@ -103,6 +123,7 @@ export function openConfirmSheet(title: string, message: string): Promise<boolea
 //   副作用走 onPick，别走返回值。
 export function openChoiceSheet<T>(title: string, message: string, choices: { label: string; value: T; primary?: boolean; onPick?: () => void }[]): Promise<T | null> {
   return new Promise((resolve) => {
+    ensureFormGuard();
     g.title().textContent = title;
     g.input().classList.add("hidden");
     if (message) { g.message().classList.remove("hidden"); g.message().textContent = message; }

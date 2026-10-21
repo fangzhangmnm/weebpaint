@@ -1222,6 +1222,9 @@ input[type="range"].color-ramp::-moz-range-thumb {
 .layer-menu-toggle .menu-item-state { margin-left: auto; }
 
 /* 通用 in-app sheet input */
+/* 真表单里的账号字段（2026-10-21）：只给密码管理器看，人看不见也点不到；不能 display:none（浏览器会当它不存在） */
+.generic-sheet-form { display: contents; }
+.generic-sheet-user { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; overflow: hidden; left: 0; top: 0; }
 .generic-sheet-input {
   width: 100%;
   padding: 10px 12px;

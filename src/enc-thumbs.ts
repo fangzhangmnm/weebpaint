@@ -103,9 +103,10 @@ export async function ensureNewPassword() {
       message: round > 0
         ? t("enc.setPwMismatch")
         : t("enc.setPwMsg"),
+      purpose: "new",
     });
     if (p1 == null) return null;
-    const p2 = await promptPassword({ title: t("enc.confirmTitle"), message: t("enc.confirmMsg"), offerRemember: true });   // 勾放在流程的最后一个面板（2026-10-17）
+    const p2 = await promptPassword({ title: t("enc.confirmTitle"), message: t("enc.confirmMsg"), offerRemember: true, purpose: "new" });   // 勾放在流程的最后一个面板（2026-10-17）
     if (p2 == null) return null;
     if (p1 === p2) { await createVerifier(p1); return p1; }   // v0.4.11：创建即落 verifier（跟账号走）
   }

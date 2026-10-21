@@ -92,7 +92,7 @@ import "./plugins/index.ts";    // 触发 HSB / ColorBalance / Curves / SharpenB
 // candidate 2：导出格式 = 注册表插件（含第一方 ora/psd/png/jpg 自注册）
 import { isAuthConfigured, initAuth, isSignedIn, retrySilentSignIn, getActiveAccount, brushRackCollection, requireStore, galleryBackend } from "./app-store.ts";   // cut-over：cloud/auth/graph 全走 lib
 import { galleryOnline } from "./gallery-capability.ts";   // 库在线 SSoT（0828 folder 无云 bug 修）
-import { galleryRegistry } from "@internal/gallery";     // P3 名册器官（播种接线在 boot 收尾段）
+import { galleryRegistry, activeGalleryId } from "@internal/gallery";     // P3 名册器官（播种接线在 boot 收尾段）；activeGalleryId = 口令真表单的账号字段
 import { setAttachmentGate, galleryAttachment } from "./gallery-attachment-host.ts";   // P3 挂载器官（收口开画 gate + 笔架重挂接线在 rack 构造后）
 import { bootAttachFromRegistry } from "./gallery-connect.ts";      // P3 boot 静默重挂（prefsReady 链头）
 import { docHome } from "./doc-home.ts";
@@ -129,8 +129,9 @@ const prefsReady: Promise<unknown> = bootAttachFromRegistry()
 // ---- 启动 ----
 // 加密（ADR-0012）：密码弹窗接线 —— crypto-state 无 DOM，composition root 把 in-app
 // 输入 sheet 注入进去（守「无系统对话框」红线）。必须在任何 decode 之前（boot load 可能是加密作品）。
-setPasswordPrompt(async ({ title, message, offerRemember }) => {
-  const r = await openInputSheetEx(title || t("mi.enterPassword"), "", { placeholder: t("mi.galleryPassword"), password: true, message: message || "",
+setPasswordPrompt(async ({ title, message, offerRemember, purpose }) => {
+  // 2026-10-21 真表单（user「口令面板改成真表单让 Edge 密码管理器记住 做，全家做」）：账号字段 = 当前图库 id（密码管理器按它记 / 填），设 / 换口令走 new-password
+  const r = await openInputSheetEx(title || t("mi.enterPassword"), "", { placeholder: t("mi.galleryPassword"), password: purpose === "new" ? "new" : "current", account: activeGalleryId(), message: message || "",
     checkbox: offerRemember && rememberAvailable() ? { label: t("enc.rememberDevice"), checked: rememberChoice() } : undefined });   // 2026-10-17：验得了的统一密码面板给勾，默认不勾
   setRememberChoice(offerRemember && rememberAvailable() ? !!r?.checked : false);   // 不给勾的面板一律清掉勾态（流程里只有最后一个面板给勾）
   return r ? r.value : null;
