@@ -3,7 +3,6 @@ import type { EncryptedBlob } from "./app-store.ts";
 import { type LocalFileHandle } from "./local-file-session.ts";
 import { type RingEntryMeta } from "./checkpoint-policy.ts";
 import type { AppContext } from "./app-context.ts";
-import type { GalleryItem } from "@internal/gallery";
 type LoadedDoc = DecodedPainting;
 declare function beginTransientBlank(): void;
 /** 崩溃快照恢复为 transient（云关语境专用——云开走 adoptAsNew 进图库）：装入字节但**不安家**
@@ -73,9 +72,12 @@ declare function newTransientDoc({ w, h }: {
     w: number;
     h: number;
 }): Promise<boolean>;
-declare function openItem(item: GalleryItem): Promise<void>;
-declare function pushItem(item: GalleryItem): Promise<void>;
-declare function unloadItem(item: GalleryItem): Promise<void>;
+declare function openItem(item: {
+    name: string;
+}): Promise<void>;
+declare function unloadItem(item: {
+    name: string;
+}): Promise<void>;
 declare function restoreSession(name: string): Promise<boolean>;
 declare function beginLazyBlank(): void;
 declare function saveAs(newName: string): Promise<void>;
@@ -120,7 +122,6 @@ export declare const session: {
     exit: typeof exitCanvasToGallery;
     newDoc: typeof newDoc;
     open: typeof openItem;
-    push: typeof pushItem;
     unload: typeof unloadItem;
     /** 当前作品的 at-rest **密文**字节（原样，不解壳、不要密码）。非加密件 → null。
      *  先 saveNow()：at-rest 字节是「上次保存」的内容，不先落盘就会导出成旧版本。 */

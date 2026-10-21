@@ -11,7 +11,7 @@ import { isUnlocked, getPassword, onPasswordVerified, promptPassword, setPasswor
 import { hasVerifier, checkVerifier, createVerifier, clearVerifier } from "./password-verifier.ts";
 
 // 边界：app 传裸 session 名，库身份是全名 → sessionFileName 统一转（与 session-state/gallery 一致）。
-const encFile = (name: string) => requireStore().file(sessionFileName(name), { isZip: true, mode: "existing" });
+const encFile = (name: string) => requireStore().zip(sessionFileName(name), { mode: "existing" });   // store 0.16：zip() = 有 getPeek / decryptPeek 的容器面
 
 /** 本地加密作品的缩略图（内存密码解得开→PNG Blob；锁定/没有→null）。非交互——批量渲染不弹窗。 */
 export async function localPeekThumb(name: string): Promise<Blob | null> {

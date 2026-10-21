@@ -475,7 +475,7 @@ const gallery = mountGallery(document.getElementById("galleryMount")!, {
   busy: (label, fn) => withBusy(label, fn),
   // 加密态探测 / 交互解锁：store 的 Item 内容盲（没有 encrypted 轴），由图库按夹自己探。
   //   isEncrypted = 纯本地 IDB 读文件头，无网络；unlock = busy 外弹密码 + verifyPassword（验 peek，便宜）。
-  isEncrypted: (name) => requireStore().file(sessionFileName(name), { isZip: true, mode: "existing" }).isEncrypted(),   // gallery 项专用 → 必有库
+  isEncrypted: (name) => requireStore().file(sessionFileName(name), { mode: "existing" }).isEncrypted(),   // gallery 项专用 → 必有库
   unlock: (name) => ensureUnlocked(name),
   // 画布耦合操作（open/push/unload/rename/exit/setName）gallery.ts 直调 session.*，不再经 host。
 });

@@ -56,11 +56,12 @@ export function initDevConsole() {
     return n;
   };
   WP.pocFetchThumb = async function (name?: string) {
-    // fetchOraThumbnail 按**裸 session 名**（item.name，无后缀）走 store.getPeek（zip 解析在库内部）。
-    //   POC 需显式给该 name（从 gallery tile 取 item.name）；不再是 OneDrive itemId / fileSize。
-    if (!name) throw new Error("pocFetchThumb needs an explicit bare session name (item.name)");
+    // fetchOraThumbnail 按 store **身份**（全名 X.ora；2026-10-21 迁库起和 gallery 包一致）走 store.getPeek（zip 解析在库内部）。
+    //   POC 需显式给该身份（从 gallery tile 取 item.identifier）；不再是 OneDrive itemId / fileSize。null = 到达了但没有这个 entry。
+    if (!name) throw new Error("pocFetchThumb needs an explicit identifier (item.identifier, e.g. 'X.ora')");
     const t0 = performance.now();
     const blob = await fetchOraThumbnail(name, "local");   // POC 诊断：本地优先（旧行为）；要看云端字节自己改 "cloud"
+    if (!blob) throw new Error("getPeek returned null (no such entry / file not in cloud)");
     console.log(`POC done in ${(performance.now() - t0) | 0}ms, blob size ${blob.size}`);
     // 显示到 console（可见 thumbnail）
     const url = URL.createObjectURL(blob);

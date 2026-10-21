@@ -24,7 +24,6 @@ export type TryMoveResult = {
 };
 export interface StoreLike {
     file(name: string, opts: {
-        isZip: boolean;
         mode: "new" | "existing";
     }): {
         open(): Promise<Blob | null>;
@@ -37,7 +36,7 @@ export interface StoreLike {
             resolution?: string;
         }>;
         tryMove(to: string): Promise<TryMoveResult>;
-        delete(): Promise<{
+        trash(): Promise<{
             status: string;
         }>;
     };
@@ -51,7 +50,6 @@ export interface LifecyclePolicy {
 export interface EditorSessionConfig {
     store: StoreLike;
     editor: EditorAdapter;
-    isZip?: boolean;
     policy?: LifecyclePolicy;
 }
 export interface EditorSession {

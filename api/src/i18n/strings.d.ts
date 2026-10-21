@@ -1965,12 +1965,6 @@ export declare const S: {
         readonly ja: "ローカルに取得";
         readonly tok: "o kama jo tawa ilo ni";
     };
-    readonly "gal.pushCloud": {
-        readonly zh: "推送到云端";
-        readonly en: "Push to cloud";
-        readonly ja: "クラウドに送信";
-        readonly tok: "o pana tawa poki sewi";
-    };
     readonly "gal.unloadLocal": {
         readonly zh: "卸载本地";
         readonly en: "Unload local";
@@ -1983,35 +1977,149 @@ export declare const S: {
         readonly ja: "ゴミ箱へ";
         readonly tok: "tawa poki jaki";
     };
-    readonly "gal.reupload": {
-        readonly zh: "重新上传";
-        readonly en: "Re-upload";
-        readonly ja: "再アップロード";
-        readonly tok: "o pana sin tawa poki sewi";
+    readonly "gal.resolve": {
+        readonly zh: "处理…";
+        readonly en: "Resolve…";
+        readonly ja: "処理…";
+        readonly tok: "o pona e ni…";
     };
-    readonly "gal.busy.reupload": {
-        readonly zh: "重新上传中…";
-        readonly en: "Re-uploading…";
-        readonly ja: "再アップロード中…";
-        readonly tok: "mi pana sin tawa poki sewi…";
+    readonly "gal.busy.resolve": {
+        readonly zh: "正在处理 {name}…";
+        readonly en: "Resolving {name}…";
+        readonly ja: "{name} を処理中…";
+        readonly tok: "mi pona e {name}…";
     };
-    readonly "gal.st.reuploaded": {
-        readonly zh: "已重新上传：{name}";
-        readonly en: "Re-uploaded: {name}";
-        readonly ja: "再アップロード完了：{name}";
-        readonly tok: "pana sin li pini: {name}";
+    readonly "gal.st.resolve.tookCloud": {
+        readonly zh: "云端覆盖了本地：{name}（这台的那份进了备份箱）";
+        readonly en: "Cloud overwrote local: {name} (this device's copy went to the backup bin)";
+        readonly ja: "クラウドでローカルを上書き：{name}（この端末の版はバックアップへ）";
+        readonly tok: "sitelen pi poki sewi li awen: {name}. sitelen pi ilo ni li tawa poki awen.";
     };
-    readonly "gal.st.reuploadConflict": {
-        readonly zh: "云端已存在同名文件，未覆盖：{name}（请改名或从云端拉取）";
-        readonly en: "A file with that name already exists on cloud; not overwritten: {name}";
-        readonly ja: "クラウドに同名ファイルが既に存在します。上書きしません：{name}";
-        readonly tok: "nimi sama li lon poki sewi la mi pana ala: {name}. o ante e nimi (anu: o kama jo tan poki sewi).";
+    readonly "gal.st.resolve.pushed": {
+        readonly zh: "本地覆盖了云端：{name}";
+        readonly en: "Local overwrote cloud: {name}";
+        readonly ja: "ローカルでクラウドを上書き：{name}";
+        readonly tok: "sitelen pi ilo ni li tawa poki sewi: {name}";
     };
-    readonly "gal.st.reuploadFail": {
-        readonly zh: "重新上传失败：{e}";
-        readonly en: "Re-upload failed: {e}";
-        readonly ja: "再アップロード失敗：{e}";
-        readonly tok: "pana sin li pakala: {e}";
+    readonly "gal.st.resolve.trashed": {
+        readonly zh: "跟了云端：云端那份已经没了，这台的 {name} 移到回收站（能恢复）";
+        readonly en: "Followed the cloud: it is gone there, so {name} on this device went to the trash (recoverable)";
+        readonly ja: "クラウドに合わせました：クラウドに無いので {name} はごみ箱へ（復元可）";
+        readonly tok: "poki sewi li jo ala e ona la {name} pi ilo ni li tawa poki jaki. sina ken kama sin e ona.";
+    };
+    readonly "gal.st.resolve.cancelled": {
+        readonly zh: "这次没动：{name}";
+        readonly en: "Nothing changed: {name}";
+        readonly ja: "変更なし：{name}";
+        readonly tok: "mi ante ala e {name}";
+    };
+    readonly "gal.st.resolve.clean": {
+        readonly zh: "{name} 没有要处理的改动";
+        readonly en: "{name} has nothing to resolve";
+        readonly ja: "{name} に処理すべき変更はありません";
+        readonly tok: "{name} li jo ala e ante";
+    };
+    readonly "gal.st.resolve.offline": {
+        readonly zh: "现在离线，连不上云端：{name}";
+        readonly en: "Offline, cannot reach the cloud: {name}";
+        readonly ja: "オフラインのためクラウドに接続できません：{name}";
+        readonly tok: "toki li ken ala. mi ken ala tawa poki sewi: {name}";
+    };
+    readonly "gal.st.resolve.unresolved": {
+        readonly zh: "没处理成：{name}（{e}）";
+        readonly en: "Could not resolve: {name} ({e})";
+        readonly ja: "処理できませんでした：{name}（{e}）";
+        readonly tok: "mi ken ala pona e {name} ({e})";
+    };
+    readonly "gal.keepOffline": {
+        readonly zh: "留一份离线";
+        readonly en: "Keep offline";
+        readonly ja: "オフライン用に保存";
+        readonly tok: "o awen lon ilo ni";
+    };
+    readonly "gal.busy.keepOffline": {
+        readonly zh: "正在下载「{name}」…";
+        readonly en: "Downloading “{name}”…";
+        readonly ja: "「{name}」をダウンロード中…";
+        readonly tok: "mi kama jo e \"{name}\"…";
+    };
+    readonly "gal.st.keptOffline": {
+        readonly zh: "已留离线：{name}";
+        readonly en: "Kept offline: {name}";
+        readonly ja: "オフライン保存済み：{name}";
+        readonly tok: "{name} li awen lon ilo ni";
+    };
+    readonly "gal.st.keepOfflineFail": {
+        readonly zh: "留离线失败：{e}";
+        readonly en: "Keep offline failed: {e}";
+        readonly ja: "オフライン保存に失敗：{e}";
+        readonly tok: "awen li pakala: {e}";
+    };
+    readonly "gal.keptAside": {
+        readonly zh: "留底";
+        readonly en: "kept";
+        readonly ja: "保管";
+        readonly tok: "awen";
+    };
+    readonly "gal.tile.active": {
+        readonly zh: "编辑中";
+        readonly en: "Editing";
+        readonly ja: "編集中";
+        readonly tok: "lon pali";
+    };
+    readonly "gal.marker.unread": {
+        readonly zh: "未读";
+        readonly en: "Unread";
+        readonly ja: "未読";
+        readonly tok: "lukin ala";
+    };
+    readonly "gal.empty.backup": {
+        readonly zh: "备份箱是空的。同步冲突里被换下的那一版会留在这里。";
+        readonly en: "No backups. When a sync conflict replaces a version, the replaced one is kept here.";
+        readonly ja: "バックアップはありません。同期の競合で置き換えられたバージョンはここに保管されます。";
+        readonly tok: "poki awen li jo e ala. ante tu la sitelen weka li awen lon ni.";
+    };
+    readonly "gal.busy.emptyBackup": {
+        readonly zh: "正在清空{label}备份箱…";
+        readonly en: "Emptying {label} backups…";
+        readonly ja: "{label}のバックアップを空に…";
+        readonly tok: "mi moli e ale lon poki awen {label}…";
+    };
+    readonly "gal.dlg.emptyBackupTitle": {
+        readonly zh: "清空{label}备份箱？";
+        readonly en: "Empty {label} backups?";
+        readonly ja: "{label}のバックアップを空に？";
+        readonly tok: "sina wile ala wile moli e ale lon poki awen {label}?";
+    };
+    readonly "gal.dlg.emptyBackupMsg": {
+        readonly zh: "{label}备份箱里留底的版本会被彻底删除，不可撤销。";
+        readonly en: "Versions kept in the {label} backups will be permanently deleted. Cannot be undone.";
+        readonly ja: "{label}のバックアップに保管されたバージョンを完全に削除します。元に戻せません。";
+        readonly tok: "sitelen lon poki awen {label} li moli. sina ken ala kama sin e ona.";
+    };
+    readonly "gal.st.emptyBackupDone": {
+        readonly zh: "已清空{label}备份箱";
+        readonly en: "Emptied {label} backups";
+        readonly ja: "{label}のバックアップを空にしました";
+        readonly tok: "poki awen {label} li jo e ala";
+    };
+    readonly "gal.st.emptyBackupPartial": {
+        readonly zh: "清空时部分失败";
+        readonly en: "Some items failed to clear";
+        readonly ja: "一部の削除に失敗しました";
+        readonly tok: "moli pi sitelen wan li pakala";
+    };
+    readonly "gal.st.emptyBackupCloudFail": {
+        readonly zh: "{n} 项云端没清（可能离线），回线再清";
+        readonly en: "{n} cloud item(s) not cleared (maybe offline); retry when online";
+        readonly ja: "{n} 件がクラウドで未削除（オフライン？）。オンライン復帰後に再試行";
+        readonly tok: "sitelen {n} li awen lon poki sewi (ken la toki li ken ala). o pali sin lon tenpo kama.";
+    };
+    readonly "gal.st.emptyBackupCloudNeedLogin": {
+        readonly zh: "清空云端备份箱需先登录并联网";
+        readonly en: "Emptying cloud backups requires sign-in and network";
+        readonly ja: "クラウドのバックアップを空にするにはサインインと接続が必要です";
+        readonly tok: "o kama sona e poki sewi. toki li wile lon. ni la sina ken moli e ale lon poki awen pi poki sewi.";
     };
     readonly "gal.deleted": {
         readonly zh: "删除";
@@ -2787,11 +2895,29 @@ export declare const S: {
         readonly ja: "クラウドのゴミ箱を空に";
         readonly tok: "o moli e insa pi poki jaki (poki sewi)";
     };
-    readonly "gal.chrome.backupBox": {
-        readonly zh: "备份箱管理（即将推出）";
-        readonly en: "Manage backup box (coming soon)";
-        readonly ja: "バックアップボックス管理（近日公開）";
-        readonly tok: "lawa pi poki awen (tenpo kama la ona li lon)";
+    readonly "gal.menu.backupBox": {
+        readonly zh: "备份箱";
+        readonly en: "Backup box";
+        readonly ja: "バックアップボックス";
+        readonly tok: "poki awen";
+    };
+    readonly "gal.chrome.backupOps": {
+        readonly zh: "备份箱操作";
+        readonly en: "Backup box actions";
+        readonly ja: "バックアップボックスの操作";
+        readonly tok: "nasin pi poki awen";
+    };
+    readonly "gal.chrome.emptyBackupLocal": {
+        readonly zh: "清空本地备份箱";
+        readonly en: "Empty local backup box";
+        readonly ja: "ローカルのバックアップボックスを空に";
+        readonly tok: "o moli e insa pi poki awen (ilo ni)";
+    };
+    readonly "gal.chrome.emptyBackupCloud": {
+        readonly zh: "清空云端备份箱";
+        readonly en: "Empty cloud backup box";
+        readonly ja: "クラウドのバックアップボックスを空に";
+        readonly tok: "o moli e insa pi poki awen (poki sewi)";
     };
     readonly "gal.chrome.versionTip": {
         readonly zh: "当前 WeebPaint 版本";
@@ -4380,12 +4506,6 @@ export declare const S: {
         readonly ja: "クラウド新バージョンをダウンロードしましたが、キャンバスの再読み込みに失敗しました。ギャラリーから「{name}」を開き直してください";
         readonly tok: "sitelen sin li lon ilo ni, taso lipu sitelen li ken ala kama sin. o open sin e \"{name}\" tan lipu ale";
     };
-    readonly "ss.pushNotDone": {
-        readonly zh: "没能推送到云端：{name}（离线或有冲突未解决，文件仍在本地）";
-        readonly en: "Couldn't push to cloud: {name} (offline or unresolved conflict; the file is still local)";
-        readonly ja: "クラウドに送信できませんでした：{name}（オフラインまたは未解決の競合。ファイルはローカルにあります）";
-        readonly tok: "mi ken ala pana tawa poki sewi: {name}. ken la toki li ken ala. ken la ante tu li lon. sitelen li awen lon ilo ni.";
-    };
     readonly "ss.savedNotPushed": {
         readonly zh: "已存本地，但没能上传到云端：{name}（稍后会重试）";
         readonly en: "Saved locally but the upload to cloud failed: {name} (will retry later)";
@@ -4644,12 +4764,6 @@ export declare const S: {
         readonly ja: "それでも終了する（この変更を破棄）";
         readonly tok: "weka (ante li moli)";
     };
-    readonly "ss.notFound": {
-        readonly zh: "找不到：{name}";
-        readonly en: "Not found: {name}";
-        readonly ja: "見つかりません：{name}";
-        readonly tok: "mi ken ala lukin e ona: {name}";
-    };
     readonly "ss.notOpenedNeedPasswordCancelled": {
         readonly zh: "未打开：需要密码解锁（已取消）";
         readonly en: "Not opened: password required to unlock (cancelled)";
@@ -4703,24 +4817,6 @@ export declare const S: {
         readonly en: "\"{name}\" is being edited in another window; editing in both will overwrite each other. Open anyway?";
         readonly ja: "「{name}」は別のウィンドウで編集中です。同時に編集するとお互いの変更を上書きしてしまいます。それでも開きますか？";
         readonly tok: "sitelen \"{name}\" li open lon lupa ante. lupa tu li ante e ona la ante li moli e ante. sina wile open ala open?";
-    };
-    readonly "ss.notPushedNeedPassword": {
-        readonly zh: "未推送：需要密码解锁（已取消）";
-        readonly en: "Not pushed: password required to unlock (cancelled)";
-        readonly ja: "プッシュしていません：ロック解除にパスワードが必要です（キャンセルしました）";
-        readonly tok: "pana ala: nimi len li wile (pali li weka)";
-    };
-    readonly "ss.pushingToCloudBusy": {
-        readonly zh: "正在推送 {name} 到云端…";
-        readonly en: "Pushing {name} to the cloud…";
-        readonly ja: "{name} をクラウドにプッシュしています…";
-        readonly tok: "mi pana e {name} tawa poki sewi…";
-    };
-    readonly "ss.pushed": {
-        readonly zh: "已推送：{name}";
-        readonly en: "Pushed: {name}";
-        readonly ja: "プッシュしました：{name}";
-        readonly tok: "pana li pini: {name}";
     };
     readonly "ss.unloadingBusy": {
         readonly zh: "正在卸载本地 {name}…";
@@ -6378,6 +6474,30 @@ export declare const S: {
         readonly ja: "「{name}」にはまだアップロードしていない変更がこの端末にあります。";
         readonly tok: "ilo ni li jo e ante pi pana ala pi sitelen \"{name}\".";
     };
+    readonly "cf.cloudGoneTitle": {
+        readonly zh: "云端没有这份";
+        readonly en: "Not in the cloud";
+        readonly ja: "クラウドにありません";
+        readonly tok: "poki sewi li jo ala e sitelen ni";
+    };
+    readonly "cf.body.absent": {
+        readonly zh: "「{name}」在云端已经不在了（别的设备删了，或移进了回收站），本机还有一份没上传的。云端覆盖本地 = 跟着云端，本机这份移到回收站；本地覆盖云端 = 把本机的传回去。";
+        readonly en: "“{name}” is no longer in the cloud (deleted or trashed on another device); this device still has an un-uploaded copy. Cloud overwrites local = follow the cloud, this copy goes to the trash; Local overwrites cloud = upload it back.";
+        readonly ja: "「{name}」はクラウドから消えています（別の端末で削除またはごみ箱へ）。この端末には未アップロードの版があります。クラウドでローカルを上書き = クラウドに合わせてごみ箱へ；ローカルでクラウドを上書き = 再アップロード。";
+        readonly tok: "sitelen \"{name}\" li lon ala poki sewi (ilo ante li weka e ona). ilo ni li jo e sitelen pi pana ala. sina kepeken e sitelen pi poki sewi la sitelen pi ilo ni li tawa poki jaki. sina pana e sitelen pi ilo ni la mi pana sin e ona.";
+    };
+    readonly "cf.body.never": {
+        readonly zh: "「{name}」从没传到云端过。本地覆盖云端 = 第一次上传；云端覆盖本地 = 云端没有这份，本机这份移到回收站。";
+        readonly en: "“{name}” has never been uploaded. Local overwrites cloud = upload it for the first time; Cloud overwrites local = the cloud has none, so this copy goes to the trash.";
+        readonly ja: "「{name}」は一度もアップロードされていません。ローカルでクラウドを上書き = 初回アップロード；クラウドでローカルを上書き = クラウドに無いのでごみ箱へ。";
+        readonly tok: "sitelen \"{name}\" li lon ala poki sewi lon tenpo ale. sina pana e sitelen pi ilo ni la pana nanpa wan li kama. sina kepeken e sitelen pi poki sewi la sitelen pi ilo ni li tawa poki jaki.";
+    };
+    readonly "cf.body.unchanged": {
+        readonly zh: "「{name}」云端还是上次同步的那一版，本机有新改动没上传。";
+        readonly en: "“{name}” in the cloud is still the last synced version; this device has new changes not uploaded yet.";
+        readonly ja: "「{name}」のクラウド版は前回同期のまま、この端末に未アップロードの変更があります。";
+        readonly tok: "sitelen \"{name}\" pi poki sewi li ante ala. ilo ni li jo e ante sin pi pana ala.";
+    };
     readonly "cf.body.pulling": {
         readonly zh: "正在取回「{name}」的云端新版本…";
         readonly en: "Fetching the newer cloud version of “{name}”…";
@@ -6485,6 +6605,12 @@ export declare const S: {
         readonly en: "Renaming…";
         readonly ja: "名前変更中…";
         readonly tok: "mi ante e nimi…";
+    };
+    readonly "st.fileUploading": {
+        readonly zh: "正在上传…";
+        readonly en: "Uploading…";
+        readonly ja: "アップロード中…";
+        readonly tok: "mi pana…";
     };
     readonly "st.filePulling": {
         readonly zh: "拉取中…";
@@ -7630,9 +7756,10 @@ export declare const S: {
         readonly ja: "クラウド側が移動/削除され、ローカルに未プッシュの変更があります——「改名して保持」か「破棄」を";
     };
     readonly "gv.badge.pendingGone": {
-        readonly zh: "云端副本已消失，本地干净副本待处理 —— 可「重新上传」推回云端，或「删除」；宽限期后自动移入回收站";
-        readonly en: "Cloud copy is gone; clean local copy pending — “re-upload” to push it back, or “delete”; auto-trashed after the grace period";
-        readonly ja: "クラウド側が消失、ローカルのクリーンな複製が保留中——「再アップロード」か「削除」を。猶予期間後は自動でゴミ箱へ";
+        readonly zh: "云端那份没了，这台还留着一份干净的副本 —— 「处理…」里选：云端覆盖本地（这份进回收站）或本地覆盖云端（传回去）；宽限期后自动移入回收站";
+        readonly en: "Cloud copy is gone; this device still holds a clean copy — use “Resolve…”: cloud overwrites local (to trash) or local overwrites cloud (upload again); auto-trashed after the grace period";
+        readonly ja: "クラウド側は消え、この端末にクリーンな複製が残っています——「処理…」で：クラウドでローカルを上書き（ゴミ箱へ）／ローカルでクラウドを上書き（再アップロード）。猶予期間後は自動でゴミ箱へ";
+        readonly tok: "poki sewi li jo ala e ona. ilo ni li jo e sitelen pona. o pona e ni: sina kepeken e sitelen pi poki sewi la ona li tawa poki jaki. sina pana e sitelen pi ilo ni la mi pana sin e ona. tenpo li pini la ona li tawa poki jaki.";
     };
     readonly "gv.badge.dirtyBoth": {
         readonly zh: "本地+云端 · 本地有未推改动";
@@ -7663,6 +7790,12 @@ export declare const S: {
         readonly zh: "仅本地（未上传云端）";
         readonly en: "Local only (not uploaded)";
         readonly ja: "ローカルのみ（未アップロード）";
+    };
+    readonly "gv.badge.float": {
+        readonly zh: "仅本地 · 有未上传的改动（从未同步）";
+        readonly en: "Local only · unsynced edits (never uploaded)";
+        readonly ja: "ローカルのみ · 未アップロードの変更あり（一度も同期していません）";
+        readonly tok: "sitelen li lon ilo ni taso. ante li lon. ona li lon ala poki sewi lon tenpo ale.";
     };
     readonly "gv.badge.localPlain": {
         readonly zh: "本地";

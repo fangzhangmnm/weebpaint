@@ -14,9 +14,9 @@ export interface GalleryHost {
     }[]): Promise<string | null>;
     status(msg: string, isError?: boolean): void;
     busy<T>(label: string, fn: () => Promise<T>): Promise<T>;
-    /** 本地字节是不是加密容器（纯本地 IDB 读文件头，无网络）。gallery 按夹探测锁态用。 */
+    /** 本地字节是不是加密容器（纯本地 IDB 读文件头，无网络）。gallery 按夹探测锁态用。name = 裸名。 */
     isEncrypted(name: string): Promise<boolean>;
-    /** 交互解锁（busy 外弹密码 + verifyPassword）。成功 → true。 */
+    /** 交互解锁（busy 外弹密码 + verifyPassword）。成功 → true。name = 裸名。 */
     unlock(name: string): Promise<boolean>;
 }
 export declare function mountGallery(el: HTMLElement, host: GalleryHost): GalleryHandle;

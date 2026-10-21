@@ -93,7 +93,7 @@ echo "[build] ✓ 无 deep import"
 #   防的是绕接缝直拿 store 内部对象——store = 插件不是地基（缺席模式 ?nostore 必须继续成立）。
 echo "[build] B 分层 lint（app 层 store 值级 import 只许接缝）…"
 APPSTORE_HITS=$(grep -rnE "(from|import)[[:space:]]*\(?[[:space:]]*['\"]@internal/store['\"]" src --include='*.ts' 2>/dev/null \
-  | grep -v "^src/app-store.ts" | grep -v "import type" || true)
+  | grep -v "^src/app-store.ts" | grep -v "^src/identifiers.ts" | grep -v "import type" || true)   # identifiers.ts = 第二个放行点（createIdentifiers 纯函数，store 0.16 文档种类表；WXHW 同形）
 if [ -n "$APPSTORE_HITS" ]; then
   echo "[build] ✗ app 层出现 store 值级 import（只准接缝 app-store.ts；其余用 import type，消费走 requireStore()/galleryBackend()）：" >&2
   echo "$APPSTORE_HITS" >&2

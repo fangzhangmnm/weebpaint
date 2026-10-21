@@ -15,6 +15,7 @@ import { reportError } from "./error-badge.ts";
 const STORE_TEXT_KEYS: Record<StoreTextKey, Key> = {
   "sync.pushing": "st.syncPushing",
   "file.renaming": "st.fileRenaming",
+  "file.uploading": "st.fileUploading",   // store 0.17.0 files.uploadStream（本 app 不用流式上传，映射只为穷举表完整）
   "file.pulling": "st.filePulling",
   "cloud.checking": "st.cloudChecking",
   "file.deleting": "st.fileDeleting",
@@ -67,8 +68,14 @@ export const storeUI: StoreUI = {
   //   2026-08-21 grill 拍板：按 occasion 分两套按钮/正文（标题统一「云端有新版本」+ 留底安心小字）——
   //   push（保存 412/撞名）三键：本地覆盖云端(=keepMine 立即强推) / 云端覆盖本地 / 取消；
   //   open（打开时）两键：打开本地(=cancel，暂不解决保存时再裁) / 云端覆盖本地。按钮写实，语义不再漂移。
-  resolveConflict: async ({ name, occasion }): Promise<"keepMine" | "takeCloud" | "cancel"> => {
+  //   store 0.18.2 起 ctx 带 cloudState（云端那一侧：有新版 / 没了 / 从没传过 / 没变）：面上换标题和正文，三个词和主按钮不变
+  //   （措辞与 gallery 0.7.2 storeUIFor 同一套；「处理…」→ file.resolve() 就靠这几种说法把「云端没了」说清楚）。
+  resolveConflict: async ({ name, occasion, cloudState }): Promise<"keepMine" | "takeCloud" | "cancel"> => {
     const n = stripSessionExt(name);
+    const gone = cloudState === "absent" || cloudState === "never";
+    const pushTitle = gone ? t("cf.cloudGoneTitle") : t("cf.cloudNewerTitle");
+    const pushBody = cloudState === "absent" ? t("cf.body.absent", { name: n }) : cloudState === "never" ? t("cf.body.never", { name: n })
+      : cloudState === "unchanged" ? t("cf.body.unchanged", { name: n }) : t("cf.body.push", { name: n });
     const choice = occasion === "open"
       ? await lockSyncGate<"cancel" | "takeCloud">({
           title: t("cf.cloudNewerTitle"),
@@ -81,8 +88,8 @@ export const storeUI: StoreUI = {
           ],
         })
       : await lockSyncGate<"keepMine" | "takeCloud" | "cancel">({
-          title: t("cf.cloudNewerTitle"),
-          message: t("cf.body.push", { name: n }),
+          title: pushTitle,
+          message: pushBody,
           note: t("cf.note.keptSafe"),
           showSpinner: false,
           // v0.14.32：主按钮 = 云端覆盖本地（user 2026-10-16「默认云端才是 authority」「一切对齐」，与 gallery 0.7.1 同步）

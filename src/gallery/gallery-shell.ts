@@ -27,7 +27,7 @@ import { readImageFromClipboard, triggerDownload } from "../session.ts";
 import { showFullscreenBusy } from "../fullscreen-busy.ts";   // #18 备份进度：withBusy 期间换文案（leaf singleton）
 import { zipPack } from "../backend/zip.ts";                  // #18 备份包（STORE 不压缩；ora/png 本就是压缩流）
 import { snapshotFolderOnce, walkLibrary, runLibraryBackup, BACKUP_BUDGET_BYTES } from "@internal/gallery";
-import { uniqueBareName } from "@internal/gallery";   // 撞名后缀兜底（纯·已 pin）；占用检查按库身份（全名 X.ora）查
+import { uniqueIdentifier } from "@internal/gallery";   // 撞名后缀（gallery 0.6.0 起按身份：主干后接一段、后缀不动）；占用检查按库身份（全名 X.ora）查
 import { galleryDefaultName } from "../naming.ts";     // P1 命名器官：yyyymmdd-hex4（v217 惯例）+ 禁「未命名」
 import { humanSize } from "@internal/gallery";   // 展示格式化（纯·KiB/MiB）；此前本模块私有一份逐字节拷贝，2026-08-21 收敛
 import { requireStore, galleryBackend, isCachedSyncState } from "../app-store.ts";
@@ -44,7 +44,7 @@ import { isUnlocked, lock, setPassword, promptPassword, setFilePassword, forgetF
 import { rememberedUntil, forgetRemembered } from "../remember-password.ts";   // 2026-10-17 在这台设备上记住密码
 import { rememberDayText } from "../remember-day.ts";
 import { hasVerifier, checkVerifier, clearVerifier, createVerifier } from "../password-verifier.ts";
-import { runChangePassword, type ChangePasswordReport } from "@internal/gallery";   // 2026-09-09 换密码编排（纯）
+import { runChangePassword, type ChangePasswordReport, type GalleryView } from "@internal/gallery";   // 2026-09-09 换密码编排（纯）；GalleryView = files | trash | backup（0.5.0 搁置区）
 import { invalidateCachedThumb } from "./cloud-thumb-cache.ts";
 import { galleryFlow } from "../gallery-connect.ts";
 import { stripSessionExt, sessionBareName, sessionFileName } from "../config.ts";
@@ -61,10 +61,18 @@ const errMsg = (e: unknown): string => String((e as { message?: unknown })?.mess
 let editMode: AppContext["editMode"], board: AppContext["board"], gallery: AppContext["gallery"], doc: AppContext["doc"], setStatus: AppContext["setStatus"], withBusy: AppContext["withBusy"];
 
 // trash-bar / add / trash 按钮的可见性随视图（旧 renderGallery 内联，现 app chrome 显式管）。
-function _galleryChrome(view: string) {
-  els.galleryTrashBar?.classList.toggle("hidden", view !== "trash");
-  els.galleryAddBtn?.classList.toggle("hidden", view === "trash");
-  els.galleryTrashBtn?.classList.toggle("hidden", view === "trash");
+//   2026-10-21（gallery 0.5.0 搁置区 = 回收站 + 备份箱）：两个视图共用这条 bar，标题 / 「清空本地 · 云端」/ 菜单 title 按视图换字。
+function _galleryChrome(view: GalleryView) {
+  const aside = view !== "files";
+  els.galleryTrashBar?.classList.toggle("hidden", !aside);
+  els.galleryAddBtn?.classList.toggle("hidden", aside);
+  els.galleryTrashBtn?.classList.toggle("hidden", aside);
+  if (!aside) return;
+  const backup = view === "backup";
+  if (els.galleryAsideTitle) els.galleryAsideTitle.textContent = t(backup ? "gal.menu.backupBox" : "nav.trash");
+  if (els.galleryEmptyAsideLocalLabel) els.galleryEmptyAsideLocalLabel.textContent = t(backup ? "gal.chrome.emptyBackupLocal" : "gal.chrome.emptyLocal");
+  if (els.galleryEmptyAsideCloudLabel) els.galleryEmptyAsideCloudLabel.textContent = t(backup ? "gal.chrome.emptyBackupCloud" : "gal.chrome.emptyCloud");
+  els.galleryTrashMenuBtn?.setAttribute("title", t(backup ? "gal.chrome.backupOps" : "gal.chrome.trashOps"));
 }
 
 export async function setGalleryOpen(open: boolean) {
@@ -205,7 +213,9 @@ export async function checkQuotaAndWarn() {
 //   归一化必须发生在名字**诞生的地方**，不是比较的地方。
 // 逻辑本体 = gallery-model.uniqueBareName（纯·已 pin）；此处只绑 store 的占用谓词。
 export async function uniqueNameFor(stem: string) {
-  return uniqueBareName(stem, (n) => requireStore().files.nameOccupied(n), { bare: sessionBareName, full: sessionFileName });   // 包化：裸名↔全名边界注入   // gallery 命名专用（无库铸户口不可达）
+  const s = requireStore();   // gallery 命名专用（无库铸户口不可达）
+  const id = await uniqueIdentifier(sessionFileName(stem), (n) => s.files.occupied(n), s.identifiers);   // 身份进、身份出；裸名 ↔ 全名只在这条边界转（sessionFileName 已归一化）
+  return stripSessionExt(id);
 }
 
 // ---- #18 全库备份（2026-08-28）：逻辑内核 = ./library-backup.ts（纯·可测），这里只装端口 + 说人话。----
@@ -250,22 +260,21 @@ async function changePasswordFlow(): Promise<void> {
       const targets: string[] = [];
       for (const fr of manifest.files) {
         if (!(fr.syncState != null && isCachedSyncState(fr.syncState as never))) continue;   // 只重封本机有字节的（云端未缓存的 rekey 也会拒 no-local）
-        try { if (await requireStore().file(fr.path, { isZip: true, mode: "existing" }).isEncrypted()) targets.push(fr.path); }
-        catch (e) { reportError(new Error(`[change-password] isEncrypted probe failed for ${fr.path}: ` + String(e)), "log"); }
+        try { if (await requireStore().file(fr.identifier, { mode: "existing" }).isEncrypted()) targets.push(fr.identifier); }
+        catch (e) { reportError(new Error(`[change-password] isEncrypted probe failed for ${fr.identifier}: ` + String(e)), "log"); }
       }
       report = await runChangePassword({
         targets, oldPassword: oldP, newPassword: newP,
-        rekey: (name, pw) => requireStore().file(name, { isZip: true, mode: "existing" }).rekey({ newPassword: pw, isOnline: galleryOnline }),
+        rekey: (name, pw) => requireStore().file(name, { mode: "existing" }).rekey({ newPassword: pw, isOnline: galleryOnline }),
         rememberFilePassword: setFilePassword,
         forgetFilePassword,
         commitNewPassword: async (pw) => { await createVerifier(pw); setPassword(pw); },
         onProgress: (done, total) => showFullscreenBusy(t("gs.changePwBusy", { n: String(done + 1), total: String(total) })),
         onError: (name, e) => reportError(new Error(`[change-password] rekey failed for ${name}: ` + String(e)), "log"),
       });
-      for (const n of report.moved) {   // 字节换了体：云 thumb 缓存条目作废 + 锁态重探（同 gallery.ts _afterSwap）
-        const bare = stripSessionExt(n);
-        try { await invalidateCachedThumb(bare); } catch (e) { reportError(new Error(`[change-password] thumb invalidate failed for ${n}: ` + String(e)), "log"); }
-        gallery.invalidateEncrypted(bare);
+      for (const n of report.moved) {   // 字节换了体：云 thumb 缓存条目作废 + 锁态重探（同 gallery.ts _afterSwap）。n = 身份（全名），缓存与包都按身份键
+        try { await invalidateCachedThumb(n); } catch (e) { reportError(new Error(`[change-password] thumb invalidate failed for ${n}: ` + String(e)), "log"); }
+        gallery.invalidateEncrypted(n);
       }
     });
     const n = String(report.moved.length), m = String(report.kept.length), k = String(partial);
@@ -285,10 +294,10 @@ async function runFullLibraryBackup(): Promise<void> {
         { onFolder: (_f, n) => showFullscreenBusy(t("bk.scanningFolders", { n })) },
       );
       if (!manifest.files.length) { setStatus(t("bk.empty"), true); return; }
-      const cachedBefore = new Map(manifest.files.map((fr) => [fr.path, fr.syncState != null && isCachedSyncState(fr.syncState as never)]));
+      const cachedBefore = new Map(manifest.files.map((fr) => [fr.identifier, fr.syncState != null && isCachedSyncState(fr.syncState as never)]));
       const report = await runLibraryBackup(manifest.files, {
         readBytes: async (path) => {
-          const f = requireStore().file(path, { isZip: true, mode: "existing" });
+          const f = requireStore().file(path, { mode: "existing" });
           // 红线修（0828）：加密+纯云端件旧路走 `?? open()` 兜底 = 解锁态**明文进备份包**。
           //   正解：先 open 暖 at-rest 缓存（明文只在内存，引用即弃），再取密文；锁定 → null = failed（诚实）。
           let bytes: Blob | null = await f.getEncryptedBlob();   // EncryptedBlob 是 Blob 的 brand 子类，宽化只读安全
@@ -372,17 +381,19 @@ export function initGalleryShell(ctx: AppContext) {
   // 回收站视图：进/出 + 清空。v211/v214 把图库收成 Vue 深模块时，trash 按钮的接线漏搬
   // （setView/getView/emptyTrash 已在 GalleryHandle 上，只是 chrome 这层没人调）→「回收站打不开」。
   // chrome 可见性 _galleryChrome + 视图切 gallery.setView 两件一起（与 setGalleryOpen 进库同模式）。
-  const _switchView = (view: "files" | "trash") => { _galleryChrome(view); gallery.setView(view); };
+  const _switchView = (view: GalleryView) => { _galleryChrome(view); gallery.setView(view); };
   els.galleryTrashBtn?.addEventListener("click", () => _switchView("trash"));
   els.galleryTrashBack?.addEventListener("click", () => _switchView("files"));
   _wireGalleryPopup(els.galleryTrashMenuBtn, els.galleryTrashMenuPopup);
+  // 「清空本地 / 云端」按当前搁置区分流（回收站 → emptyTrash；备份箱 → emptyBackup，gallery 0.5.0）；确认框和结果提示在包里
+  const _emptyAside = (scope: "local" | "cloud") => { if (gallery.getView() === "backup") gallery.emptyBackup(scope); else gallery.emptyTrash(scope); };
   els.galleryEmptyTrashLocalBtn?.addEventListener("click", () => {
     closePopupMenuOf(els.galleryTrashMenuPopup);
-    gallery.emptyTrash("local");
+    _emptyAside("local");
   });
   els.galleryEmptyTrashCloudBtn?.addEventListener("click", () => {
     closePopupMenuOf(els.galleryTrashMenuPopup);
-    gallery.emptyTrash("cloud");
+    _emptyAside("cloud");
   });
 
   // 图库菜单 popup（版本号 + 强制更新 + 文件无关设置）
@@ -536,6 +547,11 @@ export function initGalleryShell(ctx: AppContext) {
     closePopupMenuOf(els.galleryMenuPopup);
     _switchView("trash");
   });
+  // 备份箱（gallery 0.5.0 搁置区；2026-10-21 迁库收货）：同步冲突里被换下的那一版留在这里，能恢复 / 彻底删 / 清空
+  els.galleryMenuBackupBox?.addEventListener("click", () => {
+    closePopupMenuOf(els.galleryMenuPopup);
+    _switchView("backup");
+  });
   // 2026-09-06 诊断日志（图库模式下 ☰ dev 页不可达 → 图库菜单自己开同一张 sheet）
   document.getElementById("galleryMenuDiagLog")?.addEventListener("click", () => {
     closePopupMenuOf(els.galleryMenuPopup);
@@ -577,7 +593,7 @@ export function initGalleryShell(ctx: AppContext) {
     //   withBusy 可重入（ref-count），内层 store.flow.newFolder 再包一层 busy 不会提前解锁。
     await withBusy(t("gs.creatingFolder", { name: trimmed }), async () => {
       // 统一走 store.nameOccupied（唯一占用检查）：同名文件占了 → 提示；纯文件夹已存在则 ensureFolder 幂等（复用无害）。
-      if (await requireStore().files.nameOccupied(fullPath)) { setStatus(t("gs.folderExists", { name: trimmed }), true); return; }
+      if (await requireStore().files.occupied(fullPath)) { setStatus(t("gs.folderExists", { name: trimmed }), true); return; }
       // 走 store.flow.newFolder（深模块窄接口）而非裸 ensureSubfolder——锁屏/单飞守卫由库内强制。
       try { await requireStore().files.newFolder(fullPath); setStatus(t("gs.folderCreated", { name: trimmed })); }
       catch (e) { reportError(new Error("[folder] cloud ensure failed: " + String(e)), "log"); setStatus(t("gs.folderCreateFailed", { err: errMsg(e) }), true); }

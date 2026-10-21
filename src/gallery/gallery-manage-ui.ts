@@ -118,7 +118,7 @@ async function backupDirty(): Promise<void> {
     let saved = 0;
     for (const name of failed) {
       try {
-        const blob = await requireStore().file(name, { isZip: false, mode: "existing" }).open();
+        const blob = await requireStore().file(name, { mode: "existing" }).open();
         if (blob) { triggerDownload(blob, name.split("/").pop() || name); saved++; }
       } catch (e) { reportError(new Error(`[gallery-manage] backup download failed for ${name}: ` + String(e)), "log"); }
     }

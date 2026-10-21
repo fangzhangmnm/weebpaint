@@ -23,6 +23,7 @@ const STATIC_PRECACHE = [
   "./icon-512.png",
   "./apple-touch-icon-180.png",
   "./styles.css",
+  "./vendor/internal-css/gallery.css",   // @internal/gallery 的皮（2026-10-21 迁库收货）
   "./builtin-brushes.json",   // v122 r2: 改 runtime fetch，必须 precache 保证离线
   "./color-words.json",       // v0.7.16: 色名词库（20260730 Colors 编译产物），runtime fetch 同款
   "./canvas-templates.json",  // v0.7.32: 画布尺寸模板 SSoT（新建作品 + 裁切共用），runtime fetch 同款

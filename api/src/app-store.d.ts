@@ -1,10 +1,10 @@
 import { createOneDriveProvider } from "@internal/store";
 import type { RackPersistence } from "./brush-rack-controller.ts";
-import type { Store, WatchFolderErrorPhase } from "@internal/store";
+import type { Store } from "@internal/store";
 export declare const storeAbsent: boolean;
 type _Auth = ReturnType<typeof createOneDriveProvider>["auth"];
 export declare const provider: import("@internal/store").CloudProvider | null;
-export type AppStorePort = Pick<Store, "file" | "files" | "collection">;
+export type AppStorePort = Pick<Store, "file" | "zip" | "files" | "collection" | "identifiers">;
 export type GalleryBackend = {
     kind: "live";
     store: AppStorePort;
@@ -55,38 +55,6 @@ export declare const onAuthChanged: (cb: Parameters<_Auth["onAuthChanged"]>[0]) 
 export declare const getAuthState: () => import("@internal/store").AuthState | {
     signedIn: false;
 };
-declare function itemToG(it: {
-    path: string;
-    syncState: string;
-    lastModified?: number;
-    size?: number;
-}): {
-    name: string;
-    local: {
-        name: string;
-        size: number | undefined;
-        updatedAt: number | undefined;
-    } | null;
-    cloud: {
-        path: string;
-        name: string;
-        size: number | undefined;
-        lastModifiedDateTime: string | undefined;
-    } | null;
-    dirty: boolean;
-    ghost: boolean;
-    pendingGone: boolean;
-    cloudNewer: boolean;
-    newerOnCloud: boolean;
-    conflict: boolean;
-};
-/** 图库杂物条目（#24，user 0828 拍板「显示其他扩展名的文件，不提供打开」——诚实性：看似空夹其实有货）。 */
-export interface CloudOtherItem {
-    path: string;
-    name: string;
-    size?: number;
-    lastModified?: number;
-}
 export interface CloudImageItem {
     path: string;
     name: string;
@@ -94,34 +62,10 @@ export interface CloudImageItem {
     lastModified?: number;
     cached: boolean;
 }
-export declare function watchFolder(folder: string, cb: (snap: {
-    path: string;
-    items: ReturnType<typeof itemToG>[];
-    images: CloudImageItem[];
-    others: CloudOtherItem[];
-    folderNames: string[];
-}) => void, opts?: {
-    onError?: (err: unknown, phase: WatchFolderErrorPhase) => void;
-}): () => void;
 export declare function watchFolderImages(folder: string, cb: (snap: {
     path: string;
     images: CloudImageItem[];
     folderNames: string[];
 }) => void): () => void;
 /** picker 选中后取整份图片字节（本地缓存优先、整份拉云、autoCacheOpenedFile 顺手落缓存）。拿不到 → null。 */
-export declare const openCloudImage: (path: string) => Promise<Blob | null>;
-export declare const listGalleryTrash: () => Promise<{
-    name: string;
-    deletedAt: number;
-    encrypted: boolean;
-    conflictLive: boolean;
-    local: {
-        name: string;
-        trashKey: string;
-        encrypted: boolean;
-    } | null;
-    cloud: {
-        path: string;
-        id: string;
-    } | null;
-}[]>;
+export declare const openCloudImage: (identifier: string) => Promise<Blob | null>;

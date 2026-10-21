@@ -77,6 +77,10 @@ export const els = {
   galleryTrashMenuPopup: byId("galleryTrashMenuPopup"),
   galleryEmptyTrashLocalBtn: byId("galleryEmptyTrashLocalBtn"),
   galleryEmptyTrashCloudBtn: byId("galleryEmptyTrashCloudBtn"),
+  galleryAsideTitle: byId("galleryAsideTitle"),                 // 回收站 / 备份箱共用的 bar 标题（gallery 0.5.0 搁置区，2026-10-21）
+  galleryEmptyAsideLocalLabel: byId("galleryEmptyAsideLocalLabel"),
+  galleryEmptyAsideCloudLabel: byId("galleryEmptyAsideCloudLabel"),
+  galleryMenuBackupBox: byId("galleryMenuBackupBox"),           // 图库菜单「备份箱」入口
   addNewFolder: byId("addNewFolder"),
   addNew: byId("addNew"),
   addImportPhoto: byId("addImportPhoto"),

@@ -73,7 +73,9 @@
     <link rel="icon" href="./icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=2870613bae37" />
+    <link rel="stylesheet" href="./styles.css?v=62dbb069ad93" />
+    <!-- @internal/gallery 0.8.5 的皮（vendor/internal-css/gallery.css，收货时 cp 包的 src/gallery.css，别手改）：排在 styles.css 之后，同名规则以包为准 -->
+    <link rel="stylesheet" href="./vendor/internal-css/gallery.css" />
     <!-- zip.js UMD bundle：自挂 window.zip。必须在 module bundle 之前。
          defer（v417）：原来是 parser-blocking 的，硬刷新时 SW 被绕过 → 直奔网络 → 网络一卡整个
          文档解析就停住（浏览器标签页转圈）。defer 后它与下面的 type=module bundle 同属延迟脚本、
@@ -543,15 +545,14 @@
       </div>
       <div class="gallery-trash-bar hidden" id="galleryTrashBar">
         <button class="gallery-back-btn" id="galleryTrashBack" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#back"/></svg><span data-i18n="gal.chrome.back">返回图库</span></button>
-        <span class="gallery-trash-title" data-i18n="nav.trash">回收站</span>
+        <span class="gallery-trash-title" id="galleryAsideTitle" data-i18n="nav.trash">回收站</span>
         <div class="gallery-trash-menu-wrap">
           <button class="gallery-trash-menu-btn" id="galleryTrashMenuBtn" type="button" data-i18n-title="gal.chrome.trashOps" aria-haspopup="true"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#more"/></svg></button>
           <div class="gallery-trash-menu-popup hidden" id="galleryTrashMenuPopup" role="menu">
             <!-- data-i18n 必须挂在内层 span：桥是 el.textContent = t(…)，挂在按钮上会连图标一起清掉 -->
-            <button class="gallery-trash-menu-item danger menu-item-with-icon" id="galleryEmptyTrashLocalBtn" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#database"/></svg><span data-i18n="gal.chrome.emptyLocal">清空本地回收站</span></button>
-            <button class="gallery-trash-menu-item danger menu-item-with-icon" id="galleryEmptyTrashCloudBtn" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#cloud"/></svg><span data-i18n="gal.chrome.emptyCloud">清空云端回收站</span></button>
-            <!-- 备份箱预告（2026-08-21）：disabled 占位，备份箱管理 UI 落地后启用（图标暂复用 floppy-disk，同形多 id 惯例） -->
-            <button class="gallery-trash-menu-item menu-item-with-icon" id="galleryBackupBoxBtn" type="button" role="menuitem" disabled aria-disabled="true"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#floppy-disk"/></svg><span data-i18n="gal.chrome.backupBox">备份箱管理（即将推出）</span></button>
+            <button class="gallery-trash-menu-item danger menu-item-with-icon" id="galleryEmptyTrashLocalBtn" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#database"/></svg><span id="galleryEmptyAsideLocalLabel" data-i18n="gal.chrome.emptyLocal">清空本地回收站</span></button>
+            <button class="gallery-trash-menu-item danger menu-item-with-icon" id="galleryEmptyTrashCloudBtn" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#cloud"/></svg><span id="galleryEmptyAsideCloudLabel" data-i18n="gal.chrome.emptyCloud">清空云端回收站</span></button>
+            <!-- （2026-08-21 的「备份箱管理（即将推出）」占位 2026-10-21 退役：备份箱 = gallery 0.5.0 搁置区视图，入口在图库菜单，这条 bar 两个视图共用） -->
           </div>
         </div>
       </div>
@@ -569,6 +570,10 @@
       <!-- 回收站入口（user 0828：从 header 图标行收进菜单；图标=restore-trash「从垃圾桶取货」——入口语义是找回，不是删除） -->
       <button class="menu-item menu-item-with-icon" id="galleryMenuTrash" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#restore-trash"/></svg>
         <span class="menu-item-label" data-i18n="nav.trash">回收站</span>
+      </button>
+      <!-- 备份箱（gallery 0.5.0 搁置区；2026-10-21 迁库收货）：同步冲突里被换下的那一版留在这里，能恢复 / 彻底删 / 清空。图标复用 floppy-disk（同形多 id 惯例） -->
+      <button class="menu-item menu-item-with-icon" id="galleryMenuBackupBox" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#floppy-disk"/></svg>
+        <span class="menu-item-label" data-i18n="gal.menu.backupBox">备份箱</span>
       </button>
       <button class="menu-item menu-item-with-icon" id="galleryMenuForceUpdate" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#refresh"/></svg>
         <span class="menu-item-label" data-i18n="menu.forceReset">强制更新</span>
@@ -1529,6 +1534,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-e9b752615c3f.mjs"></script>
+    <script type="module" src="./dist/weebpaint-334945f2239b.mjs"></script>
   </body>
 </html>

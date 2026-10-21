@@ -2,15 +2,16 @@
 //   只做 config 注入（provider / ui bundle / crypto codec / crypt / validateAdopt）+ auth 转发 + gallery 列举适配。
 //   app 只碰 store 两面（**file / collection**）+ editor-session。绝不裸碰 kv/IDB/graph/vendor。
 //   （localSettings/syncedSettings 那两面已于 2026-07-13 删除 —— 全部 KV 化进 collection。别照旧注释找。）
-import { createStore, createOneDriveProvider, createFolderProvider, isCached, isDirty, requestStoragePersistence } from "@internal/store";
+import { createStore, createOneDriveProvider, createFolderProvider, isCached, requestStoragePersistence } from "@internal/store";
 import { detectStoreAbsent } from "./store-absent.ts";
 import { createDeviceRackSlot } from "./device-rack-slot.ts";   // A2 终案：无库笔架器官（reload 不丢）
 import type { RackPersistence } from "./brush-rack-controller.ts";   // 脑定义 port（type-only 无环）
 import { embeddedBlobUrl } from "./standalone-html.ts";   // P6 单文件内嵌读口（msal 逃生舱）
-import type { Store, Collection as _Coll, WatchFolderErrorPhase } from "@internal/store";
-import { stripSessionExt, sessionFileName } from "./config.ts";
+import type { Store, Collection as _Coll } from "@internal/store";
+import { sessionFileName } from "./config.ts";
 import { storeUI } from "./store-ui.ts";
 import { CLIENT_ID, SCOPES, AUTHORITY } from "./config.ts";
+import { DOC_KINDS } from "./identifiers.ts";   // 文档种类表（store 0.16）：身份怎么切、云端名是不是加密容器，全由它推导
 import { zipReadEntry } from "./backend/zip.ts";
 import { appEncryption } from "./encryption.ts";   // 加密器官（store 收同一实例；app 侧消费直连它，不经 store）
 import { getPassword } from "./crypto-state.ts";
@@ -18,7 +19,7 @@ import { wirePreferences, initPreferences, setGalleryLayerLive } from "./app-pre
 import { wireAppState, initAppState, appState } from "./app-state.ts";
 import { readSlate } from "@internal/gallery";   // activeFileName 守卫输入（P5：本机回执条真相）
 import { builtinBrushInitData } from "./brushes.ts";
-import { isDocPath, isImagePath, imageBasename } from "@internal/gallery";
+import { isImagePath, imageBasename } from "@internal/gallery";
 import { naturalCompare } from "@internal/gallery";
 
 // ============ 显式装配（v0.8.7 · B 骑士；2026-08-27 替身退役）============
@@ -54,8 +55,11 @@ const _createRealStore = (provider: _Prov, signedIn: () => boolean, databaseId?:
   //   身份从出生即全名——无迁移（无用户/无后向兼容，2026-07-13 清 tax；migration 框架留库内待将来）。
   encryption: appEncryption,   // EncryptionPort（0.7.0 必填表态；app 与 store 共用同一实例）
   reconcilePolicy: "app-driven",   // 0.8.0 必填表态（A6）：库保持被动，云端刷新由 app 驱动（focus/online/回前台 + app.ts 60s 前台轮询）
+  // 文档种类表（store 0.16，必填；提案 = 库仓 ai-docs/20260929-proposal-doc-types.md）：只有 .ora 一行。身份 / 云端名 / 加密容器名
+  //   和 0.15.2 的 crypt.ext:"ora" + 库默认 encFileName 一个字节不变（存量零迁移）。同一张表 src/identifiers.ts 也造了一份给纯代码用。
+  //   2.x 开关（transport / pushRetry / streaming / tier）这次一律按库默认 = 行为不变；要开哪些归 user 定（迁库 doc §3）。
+  docKinds: DOC_KINDS,
   crypt: {
-    ext: "ora",
     makePeek: async (blob) => { try { return await zipReadEntry(blob, "Thumbnails/thumbnail.png"); } catch { return null; } },  // ora 内容知识只此一行
     getPassword,
   },
@@ -80,8 +84,8 @@ const _createRealStore = (provider: _Prov, signedIn: () => boolean, databaseId?:
   autoCacheOpenedFile: true,
   signedIn,   // 连接态 store 自持（网盘模型）：OneDrive = auth.isSignedIn；folder gallery = 恒 true（本地即在线，权限掉→provider 失败呈离线）
   // 当前打开的 doc（全名）：cloud-gone 去抖 trash 绝不碰它（连 watchFolder 自动 reconcileFolder 也跳过，防 trash 掉开着的 clean 文件本地缓存）。
-  //   P5（2026-08-27）：读 resume-slate 回执条（device 本机真相，永不同步——v438 毒化案结构化根治）。
-  activeFileName: () => { try { const o = readSlate().opened; return o?.kind === "doc" ? sessionFileName(o.path) : null; } catch { return null; } },
+  //   P5（2026-08-27）：读 resume-slate 回执条（device 本机真相，永不同步——v438 毒化案结构化根治）。0.16.0 起叫 activeIdentifier。
+  activeIdentifier: () => { try { const o = readSlate().opened; return o?.kind === "doc" ? sessionFileName(o.path) : null; } catch { return null; } },
 });
 
 // 缺席平台（storeAbsent）= 三个 null，不再造 dormant/null 替身（2026-08-27 ambient store 退役：
@@ -96,7 +100,7 @@ const _auth: _Auth | null = _asm.auth;
 // app 消费的 store 面**只有三个**：file / files / collection（encryption 面已随 @internal/encryption 立户退役
 //   2026-08-28——加密消费直连 src/encryption.ts 器官，无库也活着）。
 // 收敛形 = **派生窄 Port**（Pick 自库类型 SSoT，零镜像零 drift）；类型 import 也收拢本接缝（下方 re-export）。
-export type AppStorePort = Pick<Store, "file" | "files" | "collection">;
+export type AppStorePort = Pick<Store, "file" | "zip" | "files" | "collection" | "identifiers">;   // 2026-10-21：store 0.16 把 file(isZip) 拆成 file / zip，切名唯一入口 = identifiers
 // ambient store 退役（2026-08-27 user 拍板「依赖整理好」）：不再有 take-as-granted 的全局 store 出口。
 //   消费点二选一表态（build.sh lint 守）：
 //   · requireStore()   —— 「此路径结构上必有库」（gallery UI / gallery 家保存）。无库被调 = 响亮 throw（bug surfaced）。
@@ -211,57 +215,23 @@ export const getAuthState = () => _auth?.getAuthState() ?? { signedIn: false as 
 _auth?.onAuthChanged(() => { try { window.dispatchEvent(new Event("wp:auth-changed")); } catch { /* node 测试环境无 window */ } });
 
 
-// ---- gallery 数据：统一列举（local ∪ cloud，每项带 syncState）。reconcile 已进库（watchFolder 惰性 per-folder）。----
-// 扩展名路由（spec 20260820 §2/§3）：库零内容格式知识——扩展名知识全在 gallery/cloud-image-model.ts（纯模块，可测）。
-//   gallery 白名单 = 画作/加密容器；图片走 watchFolderImages（picker）；其余杂物只在 OneDrive 侧可见。
-const _CLOUD_STATES = new Set(["cloud-only", "synced", "unpushed", "newer-on-cloud", "conflict"]);   // 有云版的 syncState
-// Item{path,syncState} → 旧 GalleryItem{name,local,cloud,dirty,ghost}（gallery-view-model 兼容；派生自 syncState）。
-function itemToG(it: { path: string; syncState: string; lastModified?: number; size?: number }) {
-  const name = stripSessionExt(it.path);
-  return {
-    name,
-    // 本地项也带 size/updatedAt（listing 现从本地缓存记录填）→ 离线 / 云端帧到达前不显 0B/1970（itemTime 优先读 local.updatedAt）。
-    local: isCached(it.syncState as never) ? { name, size: it.size, updatedAt: it.lastModified } : null,
-    // size 从 store Item 带出来（listing 已从云端 c.size 或本地 stat 解析）→ 图库显真尺寸而非 0 B。
-    cloud: _CLOUD_STATES.has(it.syncState) ? { path: it.path, name, size: it.size, lastModifiedDateTime: it.lastModified ? new Date(it.lastModified).toISOString() : undefined } : null,
-    dirty: isDirty(it.syncState as never),
-    ghost: it.syncState === "ghost",
-    pendingGone: it.syncState === "pendingGone",   // clean cloud-gone 孤儿、防抖 grace 内 → gallery 显 badge + 重传/删动作
-    // 云端字节比本地新（本地有副本 ∧ 云 etag 动了 = newer-on-cloud / conflict）→ thumb 取图必须走
-    //   getPeek source:"cloud"（QA 2026-08-21「新 token 配旧字节」根修）：这两态下 it.lastModified 是
-    //   **云端**戳（listing cf 优先），若字节仍本地优先取，就会把旧本地字节配新云 token 写进缩略图缓存 = 永不自愈。
-    //   conflict 也算：token 同样是云戳，只有云字节配得上它（本地 dirty 字节没有可用的本地戳；缓存诚实 > 展示偏好）。
-    cloudNewer: it.syncState === "newer-on-cloud" || it.syncState === "conflict",
-    // badge 去压扁（老账 C，20260820 handoff §2C；user 2026-08-25 拍板开工）：这两态不再被压平成
-    //   synced/unpushed——分叉工作流后「原名有云端新版待看」的可见性全靠它们。
-    newerOnCloud: it.syncState === "newer-on-cloud",
-    conflict: it.syncState === "conflict",
-  };
-}
-// watchFolder（网盘模型）：订阅**当前文件夹** → 立即本地帧、云端到了同一 cb 再闪。app 只知「这一夹更新了」。
-//   替代全树列举（JRP 开夹慢的根因）；连接态 store 自持、无 ctx。folderNames = immediate 子夹名。（映射 store.Item → app GItem。）
-// ---- 云盘图片条目（gallery 次级 tile + cloud-picker 共用形；spec 20260820 §2/§3，v0.9.34 图片进图库）----
-//   身份 = **全名 path**（含扩展名，直接就是 store.file 的 key——图片没有裸名/全名的 ora 代数）。
-/** 图库杂物条目（#24，user 0828 拍板「显示其他扩展名的文件，不提供打开」——诚实性：看似空夹其实有货）。 */
-export interface CloudOtherItem {
-  path: string;
-  name: string;           // basename（显示用）
-  size?: number;
-  lastModified?: number;
-}
+// ---- 图库数据面已进包（gallery 0.6.0 起 createGalleryDataFace 吃 store.identifiers + Item.syncState 原样画徽章；本仓的 itemToG /
+//   watchFolder / listGalleryTrash 包装层 2026-10-21 随迁库退役——那正是 store Item 注释警告的「下游重推导」形状）。
+//   这里只剩 cloud-picker（图层 / 参考窗入口）还在用的图片列举面：与 watchFolder 同一订阅面，只留图片。
+//   图片不是文档（docKinds 表里只有 .ora）：身份 = 全名 identifier（含扩展名，直接就是 store.file 的 key；图片没有裸名 / 全名的 ora 代数）。
 export interface CloudImageItem {
-  path: string;           // 全路径含扩展名（= store.file key / 缩略图缓存 key）
+  path: string;           // = store 身份 identifier（cloud-picker 组件字段名沿用 path）
   name: string;           // basename（显示用）
   size?: number;
   lastModified?: number;  // 缩略图新鲜度 token 的原料（退 size）
   cached: boolean;        // 本地有副本（离线可用徽章）
 }
-const _toImageItems = (items: { path: string; syncState: string; lastModified?: number; size?: number }[]): CloudImageItem[] =>
+const _toImageItems = (items: { identifier: string; syncState: string; lastModified?: number; size?: number }[]): CloudImageItem[] =>
   items
-    .filter((it) => isImagePath(it.path))
+    .filter((it) => isImagePath(it.identifier))
     .map((it) => ({
-      path: it.path,
-      name: imageBasename(it.path),
+      path: it.identifier,
+      name: imageBasename(it.identifier),
       size: it.size,
       lastModified: it.lastModified,
       cached: isCached(it.syncState as never),
@@ -269,36 +239,8 @@ const _toImageItems = (items: { path: string; syncState: string; lastModified?: 
     // 素材收件箱语义：新的在前（lastModified 倒序，缺失退名字倒序；自然序见 natural-order.ts）
     .sort((a, b) => (b.lastModified ?? 0) - (a.lastModified ?? 0) || naturalCompare(b.name, a.name));
 
-const _toOtherItems = (items: { path: string; syncState: string; lastModified?: number; size?: number }[]): CloudOtherItem[] =>
-  items
-    .filter((it) => !isDocPath(it.path) && !isImagePath(it.path))
-    .map((it) => ({ path: it.path, name: it.path.split("/").pop() || it.path, size: it.size, lastModified: it.lastModified }))
-    .sort((a, b) => naturalCompare(a.name, b.name));
-
-export function watchFolder(
-  folder: string,
-  cb: (snap: { path: string; items: ReturnType<typeof itemToG>[]; images: CloudImageItem[]; others: CloudOtherItem[]; folderNames: string[] }) => void,
-  opts?: { onError?: (err: unknown, phase: WatchFolderErrorPhase) => void },   // store 0.11.1：帧产不出的订阅者信号（gallery 首帧看门狗消费）
-): () => void {
-  const prefix = folder ? `${folder}/` : "";
-  return requireStore().files.watchFolder(folder, (snap) => {
-    cb({
-      path: snap.path,
-      // 文件名**倒序**（自然序 numeric，见 natural-order.ts）：新文档名 yyyymmdd-xxxx → 新日期在前，稳定（不随存盘时间跳）。
-      //   store 列举顺序不保证；排序是 app 展示策略（对齐 gallery-model.sliceFolder 的既定倒序），故在此 app 层做。
-      // 路由：画作（isDocPath）= 主 tile；图片 = 次级 tile（v0.9.34 拍板：可见+孪生语义，替代已删的＋菜单 picker 入口）；
-      //   其余杂物（.md 等）不进图库（诚实性余账见 ai-docs/20260820-gallery-hidden-files-honesty-handoff.md）。
-      items: snap.items.filter((it) => isDocPath(it.path)).map(itemToG).sort((a, b) => naturalCompare(b.name, a.name)),
-      images: _toImageItems(snap.items),
-      // 杂物（#24 诚实性）：非画作非图片的可见文件（dot 项已被库级 is-hidden 滤掉）——展示不提供打开。
-      others: _toOtherItems(snap.items),
-      // 文件夹 tile 自然序正排（store 列举顺序不保证；user 2026-08-21：10 要排在 2 后面）
-      folderNames: snap.folders.map((f) => f.slice(prefix.length)).filter(Boolean).sort(naturalCompare),   // 全路径 → immediate 段
-    });
-  }, opts);
-}
-
 // cloud-picker 数据面（图层/参考窗入口仍用；与 watchFolder 同一订阅面，只留图片）。
+//   watchFolder（网盘模型）：订阅**当前文件夹** → 立即本地帧、云端到了同一 cb 再闪。folderNames = immediate 子夹名。
 export function watchFolderImages(
   folder: string,
   cb: (snap: { path: string; images: CloudImageItem[]; folderNames: string[] }) => void,
@@ -306,26 +248,16 @@ export function watchFolderImages(
   const prefix = folder ? `${folder}/` : "";
   return requireStore().files.watchFolder(folder, (snap) => {
     cb({
-      path: snap.path,
+      path: snap.folder,
       images: _toImageItems(snap.items),
-      folderNames: snap.folders.map((f) => f.slice(prefix.length)).filter(Boolean).sort(naturalCompare),
+      // 文件夹 tile 自然序正排（store 列举顺序不保证；user 2026-08-21：10 要排在 2 后面）
+      folderNames: snap.folders.map((f) => f.slice(prefix.length)).filter(Boolean).sort(naturalCompare),   // 全路径 → immediate 段
     });
   });
 }
 
 /** picker 选中后取整份图片字节（本地缓存优先、整份拉云、autoCacheOpenedFile 顺手落缓存）。拿不到 → null。 */
-export const openCloudImage = (path: string): Promise<Blob | null> =>
-  requireStore().file(path, { isZip: false, mode: "existing" }).open();
-// ⛔ listGallery（全树列举）已删 2026-07-12——**库唯一列举面 = store.watchFolder（订阅当前夹）**，app 包成 watchFolder。
+export const openCloudImage = (identifier: string): Promise<Blob | null> =>
+  requireStore().file(identifier, { mode: "existing" }).open();
+// ⛔ listGallery（全树列举）已删 2026-07-12——**库唯一列举面 = store.watchFolder（订阅当前夹）**。
 //   app 原则上不知道别的 folder 内容（内存只放当前夹）；名字碰撞由 store rename/saveAs 目标护栏内化检测（撞名抛 CloudNameCollisionError），不靠先 list 目标夹。
-// 回收站视图：store.listTrash 返**两端聚合**的 TrashItem[]（side/localKey/cloudRef/encrypted/conflictLive）→ 映射成 gallery 的 TrashGItem。
-//   local/cloud 两腿据 localKey/cloudRef 填（app 原有 both-side 模型此前从没被本地腿填充；0.4.0 id→ref 行李牌语义改名）。只元数据，无 blob。
-export const listGalleryTrash = async () => (await requireStore().files.listTrash()).map((it) => ({
-  name: stripSessionExt(it.name),
-  deletedAt: 0,
-  encrypted: it.encrypted,
-  conflictLive: it.conflictLive,
-  local: it.localKey ? { name: stripSessionExt(it.name), trashKey: it.localKey, encrypted: it.encrypted } : null,
-  cloud: it.cloudRef ? { path: it.name, id: it.cloudRef } : null,
-}));
-

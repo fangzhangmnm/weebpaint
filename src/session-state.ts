@@ -44,7 +44,6 @@ import { shouldCapture, checkpointKey, planRingEviction, ringBudget, isNewSittin
 import { getCheckpoint, deleteCheckpoint, ringPut, ringGet, ringAll, ringDelete, ringDeleteByDoc, mintRingId } from "./storage.ts";
 import { els } from "./els.ts";
 import type { AppContext } from "./app-context.ts";
-import type { GalleryItem } from "@internal/gallery";
 import { t } from "./i18n/index.ts";
 import { createEditorSession, type EditorSession, type StoreLike } from "./editor-session/index.ts";
 import { timelapseDetach, timelapseAdopt, timelapseForSave } from "./timelapse-session.ts";
@@ -118,7 +117,7 @@ function _setActive(name: string | null): void {
   //   无地**不持锁**：无 store 身份、FS handle 拿不到全路径无稳定唯一键，且已有 mtime 陈旧对表兜底）。
   if (bare != null) holdDocLock(bare); else releaseDocLock();
 }
-const _file = (name: string) => requireStore().file(toFull(name), { isZip: true, mode: "existing" });   // WeebPaint work-file = ora-zip 容器（有 peek）
+const _file = (name: string) => requireStore().zip(toFull(name), { mode: "existing" });   // WeebPaint work-file = ora-zip 容器（有 peek）；store 0.16 起 zip() = 容器面
 async function _refreshEncrypted() {
   const name = _activeName();
   try { _enc.encrypted = name ? await _file(name).isEncrypted() : false; }
@@ -997,7 +996,7 @@ async function newTransientDoc({ w, h }: { w: number; h: number }): Promise<bool
 //   本地没有就自动拉云落本地，同一条路径同时覆盖本地项和纯云端项，不需要第二个平行入口。
 
 // ---- 打开图库 item ----
-async function openItem(item: GalleryItem) {
+async function openItem(item: { name: string }) {   // name = 裸名（gallery.ts 适配层把包的 identifier 剥成裸名再进来）
   if (item.name === _activeName()) { setGalleryOpen(false); return; }
   // 双实例互认（2026-08-21）：同画双开 = 本地字节互覆（store 层的修另行处理），入口拦住。
   //   警告 + 默认取消（openConfirmSheet 的 Esc/点背板都是取消），用户明确确认才继续。
@@ -1030,25 +1029,10 @@ async function openItem(item: GalleryItem) {
   } catch (err) { setStatus(t("ss.openFailed", { error: errMsg(err) })); }
 }
 
-// ---- 图库「推到云」（非活动 item）：读本地字节 → 带 tryPush 重存（薄库无独立 push，re-save 触发推）----
-async function pushItem(item: GalleryItem) {
-  if (await _file(item.name).isEncrypted()) { if (!(await ensureUnlocked(item.name))) { setStatus(t("ss.notPushedNeedPassword"), true); return; } }
-  await withBusy(t("ss.pushingToCloudBusy", { name: item.name }), async () => {
-    try {
-      const f = _file(item.name);
-      const bytes = await f.open();
-      if (!bytes) { setStatus(t("ss.notFound", { name: item.name })); return; }
-      // 这个按钮的**全部意义**就是云端那条腿 —— 必须读 pushed（v436）。
-      //   以前丢掉 SaveResult：离线 / 冲突面取消 / deferred 一律照报「已推送」。
-      const res = await f.save(bytes, { tryPush: true });
-      setStatus(res.pushed ? t("ss.pushed", { name: item.name }) : t("ss.pushNotDone", { name: item.name }), !res.pushed);
-      gallery.refresh();
-    } catch (err) { setStatus(t("ss.pushFailed", { error: errMsg(err) })); }
-  });
-}
-
+// （pushItem「推送到云端」2026-10-21 随迁库删除：读本地字节再 save({tryPush:true}) = 方向动词 + open 再 save 刷新基准，10-16 user
+//   「禁止越狱」判为词汇表外的动作；gallery 0.8.1 起没同步好的文件只有「处理…」→ store file.resolve()，由人在面里三选一。）
 // ---- 卸载本地副本（offload：清 shadow；非法=唯一副本→store 抛 OffloadIllegalError→banner）----
-async function unloadItem(item: GalleryItem) {
+async function unloadItem(item: { name: string }) {
   const isActive = item.name === _activeName();
   // ⚠ 顺序（v417 修）：**先退出画布（落盘+推云），再 offload**。反过来的后果是数据安全问题，不只是 badge 错：
   //   store 的 head dirty（head.isDirty，落盘才置）和 es 的**内容脏**（wp:histchange 驱动）是两个不同的东西
@@ -1134,7 +1118,7 @@ async function saveAs(newName: string): Promise<void> {
   _applyPendingForExplicitSave();   // 显式保存：fill 预览也收口（topbar 侧只 apply 了 transient）
   const { bytes, peek } = await _encodeCurrentOraWithPeek();
   // 另存为=写**新身份** → mode:"new"（撞名不静默覆盖；topbar 已 nameOccupied 预检，这里 store 层再兜底红线）。
-  await requireStore().file(toFull(newName), { isZip: true, mode: "new" }).save(bytes, { tryPush: true, hint: peek ? { peek } : undefined });
+  await requireStore().zip(toFull(newName), { mode: "new" }).save(bytes, { tryPush: true, hint: peek ? { peek } : undefined });
   if (_fileHome()) { _homeAuth.setHome(null); _dropLuggage(); }   // 收编：内容已进库（就是刚写的字节），不算丢弃，无需问
   _setActive(newName); _isLazyBlankSession = false; _recomputePhase();
   es.adopted(toFull(newName));   // es 切到新名（内容即新名的；下轮 autosave 若跑=同内容 re-save，无害）。边界转全名。
@@ -1167,6 +1151,9 @@ async function refreshOpenDoc(): Promise<void> {
   const probe = new Promise<void>((res) => { onSkip = res; });
   try {
     const r = await _file(name).pullIfClean({
+      // store 0.18.1：回线 / 回前台 = 怀疑自己过期的时刻，不采信 30 s 内的旧清单（0.17.0 fresh-hints），一定问云端——
+      //   别的设备恰好在这 30 s 里推过也能快进（WXHW e2e「挂机：别的设备改过、这台干净 → 醒来静默快进」就是这条）。
+      trustHints: false,
       onReplaceStart: () => {
         gateUp = true;
         void lockSyncGate<"fork" | null>({
@@ -1256,7 +1243,7 @@ export const session = {
   adoptAsNew, adoptAsExisting,
   adoptAsTransient,   // P2：崩溃恢复的云关分支（不落看不见的图库；crash-banner 唯一调用方）
   adoptTransientIntoGallery,   // A1：挂库后 transient 自动安家（gallery-manage-ui attach 收尾调）
-  rename: renameCurrentSession, exit: exitCanvasToGallery, newDoc, open: openItem, push: pushItem, unload: unloadItem,
+  rename: renameCurrentSession, exit: exitCanvasToGallery, newDoc, open: openItem, unload: unloadItem,
   /** 当前作品的 at-rest **密文**字节（原样，不解壳、不要密码）。非加密件 → null。
    *  先 saveNow()：at-rest 字节是「上次保存」的内容，不先落盘就会导出成旧版本。 */
   async readEncryptedBytes(): Promise<EncryptedBlob | null> {
@@ -1319,7 +1306,7 @@ export function initSession(ctx: AppContext) {
       encode: async () => await _encodeCurrentOraWithPeek(),
       // 字节落盘成功 → 作废该画的缩略图缓存 + 广播（gallery 在世 tile 原地重取，getPeek 本地优先
       //   = 刚写的字节）。覆盖显式保存/autosave/退出 flush 全路径（v0.10.2 缩略图冻结根修）。
-      onSaved: (fullName: string) => { void invalidateCachedThumb(stripSessionExt(fullName)); },
+      onSaved: (fullName: string) => { void invalidateCachedThumb(fullName); },   // 缩略图缓存 2026-10-21 起按身份（全名）键，和包一致
       // v0.8.5（S5）：sidecar 变更（参考图等「跟 ora 走 ∧ 不进 undo」态）与内容变更走同一内容脏门
       //   ——都要落盘/推云；差别只在不进 undo 栈（wp:sidecarchange 不碰 undo 按钮态）。
       // ⚠ wp:histchange 在 **window** 上 dispatch（history.ts）——绑 document 收不到 → 打开的文档编辑永不标脏、
@@ -1347,7 +1334,6 @@ export function initSession(ctx: AppContext) {
         window.addEventListener("wp:sidecarchange", h);
       },
     },
-    isZip: true,
     policy: { autosaveMs: 0, pushOn: ["exit"] },   // S8：interval autosave 退役，改挂 bg-jobs（下方）
   });
   es.start();   // visibility/pagehide/blur 抢救 flush（崩溃安全直调，不受空闲节流）

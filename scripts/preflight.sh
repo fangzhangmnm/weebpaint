@@ -38,6 +38,7 @@ for r in $(seq 1 "$ROUNDS"); do
   step "F6 standalone-html (round $r)"   node tools/standalone-smoke.mjs
   step "F7 export (round $r)"        node tools/preflight/f7-export.mjs
   step "F8 remember-csp (round $r)"  node tools/preflight/f8-remember-csp.mjs   # 2026-10-17 记住密码 + CSP 零拦截
+  step "F9 gallery-folder (round $r)" node tools/preflight/f9-gallery-folder.mjs   # 2026-10-21 迁库：OPFS 当本地文件夹图库，图库包 0.8.5 一圈（菜单出卡片 / 回收站 / 备份箱）
 done
 
 say "ALL GREEN（$ROUNDS 轮）→ 夹具批通过。log=$LOG"

@@ -20,7 +20,7 @@ const dumpKv = () => { const m = new Map(); return { get: (k) => (m.has(k) ? m.g
 const STUB_UI = { busy: (_l, fn) => fn(), resolveConflict: async () => ({ choice: "cancel" }), reportError: () => {} };
 const mkCollection = () => createStore({ encryption: createMockEncryption(), reconcilePolicy: "app-driven",
   appId: "wp", persistence: "none", provider: createMockProvider(), ui: STUB_UI, validateAdopt: () => true,
-  kv: dumpKv(), local: createMockLocal(), fileName: (n) => n,
+  kv: dumpKv(), local: createMockLocal(), docKinds: [],
   isOnline: () => false, signedIn: () => false, skipMigration: true,
 }).collection("brush-rack");
 

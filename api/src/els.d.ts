@@ -59,6 +59,10 @@ export declare const els: {
     galleryTrashMenuPopup: HTMLElement;
     galleryEmptyTrashLocalBtn: HTMLElement;
     galleryEmptyTrashCloudBtn: HTMLElement;
+    galleryAsideTitle: HTMLElement;
+    galleryEmptyAsideLocalLabel: HTMLElement;
+    galleryEmptyAsideCloudLabel: HTMLElement;
+    galleryMenuBackupBox: HTMLElement;
     addNewFolder: HTMLElement;
     addNew: HTMLElement;
     addImportPhoto: HTMLElement;

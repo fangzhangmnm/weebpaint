@@ -37,7 +37,7 @@ export type TryMoveResult =
   | { ok: false; reason: "name-collision"; where: "local" | "cloud" };
 export interface StoreLike {
   // mode 显式必填（new=新建、existing=打开已有）；editor-session 处理的都是已建身份 → 恒 "existing"。
-  file(name: string, opts: { isZip: boolean; mode: "new" | "existing" }): {
+  file(name: string, opts: { mode: "new" | "existing" }): {   // store 0.16：isZip 没了（容器由 docKinds 表说）；editor-session 只用 open / save / tryMove / trash，RawFile 面够
     open(): Promise<Blob | null>;
     // pushed=false 不是错误，是事实（离线/冲突未解决/只落本地）→ 据此保住 push-pending，别乐观清。
     // resolution="takeCloud"（save 途中冲突面用户选了「云端覆盖本地」）= **换世界线**：本地字节已被云端版本
@@ -45,7 +45,7 @@ export interface StoreLike {
     //   此字段（undefined）→ 行为退化为修前现状，结构类型天然向后兼容。
     save(bytes: Blob, opts?: { tryPush?: boolean; hint?: unknown }): Promise<{ pushed: boolean; reason?: string; resolution?: string }>;
     tryMove(to: string): Promise<TryMoveResult>;   // 改身份/移动唯一入口（含 nameOccupied 占用检查）——挂在 file 上
-    delete(): Promise<{ status: string }>;   // status 不是「成功」的同义词（cancelled/noop 也走这里）
+    trash(): Promise<{ status: string }>;   // store 2.1.2 起叫 trash（删除 = 移进回收站）；status 不是「成功」的同义词（cancelled/noop 也走这里）
   };
 }
 
@@ -59,7 +59,6 @@ export interface LifecyclePolicy {
 export interface EditorSessionConfig {
   store: StoreLike;
   editor: EditorAdapter;
-  isZip?: boolean;                               // 这个 app 的 doc 是不是 zip 容器（有 peek）。默认 false。
   policy?: LifecyclePolicy;
 }
 
@@ -85,7 +84,7 @@ export interface EditorSession {
 }
 
 export function createEditorSession(config: EditorSessionConfig): EditorSession {
-  const { store, editor, isZip = false } = config;
+  const { store, editor } = config;
   const policy = config.policy ?? {};
   const pushOn = new Set(policy.pushOn ?? ["exit"]);
 
@@ -110,7 +109,7 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
     });
   }
 
-  const fileOf = (name: string) => store.file(name, { isZip, mode: "existing" });   // open/rename/删：已建身份
+  const fileOf = (name: string) => store.file(name, { mode: "existing" });   // open/rename/删：已建身份
   // adopted({create:true})（新建画布/import）→ 该身份的**首存**用 mode:"new"（撞名不覆盖），首存成功即转 existing。
   // ⚠ **per-name，不是会话级布尔**（v417 修）：旧版是 `let _createNext = false`，只在 save() **resolve** 后
   //   才复位，且 open() 从不复位它。于是任意一次 save 抛异常（比如导入一个重名 .ora）就把它永久钉在 true
@@ -143,7 +142,7 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
       if (_editEpoch === epochAtFreeze) _dirty = false;   // 清内存脏：encode 已取快照；快照**之后**的编辑保住脏（下轮 autosave 收）
       // 新建画布/import 首存 → mode:"new"（撞名不静默覆盖，抛 CloudNameCollisionError；saveNow 已 try/catch surface）；成功即转 existing（后续 autosave = 编辑）。
       const mode = _createFor === _name ? "new" : "existing";
-      const res = await store.file(_name, { isZip, mode }).save(bytes, { tryPush, hint: peek != null ? { peek } : undefined });
+      const res = await store.file(_name, { mode }).save(bytes, { tryPush, hint: peek != null ? { peek } : undefined });
       // push-pending 按**实际结果**清，不再乐观清（v432）。旧版在 save 之前就 `_pushPending = false`，
       //   而 store 内部把 push 失败 catch 成 banner 后 save() 照常 resolve → 这里永远看不到失败 →
       //   badge 画干净、退出不再重推、下次 autosave 也不补 → 云端始终停在旧版而 UI 从没说过失败。
@@ -247,7 +246,7 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
       if (!_name) return;
       const n = _name;
       _name = null; _dirty = false; _pushPending = false;
-      await fileOf(n).delete();
+      await fileOf(n).trash();
     },
 
     start(): void {

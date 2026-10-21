@@ -16,7 +16,7 @@ function mockStore() {
     _pushResult: null,        // 覆写成 { pushed:false } 模拟「本地落了、云端没推成」
     file(name, opts) {
       return {
-        open: async () => { opened.push({ name, isZip: opts.isZip, mode: opts.mode }); return this._openReturns; },
+        open: async () => { opened.push({ name, mode: opts.mode }); return this._openReturns; },
         // save 返回 { pushed }（v432）：push 上没上去是**事实不是异常**，editor-session 据此决定 push-pending 留不留。
         //   _pushResult 可被单测覆写成 { pushed:false } 来模拟「本地落了但云端没推成」。
         save: async (bytes, o) => {
@@ -24,7 +24,7 @@ function mockStore() {
           return this._pushResult ?? { pushed: o?.tryPush !== false };
         },
         tryMove: async (to) => { renames.push({ from: name, to }); return { ok: true }; },   // 改身份/移动唯一入口（挂 file 上）
-        delete: async () => { deletes.push(name); },
+        trash: async () => { deletes.push(name); return { status: "trashed" }; },   // store 2.1.2：delete() → trash()
       };
     },
   };
@@ -47,9 +47,9 @@ function mockEditor() {
 describe("editor-session › 打开 & 内存脏", () => {
   it("open → file.open → editor.adopt；开完不脏", async () => {
     const store = mockStore(), editor = mockEditor();
-    const es = createEditorSession({ store, editor, isZip: true });
+    const es = createEditorSession({ store, editor });
     await es.open("a.ora");
-    eq(store.opened.length, 1); eq(store.opened[0].isZip, true);
+    eq(store.opened.length, 1); eq(store.opened[0].mode, "existing");
     eq(editor.adopted.length, 1, "adopt 收到 open 的 blob");
     eq(es.currentName(), "a.ora"); eq(es.isDirty(), false);
   });
@@ -290,7 +290,7 @@ describe("editor-session › onSaved 保存成功回调", () => {
 describe("editor-session › takeCloud 换世界线重载", () => {
   it("save 返回 resolution='takeCloud' → 重新 open + adopt 云端字节；flags 干净", async () => {
     const store = mockStore(), editor = mockEditor();
-    const es = createEditorSession({ store, editor, isZip: true });
+    const es = createEditorSession({ store, editor });
     await es.open("a.ora");
     eq(store.opened.length, 1); eq(editor.adopted.length, 1);
     editor.fireChange();

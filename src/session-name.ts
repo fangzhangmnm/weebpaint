@@ -12,5 +12,5 @@ import { sessionFileName } from "./config.ts";
 export async function sessionNameConflict(name: string): Promise<boolean> {
   const be = galleryBackend();
   if (be.kind === "none") return false;   // 无库：无占用可查（下载名浏览器自补 (1)；saveAs 入口无库本就不可达）
-  return be.store.files.nameOccupied(sessionFileName(name));
+  return be.store.files.occupied(sessionFileName(name));
 }
