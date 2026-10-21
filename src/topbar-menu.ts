@@ -42,6 +42,7 @@ import { decodeOraToPainting } from "./backend/ora.ts";
 import { t } from "./i18n/index.ts";
 import { openConnectMenuFromEditor } from "./gallery/gallery-manage-ui.ts";   // P3 无库单入口（0830：同一个连接菜单）
 import { runFactoryReset } from "./factory-reset.ts";   // P7 还原出厂（0828 收货 store 0.7.0 深清口子）
+import { clearOwnShell } from "./shell-reset.ts";   // 强制更新：只注销自己的 SW + 只删 weebpaint- 前缀缓存
 import type { ViewLeaf } from "./backend/workpiece/painting-view.ts";
 
 import type { AppContext } from "./app-context.ts";
@@ -348,19 +349,8 @@ export function initTopbarMenu(ctx: AppContext) {
     );
     if (!ok) return;
     try {
-      // 只动自己的（家族 2026-10-01 规矩，WeebPaint 10-16 补上）：缓存和 service worker 按域名算——weebpaint.com 的 `/`（正式版）和 `/dev/` 同源，
-      //   「全部注销 / 全部删除」会把另一边的离线壳一起清掉。自己的 = 管着当前页面的那一个 service worker + 名字以 `weebpaint-` 开头的缓存
-      //   （service-worker.js 的 CACHE_NAME 前缀）。IDB 一律不碰。user 2026-10-16「随手修」。
-      // 1. 注销管着当前页面的 SW
-      if (navigator.serviceWorker) {
-        const r = await navigator.serviceWorker.getRegistration();
-        if (r) await r.unregister().catch(() => {});
-      }
-      // 2. 清自己前缀的 Cache Storage（不动 IDB）
-      if (typeof caches !== "undefined") {
-        const keys = await caches.keys();
-        for (const k of keys) if (k.startsWith("weebpaint-")) await caches.delete(k).catch(() => {});
-      }
+      // 只动自己的（家族 2026-10-01 规矩，WeebPaint 10-16 补上；逻辑 2026-10-21 抽到 shell-reset.ts，还原出厂同用）。IDB 一律不碰。
+      await clearOwnShell();
       setStatus(t("tm.cacheClearedReloading"), true);
       setTimeout(() => location.reload(), 200);
     } catch (e) {

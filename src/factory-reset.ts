@@ -12,6 +12,7 @@ import { wipeAppNamespace, scanAppNamespace, galleryBackend } from "./app-store.
 import { docHome } from "./doc-home.ts";
 import { session } from "./session-state.ts";
 import { openConfirmSheet, openInputSheet } from "./sheets.ts";
+import { clearOwnShell } from "./shell-reset.ts";   // 2026-10-21：变成新的 = 数据 + 自己的离线壳一起清（统筹转述 user「点了之后变成新的」）
 import { t } from "./i18n/index.ts";
 import { reportError } from "./error-badge.ts";
 
@@ -92,6 +93,9 @@ export async function runFactoryReset(setStatus: (msg: string, persist?: boolean
     const ls = storeReport.localStorageKeysRemoved + appReport.lsRemoved;
     await openConfirmSheet(t("fr.introTitle"),
       residue === 0 ? t("fr.doneClean", { db: String(db), ls: String(ls) }) : t("fr.residue", { db: String(storeScan.databases.length + appResidue), ls: String(storeScan.localStorageKeys) }));
+    // 「变成新的」连离线壳一起：只注销自己的 SW、只删 weebpaint- 前缀缓存（和「强制更新」同一个器官；两个钮不合并——强制更新只清缓存不动数据）。
+    //   壳清失败不挡 reload：数据已归零，reload 后 SW 会按新壳重装。
+    try { await clearOwnShell(); } catch (e) { reportError(e instanceof Error ? e : new Error(String(e)), "log"); }
     location.reload();   // 出厂态重启（内存里残余的单例/缓存全部清零的唯一诚实方式）
   } catch (e) {
     if ((e as { name?: string })?.name === "WipeConsentError") { setStatus(t("fr.mismatch"), true); return; }
