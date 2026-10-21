@@ -29,16 +29,18 @@ await page.waitForTimeout(300);
 await evClick(page, "menuButton");
 
 trace("① dirty guard");
-// ── ① 脏 transient：挽留门 → 取消 ─────────────────────────────────────────────
+// ── ① 脏 transient：说明 sheet（2026-10-21 家族 2½：不硬拦、不三键挽留——说清「当前画作还没保存的改动也会丢」，人能取消）→ 取消 ──
 await drawStroke(page);
 await evClick(page, "menuButton");
 await evClick(page, "menuFactoryReset");
-await page.waitForTimeout(400);
+await page.waitForTimeout(600);
 const sheet1 = await page.evaluate(() => ({
+  confirmVisible: !document.getElementById("genericSheet").classList.contains("hidden"),
   choicesVisible: !document.getElementById("genericSheetChoices").classList.contains("hidden"),
-  nChoices: document.querySelectorAll("#genericSheetChoices button").length,
+  msg: document.getElementById("genericSheetMessage")?.textContent || "",
 }));
-c.expect("dirty transient → 三键挽留（choice sheet 2 键 + 取消）", sheet1.choicesVisible && sheet1.nChoices === 2, JSON.stringify(sheet1));
+c.expect("dirty transient → 说明 sheet（confirm，不是三键挽留）", sheet1.confirmVisible && !sheet1.choicesVisible, JSON.stringify(sheet1));
+c.expect("说明里讲了「没保存的改动也会丢」+ 没传上去的作品", /没保存的改动/.test(sheet1.msg) && /云端/.test(sheet1.msg), sheet1.msg);
 await evClick(page, "genericSheetCancel");
 await page.waitForTimeout(300);
 c.expect("取消=中止，theme 未动", await page.evaluate(() => document.documentElement.getAttribute("data-theme")) === "night");

@@ -1117,8 +1117,10 @@ export const S = {
   "fr.menuItem": { zh: "还原出厂设置…", en: "Factory reset…", ja: "出荷時設定にリセット…", tok: "o sin e ilo ni…" },
   "fr.introTitle": { zh: "还原出厂设置", en: "Factory reset", ja: "出荷時設定にリセット", tok: "o sin e ilo ni" },
   "fr.introMsg": { zh: "删除这台设备上的全部本地数据：图库缓存、设置、崩溃快照、恢复档。云端与磁盘上的作品文件不受影响。", en: "Deletes all local data on this device: gallery caches, settings, crash snapshots, revert history. Files in the cloud or on disk are untouched.", ja: "この端末のローカルデータ（ギャラリーキャッシュ・設定・クラッシュスナップショット・復元履歴）をすべて削除します。クラウドやディスク上の作品ファイルは影響を受けません。", tok: "ni li weka e sona ale lon ilo ni. sitelen lon poki sewi anu lon lipu ilo li awen pona." },
-  "fr.needClose": { zh: "先关闭当前画作，再还原出厂设置", en: "Close the current artwork before a factory reset", ja: "先に現在の作品を閉じてください", tok: "o pini e sitelen ni. o sin e ilo kepeken ni la" },
-  "fr.needDetach": { zh: "先在图库页卸下图库（那里有备份逃生口），再还原出厂设置", en: "Detach the gallery first (the gallery page has the backup escape hatch)", ja: "先にギャラリーページでギャラリーを取り外してください（バックアップ手段があります）", tok: "o weka e poki sitelen lon lipu poki. o sin e ilo kepeken ni la" },
+  // 2026-10-21（家族 2½，统筹稿问题 7）：① 说明 sheet 里的三句——有没有没传上去的、当前画有没有没保存的；不硬拦，人看完能取消
+  "fr.introDirty": { zh: "有 {n} 份作品还没传上云端，会一起删掉，不会留逃生副本。", en: "{n} artwork(s) are not uploaded yet; they will be deleted too, with no escape copy.", ja: "{n} 件の作品がまだクラウドに送信されていません。これらも一緒に削除され、退避コピーは作りません。", tok: "sitelen {n} li lon ala poki sewi. ona li moli kin. mi pali ala e sitelen awen." },
+  "fr.introNoDirty": { zh: "没有还没传上云端的作品。", en: "No artwork is waiting to be uploaded.", ja: "未送信の作品はありません。", tok: "sitelen ale li lon poki sewi." },
+  "fr.introOpenUnsaved": { zh: "当前画作还没保存的改动也会丢。", en: "Unsaved changes in the open artwork will be lost as well.", ja: "開いている作品の未保存の変更も失われます。", tok: "ante pi awen ala pi sitelen ni li moli kin." },
   "fr.consentPhrase": { zh: "删除全部本地数据", en: "DELETE ALL LOCAL DATA", ja: "ローカルデータをすべて削除", tok: "o weka e sona ale" },
   "fr.consentPrompt": { zh: "输入「{phrase}」以确认（逐字）", en: "Type \"{phrase}\" to confirm (exactly)", ja: "「{phrase}」と入力して確認（一字一句）", tok: "o sitelen e \"{phrase}\" tawa ken" },
   "fr.mismatch": { zh: "输入不匹配，已取消", en: "Input didn't match — cancelled", ja: "入力が一致しません。キャンセルしました", tok: "sitelen li sama ala. mi pini" },

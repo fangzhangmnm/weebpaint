@@ -5,10 +5,13 @@
 //   报告只含命名空间级库名+键计数、永不透文件名）+ app 自家足迹（裸 "weebpaint" 库 = 缩略图/
 //   checkpoint ring、GUID 前缀库 = gallery-registry/crash、device-kv localStorage 键）。
 // **云端与磁盘文件永不碰**（还原出厂 ≠ 删作品——正本在云/盘上；这是「公用电脑离开前清痕」+调试双用）。
-// SW 预缓存不在此（menuForcePwaReset 另有门）。
-// 前置（结构性，不造逃生复本）：无开画（docHome=null）+ 无挂库（kind:none）——卸库走图库页正门
-//   （那里有绿灯门 + dirty 逃生 sheet），本器官不重复造第二套。
-import { wipeAppNamespace, scanAppNamespace, galleryBackend } from "./app-store.ts";   // maintenance 面经接缝（B 分层 lint 守）
+// 2026-10-21 起连自己的离线壳一起清（shell-reset.ts）；「强制更新」仍是另一颗只清缓存的钮，两钮不合并。
+// 护栏（家族根 CLAUDE.md 2½，user 2026-10-21「全家swipe的语义统一，然后full swipe应该有二次确定护栏，而且是开发者菜单里面」；
+//   统筹稿问题 7 答「只提示一次、可取消、不硬拦」）= 两步：① 说明 sheet——有 N 份没传上去会一起删、不造逃生副本（没有就说没有）、
+//   当前画未保存的改动也会丢，可取消；② 逐字确认（库内比对）。**没有硬门**：以前「先关画 / 先去图库页卸库」那两道改成 ① 里的一句话。
+//   挂着库时先 forceDetach 关掉 IDB 连接（不关 deleteDatabase 会被堵），不 drain、不造逃生副本——① 已经说清了。
+import { wipeAppNamespace, scanAppNamespace, galleryBackend, requireStore } from "./app-store.ts";   // maintenance 面经接缝（B 分层 lint 守）
+import { galleryAttachment } from "./gallery-attachment-host.ts";
 import { docHome } from "./doc-home.ts";
 import { session } from "./session-state.ts";
 import { openConfirmSheet, openInputSheet } from "./sheets.ts";
@@ -65,19 +68,21 @@ async function _wipeAppFootprint(): Promise<{ deleted: string[]; blocked: string
 
 /** 还原出厂主流程（topbar-menu 的 menuFactoryReset 调）。全程 in-app sheet（无系统对话框红线）。 */
 export async function runFactoryReset(setStatus: (msg: string, persist?: boolean) => void): Promise<void> {
-  // 结构前置：gallery 家开画/挂库走各自正门收口（那里有真护栏），本器官不开旁门。
-  //   ⚠ canvas-first 下无库恒有 transient 在场（boot 即画布）——transient/file 家走既有三键挽留门
-  //   （保存/丢弃/取消；wipe+reload 会连 T-crash 快照一起清，未收口就等于焚画）。
-  const home = docHome();
-  if (home?.kind === "gallery") { setStatus(t("fr.needClose"), true); return; }
-  if (galleryBackend().kind !== "none") { setStatus(t("fr.needDetach"), true); return; }
-  if (home != null && !(await session.leaveLocalDoc())) return;   // 取消 = 整个还原中止
-  if (!(await openConfirmSheet(t("fr.introTitle"), t("fr.introMsg")))) return;
+  // ① 说明 sheet（不硬拦：有什么会丢就说什么，人看完能取消）。wipe + reload 会连 T-crash 快照一起清，没传上去的 / 没保存的都是真丢。
+  const attached = galleryBackend().kind !== "none";
+  let dirtyN = 0;
+  if (attached) { try { dirtyN = await requireStore().files.dirty.count(); } catch (e) { reportError(new Error("[factory-reset] dirty.count failed: " + String(e)), "log"); } }
+  const openUnsaved = docHome() != null && session.dirty;
+  const intro = [t("fr.introMsg"), dirtyN > 0 ? t("fr.introDirty", { n: String(dirtyN) }) : t("fr.introNoDirty")];
+  if (openUnsaved) intro.push(t("fr.introOpenUnsaved"));
+  if (!(await openConfirmSheet(t("fr.introTitle"), intro.join("\n")))) return;
   // 打字 consent（0825 拍板：typing check 在库内做；这里收集，库比对不过=拒绝执行）
   const phrase = t("fr.consentPhrase");
   const typed = await openInputSheet(t("fr.introTitle"), "", { placeholder: phrase, message: t("fr.consentPrompt", { phrase }) });
   if (typed == null) return;
   try {
+    // 挂着库 → 先关连接（attachment 器官的显式逃生：swap(null) + dispose，不 drain）。reload 在几秒内，期间别的消费点撞 StoreDisposedError 是契约不是事故。
+    if (attached) await galleryAttachment.forceDetach();
     const storeReport = await wipeAppNamespace({ appId: APP_ID, consent: { expected: phrase, typed } });
     const appReport = await _wipeAppFootprint();
     // 无痕扫（验证归零；报告永不含文件名——库口子红线口径，app 侧同口径）
