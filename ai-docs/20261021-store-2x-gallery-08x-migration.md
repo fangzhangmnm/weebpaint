@@ -35,9 +35,9 @@ WeebPaint 是家族里库最旧的一家（store 0.15.2 / gallery 0.1.0，WXHW /
 
 | 开关 | 在哪 | 库默认 | 这次 | 推荐 | 为什么 |
 |---|---|---|---|---|---|
-| `transport.timeouts` | `createOneDriveProvider({ transport })` | 关（请求没有超时） | 关 | **开**（`DEFAULT_GRAPH_TIMEOUTS`：meta 30 s / 块 120 s / range 60 s / 整文件 15 min） | iPad 锁屏后在途的 fetch 常常**永远挂着**（KudsRocket 10-15 实录）。WeebPaint 的 `editor-session.persist()` 是 `_saving` 单飞锁，`await store.save()` 里内联 await 推云：推挂死 → `_saving` 永远 true → 之后的 autosave 全部跳过 → 编辑只在内存里，直到 reload。这碰的是第 2 条（没传上去的改动不能丢），§3 A3。有超时 → `CloudNetworkError` → save 返 `pushed:false` → 文件留脏、下次补推。 |
-| `transport.chunkResume` | 同上 | 关（单块失败 = 整份网络错） | 关 | 开 | `.ora` 带 timelapse 动辄 5–50 MB，走分块上传；网络抖一下整份重来 = 流量 × N。只影响成功率，不影响安全。 |
-| `transport.verifyChunkedCommit` | 同上 | 关（只在开会话时核 eTag） | 关 | **开** | 两台设备同时覆盖同一文件，分块上传「传那几十秒」里有窗口（store 0.17.1 分析 §4）。开了 = 提交最后一块前再比一次 eTag，窗口缩到最后一块那几秒。碰第 1 条（云端已有的不被盖），§3 A6 / A9。代价 = 每次分块覆盖多一个 GET。 |
+| `transport.timeouts` | `createOneDriveProvider({ transport })` | 关（请求没有超时） | 关 → **v0.14.39 开**（user 10-21「没问题」） | **开**（`DEFAULT_GRAPH_TIMEOUTS`：meta 30 s / 块 120 s / range 60 s / 整文件 15 min） | iPad 锁屏后在途的 fetch 常常**永远挂着**（KudsRocket 10-15 实录）。WeebPaint 的 `editor-session.persist()` 是 `_saving` 单飞锁，`await store.save()` 里内联 await 推云：推挂死 → `_saving` 永远 true → 之后的 autosave 全部跳过 → 编辑只在内存里，直到 reload。这碰的是第 2 条（没传上去的改动不能丢），§3 A3。有超时 → `CloudNetworkError` → save 返 `pushed:false` → 文件留脏、下次补推。 |
+| `transport.chunkResume` | 同上 | 关（单块失败 = 整份网络错） | 关 → **v0.14.39 开** | 开 | `.ora` 带 timelapse 动辄 5–50 MB，走分块上传；网络抖一下整份重来 = 流量 × N。只影响成功率，不影响安全。 |
+| `transport.verifyChunkedCommit` | 同上 | 关（只在开会话时核 eTag） | 关 → **v0.14.39 开** | **开** | 两台设备同时覆盖同一文件，分块上传「传那几十秒」里有窗口（store 0.17.1 分析 §4）。开了 = 提交最后一块前再比一次 eTag，窗口缩到最后一块那几秒。碰第 1 条（云端已有的不被盖），§3 A6 / A9。代价 = 每次分块覆盖多一个 GET。 |
 | `pushRetry` | `createStore({ pushRetry })` | 4 次 × 200·n ms（共 2 s） | 默认 | 默认 | 推云在 `_saving` 锁内，退避拉到 15 s 会让 autosave 停 15 s；画画 app 没有 KudsRocket 那种「每 20 s 一片」的压力。 |
 | `openLineageFromDurable` | `createStore` | **开** | 开 | 开 | §2 0.18.0 行。 |
 | `trustHints:false` | `pullIfClean` 调用点 | 默认 true | **回线 / 回前台两处传 false** | 同 | 不是开关是用法；库说明写明这两个时刻该传。 |
@@ -103,6 +103,6 @@ WeebPaint 是家族里库最旧的一家（store 0.15.2 / gallery 0.1.0，WXHW /
 
 ## 8. 要 user 一句话的
 
-1. §3 三个 transport 开关（timeouts / chunkResume / verifyChunkedCommit）开不开——推荐开。
+1. ~~§3 三个 transport 开关~~ user 10-21「没问题」→ v0.14.39 开了（`src/app-store.ts` `GRAPH_TRANSPORT`）。
 2. 登录后 / 回线后 `pushAll` 加不加（会把推云提前到人没按存的时候）。
 3. prod 不推（照 F-64：等用一段 dev）。

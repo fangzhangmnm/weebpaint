@@ -2,7 +2,8 @@
 //   只做 config 注入（provider / ui bundle / crypto codec / crypt / validateAdopt）+ auth 转发 + gallery 列举适配。
 //   app 只碰 store 两面（**file / collection**）+ editor-session。绝不裸碰 kv/IDB/graph/vendor。
 //   （localSettings/syncedSettings 那两面已于 2026-07-13 删除 —— 全部 KV 化进 collection。别照旧注释找。）
-import { createStore, createOneDriveProvider, createFolderProvider, isCached, requestStoragePersistence } from "@internal/store";
+import { createStore, createOneDriveProvider, createFolderProvider, isCached, requestStoragePersistence, DEFAULT_GRAPH_TIMEOUTS } from "@internal/store";
+import type { GraphTransportOptions } from "@internal/store";
 import { detectStoreAbsent } from "./store-absent.ts";
 import { createDeviceRackSlot } from "./device-rack-slot.ts";   // A2 终案：无库笔架器官（reload 不丢）
 import type { RackPersistence } from "./brush-rack-controller.ts";   // 脑定义 port（type-only 无环）
@@ -27,6 +28,14 @@ import { naturalCompare } from "@internal/gallery";
 // 缺席模式下 createOneDriveProvider/createStore **完全不被调用**（零 IDB/localStorage 命名空间副作用）。
 export const storeAbsent = detectStoreAbsent();
 
+// Graph 传输层三个显式开关（store 0.17.2 默认全关 = 行为变更默认关；user 2026-10-21「没问题」开；取舍 = ai-docs/20261021-store-2x-gallery-08x-migration.md §3）：
+//   timeouts：每个 Graph 请求带超时（meta 30 s / 一块 5 MiB 120 s / byte-range 60 s / 整文件 15 min）。iPad 锁屏后在途 fetch 常常永远挂着，
+//     editor-session.persist() 的 _saving 单飞锁等的就是这一个 await → 推挂死 = 之后的 autosave 全停、编辑只在内存里。到点 → CloudNetworkError
+//     = 和断网同一类：save 返 pushed:false、文件留脏、下次补推。
+//   chunkResume：> 4 MB 的 .ora 走分块上传；单块失败不再整份从头来，问会话传到哪了接着传（退避 1/2/4/8/16 s，5 次）。
+//   verifyChunkedCommit：分块上传只在开会话时核 If-Match，最后一块落地无条件 → 两台设备同时覆盖同一文件有「传那几十秒」的窗口；
+//     开了 = 提交最后一块前再比一次 eTag，变了就撤会话抛 412 → 冲突面。代价 = 每次分块覆盖多一个 GET。
+const GRAPH_TRANSPORT: GraphTransportOptions = { timeouts: DEFAULT_GRAPH_TIMEOUTS, chunkResume: true, verifyChunkedCommit: true };
 type _Prov = ReturnType<typeof createOneDriveProvider>["provider"];
 type _Auth = ReturnType<typeof createOneDriveProvider>["auth"];
 function _assembleReal(): { provider: _Prov | null; auth: _Auth } {
@@ -34,7 +43,7 @@ function _assembleReal(): { provider: _Prov | null; auth: _Auth } {
   // ⚠ 这里**不再预建 store**（2026-08-27 懒出生）：店只在 attach 时刻经 _buildStoreForGalleryEntry 出生。
   //   预建的代价实测过：boot 进无库要 dispose 它，migration 后台自跑被腰斩 + eval 期 collections 骑上
   //   注定要死的实例 →「idb cache closed」黄警告（user 无痕实锤 2026-08-27）。
-  const od = createOneDriveProvider({ clientId: CLIENT_ID, scopes: SCOPES, authority: AUTHORITY, msalUrl: embeddedBlobUrl("msal-browser.min.js", "text/javascript") ?? "./vendor/msal/msal-browser.min.js" });
+  const od = createOneDriveProvider({ clientId: CLIENT_ID, scopes: SCOPES, authority: AUTHORITY, msalUrl: embeddedBlobUrl("msal-browser.min.js", "text/javascript") ?? "./vendor/msal/msal-browser.min.js", transport: GRAPH_TRANSPORT });
   return { provider: od.provider, auth: od.auth };
 }
 
@@ -185,7 +194,7 @@ export function _buildStoreForGalleryEntry(entry: { kind: "onedrive" | "folder";
   if (!provider || !_auth) throw new Error("onedrive provider unavailable");
   const auth = _auth;
   const prov = entry.homeAccountId
-    ? createOneDriveProvider({ clientId: CLIENT_ID, scopes: SCOPES, authority: AUTHORITY, msalUrl: embeddedBlobUrl("msal-browser.min.js", "text/javascript") ?? "./vendor/msal/msal-browser.min.js", homeAccountId: entry.homeAccountId }).provider
+    ? createOneDriveProvider({ clientId: CLIENT_ID, scopes: SCOPES, authority: AUTHORITY, msalUrl: embeddedBlobUrl("msal-browser.min.js", "text/javascript") ?? "./vendor/msal/msal-browser.min.js", homeAccountId: entry.homeAccountId, transport: GRAPH_TRANSPORT }).provider
     : provider;
   return _createRealStore(prov, () => auth.isSignedIn(), entry.dbId === "defaultStore" ? undefined : entry.dbId);
 }
