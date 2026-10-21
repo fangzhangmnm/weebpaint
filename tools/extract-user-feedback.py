@@ -1,9 +1,15 @@
 import argparse, json, glob, re, os, sys
-# 人类语料抽取（出处核查用）。两个通道缺一不可：
-#   ① type=user 的文本回合；② type=queue-operation 的 enqueue（用户在 AI 干活时排队塞的消息）。
+# 人类语料抽取（出处核查用）。三个通道缺一不可：
+#   ① type=user 的文本回合；② type=queue-operation 的 enqueue（用户在 AI 干活时排队塞的消息）；
+#   ③ AskUserQuestion 的答案（AI 弹选择题、用户点的那一项或打的字；周账 F-38，2026-10-21 Claude Fable 5.1 补）。
 # ②是 2026-08-25 补的——2026-08-21 审计只扫①，把「E1 E2 E3批准」「禁用云的时候应该所有用户路线都走
 # blockbench模式」等排队原话全漏了，产生过一起「伪造用户原话」冤案（详 WeebPaint
 # ai-docs/20260821-opus-round-rollback-and-security-handoff.md 的 2026-08-25 更正节）。
+# ③的形状（2026-10-21 从 transcript 核）：type=user 的回合里一个 tool_result 块，content 是一句
+#   `Your questions have been answered: "问题"="答案", "问题2"="答案2". You can now continue with these answers in mind.`
+#   答案单独看没意义（「同意 (Recommended)」），所以连问题一起抽成 `[AskUserQuestion] 问题 → 答案`；多选题的答案是逗号串。
+ASK_PREFIX = 'Your questions have been answered: '
+ASK_PAIR = re.compile(r'"((?:[^"\\]|\\.)*)"="((?:[^"\\]|\\.)*)"')   # "问题"="答案"（问题里的中文引号「」不是 ASCII 引号，不会撞）
 SKIP = re.compile(r'<system-reminder>|<command-name>|<local-command|tool_use_error|\[Request interrupted|<ide_opened_file>|<task-notification>')
 def extract(files, out):
     n = 0
@@ -17,7 +23,19 @@ def extract(files, out):
                 if d.get('type') == 'user':
                     c = d.get('message', {}).get('content')
                     if isinstance(c, str): texts = [c]
-                    elif isinstance(c, list): texts = [b.get('text','') for b in c if isinstance(b,dict) and b.get('type')=='text']
+                    elif isinstance(c, list):
+                        texts = [b.get('text','') for b in c if isinstance(b,dict) and b.get('type')=='text']
+                        # ③ AskUserQuestion 的答案（tool_result 块；answers 的 SSoT 是 content 那句话，toolUseResult 只有题目）
+                        for b in c:
+                            if not (isinstance(b, dict) and b.get('type') == 'tool_result'): continue
+                            rc = b.get('content')
+                            if isinstance(rc, list): rc = ''.join(x.get('text', '') for x in rc if isinstance(x, dict))
+                            if not isinstance(rc, str) or not rc.startswith(ASK_PREFIX): continue
+                            body = rc[len(ASK_PREFIX):]
+                            body = body[:body.rfind('. You can now continue')] if '. You can now continue' in body else body
+                            pairs = ASK_PAIR.findall(body)
+                            if not pairs: pairs = [('?', body)]
+                            texts.extend(f'[AskUserQuestion] {q} → {a}' for q, a in pairs)
                 elif d.get('type') == 'queue-operation' and d.get('operation') == 'enqueue':
                     # remove/dequeue 是投递记账，内容与 enqueue 重复，只取 enqueue
                     c = d.get('content')
