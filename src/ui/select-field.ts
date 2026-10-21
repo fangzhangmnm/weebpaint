@@ -16,6 +16,7 @@
 import { togglePopupMenu, type PopupBand, type PopupMenuItem } from "./popup-menu.ts";
 import { iconHtml, slotCaretHtml } from "./icon.ts";
 import { defineComponent, ref, watch, onMounted, onUnmounted } from "../../vendor/vue/vue.esm-browser.prod.js";
+import { VUE_RENDER } from "../vue-render.ts";   // #89：模板构建时编好（SSoT = src/vue-templates.ts），运行时零 eval
 
 // 2026-09-09 icon（sprite symbol id，可选）：弹层项与钮面都带图标（user「手指的几种工具用下拉框吧，图标太打哑谜了」——图标 + 文字并列才读得懂）。
 // 2026-09-11 short（可选）：定宽钮面用的缩写（"正片" / "Mult"）；弹层仍画 label 全名。
@@ -167,5 +168,5 @@ export const SelectFieldVue = defineComponent({
     watch(() => [props.modelValue, props.options], () => f?.refresh(), { deep: true });
     return { btn };
   },
-  template: `<button ref="btn" type="button" class="select-field" :disabled="disabled"></button>`,
+  render: VUE_RENDER.selectField,
 });

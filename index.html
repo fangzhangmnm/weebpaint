@@ -6,7 +6,7 @@
          connect-src 放 https:（OneDrive 下载 / 上传主机不固定、Blender 远程地址人能填）+ 本机 127.0.0.1 / localhost（Blender 同步默认 http://127.0.0.1:18765）。
          ⚠ 'unsafe-eval' 是过渡：本 app 的 Vue 组件（十几处 template:）和 gallery 0.1.0 在运行时编译模板，要 eval；退场条件 = 构建时预编译（gallery 0.8.4 已有，F-19 迁过去 + 本仓组件预编译后去掉）。
          test/csp-guard.test.mjs 钉着；standalone 单文件版（全是内联脚本）由 pack-standalone.mjs 去掉这条。 -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' https: blob: data: http://127.0.0.1:* http://localhost:*; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; frame-src 'self' https://login.microsoftonline.com https://login.live.com; object-src 'none'; base-uri 'self'; form-action 'self'; manifest-src 'self'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' https: blob: data: http://127.0.0.1:* http://localhost:*; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; frame-src 'self' https://login.microsoftonline.com https://login.live.com; object-src 'none'; base-uri 'self'; form-action 'self'; manifest-src 'self'" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
     <meta name="theme-color" content="#F6F4EF" />
     <meta name="theme-color" content="#121110" media="(prefers-color-scheme: dark)" />
@@ -1534,6 +1534,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-5de6cc078970.mjs"></script>
+    <script type="module" src="./dist/weebpaint-f719c1881b6b.mjs"></script>
   </body>
 </html>

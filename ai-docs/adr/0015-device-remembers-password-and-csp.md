@@ -18,7 +18,7 @@
 
 `index.html` 头上一条 meta（GitHub Pages 配不了响应头）：`script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'`（不放行内联脚本 → 主题防闪白那段搬成 `theme-guard.js`，SW 预缓存）；`connect-src 'self' https: blob: data: http://127.0.0.1:* http://localhost:*`（OneDrive 主机不固定、Blender 同步默认本机 18765、远程地址人能填）；`frame-src` 只准本站 + 微软登录（MSAL 后台续登录）；`img/media/font` = 本站 + data / blob；`style-src 'self' 'unsafe-inline'`；`object-src 'none'`、`base-uri`、`form-action` 收口。被拦的东西走 `reportError(…, "log")`（`[csp] blocked …`）。
 
-- **`'unsafe-eval'` 是过渡**：本仓十几处 Vue `template:` 组件 + gallery 0.1.0 都在运行时编译模板（`new Function`）。退场 = 构建时预编译：gallery 0.8.4 已经做了（宿主递整个 Vue 模块即零 eval），F-19 迁过去 + 本仓组件也预编译后，把 `test/csp-guard.test.mjs` 的期望值和 index.html 一起改掉（总账 #89）。在那之前注入的 `<script>` / 内联事件 / 外站脚本照样不跑。
+- **`'unsafe-eval'` 2026-10-21 退场**（总账 #89，Claude Fable 5.1，v0.14.38）：gallery 0.8.5 收货 + 递整个 Vue 模块（0.8.4 预编译）；本仓 10 处 Vue `template:` 搬进 `src/vue-templates.ts`（SSoT），`scripts/compile-vue-templates.mjs` 用 `@vue/compiler-dom` 3.5.35（= vendor/vue/VERSION，脚本核）构建时编成 `src/vue-templates.compiled.ts`（生成物进仓），组件经 `src/vue-render.ts` 拿 `render:`。守卫 = `test/vue-templates-compiled.test.mjs`（生成物不过期 / 无 eval / src 里不许长回 `template:`）+ `test/csp-guard.test.mjs`（`script-src 'self' 'wasm-unsafe-eval'`）。此前（v0.14.33–37）它是写明的过渡：本仓组件 + gallery 0.1.0 都在运行时编译模板。
 - **standalone 单文件版没有 CSP**：它本来就全是内联脚本（`scripts/pack-standalone.mjs` 去掉 meta、把 theme-guard 内联回去，并自检）。
 
 ## 验证（2026-10-17）

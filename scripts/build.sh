@@ -40,6 +40,11 @@ TMP_OUT="$OUT_DIR/weebpaint-tmp.mjs"
 # 0. 类型检查门（store 深模块被 Uint8Array/Blob 类型 bug 雷击两次 → 把 tsc --noEmit 设成构建前置）。
 #    esbuild 只 strip 类型不检查；这道才是真护栏。tsc 装在 devDependencies（npm i 一次）。
 #    没装 tsc（裸 clone 未 npm i）→ 大声警告但不挡构建（保留 node 直跑的简单性）；装了就强制过。
+# 00. Vue 模板构建时编译（总账 #89，2026-10-21）：src/vue-templates.ts → src/vue-templates.compiled.ts（生成物进仓，test/vue-templates-compiled 盯它不过期）。
+#     运行时零 eval → 页面 CSP 不放行 'unsafe-eval'（ADR-0015）。编译器版本必须 = vendor/vue/VERSION，脚本自己核。
+echo "[build] Vue 模板预编译…"
+node scripts/compile-vue-templates.mjs || { echo "[build] ✗ Vue 模板预编译失败（@vue/compiler-dom 没装？npm i）" >&2; exit 1; }
+
 TSC="./node_modules/.bin/tsc"
 if [ -x "$TSC" ]; then
   echo "[build] 类型检查 tsc --noEmit…"

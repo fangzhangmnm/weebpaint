@@ -11,6 +11,7 @@
 //   applyToolState 的 slider-DOM-push / _sidebarBrushBtn tap-长按手势。
 
 import { createApp, defineComponent, reactive, ref, computed, watch } from "../../vendor/vue/vue.esm-browser.prod.js";
+import { VUE_RENDER } from "../vue-render.ts";   // #89：模板构建时编好（SSoT = src/vue-templates.ts），运行时零 eval
 import { sliderPosToSize, sizeToSliderPos, sliderMaxPos } from "./brush-size.ts";
 import { t } from "../i18n/index.ts";
 
@@ -108,31 +109,7 @@ export function mountLeftDial(el: HTMLElement, opts: LeftDialOpts): LeftDialHand
         picking, pickIcon, pickTitle, pickDown, pickUp, pickClick,
       };
     },
-    template: `
-      <!-- 2026-09-10：左栏 = 笔粗滑条 · 取样钮 · 不透明滑条，永远在（不能画时滑条 disabled）；笔架钮 / 尺钮已撤 -->
-      <input ref="sizeSlider" id="sizeSlider" class="left-sidebar-slider" type="range" min="0" :max="sizePosMax" step="1"
-        :value="sizePos" :disabled="!canDraw" orient="vertical" :aria-label="L.size" @input="onSizeInput" />
-      <!-- 笔粗图标位 = 纯标签（v0.6.32 迁出的笔压 toggle 已于 2026-08-28 整条 sunset：不要压感 = 选「固定xx」笔） -->
-      <span class="left-sidebar-label" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><use href="#brush-width"/></svg>
-      </span>
-      <!-- 2026-09-06 一次性取样钮（两滑条之间，Procreate 修饰键的位置，但用我们的吸管而不是方框；图标随 context 变） -->
-      <button class="left-sidebar-brush left-sidebar-pick" id="leftPick" type="button" :title="pickTitle" :aria-label="pickTitle"
-        :aria-pressed="picking ? 'true' : 'false'" @pointerdown="pickDown" @pointerup="pickUp" @pointercancel="pickUp" @click="pickClick">
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><use :href="'#' + pickIcon"/></svg>
-      </button>
-      <div class="size-popup" :class="{ hidden: !popup.visible }" :style="{ left: popup.left + 'px', top: popup.top + 'px' }" aria-hidden="true">
-        <div class="size-popup-circle-frame">
-          <div class="size-popup-circle" :style="{ width: popup.dia + 'px', height: popup.dia + 'px', opacity: popup.opacity }"></div>
-        </div>
-        <span class="size-popup-text">{{ popup.text }}</span>
-      </div>
-      <input ref="opaSlider" id="opacitySlider" class="left-sidebar-slider" type="range" min="1" max="100" step="1"
-        :value="opaPct" :disabled="!canDraw" orient="vertical" :aria-label="L.opacity" @input="onOpaInput" />
-      <span class="left-sidebar-label" :title="L.opacity" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><use href="#opacity"/></svg>
-      </span>
-    `,
+    render: VUE_RENDER.leftDial,
   });
 
   const app = createApp(Comp);

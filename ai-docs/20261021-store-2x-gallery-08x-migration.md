@@ -98,6 +98,7 @@ WeebPaint 是家族里库最旧的一家（store 0.15.2 / gallery 0.1.0，WXHW /
 - `scripts/build-standalone.sh` + `tools/standalone-smoke.mjs` OK（两份 css 都内联；记住密码记录重开原样不动）。
 - `tp_check`：新 tok 全 ok / 名词短语 label 只有 fragment WARN（预期）。
 - F2 / F3 / F4 / F7 没跑（不碰图库 / store 接线；F4 三条基线红 = 总账 #90）；gl-smoke 不碰 GL 不跑（user 10-17「别动不动全量」）。
+- **#89 同道顺手做完（v0.14.38）**：本仓 10 处 Vue `template:` 搬进 `src/vue-templates.ts`，`scripts/compile-vue-templates.mjs`（`@vue/compiler-dom` 3.5.35 = vendor/vue/VERSION）构建时编成 `src/vue-templates.compiled.ts`，组件经 `src/vue-render.ts` 拿 `render:`；CSP `script-src 'self' 'wasm-unsafe-eval'`；守卫 `test/vue-templates-compiled.test.mjs`（生成物不过期 / 无 eval / src 里不许长回 `template:`）+ csp-guard；**F10（新）** 左栏 dial / 笔架 sheet / 图层面板 / 颜色轮 / 笔刷设置 + 下拉 逐个点出来看 DOM、零 securitypolicyviolation。决策记在 ADR-0015。
 - **没验的**：OneDrive provider 这条腿（无头没有账号）——和 folder provider 走同一套 store 引擎，差别只在 provider；`resolve()` 三选一的面（folder 库里退出即推、造不出脏 ∧ 云变的分叉）；加密件的锁图标 / 解锁 / 换密码（F9 没设密码）。这三样归 iPad Edge 真机，user 自己决定什么时候跑，AI 不催。
 
 ## 8. 要 user 一句话的

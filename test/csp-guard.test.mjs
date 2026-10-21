@@ -1,5 +1,6 @@
 // CSP 守卫（2026-10-17，user「csp…一起上」）：index.html 头上的内容安全策略逐条钉死，不许被悄悄放松；页面也不许长回内联脚本 / 内联事件。
-// 'unsafe-eval' 是写明的过渡（Vue 运行时编译模板）：退场 = 预编译后把这里的期望值和 index.html 一起改掉。created 2026-10-17 by Claude Opus 5.5
+// 'unsafe-eval' 2026-10-21 退场（总账 #89，Claude Fable 5.1）：本仓 Vue 模板构建时编好（src/vue-templates.ts → .compiled.ts）+ gallery 0.8.4 预编译 → 运行时零 eval。
+// created 2026-10-17 by Claude Opus 5.5
 import { readFileSync } from "node:fs";
 import { describe, it, assert, eq } from "./runner.mjs";
 
@@ -12,8 +13,8 @@ describe("csp-guard", () => {
     assert(m, "no CSP meta");
     assert(html.indexOf(m[0]) < html.indexOf("<script"), "CSP meta must come before any script");
   });
-  it("脚本只准本站文件：没有 unsafe-inline / 外站 / 通配；unsafe-eval 是写明的过渡", () => {
-    eq(policy.get("script-src"), "'self' 'unsafe-eval' 'wasm-unsafe-eval'");
+  it("脚本只准本站文件：没有 unsafe-inline / unsafe-eval / 外站 / 通配（wasm-unsafe-eval 给 7z-wasm 等）", () => {
+    eq(policy.get("script-src"), "'self' 'wasm-unsafe-eval'");
   });
   it("连接：本站 + https + 本机 Blender（127.0.0.1 / localhost），别的 http 不放", () => {
     eq(policy.get("connect-src"), "'self' https: blob: data: http://127.0.0.1:* http://localhost:*");

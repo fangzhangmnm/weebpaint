@@ -22,6 +22,7 @@
 // + _afterDocChange（lasso / history handler 也调）。
 
 import { createApp, defineComponent, reactive, computed, watch, nextTick, ref, onUnmounted } from "../vendor/vue/vue.esm-browser.prod.js";
+import { VUE_RENDER } from "./vue-render.ts";   // #89：模板构建时编好（SSoT = src/vue-templates.ts），运行时零 eval
 import { positionPopup } from "./anchored-popup.ts";
 import { registerFloatingWindow, type FloatingWindowHandle } from "./ui/floating-window.ts";
 import { toggleAdoptedPopup, closePopupMenuOf, openAdoptedPopup, type PopupMenuHandle } from "./ui/popup-menu.ts";   // 2026-09-02 C1：＋ 菜单收养（搬 body，锚到 ＋ 钮）；2026-09-11 图层调整弹层同款收养
@@ -585,85 +586,7 @@ const LayerRow = defineComponent({
       toggleClip, toggleRef, toggleLock,
     };
   },
-  template: `
-    <div
-      class="layer-row"
-      :class="{ active, clipping: layer.clippingMask, reference: isRef, 'layer-group-row': isGroup, 'layer-nested': depth > 0 }"
-      :style="{ marginLeft: railPad + 'px' }"
-      :data-layer-id="String(layer.id)"
-      @click="onRowClick"
-    >
-      <!-- 眼睛**始终第一**（组/叶都是）→ 眼睛列对齐，组不再有误导性缩进。 -->
-      <button type="button" class="layer-vis" :class="{ 'hidden-icon': !layer.visible }"
-        :title="layer.visible ? L.visible : L.hidden"
-        @click="vis"
-        v-html="layer.visible ? EYE_OPEN : EYE_OFF"></button>
-
-      <!-- 组：文件夹图标点击折叠（去三角），排在眼睛之后。叶不显。不缩进，组内层靠 .layer-nested 左竖条标归属。 -->
-      <button v-if="isGroup" type="button" class="layer-folder" :title="collapsed ? L.expandGroup : L.collapseGroup"
-        @click="toggleCollapse" v-html="collapsed ? FOLDER_CLOSED : FOLDER_OPEN"></button>
-
-      <input v-if="renaming" type="text" class="layer-name-input" :value="layer.name"
-        @click.stop @blur="onRenameCommit" @keydown="onRenameKey" />
-      <span v-else class="layer-name" @click="onNameClick">{{ layer.name }}<span v-if="isGroup && collapsed" class="layer-group-count"> ({{ childLeafCount }})</span></span>
-
-      <span v-if="layer.clippingMask" class="layer-clip-chip" :title="L.clippedTip"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#clipping-mask"/></svg></span>
-      <!-- v0.5.8：锁α chip 用 #lock-alpha（不透明度锁）而非通用 #lock——与 ⋯ 菜单 toggle 同图形 -->
-      <span v-if="!isGroup && layer.lockAlpha" class="layer-lock-chip" :title="L.lockAlphaTip">
-        <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><use href="#lock-alpha"/></svg>
-      </span>
-      <!-- 参考层 chip：SVG（#reference-layer），不用语言相关的文字图标（家族规则；旧「参/R」已废） -->
-      <span v-if="isRef" class="layer-ref-chip" :title="L.refTip"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#reference-layer"/></svg></span>
-
-      <button type="button" ref="menuBtn" class="layer-tools-btn" :title="L.layerMenu" @click="toggleMenu"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#more"/></svg></button>
-
-      <button type="button" ref="badgeBtn" class="layer-mode-badge" :class="{ active: expanded }"
-        :title="badgeTitle" @click="toggleBadge">{{ modeBadge }}</button>
-
-      <Teleport to="body"><div v-if="menuOpen" ref="menuEl" class="menu-panel layer-tools-popup" @click.stop>
-        <button class="menu-item menu-item-with-icon" type="button" @click="act('rename')"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#rename"/></svg><span class="menu-item-label">{{ L.rename }}</span></button>
-
-        <!-- 复制（叶+组皆可；组=递归深拷，disabled 按叶数预算） -->
-        <button class="menu-item menu-item-with-icon" type="button" :disabled="!canDuplicate" @click="act('duplicate')"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#copy"/></svg><span class="menu-item-label">{{ L.duplicate }}</span></button>
-
-        <!-- 图层组 reparent：解组（仅组）/ 移入某组（dropdown，不挤占菜单空间）/ 移出组。编组 = 「+」里新建空组 -->
-        <hr class="menu-sep" v-if="isGroup || moveTargets.length || canMoveOut" />
-        <button v-if="isGroup" class="menu-item menu-item-with-icon" type="button" @click="act('ungroup')"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#explode-folder"/></svg><span class="menu-item-label">{{ L.ungroup }}</span></button>
-        <button v-if="isGroup" class="menu-item menu-item-with-icon" type="button" @click="act('collapseToLayer')"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#merge-layers"/></svg><span class="menu-item-label">{{ L.collapseToLayer }}</span></button>
-        <label v-if="moveTargets.length" class="menu-item layer-move-into menu-item-with-icon" @click.stop><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#move-to-folder"/></svg><span class="menu-item-label">{{ L.moveIntoGroup }}</span>
-          <button ref="moveBtn" type="button" class="layer-move-select select-field" @click.stop></button>
-        </label>
-        <button v-if="canMoveOut" class="menu-item menu-item-with-icon" type="button" @click="act('moveOut')"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#move-out-folder"/></svg><span class="menu-item-label">{{ L.moveOut }}</span></button>
-
-        <hr class="menu-sep" />
-        <!-- v267 (user)：层属性 toggle 收进 ⋯ 菜单（点了不关菜单，可连续切） -->
-        <button v-if="!isGroup" class="menu-item layer-menu-toggle" type="button" role="menuitemcheckbox" :aria-pressed="layer.lockAlpha ? 'true' : 'false'" @click="toggleLock"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#lock-alpha"/></svg><span class="menu-item-label">{{ L.lockAlpha }}</span><span class="menu-item-state">{{ layer.lockAlpha ? L.on : L.off }}</span></button>
-        <button class="menu-item layer-menu-toggle" type="button" role="menuitemcheckbox" :aria-pressed="layer.clippingMask ? 'true' : 'false'" @click="toggleClip"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#clipping-mask"/></svg><span class="menu-item-label">{{ isGroup ? L.clipGroup : L.clip }}</span><span class="menu-item-state">{{ layer.clippingMask ? L.on : L.off }}</span></button>
-        <button v-if="!isGroup" class="menu-item layer-menu-toggle" type="button" role="menuitemcheckbox" :aria-pressed="isRef ? 'true' : 'false'" @click="toggleRef"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#reference-layer"/></svg><span class="menu-item-label">{{ L.refLayer }}</span><span class="menu-item-state">{{ isRef ? L.on : L.off }}</span></button>
-
-        <hr class="menu-sep" />
-        <button v-if="!isGroup" class="menu-item menu-item-with-icon" type="button" :disabled="!canMergeDown" @click="act('mergeDown')"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#merge-layer-down"/></svg><span class="menu-item-label">{{ L.mergeDown }}</span></button>
-        <button v-if="!isGroup" class="menu-item menu-item-with-icon" type="button" :disabled="!hasPx" @click="act('explodeColors')"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#separate-colors"/></svg><span class="menu-item-label">{{ L.explodeColors }}</span></button>
-        <button v-if="!isGroup" class="menu-item menu-item-with-icon" type="button" :disabled="!hasPx" @click="act('clear')"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#clear-document"/></svg><span class="menu-item-label">{{ L.clearContent }}</span></button>
-        <button class="menu-item menu-danger menu-item-with-icon" type="button" :disabled="!canDel" @click="act('del')"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#trash-can"/></svg><span class="menu-item-label">{{ isGroup ? L.delGroup : L.del }}</span></button>
-      </div></Teleport>
-    </div>
-
-    <!-- 调整弹层（2026-09-11）：Teleport 到 body（逃出面板 backdrop-filter 包含块，与 ⋯ 菜单同理），popup-menu 收养定位/关闭纪律 -->
-    <Teleport to="body"><div v-if="expanded" ref="adjEl" class="menu-panel layer-adjust-popup hidden" @click.stop>
-      <label class="layer-slider-row">
-        <span class="layer-slider-icon" :title="L.opa"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#opacity"/></svg></span>
-        <input type="range" min="0" max="100" :value="opacityPct"
-          @input="opaInput" @change="opaCommit" @pointerup="opaCommit" @pointercancel="opaCommit" @click.stop />
-        <span class="layer-slider-val">{{ opacityPct }}</span>
-      </label>
-      <label class="layer-slider-row">
-        <span>{{ L.mode }}</span>
-        <button ref="modeBtn" type="button" class="select-field layer-mode-select" style="grid-column: span 2;" @click.stop></button>
-      </label>
-      <!-- v267 (user)：剪裁 / 锁α / 参考 toggle 已收进 ⋯ 菜单，这里只留 透明度 + 模式 -->
-    </div></Teleport>
-  `,
+  render: VUE_RENDER.layerRow,
 });
 
 // ---- 顶层组件：数据驱动列表（读 docVersion 后快照 doc.layers，倒序：UI 顶 = 栈顶）----
@@ -728,25 +651,7 @@ const LayersPanel = defineComponent({
     });
     return { rows, layersUi };
   },
-  template: `
-    <template v-for="r in rows" :key="r.layer.id">
-      <LayerRow
-        :layer="r.layer"
-        :depth="r.depth"
-        :is-group="r.isGroup"
-        :collapsed="r.collapsed"
-        :child-leaf-count="r.childLeafCount"
-        :active="r.active"
-        :is-ref="r.isRef"
-        :expanded="layersUi.expandedId === r.layer.id"
-        :menu-open="layersUi.menuId === r.layer.id"
-        :renaming="layersUi.renameId === r.layer.id"
-        :can-up="r.canUp" :can-down="r.canDown" :can-del="r.canDel"
-        :can-duplicate="r.canDuplicate" :can-merge-down="r.canMergeDown" :has-px="r.hasPx"
-        :can-move-out="r.canMoveOut" :move-targets="r.moveTargets"
-      />
-    </template>
-  `,
+  render: VUE_RENDER.layersPanel,
 });
 
 let _vueApp: { mount(el: Element): unknown } | null = null;

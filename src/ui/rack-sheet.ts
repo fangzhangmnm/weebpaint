@@ -10,6 +10,7 @@
 // 纯派生（collectFolders/brushesInFolder/smoothstepRadialGradient）在 brush-rack-view.js（node 可测）。
 
 import { createApp, defineComponent, computed } from "../../vendor/vue/vue.esm-browser.prod.js";
+import { VUE_RENDER } from "../vue-render.ts";   // #89：模板构建时编好（SSoT = src/vue-templates.ts），运行时零 eval
 import { collectFolders, brushesInFolder, smoothstepRadialGradient } from "../brush-rack-view.ts";
 import { t } from "../i18n/index.ts";
 import type { Brush } from "../brush-types.ts";
@@ -57,34 +58,7 @@ export function mountRackSheet(el: HTMLElement, opts: RackSheetOpts): RackSheetH
         editBrush: opts.onEditBrush, reset: opts.onReset, L,
       };
     },
-    template: `
-      <div v-if="rackEmpty" class="brush-rack-grid">
-        <div style="padding:20px;text-align:center;color:var(--ink-soft);">
-          {{ L.rackEmpty }}<br><br>
-          <button class="brush-rack-action" @click="reset()">{{ L.resetRack }}</button>
-        </div>
-      </div>
-      <template v-else-if="!brushes.length">
-        <div class="brush-rack-folders"></div>
-        <div class="brush-rack-grid">
-          <div style="padding:20px;text-align:center;color:var(--ink-soft);">{{ L.empty }}</div>
-        </div>
-      </template>
-      <template v-else>
-        <div class="brush-rack-folders">
-          <button v-for="f in folders" :key="f" type="button" class="brush-rack-folder"
-            :aria-pressed="f === effectiveFolder" @click="selectFolder(f)">{{ folderLabel(f) }}</button>
-        </div>
-        <div class="brush-rack-grid">
-          <div v-for="b in tiles" :key="b.id" class="brush-rack-tile" role="button" :tabindex="0"
-            :aria-pressed="b.id === activeId" @click="selectBrush(b.id)">
-            <div class="brush-rack-tile-preview" :style="tileStyle(b)"></div>
-            <span class="brush-rack-tile-name">{{ b.name }}</span>
-            <button type="button" class="brush-rack-tile-edit" :title="L.edit" @click.stop="editBrush(b.id)"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#more"/></svg></button>
-          </div>
-        </div>
-      </template>
-    `,
+    render: VUE_RENDER.rackSheet,
   });
 
   const app = createApp(Comp);

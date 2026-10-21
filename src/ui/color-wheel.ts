@@ -14,6 +14,7 @@
 import {
   createApp, defineComponent, reactive, ref, computed, watch, onMounted, onUnmounted,
 } from "../../vendor/vue/vue.esm-browser.prod.js";
+import { VUE_RENDER } from "../vue-render.ts";   // #89：模板构建时编好（SSoT = src/vue-templates.ts），运行时零 eval
 import { hsvToHex, hexToHsv, sameHex } from "./color-model.ts";
 import { parseColorInput, searchColorNames, type ColorNameHit } from "../color-name.ts";
 import { attachInputSense, type InputSenseHandle } from "./input-sense.ts";
@@ -175,21 +176,7 @@ export const ColorWheel = defineComponent({
   // 多根 = fragment：挂进 .float-panel-body 后三个节点成为它的直接 flex 子节点，
   // DOM 结构与原 index.html 一字不差（样式全 class-based，照旧生效）。
   // v0.7.8：hue 从原生 range 换自绘（ramp-slider 同款 track/thumb class）——原生 range 做不了 shift 细调。
-  template: `
-    <canvas ref="pad" class="sv-pad" width="240" height="180" :aria-label="L.svPad"></canvas>
-    <div ref="hueEl" class="hue-slider ramp-slider" role="slider" tabindex="0" :aria-label="L.hue"
-      :aria-valuenow="hueDeg" aria-valuemin="0" aria-valuemax="360" @keydown="onHueKey">
-      <div class="ramp-slider-thumb" :style="{ left: (hsv.h / 360 * 100) + '%' }"></div>
-    </div>
-    <div class="picker-row">
-      <span class="picker-preview" :style="{ background: hex }"></span>
-      <input ref="hexInput" type="text" maxlength="24" :value="hexText" @keydown="onHexKey" @blur="onHexBlur"
-        @dblclick="onHexDblClick" aria-label="HEX" />
-      <button class="cw-pick" type="button" :title="L.pick" :aria-label="L.pick" @click="$emit('pickRequest')">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#eyedropper"/></svg>
-      </button>
-    </div>
-  `,
+  render: VUE_RENDER.colorWheel,
 });
 
 // 挂载控制器：app 拿到 setColor（外部色推进来）+ unmount。
@@ -209,7 +196,7 @@ export function mountColorWheel(
     setup() {
       return { color, onPick: opts.onPick, onPickRequest: () => opts.onPickRequest?.() };
     },
-    template: `<ColorWheel :color="color" @pick="onPick" @pick-request="onPickRequest" />`,
+    render: VUE_RENDER.colorWheelHost,
   }));
   app.mount(el);
   return {

@@ -69,7 +69,8 @@ import "./resample-bytes.test.mjs"; // 字节重采样：面积平均严格box/a
 import "./png-codec.test.mjs"; // PNG 接缝（UPNG 内脏）：低α无损roundtrip/pHYs
 import "./password-verifier.test.mjs";
 import "./remember-password.test.mjs";   // 2026-10-17 在这台设备上记住密码（≤ 30 天）
-import "./csp-guard.test.mjs";           // 2026-10-17 CSP 逐条钉死
+import "./csp-guard.test.mjs";
+import "./vue-templates-compiled.test.mjs";   // #89：模板生成物不过期 / 无 eval / 组件里不许长回 template:           // 2026-10-17 CSP 逐条钉死
 import "./deploy-list.test.mjs";           // 2026-10-17 新根文件要进部署清单
 import "./liquify-bilinear.test.mjs";
 import "./liquify-bicubic.test.mjs";
