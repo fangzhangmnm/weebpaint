@@ -4,7 +4,7 @@
 //   → 「子工具栈并入上下文条，成为它的左段；长按不再弹菜单，只是把这条上下文条叫出来……先试试这个吧，次优解。先活下来再说」。
 // 一个动词位从此只会冒出一种东西 = 它的上下文条；本段就是那条的左端。何时显条归宿主（套索/形状/滤镜笔随动词激活即显；
 //   笔·自由手默认没有条，长按叫出，✓ 收起）。本模块零业务依赖：tools/current/onPick 全由宿主注入。
-import { iconHtml } from "./icon.ts";
+import { iconHtml } from "@internal/workbench-elements";
 
 export interface VerbSegmentTool { id: string; icon: string; title: string }
 export interface VerbSegmentOpts {

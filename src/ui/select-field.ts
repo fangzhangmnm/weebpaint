@@ -13,8 +13,9 @@
 //   量不到（未入树 / 无布局环境）就留 CSS 兜底宽 --select-fixed-w。
 //   角标 = 右下角小三角（ui/icon slotCaretHtml；下箭头 chevron 退役）：与工具条变体槽同一颗，「有三角 = 有菜单」。
 
-import { togglePopupMenu, type PopupBand, type PopupMenuItem } from "./popup-menu.ts";
-import { iconHtml, slotCaretHtml } from "./icon.ts";
+import { togglePopupMenu, type PopupBand, type PopupMenuItem } from "@internal/workbench-elements";
+import { iconHtml } from "@internal/workbench-elements";
+import { slotCaretHtml } from "./icon.ts";
 import { defineComponent, ref, watch, onMounted, onUnmounted } from "../../vendor/vue/vue.esm-browser.prod.js";
 import { VUE_RENDER } from "../vue-render.ts";   // #89：模板构建时编好（SSoT = src/vue-templates.ts），运行时零 eval
 

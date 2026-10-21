@@ -14,6 +14,7 @@
 //   currentBrush    ← 不可变 ResolvedBrush（从 dial+预设纯派生，引擎唯一吃）
 
 import "./gallery-pkg-init.ts";   // 2026-09-10 收货：@internal/gallery 的 device-kv / 文案注入，必须最先
+import "./workbench-init.ts";     // 2026-10-21 收货：@internal/workbench-elements 的地板注入（顶栏下缘 / 浮窗顶地板），任何 popup 开之前
 import { WEEBPAINT_VERSION } from "./version.ts";
 import { initI18n, t, reconcileLangFromPrefs, tLatin } from "./i18n/index.ts";   // 本地化：<html lang> + 静态 HTML data-i18n 填充
 import { Board } from "./board.ts";
@@ -52,8 +53,8 @@ import { initReadmePanel } from "./readme-panel.ts";       // 2026-09-02 内置�
 import { initPressureToast } from "./pressure-toast.ts";   // 2026-09-02 压感自诊 toast（input.ts 探针 → wp:pressure-doubt）
 import { initFiltersAdjust } from "./filters-adjust.ts";
 import { initToolbar, RACK_PANEL_BY_TOOL, pickOnce, pickHoldBegin, pickHoldEnd, isPicking } from "./toolbar.ts";
-import { closePopupMenu } from "./ui/popup-menu.ts";
-import { showNotice } from "./ui/notice.ts";   // 2026-09-02 C7 通知栈   // 2026-09-02 C1：下笔一把关所有 popup（组槽/变体/stepper/主菜单/⋯）
+import { closePopupMenu } from "@internal/workbench-elements";
+import { showNotice } from "@internal/workbench-elements";   // 2026-09-02 C7 通知栈   // 2026-09-02 C1：下笔一把关所有 popup（组槽/变体/stepper/主菜单/⋯）
 import { setColor, initColorPanel } from "./color-panel.ts";
 import { session, initSession, setSessionGallery } from "./session-state.ts";   // candidate 3 · 活动文档生命周期 SSoT
 import { setDocCompositor, setDocCompositorBytes } from "./backend/doc-render.ts";

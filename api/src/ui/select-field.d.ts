@@ -1,4 +1,4 @@
-import { type PopupBand } from "./popup-menu.ts";
+import { type PopupBand } from "@internal/workbench-elements";
 export interface SelectItem {
     value: string;
     label: string;

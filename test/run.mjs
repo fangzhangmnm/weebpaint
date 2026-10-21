@@ -71,6 +71,7 @@ import "./png-codec.test.mjs"; // PNG 接缝（UPNG 内脏）：低α无损round
 import "./password-verifier.test.mjs";
 import "./remember-password.test.mjs";   // 2026-10-17 在这台设备上记住密码（≤ 30 天）
 import "./csp-guard.test.mjs";
+import "./storage-whitelist.test.mjs";   // 2026-10-21 持久层显式白名单（家族规程；CLAUDE.md 同名表）
 import "./vue-templates-compiled.test.mjs";   // #89：模板生成物不过期 / 无 eval / 组件里不许长回 template:           // 2026-10-17 CSP 逐条钉死
 import "./deploy-list.test.mjs";           // 2026-10-17 新根文件要进部署清单
 import "./liquify-bilinear.test.mjs";

@@ -7,7 +7,7 @@ import { t } from "./i18n/index.ts";
 import { isWindowsPlatform } from "./pressure-probe.ts";
 import { openReadmePanel } from "./readme-panel.ts";
 import { reportError } from "./error-badge.ts";
-import { showNotice } from "./ui/notice.ts";
+import { showNotice } from "@internal/workbench-elements";
 
 export const PRESSURE_DOUBT_EVENT = "wp:pressure-doubt";
 let _shown = false;

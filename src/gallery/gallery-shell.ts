@@ -32,7 +32,7 @@ import { galleryDefaultName } from "../naming.ts";     // P1 命名器官：yyyy
 import { humanSize } from "@internal/gallery";   // 展示格式化（纯·KiB/MiB）；此前本模块私有一份逐字节拷贝，2026-08-21 收敛
 import { requireStore, galleryBackend, isCachedSyncState } from "../app-store.ts";
 import { galleryOnline } from "../gallery-capability.ts";
-import { toggleAdoptedPopup, closePopupMenuOf, isPopupOpen } from "../ui/popup-menu.ts";   // 2026-09-02 C1：图库四 popup 收养
+import { toggleAdoptedPopup, closePopupMenuOf, isPopupOpen } from "@internal/workbench-elements";   // 2026-09-02 C1：图库四 popup 收养
 import { openSheet, closeSheet } from "../ui/sheet.ts";   // 2026-09-02 C3
 import { wireInlineSelect } from "../inline-select.ts";
 import { applyTheme, themeLabel, THEMES, currentTheme } from "../theme.ts";

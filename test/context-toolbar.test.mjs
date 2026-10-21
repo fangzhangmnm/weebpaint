@@ -2,7 +2,7 @@
 //   漏登记 = popup 让位高度算不到它（T2 复发）。跑在 app-boot 之后（app.ts 已 import，各 owner 的 init 已跑）。
 // created 2026-09-02 by Claude Fable 5.1（UI 纪元 C4）。
 import { describe, it, assert, eq } from "./runner.mjs";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 
 describe("context-toolbar · 登记表 = index.html 顶栏条全集", () => {
   it("index.html 里的每条顶栏条都登记了（owner init 各一行；anchored-popup 不再手填 id）", async () => {
@@ -29,8 +29,9 @@ describe("context-toolbar · 登记表 = index.html 顶栏条全集", () => {
     eq(typeof mod.relayoutContextToolbars, "function");
     eq(typeof mod.contextToolbarBottomExcept, "undefined", "contextToolbarBottomExcept 退役");
   });
-  it("anchored-popup 源码不再持顶栏 id 数组", () => {
-    const src = readFileSync(new URL("../src/anchored-popup.ts", import.meta.url), "utf-8");
-    assert(!/_TOP_TOOLBAR_IDS\s*=/.test(src), "anchored-popup 不该再有 _TOP_TOOLBAR_IDS 数组");
+  it("anchored-popup 进了 @internal/workbench-elements（2026-10-21 #2）：本仓没有这个文件，顶栏下缘经 configureFloors 注入", () => {
+    assert(!existsSync(new URL("../src/anchored-popup.ts", import.meta.url)), "src/anchored-popup.ts 不该再存在（包里的版本不持顶栏 id 数组）");
+    const init = readFileSync(new URL("../src/workbench-init.ts", import.meta.url), "utf-8");
+    assert(/configureFloors\(\{[^}]*toolbarBottom/.test(init), "workbench-init 要把 contextToolbarBottom 注进 configureFloors");
   });
 });

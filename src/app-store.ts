@@ -68,6 +68,10 @@ const _createRealStore = (provider: _Prov, signedIn: () => boolean, databaseId?:
   //   和 0.15.2 的 crypt.ext:"ora" + 库默认 encFileName 一个字节不变（存量零迁移）。同一张表 src/identifiers.ts 也造了一份给纯代码用。
   //   2.x 开关（transport / pushRetry / streaming / tier）这次一律按库默认 = 行为不变；要开哪些归 user 定（迁库 doc §3）。
   docKinds: DOC_KINDS,
+  // store 2.1.4（F-54，user 10-21 批这个新持久化键）：> 4 MB 的推（带 timelapse 的 .ora 常见）上传会话落 kv `internal.upload-session:*`，
+  //   刷新 / iOS 杀页之后再推同一份字节（退出 / 显式保存 / 回线补推）先问 Graph 传到哪、从那里接着传，不从零；续上的会话提交前一律核 eTag。
+  //   UI 侧没传完 = 既有的「已存本地，未上云」徽章（save-status），文案加了「回线后接着传」。
+  uploads: { resumable: true },
   crypt: {
     makePeek: async (blob) => { try { return await zipReadEntry(blob, "Thumbnails/thumbnail.png"); } catch { return null; } },  // ora 内容知识只此一行
     getPassword,

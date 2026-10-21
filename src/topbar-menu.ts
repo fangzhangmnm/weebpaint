@@ -33,7 +33,7 @@ import { galleryAttachment } from "./gallery-attachment-host.ts";
 import { sessionNameConflict } from "./session-name.ts";
 import { supportsFileSystemAccess, pickLocalOraFile } from "./local-file-session.ts";
 import { intakeOraDoc } from "./import-image.ts";
-import { openAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";   // 2026-09-02 C1
+import { openAdoptedPopup, closePopupMenuOf } from "@internal/workbench-elements";   // 2026-09-02 C1
 import { allows } from "./ui/interaction-lock.ts";   // 2026-09-02 C8
 import { reportError } from "./error-badge.ts";
 import { flushAppState } from "./app-state.ts";   // #60-C

@@ -18,7 +18,7 @@ import { stripSessionExt, sessionFileName } from "../config.ts";
 import { ORA_KIND } from "../identifiers.ts";
 import { session } from "../session-state.ts";
 import { appState } from "../app-state.ts";
-import { iconHtml } from "../ui/icon.ts";
+import { iconHtml } from "@internal/workbench-elements";
 export type { GalleryHandle };
 
 export interface GalleryHost {

@@ -1039,9 +1039,9 @@ export declare const S: {
         readonly tok: "sitelen li awen lon lipu ilo · {name}";
     };
     readonly "save.unpushed": {
-        readonly zh: "已存本地，未上云（点击重试推送） · {name}";
-        readonly en: "Saved locally, not uploaded (tap to retry) · {name}";
-        readonly ja: "ローカル保存済み、クラウド未送信（タップで再試行） · {name}";
+        readonly zh: "已存本地，未上云（回线后接着传 · 点击重试推送） · {name}";
+        readonly en: "Saved locally, not uploaded (resumes when back online · tap to retry) · {name}";
+        readonly ja: "ローカル保存済み、クラウド未送信（オンライン復帰後に続きから送信 · タップで再試行） · {name}";
         readonly tok: "awen lon ilo ni · pana tawa poki sewi li pakala · sina luka la mi pana sin · {name}";
     };
     readonly "mode.normal": {
@@ -1935,12 +1935,6 @@ export declare const S: {
         readonly ja: "名前を変えて保持";
         readonly tok: "o ante e nimi o awen";
     };
-    readonly "gal.discardToTrash": {
-        readonly zh: "丢弃（送回收站）";
-        readonly en: "Discard (to trash)";
-        readonly ja: "破棄（ゴミ箱へ）";
-        readonly tok: "o weka tawa poki jaki";
-    };
     readonly "gal.rename": {
         readonly zh: "重命名";
         readonly en: "Rename";
@@ -1976,6 +1970,18 @@ export declare const S: {
         readonly en: "Move to trash";
         readonly ja: "ゴミ箱へ";
         readonly tok: "tawa poki jaki";
+    };
+    readonly "gal.emptyTrashBtn": {
+        readonly zh: "清空回收站…";
+        readonly en: "Empty trash…";
+        readonly ja: "ゴミ箱を空に…";
+        readonly tok: "o moli e ale lon poki jaki…";
+    };
+    readonly "gal.emptyBackupBtn": {
+        readonly zh: "清空备份箱…";
+        readonly en: "Empty backups…";
+        readonly ja: "バックアップを空に…";
+        readonly tok: "o moli e ale lon poki awen…";
     };
     readonly "gal.resolve": {
         readonly zh: "处理…";
@@ -5934,17 +5940,23 @@ export declare const S: {
         readonly ja: "この端末のローカルデータ（ギャラリーキャッシュ・設定・クラッシュスナップショット・復元履歴）をすべて削除します。クラウドやディスク上の作品ファイルは影響を受けません。";
         readonly tok: "ni li weka e sona ale lon ilo ni. sitelen lon poki sewi anu lon lipu ilo li awen pona.";
     };
-    readonly "fr.needClose": {
-        readonly zh: "先关闭当前画作，再还原出厂设置";
-        readonly en: "Close the current artwork before a factory reset";
-        readonly ja: "先に現在の作品を閉じてください";
-        readonly tok: "o pini e sitelen ni. o sin e ilo kepeken ni la";
+    readonly "fr.introDirty": {
+        readonly zh: "有 {n} 份作品还没传上云端，会一起删掉，不会留逃生副本。";
+        readonly en: "{n} artwork(s) are not uploaded yet; they will be deleted too, with no escape copy.";
+        readonly ja: "{n} 件の作品がまだクラウドに送信されていません。これらも一緒に削除され、退避コピーは作りません。";
+        readonly tok: "sitelen {n} li lon ala poki sewi. ona li moli kin. mi pali ala e sitelen awen.";
     };
-    readonly "fr.needDetach": {
-        readonly zh: "先在图库页卸下图库（那里有备份逃生口），再还原出厂设置";
-        readonly en: "Detach the gallery first (the gallery page has the backup escape hatch)";
-        readonly ja: "先にギャラリーページでギャラリーを取り外してください（バックアップ手段があります）";
-        readonly tok: "o weka e poki sitelen lon lipu poki. o sin e ilo kepeken ni la";
+    readonly "fr.introNoDirty": {
+        readonly zh: "没有还没传上云端的作品。";
+        readonly en: "No artwork is waiting to be uploaded.";
+        readonly ja: "未送信の作品はありません。";
+        readonly tok: "sitelen ale li lon poki sewi.";
+    };
+    readonly "fr.introOpenUnsaved": {
+        readonly zh: "当前画作还没保存的改动也会丢。";
+        readonly en: "Unsaved changes in the open artwork will be lost as well.";
+        readonly ja: "開いている作品の未保存の変更も失われます。";
+        readonly tok: "ante pi awen ala pi sitelen ni li moli kin.";
     };
     readonly "fr.consentPhrase": {
         readonly zh: "删除全部本地数据";

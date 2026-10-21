@@ -11,8 +11,9 @@
 
 import { createSelectField, type SelectField, type SelectItem, type SelectFace } from "./select-field.ts";
 import { makeRampSlider, type RampSliderHandle } from "./ramp-slider.ts";
-import { togglePopupMenu, type PopupMenuItem } from "./popup-menu.ts";
-import { iconHtml, slotCaretHtml, type IconName } from "./icon.ts";
+import { togglePopupMenu, type PopupMenuItem } from "@internal/workbench-elements";
+import { iconHtml, type IconName } from "@internal/workbench-elements";
+import { slotCaretHtml } from "./icon.ts";
 
 // ---- 登记表（C4 原样）----
 const _registry = new Map<string, HTMLElement>();

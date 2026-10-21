@@ -29,7 +29,7 @@ import { humanSize } from "@internal/gallery";
 import { setColor } from "./color-panel.ts";
 import { setMenuOpen, setMenuItem } from "./settings-menu.ts";
 import { registerFloatingWindow, floatingTopFloor, type FloatingWindowHandle } from "./ui/floating-window.ts";   // 2026-09-02 C2 浮窗深模块
-import { togglePopupMenu } from "./ui/popup-menu.ts";   // 参考窗 ＋ 菜单端口（挂 body；组件在包里，菜单由宿主注入）
+import { togglePopupMenu } from "@internal/workbench-elements";   // 参考窗 ＋ 菜单端口（挂 body；组件在包里，菜单由宿主注入）
 import { desk } from "./workbench-state.ts";
 import { renderNodesToCanvas } from "./backend/doc-render.ts";
 import { pickCloudImage } from "./cloud-picker-host.ts";

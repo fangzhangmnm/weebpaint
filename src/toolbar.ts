@@ -20,7 +20,7 @@ import { resampleItems } from "./frontend/resample-modes.ts";
 import { mountSelectField, type SelectField } from "./ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
 import { t, tLatin } from "./i18n/index.ts";
 import { fillPreviewActive, commitFillNow } from "./fill-mode.ts";
-import { isPopupOpen, openAdoptedPopup, toggleAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";
+import { isPopupOpen, openAdoptedPopup, toggleAdoptedPopup, closePopupMenuOf } from "@internal/workbench-elements";
 import { registerContextToolbar, mountContextToolbar, type ContextToolbarHandle } from "./ui/context-toolbar.ts";
 import { attachSubToolSlot, type SubToolSlotHandle } from "./ui/subtool-slot.ts";   // 2026-09-06 U3 动词位长按（修订 ③：长按 = 叫出上下文条）
 import { mountVerbSegment, type VerbSegmentHandle } from "./ui/verb-segment.ts";   // 2026-09-06 晚 ADR-0012 修订 ③：子工具栈并入上下文条左段

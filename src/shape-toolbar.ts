@@ -20,7 +20,7 @@ import { togglePerspEdit } from "./persp-edit.ts";
 import { tLatin } from "./i18n/index.ts";
 import type { AppContext } from "./app-context.ts";
 import type { ShapeSubTool } from "./shape-brush.ts";
-import type { PopupMenuItem } from "./ui/popup-menu.ts";
+import type { PopupMenuItem } from "@internal/workbench-elements";
 
 let _ctx: AppContext | null = null;
 let _bar: ContextToolbarHandle | null = null;

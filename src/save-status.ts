@@ -10,7 +10,7 @@ import { hasGallery, galleryOnline } from "./gallery-capability.ts";
 import { session } from "./session-state.ts";
 import { assertNever, type DocHome } from "./doc-home.ts";
 import { t, tLatin } from "./i18n/index.ts";
-import { iconHtml } from "./ui/icon.ts";
+import { iconHtml } from "@internal/workbench-elements";
 
 // 文档版本警告：在 setStatus 之上再呈现一个持久 banner（用 doc.body.dataset 给 CSS 染色）
 export function updateNewerBanner() {

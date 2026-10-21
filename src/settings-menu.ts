@@ -16,7 +16,7 @@ import { t, lang, setLang, LANGS, langDisplayName, type Key } from "./i18n/index
 import { KEYBOARD_SHORTCUTS } from "./input.ts";
 import { penAutoOffSingleFingerDraw } from "./pointer-route.ts";   // 总账 #85：第一次见到笔 → 单指绘画自动关一次（纯决策）
 import { _updateMenuCropLabel } from "./doc-ops.ts";
-import { openAdoptedPopup, closePopupMenuOf, isPopupOpen } from "./ui/popup-menu.ts";
+import { openAdoptedPopup, closePopupMenuOf, isPopupOpen } from "@internal/workbench-elements";
 import { openSheet, closeSheet } from "./ui/sheet.ts";   // 2026-09-02 C3   // 2026-09-02 C1：主菜单收养进 popup-menu（外点关/Escape/栈/定位一处）
 import { wireInlineSelect } from "./inline-select.ts";
 import { openInputSheet } from "./sheets.ts";

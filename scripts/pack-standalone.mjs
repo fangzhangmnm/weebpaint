@@ -36,11 +36,15 @@ css = css.replace(/url\("?(vendor\/[^")]+)"?\)/g, (_, p) => {
 });
 if (css.includes("url(\"vendor") || css.includes("url(vendor")) die("styles.css 还有未内联的 vendor url()");
 html = html.replace(/<link rel="stylesheet" href="\.\/styles\.css[^"]*" \/>/, () => `<style>\n${css}\n</style>`);
-// 2026-10-21 迁库：@internal/gallery 的皮是第二份 css（vendor/internal-css/gallery.css），单文件版一样内联（无 vendor url()）。
-const galleryCss = readText("vendor/internal-css/gallery.css");
-if (/url\(\s*"?vendor/.test(galleryCss)) die("gallery.css 有 vendor url()，内联前要先处理");
-html = html.replace(/<link rel="stylesheet" href="\.\/vendor\/internal-css\/gallery\.css" \/>/, () => `<style>\n${galleryCss}\n</style>`);
-if (html.includes("internal-css/gallery.css\"")) die("gallery.css 没内联");
+// 2026-10-21 收包：@internal/gallery / @internal/workbench-elements 的皮是另外两份 css（vendor/internal-css/*.css），单文件版一样内联（无 vendor url()）。
+for (const name of ["gallery.css", "workbench-elements.css"]) {
+  const css2 = readText(`vendor/internal-css/${name}`);
+  if (/url\(\s*"?vendor/.test(css2)) die(`${name} 有 vendor url()，内联前要先处理`);
+  const linkRe = new RegExp(`<link rel="stylesheet" href="\\./vendor/internal-css/${name.replace(".", "\\.")}" />`);
+  if (!linkRe.test(html)) die(`index.html 里没有 ${name} 的 link`);
+  html = html.replace(linkRe, () => `<style>\n${css2}\n</style>`);
+  if (html.includes(`internal-css/${name}"`)) die(`${name} 没内联`);
+}
 
 // ---- 2½. CSP 去掉 + theme guard 内联回去（2026-10-17，Claude Opus 5.5）：网页版头上有一条 CSP（不放行内联脚本），单文件版全是内联脚本，
 //   留着它 = 自己的脚本全被拦；theme-guard.js 在网页版是外链（同样因为 CSP），这里原样内联回 <head>，首帧前落主题不变。

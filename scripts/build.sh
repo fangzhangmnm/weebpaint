@@ -132,6 +132,16 @@ if [ -n "$REVIVAL_HITS" ]; then
 fi
 echo "[build] ✓ ambient-store lint 过"
 
+# 0.56 workbench-elements 收货封口（2026-10-21 总账 #2）：popup-menu / anchored-popup / notice / iconHtml 进包了，本仓不许长回第二份。
+WB_FILES=$(ls src/ui/popup-menu.ts src/anchored-popup.ts src/ui/notice.ts 2>/dev/null || true)
+WB_HITS=$(grep -rnE "(from|import)[[:space:]]*\(?[[:space:]]*['\"][^'\"]*(/popup-menu\.ts|/anchored-popup\.ts|/notice\.ts)['\"]" src test --include='*.ts' --include='*.mjs' 2>/dev/null || true)
+if [ -n "$WB_FILES$WB_HITS" ]; then
+  echo "[build] ✗ UI 原子复活（popup-menu / anchored-popup / notice 住 @internal/workbench-elements，别在本仓再长一份）：" >&2
+  echo "$WB_FILES$WB_HITS" >&2
+  exit 1
+fi
+echo "[build] ✓ workbench-elements 封口"
+
 # 0.6 v0.4 分层 lint（workpiece/tiles 红线 + 已死模块防复活）。
 #   · workpiece/** 不碰 store（持久化归 importer/exporter/persistency；spec journal/20260721 §workpiece）
 #   · tiles/** 不碰 gl/**（CPU tile 池是纯底座；GPU 侧经 bridge 反向依赖它）

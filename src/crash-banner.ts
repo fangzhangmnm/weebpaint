@@ -18,7 +18,7 @@ import { uniqueNameFor, setGalleryOpen } from "./gallery/gallery-shell.ts";
 import { withBusy } from "./fullscreen-busy.ts";
 import { stripSessionExt } from "./config.ts";
 import { reportError } from "./error-badge.ts";
-import { showNotice, closeNotice } from "./ui/notice.ts";   // 2026-09-02 C7 通知栈
+import { showNotice, closeNotice } from "@internal/workbench-elements";   // 2026-09-02 C7 通知栈
 import { t } from "./i18n/index.ts";
 import { hasGallery } from "./gallery-capability.ts";
 import type { AppContext } from "./app-context.ts";

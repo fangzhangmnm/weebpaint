@@ -12,8 +12,8 @@ import { t, tLatin } from "./i18n/index.ts";
 import { desk } from "./workbench-state.ts";
 import { PANELS, openExclusive, closeExclusive } from "./panel-state.ts";
 import { getFilter, listFilters, onFilterRegistered } from "./filters.ts";
-import { positionPopup } from "./anchored-popup.ts";
-import { openAdoptedPopup, closePopupMenuOf, isPopupOpen } from "./ui/popup-menu.ts";   // 2026-09-02 C1：调整 popup 收养
+import { positionPopup } from "@internal/workbench-elements";
+import { openAdoptedPopup, closePopupMenuOf, isPopupOpen } from "@internal/workbench-elements";   // 2026-09-02 C1：调整 popup 收养
 import { mountContextToolbar, type ContextToolbarHandle, type ToolbarItem } from "./ui/context-toolbar.ts";   // 2026-09-02 C4 登记 → 2026-09-06 U1 工厂
 
 import { setTool, setVerb } from "./toolbar.ts";   // 命令 = toolbar 的接口（显式 import）
@@ -24,7 +24,7 @@ import { createSelectField, type SelectFieldOpts } from "./ui/select-field.ts"; 
 import type { ViewLeafSnap as LayerSnap } from "./backend/workpiece/painting-view.ts";
 import type { WriteToken } from "./backend/workpiece/workpiece.ts";
 import type { AppContext } from "./app-context.ts";
-import { iconHtml } from "./ui/icon.ts";
+import { iconHtml } from "@internal/workbench-elements";
 import { preferences } from "./app-prefs.ts";   // 2026-09-05：手指混色空间偏好 smudge-mix（gallery scope）
 import { isMixSpace } from "./backend/algorithms/color-mix.ts";
 

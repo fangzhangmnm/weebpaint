@@ -18,7 +18,7 @@
 // 可见性用 .hidden 类（与全仓现状一致；C5 换原语时只改这一处 = 本模块存在的意义）。
 
 import { attachPanelDrag, attachPanelResize, clampPanelPos, clampSize, type GizmoHandle, type PanelPos } from "./panel-gizmo.ts";
-import { safeAreaTop } from "../anchored-popup.ts";
+import { safeAreaTop } from "@internal/workbench-elements";
 
 export type { PanelPos } from "./panel-gizmo.ts";
 

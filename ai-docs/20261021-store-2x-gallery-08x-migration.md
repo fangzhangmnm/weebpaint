@@ -101,6 +101,16 @@ WeebPaint 是家族里库最旧的一家（store 0.15.2 / gallery 0.1.0，WXHW /
 - **#89 同道顺手做完（v0.14.38）**：本仓 10 处 Vue `template:` 搬进 `src/vue-templates.ts`，`scripts/compile-vue-templates.mjs`（`@vue/compiler-dom` 3.5.35 = vendor/vue/VERSION）构建时编成 `src/vue-templates.compiled.ts`，组件经 `src/vue-render.ts` 拿 `render:`；CSP `script-src 'self' 'wasm-unsafe-eval'`；守卫 `test/vue-templates-compiled.test.mjs`（生成物不过期 / 无 eval / src 里不许长回 `template:`）+ csp-guard；**F10（新）** 左栏 dial / 笔架 sheet / 图层面板 / 颜色轮 / 笔刷设置 + 下拉 逐个点出来看 DOM、零 securitypolicyviolation。决策记在 ADR-0015。
 - **没验的**：OneDrive provider 这条腿（无头没有账号）——和 folder provider 走同一套 store 引擎，差别只在 provider；`resolve()` 三选一的面（folder 库里退出即推、造不出脏 ∧ 云变的分叉）；加密件的锁图标 / 解锁 / 换密码（F9 没设密码）。这三样归 iPad Edge 真机，user 自己决定什么时候跑，AI 不催。
 
+## 9. 2026-10-21 晚：库冻结后一次收齐（v0.14.41；统筹 = 家族根 `ai-docs/20261021-lane-merge-phase.md`）
+
+| 包 | 版本 | 对 WeebPaint 的行为差异 | 这次 |
+|---|---|---|---|
+| store | 2.1.2 → **2.2.0** | 2.1.3 镜像抽样（没开 streaming，零）；**2.1.4 F-19** 加密稿 `save()` 推云字节 = 本机密文（以前另封一份 → 丢回执后 tryHeal 比不出 → 冤枉面；现在自愈），**F-54** `uploads.resumable`（默认关）；2.1.5 暂存区按块淘汰（streaming 模式，零）；**2.2.0** 暂存区分库（本仓没流式读，零；首次开页主库旧 `staging/` 键删掉）、MSAL authority 默认 `/consumers`（本仓一直显式传，零）、`streaming.verifyChunk`（零） | **开 `uploads: { resumable: true }`**（user 10-21 批这个新持久化键）：> 4 MB 的推上传会话落 kv，刷新 / iOS 杀页后再推同一份字节接着传、续上的会话提交前一律核 eTag；徽章文案加「回线后接着传」 |
+| gallery | 0.8.5 → **0.8.7** | 0.8.6 ghost 行「丢弃」→「处理…」（面外方向动词退役；**user 10-21 后定「四个方向动词留着…记账有空好好讨论」，这条线冻结，别再动**）、搁置区多「清空…」钮；0.8.7 registry 库名归宿主 | `configureGalleryRegistry({ dbName })` 用既有 GUID 字面量 = 零迁移；两个新文案键补 tok；`gal.discardToTrash` 删 |
+| workbench-elements | 0.1.2 → **0.1.3** | 外点关加「子弹层不算外面」（本仓 09-11 规则进包） | #2 收货（见 `20261021-workbench-elements-intake-handoff.md` 顶部） |
+
+同版顺手：#96 还原出厂按家规 2½（两步护栏、去硬拦、连壳清）；#93 的 CLAUDE.md 持久层白名单表 + `test/storage-whitelist.test.mjs`。验证同 §7（npm test 1503 / build 含新封口 lint / F1 F4 F8 F9 F10 / standalone smoke）。没做：登录后 pushAll（问题 3 没答）；F-69 格式版本纪律（#92，挑时机）；#97 口令面板真表单（下一版）。
+
 ## 8. 要 user 一句话的
 
 1. ~~§3 三个 transport 开关~~ user 10-21「没问题」→ v0.14.39 开了（`src/app-store.ts` `GRAPH_TRANSPORT`）。

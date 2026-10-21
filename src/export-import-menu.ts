@@ -16,7 +16,7 @@ import { parseColorInput, colorNameOf } from "./color-name.ts";
 import { parseExportBg } from "./backend/algorithms/flatten-bg.ts";
 import { els } from "./els.ts";
 import { mountSelectField, type SelectField } from "./ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
-import { openAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";   // 2026-09-02：扳手弹层收养（挂 body，不再困在菜单 overflow 里）
+import { openAdoptedPopup, closePopupMenuOf } from "@internal/workbench-elements";   // 2026-09-02：扳手弹层收养（挂 body，不再困在菜单 overflow 里）
 import { t } from "./i18n/index.ts";
 import { setMenuOpen } from "./settings-menu.ts";
 import { session } from "./session-state.ts";

@@ -17,9 +17,9 @@ import { t } from "../i18n/index.ts";
 import { forgetRemembered } from "../remember-password.ts";
 import { els } from "../els.ts";
 import { openChoiceSheet, openConfirmSheet } from "../sheets.ts";
-import { openAdoptedPopup, closePopupMenuOf } from "../ui/popup-menu.ts";   // 2026-09-02 C1
-import { showNotice, closeNotice } from "../ui/notice.ts";   // 2026-09-02 C7 通知栈
-import { iconHtml } from "../ui/icon.ts";
+import { openAdoptedPopup, closePopupMenuOf } from "@internal/workbench-elements";   // 2026-09-02 C1
+import { showNotice, closeNotice } from "@internal/workbench-elements";   // 2026-09-02 C7 通知栈
+import { iconHtml } from "@internal/workbench-elements";
 import { galleryAttachment } from "../gallery-attachment-host.ts";
 import { galleryRegistry } from "@internal/gallery";
 import type { GalleryEntry } from "@internal/gallery";

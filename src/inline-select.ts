@@ -6,7 +6,7 @@
 //   全走 ui/popup-menu（挂 body / 锚定 / z band / 外点关 / Escape / 单例）。本文件只剩「值列表 → 菜单项」的适配。
 //   z：默认 popover（菜单内再弹，压过 --z-menu）；sheet(modal) 内的下拉传 band:"modal"。edited by Claude Fable 5.1
 
-import { togglePopupMenu, type PopupBand } from "./ui/popup-menu.ts";
+import { togglePopupMenu, type PopupBand } from "@internal/workbench-elements";
 
 export function wireInlineSelect<V extends string>(
   btnId: string,

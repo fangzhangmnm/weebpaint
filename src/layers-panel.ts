@@ -23,9 +23,9 @@
 
 import { createApp, defineComponent, reactive, computed, watch, nextTick, ref, onUnmounted } from "../vendor/vue/vue.esm-browser.prod.js";
 import { VUE_RENDER } from "./vue-render.ts";   // #89：模板构建时编好（SSoT = src/vue-templates.ts），运行时零 eval
-import { positionPopup } from "./anchored-popup.ts";
+import { positionPopup } from "@internal/workbench-elements";
 import { registerFloatingWindow, type FloatingWindowHandle } from "./ui/floating-window.ts";
-import { toggleAdoptedPopup, closePopupMenuOf, openAdoptedPopup, type PopupMenuHandle } from "./ui/popup-menu.ts";   // 2026-09-02 C1：＋ 菜单收养（搬 body，锚到 ＋ 钮）；2026-09-11 图层调整弹层同款收养
+import { toggleAdoptedPopup, closePopupMenuOf, openAdoptedPopup, type PopupMenuHandle } from "@internal/workbench-elements";   // 2026-09-02 C1：＋ 菜单收养（搬 body，锚到 ＋ 钮）；2026-09-11 图层调整弹层同款收养
 import { mountSelectField, type SelectField, type SelectItem } from "./ui/select-field.ts";   // 2026-09-02 C6：混合模式下拉标准件（Vue 行内原生 select 退役）   // 2026-09-02 C2 浮窗深模块（z/拖缩/钳制/出血区/transient 一处）
 
 // （出血区地板常数 PANEL_MIN_TOP=60 退役 2026-09-02：iPadOS 顶部死区没有 API 可查，地板由 ui/floating-window 运行时量顶栏下缘）
@@ -36,7 +36,7 @@ import { docVersion, bumpDoc } from "./signals.ts";
 import { els } from "./els.ts";
 import { desk } from "./workbench-state.ts";
 import type { AppContext } from "./app-context.ts";
-import { iconHtml } from "./ui/icon.ts";
+import { iconHtml } from "@internal/workbench-elements";
 import { initExplodeSheet, openExplodeSheet } from "./explode-layers.ts";
 
 // 「组 N」序号扫描的正则按当前语言的 name.groupN 模板生成（名字是数据，换语言从头起序无害）。

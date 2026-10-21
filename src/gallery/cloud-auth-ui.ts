@@ -12,7 +12,7 @@ import { t, tLatin } from "../i18n/index.ts";
 import { renderGalleryManage } from "./gallery-manage-ui.ts";   // P3：popup = 图库管理面 + 账号（一起刷）
 import type { AppContext } from "../app-context.ts";
 import { els } from "../els.ts";
-import { iconHtml } from "../ui/icon.ts";
+import { iconHtml } from "@internal/workbench-elements";
 import {
   isSignedIn, isAuthConfigured,
   getActiveAccount, retrySilentSignIn,

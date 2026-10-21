@@ -16,7 +16,7 @@
 
 import { registerFloatingWindow, type FloatingWindowHandle } from "./ui/floating-window.ts";   // 2026-09-02 C2 浮窗深模块
 import { mountSelectField } from "./ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
-import { toggleAdoptedPopup, closePopupMenuOf } from "./ui/popup-menu.ts";   // 2026-09-02：⋯ 弹层收养（挂 body、锚到扳手）
+import { toggleAdoptedPopup, closePopupMenuOf } from "@internal/workbench-elements";   // 2026-09-02：⋯ 弹层收养（挂 body、锚到扳手）
 import type { AppContext } from "./app-context.ts";
 import { preferences } from "./app-prefs.ts";   // blender-panel-url（gallery scope+无库 cascade，残留审计 F）
 import { reportError } from "./error-badge.ts";
@@ -31,7 +31,7 @@ import { setMenuOpen } from "./settings-menu.ts";
 import { desk } from "./workbench-state.ts";
 import { BTPClient, BTPError } from "../vendor/btp/v1/index.js";
 import { t } from "./i18n/index.ts";
-import { iconHtml } from "./ui/icon.ts";
+import { iconHtml } from "@internal/workbench-elements";
 
 // 面板 show/position 随文档走 → desk.blenderPanel（.ora 序列化）。
 // 远端 URL 是账号级设置（tailscale 稳定端点，跨设备同步）→ preferences "blender-panel-url"（gallery scope，

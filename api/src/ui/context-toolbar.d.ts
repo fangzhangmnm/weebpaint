@@ -1,6 +1,6 @@
 import { type SelectItem, type SelectFace } from "./select-field.ts";
-import { type PopupMenuItem } from "./popup-menu.ts";
-import { type IconName } from "./icon.ts";
+import { type PopupMenuItem } from "@internal/workbench-elements";
+import { type IconName } from "@internal/workbench-elements";
 /** owner 在 init 时登记（幂等）。静态条用；工厂 mount 自动登记。
  *  2026-09-11：静态条的显隐（owner 自己 toggle .hidden）用 MutationObserver 接进叠放重排——不靠 owner 记得通知、不吃事件监听顺序。 */
 export declare function registerContextToolbar(el: HTMLElement | null): void;

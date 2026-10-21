@@ -10,7 +10,7 @@
 // 条目用 pointerdown+preventDefault 选中（保住输入框焦点，不触发宿主 blur-弹回竞态）。
 // 弹层锚定走 anchored-popup（全仓 popup 定位唯一入口）。
 
-import { positionPopup } from "../anchored-popup.ts";
+import { positionPopup } from "@internal/workbench-elements";
 
 export interface InputSenseItem<T> {
   label: string;

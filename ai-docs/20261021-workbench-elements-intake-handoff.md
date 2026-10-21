@@ -2,6 +2,8 @@
 
 > created 20261021 by Claude Fable 5.1 · as-of v0.14.38 / workbench-elements 0.1.2 · 周账 §6 道 2 的「接着做」之一；按撞车规矩（库只有道 1 能改），本仓这边只写交接，不动库仓。
 
+> **2026-10-21 晚收了**：道 1 发 0.1.3（子弹层规则进包）→ v0.14.41 按下面「本仓的活」做完（27 处 import、三个本地件删、`src/ui/icon.ts` 只剩 `slotCaretHtml`、`src/workbench-init.ts` configureFloors、`vendor/internal-css/workbench-elements.css`、styles.css 删 29 条同选择器规则、build.sh 封口）。小三角 `slotCaretHtml` 要不要提给包仍等 user。
+
 ## 一句话
 
 WeebPaint 的四个 UI 原子（`src/ui/popup-menu.ts` / `src/anchored-popup.ts` / `src/ui/notice.ts` / `src/ui/icon.ts`）和包 0.1.2 的源码几乎逐行相同（2026-09-09 包就是从这里 WET 出去的），**但两边各自长了一条对方没有的规则**，直接换 import 会把本仓 09-11 的修复丢掉。所以顺序是：库先补 → 本仓再收。

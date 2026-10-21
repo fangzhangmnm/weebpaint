@@ -16,7 +16,7 @@ import {
 } from "../common/color-ramp.ts";
 import { dragMove, type DragState } from "./drag-value.ts";
 import { createSelectField, type SelectField } from "./select-field.ts";
-import { iconHtml } from "./icon.ts";
+import { iconHtml } from "@internal/workbench-elements";
 import { t as tr } from "../i18n/index.ts";
 import { keyboardNudge } from "./curve-editor.ts";
 

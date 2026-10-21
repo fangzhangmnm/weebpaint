@@ -231,7 +231,7 @@ export const S = {
   "save.localFileSaved": { zh: "已保存到本地文件 · {name}", en: "Saved to local file · {name}", ja: "ローカルファイルに保存済み · {name}", tok: "sitelen li awen lon lipu ilo · {name}" },
   // 终态：存进本地了，但云端那条腿没成（离线/冲突取消/落地未确认）。必须和 synced 长得不一样——
   //   这正是「远端文件不一样而 UI 从没说过」的渲染面。
-  "save.unpushed":   { zh: "已存本地，未上云（点击重试推送） · {name}", en: "Saved locally, not uploaded (tap to retry) · {name}", ja: "ローカル保存済み、クラウド未送信（タップで再試行） · {name}", tok: "awen lon ilo ni · pana tawa poki sewi li pakala · sina luka la mi pana sin · {name}" },
+  "save.unpushed":   { zh: "已存本地，未上云（回线后接着传 · 点击重试推送） · {name}", en: "Saved locally, not uploaded (resumes when back online · tap to retry) · {name}", ja: "ローカル保存済み、クラウド未送信（オンライン復帰後に続きから送信 · タップで再試行） · {name}", tok: "awen lon ilo ni · pana tawa poki sewi li pakala · sina luka la mi pana sin · {name}" },
   // ── 混合模式名（LAYER_MODE_LABEL 单一源；图层面板 + 笔刷设置下拉共用）切片 3a ──
   "mode.normal":     { zh: "正常",     en: "Normal",       ja: "通常", tok: "sama" }, 
   "mode.multiply":   { zh: "正片叠底", en: "Multiply",     ja: "乗算", tok: "pimeja kule" }, 
@@ -397,13 +397,15 @@ export const S = {
   "gal.delFolderNonEmpty": { zh: "删除（请先清空里面）", en: "Delete (empty it first)", ja: "削除（先に中を空に）", tok: "weka (o weka e ijo insa lon tenpo open)" },
   "gal.divergedNote":{ zh: "云端副本已被别的设备移动或删除；本地这份有未推送的修改。", en: "The cloud copy was moved or deleted by another device; this local copy has unpushed changes.", ja: "クラウド側は別端末で移動/削除されました。ローカルには未送信の変更があります。", tok: "ilo ante li tawa anu weka e sitelen ni lon poki sewi. sitelen pi ilo ni li jo e ante. ante ni li lon ala poki sewi." },
   "gal.renameKeep":  { zh: "重命名留存", en: "Rename & keep", ja: "名前を変えて保持", tok: "o ante e nimi o awen" },
-  "gal.discardToTrash":{ zh: "丢弃（送回收站）", en: "Discard (to trash)", ja: "破棄（ゴミ箱へ）", tok: "o weka tawa poki jaki" },
   "gal.rename":      { zh: "重命名", en: "Rename", ja: "名前を変更", tok: "ante nimi" },
   "gal.moveTo":      { zh: "移动到…", en: "Move to…", ja: "移動…", tok: "tawa poki ante…" },
   "gal.copy":        { zh: "创建副本", en: "Duplicate", ja: "複製を作成", tok: "o pali e sama" },
   "gal.pullLocal":   { zh: "拉取到本地", en: "Pull to local", ja: "ローカルに取得", tok: "o kama jo tawa ilo ni" },
   "gal.unloadLocal": { zh: "卸载本地", en: "Unload local", ja: "ローカルを解放", tok: "o weka e ona tan ilo ni (poki sewi li awen jo)" },
   "gal.toTrash":     { zh: "送到回收站", en: "Move to trash", ja: "ゴミ箱へ", tok: "tawa poki jaki" },
+  // gallery 0.8.6：搁置区视图里的「清空…」钮（ghost 行的「丢弃」动词同版退役 → 「处理…」）
+  "gal.emptyTrashBtn":  { zh: "清空回收站…", en: "Empty trash…", ja: "ゴミ箱を空に…", tok: "o moli e ale lon poki jaki…" },
+  "gal.emptyBackupBtn": { zh: "清空备份箱…", en: "Empty backups…", ja: "バックアップを空に…", tok: "o moli e ale lon poki awen…" },
   // gallery 0.8.1（2026-10-21 迁库收货）：没同步好的文件只有「处理…」→ store file.resolve()，由人在面里三选一（云端覆盖本地 / 本地覆盖云端 / 取消）；
   //   「推送到云端」「重新上传」这两个方向动词已从词汇表删除（user 2026-10-16「禁止越狱」「这个按钮为什么能存在是更大的安全问题」）。zh/en/ja 抄包内默认（包不认 tok，这里补）。
   "gal.resolve":            { zh: "处理…", en: "Resolve…", ja: "処理…", tok: "o pona e ni…" },

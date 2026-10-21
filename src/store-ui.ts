@@ -4,7 +4,7 @@
 //   ③ 错误 surface——塌进这一个模块。app 只在 app-store 装配时把它传进 createStore。
 import type { StoreUI, StoreTextKey, StoreTextParams } from "@internal/store";
 import { withBusy } from "./fullscreen-busy.ts";
-import { showNotice, type NoticeHandle } from "./ui/notice.ts";
+import { showNotice, type NoticeHandle } from "@internal/workbench-elements";
 import { lockSyncGate, settleSyncGate } from "./sheets.ts";
 import { t, type Key } from "./i18n/index.ts";
 import { stripSessionExt } from "./config.ts";

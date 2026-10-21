@@ -9,7 +9,7 @@
 
 import { t } from "./i18n/index.ts";
 import { record as diagRecord } from "./diag-log.ts";
-import { showNotice } from "./ui/notice.ts";   // 2026-09-02 C7 通知栈   // 黑匣子（2026-08-31）：全部级别都记，dev 页可看/复制
+import { showNotice } from "@internal/workbench-elements";   // 2026-09-02 C7 通知栈   // 黑匣子（2026-08-31）：全部级别都记，dev 页可看/复制
 export type ErrorLevel = "error" | "warning" | "info" | "log";
 
 

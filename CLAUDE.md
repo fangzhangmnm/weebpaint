@@ -19,6 +19,22 @@ Procreate 级绘画 PWA。UI 中文。iPad 是手感的最终裁判。
   `reportStoreError`（store 不 log），createStore 把它接到 app 传进去的 `ui.reportError`（= error-badge）。
 - **持久化立宪（2026-09-29 user「weebpaint升级同意」；edited by Claude Fable 5.1；机制照 CatsUp 契约 §7）**：`src/backend/format/` = 布局归一化表（`layout.ts`，历史布局 → 当前布局，ora.ts 读端只认一种形状）+ 子结构版本链（`migrate.ts`，desk 等 JSON 各自 `version`；比 app 新 → `FormatTooNewError`，壳层走「新版本写的」警告 + 覆盖守卫）。timelapse.json 2026-09-30 纳入表（版本键 `v` 照旧；太新 = `too-new` 进检疫区原样带回、壳层说「新版本写的」）。**任何格式改动必须附迁移函数 + 冻结样本**（`test/fixtures/format/`，只增不改；`test/format-samples.test.mjs` = 读 → 写 → 再读语义逐字段一致）。参考窗那一段的契约归 `@internal/reference-window`（`.weebpaint/references/` 整个目录原样进出，codec 零知识）。
 - **ora 布局变更纪律（2026-08-30 user 拍板；edited by Claude Fable 5）**：每次动 .ora 内部布局（entry 增删/改名/搬家）**必须严格上报 user，并附一张具体文件的完整目录表**（entry 清单，长什么样一眼可见）。背景：weebpaint//.weebpaint//根目录三套并存是历史有机生长的事故，读端兼容路由是代价——布局从此只准显式演化。
+- **持久层白名单**（家族规程 user 2026-09-03「touch idb or local storage 必须显式白名单」；本仓 2026-10-21 补，`test/storage-whitelist.test.mjs` 机械执法；每种字节落在哪一等 = 家族根 ai-docs/20261016-data-safety-model.md §2 四等表）：
+
+| 文件 | 持久层 | 用途 / 等级 |
+|---|---|---|
+| `@internal/store`（经 `src/app-store.ts`） | IDB `weebpaint.<databaseId>`（2.2.0 起流式暂存区另库 `.staging`，本仓没用）+ localStorage `weebpaint.<databaseId>.*`（含 2.1.4 `internal.upload-session:*` 上传会话记忆） | 作品 / 回收站 / 备份箱 / collections / 同步态——一等；app 只经接缝 |
+| `@internal/gallery`（经 `src/gallery-pkg-init.ts` 配名） | IDB `weebpaint-bd6cece69075d759.gallery-registry` | 这台设备的图库名册（device-local、永不同步；ADR-0024）——四等 |
+| `@internal/encryption`（建 `src/encryption.ts`、递 `src/app.ts`、用 `src/remember-password.ts`） | IDB `weebpaint-bd6cece69075d759.remember` | 在这台设备上记住图库密码（opt-in、≤ 30 天；ADR-0015）——四等 |
+| `src/storage.ts` | IDB `weebpaint`（裸名）：gallery-thumbs / image-thumbs / checkpoint-ring | 缩略图派生缓存 + revert 快照环——全删可再生 / 可丢（二等） |
+| `src/crash-store.ts` | IDB `weebpaint-bd6cece69075d759.crash` | T-crash 崩溃快照——二等 |
+| `src/device-rack-slot.ts` | IDB `weebpaint-bd6cece69075d759.device-rack` | 无库笔架单槽——四等 |
+| `src/device-kv.ts` | localStorage `weebpaint-bd6cece69075d759:*` | device 层标量唯一器官（resume-slate / 黑匣子 / 偏好）——四等；`theme-guard.js` 首帧前只读主题键；`src/boot-snapshot.ts` 清扫旧键 `weebpaint.boot.lang` |
+| `src/store-absent.ts` | localStorage 探针 + `weebpaint.nostore` | 缺席平台探测 / dev 开关 |
+| `service-worker.js` + `src/shell-reset.ts` | Cache Storage `weebpaint-<hash>` | app 壳；强制更新 / 还原出厂只动自己前缀、只注销自己的 SW（家族 2026-10-01） |
+| `src/factory-reset.ts` | 以上全部（删） | 还原出厂 = 变成新的（家族 2½）：库的 wipeAppNamespace（typed consent）+ 自家 GUID 库 + 壳 → reload |
+| `vendor/msal/msal-browser.min.js` | IDB / localStorage / sessionStorage | MSAL token 缓存，由库的 auth 配置驱动 |
+
 - `journal/cached feedback.md` = 人类专属反馈日志，AI 只读，永不写。
 - **宣发（launch）已分仓（2026-08-21）**：素材源件 + 宣发工单 + 台账在兄弟目录 `../20260821 WeebPaint宣发/`（私有孵化仓）。B1-B4 前置工单、itch/og/截图交付槽位表、图片素材工单**都在那边**，本仓 ai-docs 已不再持有（`20260821-launch-prep-workorders.md` 已迁出）。起手读那仓的 `ai-docs/20260821-material-inventory-and-doc-index.md`。本仓仍持有的宣发相关件：`ai-docs/20260821-icon-tiers.md`（图标档位+两条别再踩回去的线）、图标输出档（`icon-*.png` / `icon.svg` 的 SSoT 在本仓根，美术 `.ora` 源在宣发仓）。
 - 人类钉死的区域：手感（streamline/taper/压感 gamma）、UI/UX 决策、store model。其余按 greenfield 标准大胆重构。

@@ -1,4 +1,4 @@
-import { type PopupBand } from "./ui/popup-menu.ts";
+import { type PopupBand } from "@internal/workbench-elements";
 export declare function wireInlineSelect<V extends string>(btnId: string, items: () => {
     value: V;
     label: string;
