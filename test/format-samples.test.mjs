@@ -117,6 +117,27 @@ describe("冻结样本 · real/v3（v0.14.44 写入器真写的 format 3；tools
   });
 });
 
+describe("冻结样本 · desk 结构等价（每份样本：文件里 desk 的每个顶层键，读 → 写 → 再读，值逐字段不变）", () => {
+  // 家族格式版本纪律 F-69 护栏 1（统筹 10-21）：动 desk 读写之前，先钉住「现有每一种 desk 都原样往返」。
+  //   比的是文件里（布局归一化之后）有的键：当前写入器会补上缺的默认组，那不算变化；version 归写入器自己（只写当前拍）。
+  const walk = (dir) => readdirSync(new URL(dir, FIX), { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(`${dir}${e.name}/`) : (e.name.endsWith(".ora") ? [`${dir}${e.name}`] : []));
+  it("所有带 desk 的样本", async () => {
+    let checked = 0;
+    for (const rel of walk("")) {
+      const dec = await decodeOraToPainting(load(rel));
+      if (dec._editorState == null || typeof dec._editorState !== "object") continue;
+      try { desk.reset(); desk.Unserialize(dec._editorState); } catch (e) { if (e?.name === "FormatTooNewError") continue; throw e; }   // 比本版新的样本另测
+      const out = JSON.parse(JSON.stringify(desk.Serialize()));
+      for (const [k, v] of Object.entries(dec._editorState)) {
+        if (["version", "minor", "patch"].includes(k)) continue;
+        eq(JSON.stringify(out[k]), JSON.stringify(v), `${rel}: desk.${k}`);
+      }
+      checked++;
+    }
+    assert(checked >= 3, `checked ${checked} desks`);
+  });
+});
+
 describe("冻结样本 · synthetic（按旧路由表拼的历史布局）", () => {
   it("v0 webpaint-dirs：无 format 戳、非点 webpaint/、.webpaint/、根目录 mp4 —— 全部归一化；单张参考带老视口；旧轨 state.json 还在", async () => {
     const dec = await decodeOraToPainting(load("synthetic/v0/webpaint-dirs.ora"));
