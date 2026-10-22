@@ -27,7 +27,7 @@ import { t, lang } from "./i18n/index.ts";
 import type { Brush, BrushRackData } from "./brush-types.ts";
 import type { AnimCurve } from "./common/anim-curve.ts";
 import { reportError } from "./error-badge.ts";
-import { stampFields } from "./backend/format/migrate.ts";   // 格式版本纪律：出厂种子盖本版拍
+import { stampFields, readStamp, judge, FormatTooNewError, FORMAT } from "./backend/format/migrate.ts";   // 格式版本纪律：出厂种子盖本版拍；导入拒收更新 major
 
 // getInitData 的初始项形状（与 store 的 CollectionInitItem 结构等价；不 import 库类型免耦合）。
 export interface BrushInitItem { id: string; value: unknown; }
@@ -408,6 +408,9 @@ export function brushToJSON(brush: Brush): string {
 export function brushFromJSON(text: string): LegacyBrush {
   const obj = JSON.parse(text);
   if (!obj.id || !obj.name || !obj.tool) throw new Error("brush JSON missing required fields");
+  // 格式版本纪律（2026-10-21 审计）：更新 major 的笔不认、也不能盖成本版拍写进笔架（那是降级伪装成迁移）。
+  const stamp = readStamp("brush", obj);
+  if (judge("brush", stamp) === "too-new") throw new FormatTooNewError("brush", stamp, FORMAT.brush);
   obj.id = newBrushId();
   migrateBrush(obj);
   return obj;

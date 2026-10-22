@@ -8,7 +8,7 @@ const { FORMAT, MISSING_MAJOR, MAJOR_KEY, STEPS, readStamp, readOraStamp, judge,
 const { desk, deskKnownKeys } = await import("../src/workbench-state.ts");
 const { TimelapseDocState, KNOWN_TIMELAPSE_FIELDS } = await import("../src/backend/timelapse/timelapse-state.ts");
 const { guardRackFormat } = await import("../src/rack-format-guard.ts");
-const { RACK_META_ID, metaAppend, metaRemove, metaMove, metaPrependBuiltins } = await import("../src/brushes.ts");
+const { RACK_META_ID, metaAppend, metaRemove, metaMove, metaPrependBuiltins, brushFromJSON, makeBrush } = await import("../src/brushes.ts");
 
 const J = (x) => JSON.stringify(x);
 
@@ -125,10 +125,17 @@ describe("timelapse 直通袋", () => {
     st.clear(); eq(J(st.extra), "{}");
     assert(KNOWN_TIMELAPSE_FIELDS.includes("motionSamples"));
   });
-  it("major 更新照旧进检疫区原样带回", () => {
+  it("major 更新照旧进检疫区原样带回；检疫态不许直接开新录（会顶掉更新版本的录像），显式 clear 后才能", () => {
     const raw = JSON.stringify({ v: 2, whatever: true });
     const st = TimelapseDocState.restore(raw, null);
     eq(st.restoreIssue, "too-new"); eq(st.serializeForSave(null, 1, 1).json, raw);
+    let err = null; try { st.startRecording({ aspectW: 1, aspectH: 1, longEdge: 512 }); } catch (e) { err = e; }
+    assert(err && /newer version/.test(err.message), String(err));
+    eq(st.serializeForSave(null, 1, 1).json, raw, "拒开新录后原字节仍带着");
+    st.clear(); st.startRecording({ aspectW: 1, aspectH: 1, longEdge: 512 });
+    eq(st.restoreIssue, null);
+    const corrupt = TimelapseDocState.restore("{not json", null);   // 损坏 json 照旧：开新录 = 出所（护栏 E 既定语义）
+    corrupt.startRecording({ aspectW: 1, aspectH: 1, longEdge: 512 }); eq(corrupt.quarantineJson, null);
   });
 });
 
@@ -183,5 +190,30 @@ describe("笔架咽喉（rack-format-guard）", () => {
     eq(g.reconcileWithRemote, undefined);
     const withRemote = guardRackFormat({ ...memRack([]), reconcileWithRemote: async () => ({ ok: true }) });
     eq(typeof withRemote.reconcileWithRemote, "function");
+  });
+});
+
+
+describe("笔架咽喉 · 2026-10-21 审计第 5 条补", () => {
+  it("老用户的笔（v99 形状、从没有 version 键）和 .meta 原样读出、不被当成更新 major；`.meta` 从前也没 version", () => {
+    const old = makeBrush({ name: "老笔", tool: "brush" }); delete old.version; delete old.minor; delete old.patch;
+    assert(!("version" in old), "makeBrush 不该自己带拍子（拍子归咽喉 / 种子）");
+    const inner = memRack([["b1", old], [RACK_META_ID, { folderOrder: ["我的常用"], order: { "我的常用": ["b1"] } }]]);
+    const g = guardRackFormat(inner);
+    eq(g.entries().map((e) => e.id).join(","), `b1,${RACK_META_ID}`);
+    eq(g.getItem("b1").name, "老笔"); eq(J(g.getItem(RACK_META_ID).order), J({ "我的常用": ["b1"] }));
+  });
+  it("写：值本身是更新 major（只可能来自导入）→ 不写，不盖拍伪装成本版", () => {
+    const inner = memRack([]);
+    const g = guardRackFormat(inner);
+    g.setItem("b-fut", { id: "b-fut", name: "未来", tool: "brush", version: FORMAT.brush.major + 1 });
+    eq(inner._m.size, 0); eq(J(inner._writes), "[]");
+  });
+  it("brushFromJSON：更新 major 的笔 JSON 直接拒（FormatTooNewError），本版 / 无拍的照收", () => {
+    let err = null;
+    try { brushFromJSON(JSON.stringify({ id: "x", name: "未来", tool: "brush", version: FORMAT.brush.major + 1 })); } catch (e) { err = e; }
+    assert(err instanceof FormatTooNewError && err.component === "brush", String(err));
+    const ok = brushFromJSON(JSON.stringify({ id: "x", name: "老", tool: "brush", size: { base: 10 } }));
+    eq(ok.name, "老");
   });
 });

@@ -57,6 +57,9 @@ export class TimelapseDocState {
    *  用户明确开新录 = 检疫字节出所（旧的读不懂的 entry 被新录像取代）。 */
   startRecording(s: TimelapseSettings): void {
     if (this.settings) throw new Error("timelapse already recording; clear() first");
+    // 格式版本纪律（2026-10-21 审计）：检疫区里是更新版本写的录像 → 不许靠「开新录」把它顶掉（那是静默丢），得先显式 clear()（UI 有确认）。
+    //   读不懂的损坏 json 照旧：开新录 = 出所（2026-08-25 护栏 E 的既定语义）。
+    if (this.restoreIssue === "too-new") throw new Error("timelapse: the quarantined recording was written by a newer version; clear() it explicitly before starting a new one");
     if (!TIMELAPSE_LONG_EDGES.includes(s.longEdge)) throw new Error(`bad longEdge ${s.longEdge}`);
     if (!TIMELAPSE_ASPECTS.some(([w, h]) => w === s.aspectW && h === s.aspectH)) throw new Error("bad aspect");
     this.settings = { ...s };

@@ -389,3 +389,19 @@ export async function decodeOraToPainting(blob: Blob): Promise<DecodedPainting> 
   return out;
 }
 
+// 把版本号字符串解析成可比较的整数，横跨新旧两种命名制（0.4 纪元换制）：
+//   新制 "v0.4.0-2026-07-22" / "v0.4.0" → (major*100+minor)*1e6+patch
+//   旧制 "v438-2026-07-18" / "v438"     → 统一归入 0.3 纪元（= v0.3.438），与新制全序可比
+// （旧制 patch 是单调单序列，所以 v438 < v0.4.0 < v0.4.10 < v0.5.0 成立。）
+// 失败 → null（caller 跳过比较；零信息时不警告）。
+// 用途 = session-state「较新 app 写的画 → 说一次 + 覆盖前确认」那一层（2026-10-21 曾随格式拍子一起删，同日审计恢复：拍子兜不住 stack.xml 内部）。
+export function parseAppVersion(s: string | null | undefined): number | null {
+  if (!s) return null;
+  const str = String(s);
+  const dotted = str.match(/^v(\d+)\.(\d+)\.(\d+)/);
+  if (dotted) {
+    return (parseInt(dotted[1], 10) * 100 + parseInt(dotted[2], 10)) * 1_000_000 + parseInt(dotted[3], 10);
+  }
+  const legacy = str.match(/^v(\d+)/);
+  return legacy ? 3 * 1_000_000 + parseInt(legacy[1], 10) : null;
+}

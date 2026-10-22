@@ -7,6 +7,7 @@ export interface EditorAdapter {
         peek?: Blob | null;
     }>;
     onSaved?(name: string): void;
+    mayWrite?(): boolean;
 }
 /** editor-session 消费的 store 最小面（结构类型；真 sync-store 天然满足，测试可 mock）。 */
 export type TryMoveResult = {

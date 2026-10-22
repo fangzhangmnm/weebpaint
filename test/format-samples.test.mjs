@@ -144,6 +144,57 @@ describe("冻结样本 · real/v3.0.0（v0.14.46 写入器真写的三级拍子�
   });
 });
 
+describe("冻结样本 · real/v1（format 1 最后一版写入器 bfb9f08 = v0.12.6 时代真写的；2026-10-21 审计第 2 条，gen-v1-at-bfb9f08.mjs 在该 commit 的源码树上跑出来）", () => {
+  it("reference-timelapse：非点 weebpaint/reference.png + 根目录 timelapse.mp4 → 全归一化；单张参考带老视口；录像 json 原样；往返语义一致、写成当前布局", async () => {
+    const dec = await decodeOraToPainting(load("real/v1/reference-timelapse.ora"));
+    eq(dec._formatVersion, 1); eq(dec._wroteWith, "v0.12.6-2026-08-30");
+    for (const m of ["timelapse.mp4 → .weebpaint/timelapse.mp4"]) assert(dec._layoutMigrated.includes(m), dec._layoutMigrated.join("; "));
+    assert(dec._layoutMigrated.some((x) => x.startsWith("weebpaint/reference.png →")), dec._layoutMigrated.join("; "));
+    const deck = await readDeck(dec);
+    eq(deck.size, 1); eq(deck.current.kind, "image"); eq(JSON.stringify(deck.current.vp), JSON.stringify({ tx: 7, ty: 8, scale: 2, rot: 0 }));
+    eq(joined(new Uint8Array(await deck.current.bytes.arrayBuffer())), PNG_STUB);
+    eq(JSON.parse(dec._timelapseJson).n, 3); eq(joined(dec._timelapseMp4), MP4_STUB);
+    eq(dec._editorState.refPanel.enabled, true);
+    const before = await semantics(dec, deck);
+    const out = await rewrite(dec, deck);
+    const dec2 = await decodeOraToPainting(out);
+    eq(await semantics(dec2, await readDeck(dec2)), before, "往返语义逐字段一致");
+    eq(dec2._formatVersion, ORA_FORMAT_VERSION); eq(dec2._layoutMigrated.length, 0);
+    eq(Object.keys(await zipUnpack(out)).join("|"), CURRENT_LAYOUT([REFERENCES_MANIFEST, `${REFERENCES_DIR}/r0.png`], true).join("|"));
+  });
+  it("plain：desk 非默认值（导出 jpg / 白底）往返不丢", async () => {
+    const dec = await decodeOraToPainting(load("real/v1/plain.ora"));
+    eq(dec._formatVersion, 1); eq(dec._editorState.export.format, "jpg"); eq(dec._editorState.export.bg, "#ffffff");
+    const deck = await readDeck(dec);
+    const dec2 = await decodeOraToPainting(await rewrite(dec, deck));
+    eq(await semantics(dec2, await readDeck(dec2)), await semantics(dec, deck));
+  });
+});
+
+describe("冻结样本 · 第二层的理由（2026-10-21 审计第 1 / 6 条）：拍子全是本版、只有 wrote-with 更新的画，stack.xml 图层上的未知属性存一次就丢", () => {
+  it("future-app/newer-app-same-format：拍子判 same（第一层放行）；parseAppVersion 判写入 app 更新（第二层要确认）；重写后 future-layer-flag 没了", async () => {
+    const { parseAppVersion } = await import("../src/backend/ora.ts");
+    const { WEEBPAINT_VERSION } = await import("../src/version.ts");
+    const raw = load("synthetic/future-app/newer-app-same-format.ora");
+    const dec = await decodeOraToPainting(raw);
+    eq(judge("ora", dec._formatStamp), "same"); eq(dec._wroteWith, "v9.9.9-future");
+    assert(parseAppVersion(dec._wroteWith) > parseAppVersion(WEEBPAINT_VERSION), "写入 app 比本版新");
+    const xmlOf = async (blob) => new TextDecoder().decode((await zipUnpack(blob))["stack.xml"]);
+    assert((await xmlOf(raw)).includes("future-layer-flag"), "样本里确实有");
+    const out = await rewrite(dec, await readDeck(dec));
+    assert(!(await xmlOf(out)).includes("future-layer-flag"), "本版重写后丢了——这就是「覆盖前确认」那层存在的理由");
+  });
+  it("future-major/references-2：参考清单 major 比库新 → 库抛 DeckManifestTooNewError（壳层整个目录原样带着、拒收导入）", async () => {
+    const dec = await decodeOraToPainting(load("synthetic/future-major/references-2.ora"));
+    let err = null;
+    try { await decodeDeck({ app: "weebpaint", knownKinds: ["image", "live"], getFile: (p) => { const b = dec._referenceFiles.get(p); return b ? new Blob([b], { type: mimeForName(p) }) : null; } }); } catch (e) { err = e; }
+    assert(err && err.name === "DeckManifestTooNewError", String(err));
+    const saved = await encodeDocToOra(paintingDataToEncodeDoc(dec.data), { wroteWith: "v-test", desk: {}, referenceFiles: dec._referenceFiles });   // 壳层 collectReferenceFilesForSave 带着的就是 _referenceFiles
+    const b = await zipUnpack(saved);
+    eq(joined(b[REFERENCES_MANIFEST]), joined(dec._referenceFiles.get(REFERENCES_MANIFEST)));
+  });
+});
+
 describe("冻结样本 · desk 结构等价（每份样本：文件里 desk 的每个顶层键，读 → 写 → 再读，值逐字段不变）", () => {
   // 家族格式版本纪律 F-69 护栏 1（统筹 10-21）：动 desk 读写之前，先钉住「现有每一种 desk 都原样往返」。
   //   比的是文件里（布局归一化之后）有的键：当前写入器会补上缺的默认组，那不算变化；version 归写入器自己（只写当前拍）。

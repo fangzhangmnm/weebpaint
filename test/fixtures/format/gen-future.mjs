@@ -24,8 +24,14 @@ const { desk } = await import("../../../src/workbench-state.ts");
 const { TimelapseDocState } = await import("../../../src/backend/timelapse/timelapse-state.ts");
 const { createDeck, encodeDeck } = await import("@internal/reference-window/deck");
 
-const outputs = ["synthetic/future-minor/all-parts.ora", "synthetic/future-major/ora-4.ora", "synthetic/future-major/desk-2.ora"];
-for (const rel of outputs) if (existsSync(path.join(here, rel))) { console.error(`refusing: ${rel} already exists (frozen samples are append-only)`); process.exit(1); }
+//   synthetic/future-app/newer-app-same-format.ora —— 拍子全是本版（3.0.0 / desk 1.0.0），只有 wrote-with 是更新的 app：第二层「说一次 + 落盘前确认」的样本
+//       （2026-10-21 审计第 6 条）。stack.xml 的 <layer> 上还放了一个本版不认识的属性 weebpaint:future-layer-flag——本版存一次它就丢，这正是第二层存在的理由。
+//   synthetic/future-major/references-2.ora —— 参考清单 version 2（库只认到 1）：目录原样带着、这张画上不能再加参考、存回逐字节相同。
+// 已存在的文件跳过不重写（只增不改）；新加的样本用 new 标出来。
+const outputs = ["synthetic/future-minor/all-parts.ora", "synthetic/future-major/ora-4.ora", "synthetic/future-major/desk-2.ora",
+  "synthetic/future-app/newer-app-same-format.ora", "synthetic/future-major/references-2.ora"];
+const skip = new Set(outputs.filter((rel) => existsSync(path.join(here, rel))));
+for (const rel of skip) console.log(`  exists, kept: ${rel}`);
 
 const px = (w, h, paint) => { const d = new Uint8ClampedArray(w * h * 4); paint(d, w); return d; };
 const red = px(4, 4, (d, w) => { for (const [x, y] of [[0, 0], [1, 0], [0, 1], [1, 1]]) d.set([255, 0, 0, 255], (y * w + x) * 4); });
@@ -40,6 +46,7 @@ const PNG_STUB = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 9, 9, 9]);
 
 /** 当前写入器写 → 解成 entry 表 → patch(files) 改 → 按原顺序重打（缩略图垫尾）。 */
 async function forge(rel, opts, patch) {
+  if (skip.has(rel)) return;
   const files = await zipUnpack(await encodeDocToOra(doc(), { wroteWith: "v9.9.9-future", ...opts }));
   patch(files);
   const order = Object.keys(files).filter((p) => p !== "Thumbnails/thumbnail.png");
@@ -79,5 +86,18 @@ await forge(outputs[1], { desk: desk.Serialize() }, (files) => {
 desk.reset();
 await forge(outputs[2], { desk: desk.Serialize() }, (files) => {
   editJson(files, ".weebpaint/editor-state.json", (j) => ({ version: 2, minor: 0, patch: 0, panels: { reshaped: true }, brushTool: "now a string" }));
+});
+// ④ future-app：拍子全是本版，只有 wrote-with 更新；<layer> 上一个本版不认识的属性
+desk.reset();
+await forge(outputs[3], { desk: desk.Serialize() }, (files) => {
+  editXml(files, (x) => x.replace('weebpaint:active="true"', 'weebpaint:active="true" weebpaint:future-layer-flag="glow"'));
+});
+
+// ⑤ future-major：只有参考清单的 major 更新（库 DeckManifestTooNewError）
+desk.reset(); desk.refPanel.enabled = true;
+const deck2 = createDeck();
+deck2.add({ kind: "image", bytes: new Blob([PNG_STUB], { type: "image/png" }), vp: { tx: 1, ty: 2, scale: 3, rot: 0 } });
+await forge(outputs[4], { desk: desk.Serialize(), referenceFiles: encodeDeck(deck2.snapshot(), { app: "weebpaint" }) }, (files) => {
+  editJson(files, ".weebpaint/references/manifest.json", (j) => ({ ...j, version: 2, minor: 0, patch: 0, reshaped: true }));
 });
 console.log("now add rows to test/fixtures/format/README.md");

@@ -64,6 +64,9 @@ import "./ora-references.test.mjs";       // 参考目录 × ora（format 3）�
 import "./format-layout.test.mjs";        // 2026-09-29 持久化立宪：布局归一化表 + 子结构版本链
 import "./format-samples.test.mjs";       // 2026-09-29 持久化立宪：冻结样本往返（老文件永远能开、语义无损、写成当前布局）
 import "./format-migrate.test.mjs";       // 2026-10-21 格式版本纪律 F-69：拍子表 / 判决 / 迁移链 / desk·录像直通袋 / 笔架咽喉
+import "./format-stack-xml-unknown.test.mjs";   // 2026-10-21 审计第 1 条：stack.xml 未知属性 / 子元素读写会丢（钉住；靠 app 版本号那层兜）
+import "./editor-session-write-gate.test.mjs";
+import "./app-version.test.mjs";                 // parseAppVersion 全序（较新 app 写的画那一层的判据；2026-10-21 审计恢复）  // 2026-10-21 审计第 6 条：覆盖前确认的最后一道 = editor-session persist 的 mayWrite 闸
 import "./reference-transcode.test.mjs";  // 0830 参考图压缩政策纯函数（1024² 面积/豁免/拍平白底）
 import "./reference-icons.test.mjs";      // 0830 参考窗图标 SSoT：id 全在 sprite（零自绘几何那条 2026-09-29 随组件搬进库仓）
 import "./resample-bytes.test.mjs"; // 字节重采样：面积平均严格box/alpha加权/限幅

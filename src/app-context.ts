@@ -126,6 +126,7 @@ export interface AppContext {
   withBusy: <T>(label: string, fn: () => Promise<T> | T) => Promise<T>;
   leftDial: LeftDialHandle;
   updateSaveStatus: () => void;
+  updateNewerBanner: () => void;   // 较新 app 写的画：顶栏红边（save-status.ts）
   // 「操作做到一半」统一谓词（user pin 2026-07-24：auto 不打断半成品操作）。true = 笔画进行中 /
   //   浮层变换挂着 / transient 待决 / fill 预览挂着。idle autosave 之类的自动动作据此让路；
   //   crash-safety flush（pagehide/blur）**不受此门**——数据安全词典序优先。

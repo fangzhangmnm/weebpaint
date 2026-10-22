@@ -16,10 +16,10 @@ import { reportError } from "./error-badge.ts";
 import { setBrushColor } from "./color-panel.ts";
 import { thumbBlobFromBytes, setCurrentSessionName, triggerDownload } from "./session.ts";
 import { renderNodesToBytes } from "./backend/doc-render.ts";
-import { encodeDocToOra, decodeOraToPainting, paintingDataToEncodeDoc, type DecodedPainting, type ExtraEntries } from "./backend/ora.ts";
+import { encodeDocToOra, decodeOraToPainting, paintingDataToEncodeDoc, parseAppVersion, type DecodedPainting, type ExtraEntries } from "./backend/ora.ts";
 import { applyLoadedReferences, collectReferenceFilesForSave, clearCarriedReferences } from "./side-windows.ts";   // 参考目录（format 3）：载入灌注/保存收集
 import { FORMAT, judge, fmt, FormatTooNewError } from "./backend/format/migrate.ts";   // 格式版本纪律：按拍子判（app 版本号不参与）
-import { configureFormatNotice, beginFormatNotice, noteNewerMinor, noteTooNewPart } from "./format-notice.ts";   // 「更新版本写的」每张画每类最多说一次
+import { configureFormatNotice, beginFormatNotice, noteNewerMinor, noteTooNewPart, noteNewerApp } from "./format-notice.ts";   // 「更新版本写的」每张画每类最多说一次
 import { showNotice } from "@internal/workbench-elements";   // 「更新版本写的」走通知条
 import { flattenViewLeaves } from "./backend/workpiece/painting-view.ts";
 import { tLatin } from "./i18n/index.ts";
@@ -67,7 +67,7 @@ let wp2: AppContext["wp2"];
 let input: AppContext["input"], editMode: AppContext["editMode"], rack: AppContext["rack"];
 let referenceWindow: AppContext["referenceWindow"], paletteWindow: AppContext["paletteWindow"];
 let setStatus: AppContext["setStatus"], withBusy: AppContext["withBusy"];
-let updateSaveStatus: AppContext["updateSaveStatus"];
+let updateSaveStatus: AppContext["updateSaveStatus"], updateNewerBanner: AppContext["updateNewerBanner"];
 let pullSettingsAndState: AppContext["pullSettingsAndState"];
 let applyCheckerboard: AppContext["applyCheckerboard"], renderLayersPanel: AppContext["renderLayersPanel"];
 let setGalleryOpen: AppContext["setGalleryOpen"];
@@ -93,9 +93,15 @@ function _fileHome() { const h = docHome(); return h?.kind === "file" ? h : null
 let _isLazyBlankSession = false;
 // 格式版本纪律（F-69）：跟着这张画走、本版读不懂但必须原样带回的两样。adoptModel 填，resetEditorState 清（新建 / 换画都过它）。
 //   desk 的 major 比本版新 → 原字节（desk 用默认值显示，存时写回原字节）；`.weebpaint/` 下不认识的 entry → 原样写回。
-//   （ora 本身 major 比本版新 = 拒开，见 refuseIfTooNew——这种画从来进不了画布，所以没有「已打开的新版画」这个态，也就不需要覆盖确认。）
+//   （ora 本身 major 比本版新 = 拒开，见 refuseIfTooNew——这种画进不了画布。）
 let _carriedDeskBytes: Uint8Array | null = null;
 let _extraEntries: ExtraEntries = new Map();
+// 第二层，和拍子并存（2026-10-21 审计恢复；统筹「删掉一层已有的数据安全保护 user 没批过」；坐实的理由 = stack.xml 图层上的未知属性没有直通，
+//   test/format-stack-xml-unknown.test.mjs）：**写这画的 app 版本比本版新（wrote-with 戳）→ 说一次（警告通知 + 顶栏红边）+ 任何落盘前确认一次**。
+//   确认之前 editor-session 的 autosave / 失焦 / 关页 / 退出推云也不写（EditorAdapter.mayWrite 闸——旧版只拦 saveNow，那是个洞，审计补上）。
+let _loadedDocIsNewer = false;           // 写这画的 app 版本 > 本版（parseAppVersion 全序；解析不了 = 不判）
+let _loadedDocWriterVer: string | null = null;
+let _loadedDocNewerConfirmed = false;    // 用户已确认「用本版覆盖」→ 这张画此后照常落盘；换画 / 新建即复位
 let _loadingDoc = false;
 
 const AUTOSAVE_IDLE_MS = 30_000;   // v0.4.11 用户拍板：停笔 30 秒即落盘（旧 3min 墙钟 gate 删——dirty 门已足够：存完即净，再编辑本身重置空闲时钟）
@@ -283,7 +289,7 @@ async function openLocalFile(handle: LocalFileHandle): Promise<File | null> {
   if (!hasWeebPaintTraces(loaded)) return file;   // 外来 ora（Krita 等）→ 导入为新 doc，绝不原位覆写别人的文件
   if (!(await _gateFillOnSwitch())) return null; // 挽留门：fill 预览挂着 → 应用/丢弃/取消（user 2026-08-21）
   if (!(await leaveLocalDoc())) return null;    // 已在无地且脏 → 先问（保存/丢弃/取消）
-  if (es.isDirty()) await saveNow();             // 旧 store doc 先落盘（openItem 同款；无地时已被上一行清场）
+  if (es.isDirty()) { if (!(await _gateNewerOverwrite())) { setStatus(t("ss.saveCancelled")); return null; } await saveNow(); }   // 旧 store doc 先落盘（openItem 同款；无地时已被上一行清场）；较新 app 写的先确认，取消 = 不开
   _esMuted = true;   // 墙②先立再换内容：adoptModel 之后 canvas 就不再是 es._name 的像素了
   adoptModel(loaded);
   _setActive(null); _isLazyBlankSession = false;   // 先离旧家（释放锁 + 清持久 currentFile）
@@ -320,6 +326,7 @@ async function saveLocalFileNow(): Promise<boolean> {
   const fh = _fileHome();
   if (!fh) return false;
   _applyPendingForExplicitSave();   // 无地保存全部来自显式动作（implicit 在 saveNow 就 no-op 了）
+  if (!(await _gateNewerOverwrite())) { setStatus(t("ss.saveCancelled")); return false; }   // 第二层：较新 app 写的画，覆盖前确认
   try {
     // 陈旧对表（FS Access 无 etag，mtime 是零成本的 freshness 检查）：文件在我们打开后被外部改过 → 问。
     const mt = await handleMtime(fh.handle);
@@ -381,6 +388,17 @@ function resetEditorState() {
   desk.reset();   // desk per-doc：开新文件/换画/卸载 → 重置 desk struct（stage4）
   _carriedDeskBytes = null; _extraEntries = new Map();   // 上一张画带着的原字节不许跟进新画
   clearCarriedReferences();                              // 同上：参考目录的原样携带（side-windows）
+  _loadedDocIsNewer = false; _loadedDocNewerConfirmed = false; _loadedDocWriterVer = null; updateNewerBanner?.();   // 第二层旗标不跨画（adoptModel 随后按这张画重判）
+}
+
+/** 第二层的门：较新 app 写的画、还没确认 → 问一次「覆盖更新版本写的画？」；确认了这张画此后放行。不是较新的 / 已确认 → 直接 true。
+ *  调用方自己决定取消后说什么、留在哪（保存入口 = 「已取消」；切画 / 退出入口 = 留在画布）。 */
+async function _gateNewerOverwrite(): Promise<boolean> {
+  if (!_loadedDocIsNewer || _loadedDocNewerConfirmed) return true;
+  const ok = await openConfirmSheet(t("ss.overwriteNewerTitle"), t("ss.overwriteNewerMsg", { writer: String(_loadedDocWriterVer), version: WEEBPAINT_VERSION }));
+  if (!ok) return false;
+  _loadedDocNewerConfirmed = true; updateNewerBanner();
+  return true;
 }
 
 /** 格式版本纪律：ora 的 major 比本版新 = 图层结构可能读错 → **拒开**。每个打开入口解完码、动任何状态之前调。
@@ -428,7 +446,7 @@ function restoreEditorStateFromOra(loaded: LoadedDoc) {
       desk.reset();
       _carriedDeskBytes = loaded._editorStateBytes ?? null;
       noteTooNewPart("desk", fmt(e.fileStamp), fmt(e.appStamp));
-      reportError(new Error(`[session] ${e.message}; desk shown at defaults, original bytes carried back on save`), "warning");
+      reportError(new Error(`[session] ${e.message}; desk shown at defaults, original bytes carried back on save`), "log");   // 用户看的是上一行的中文通知；这条只进黑匣子（warning 会把英文顶到脸上，F12 抓到）
     }
   }
   // 参考目录（format 3）：清单在目录里自带，不再依赖 desk；空目录也要调（清掉上一张画的牌组）。
@@ -513,11 +531,18 @@ function adoptModel(loaded: LoadedDoc) {
     resetEditorState();
     els.canvasSizeLabel.textContent = `${doc.width}×${doc.height}`;
     board.invalidateAll(); board.requestRender(); renderLayersPanel();
-    // 格式版本纪律（F-69，家族根 ai-docs/20261021-format-version-discipline.md）：按拍子判，app 版本号（wrote-with）不参与
-    //   （两套号别混；旧的「写这画的 app 版本比我新 → 警告 + 覆盖确认」随之退役）。ora major 更新已在入口拒开；
+    // 第一层 = 格式拍子（F-69，家族根 ai-docs/20261021-format-version-discipline.md）：ora major 更新已在入口拒开；
     //   minor 更新 = 能开能改能存：`.weebpaint/` 下不认识的 entry 原样带着（_extraEntries），告诉用户一次。
     if (judge("ora", loaded._formatStamp) === "newer-minor") noteNewerMinor("ora", fmt(loaded._formatStamp), fmt(FORMAT.ora));
     _extraEntries = new Map(loaded._extraEntries ?? []);
+    // 第二层 = 写这画的 app 版本比本版新（wrote-with 戳，两套号各判各的）：拍子兜不住 stack.xml 内部（更新版本可能在图层上加了本版不认识的
+    //   属性，本版存一次就丢）→ 说一次 + 落盘前确认（见顶部 _loadedDocIsNewer 注；resetEditorState 刚把旗标清过）。
+    const writerN = parseAppVersion(loaded._wroteWith), selfN = parseAppVersion(WEEBPAINT_VERSION);
+    if (writerN !== null && selfN !== null && writerN > selfN) {
+      _loadedDocIsNewer = true; _loadedDocWriterVer = loaded._wroteWith ?? null;
+      noteNewerApp(String(loaded._wroteWith), WEEBPAINT_VERSION);
+    }
+    updateNewerBanner();
     // 持久化立宪：读端把历史布局归一化过的话记一行（黑匣子看得见；保存时自然写成当前布局 = 「保存即自愈」）。
     if (loaded._layoutMigrated?.length) reportError(`[ora] layout normalized on read: ${loaded._layoutMigrated.join("; ")}`, "log");
     restoreEditorStateFromOra(loaded);
@@ -714,6 +739,10 @@ async function saveNow(opts: { implicit?: boolean; commitPending?: boolean } = {
   if (_docIsBlankUnnamed()) return;
   if (editMode.hasPendingTransient()) { if (opts.implicit) return; editMode.applyPendingTransient(); }
   if (opts.commitPending && !opts.implicit) commitFillNow();   // 显式保存入口（Ctrl+Shift+S 等）自带收口
+  if (_loadedDocIsNewer && !_loadedDocNewerConfirmed) {   // 第二层：较新 app 写的画
+    if (opts.implicit) return;   // 自动保存不替人决定（editor-session 那头的 mayWrite 闸同样挡着）
+    if (!(await _gateNewerOverwrite())) { setStatus(t("ss.saveCancelled")); return; }
+  }
   updateSaveStatus();
   try {
     await es.flushLocal();   // encode（+peek）→ store.file.save({tryPush:false})；只落本地（consent-safe）
@@ -737,6 +766,7 @@ async function saveAndPush() {
   const name = _activeName();
   if (!name) { setStatus(t("ss.noDocCannotSave"), true); return; }
   _applyPendingForExplicitSave();   // Ctrl+S/save 按钮 = 显式保存：fill 预览 commit + transient apply（QA 2026-08-21）
+  if (!(await _gateNewerOverwrite())) { setStatus(t("ss.notPushedNewer"), true); return; }   // 第二层：较新 app 写的画，覆盖前确认（取消 = 本地云端都不动）
   _pushInFlight = true;
   updateSaveStatus();
   try {
@@ -901,6 +931,8 @@ async function renameCurrentSession({ suggested, reason }: { suggested?: string;
 /** 刷新时云端那份变成了更新 major 的格式（refreshOpenDoc 拒开）：画布上还是旧像素、es 身份还指着它——
  *  再存一次就是用旧格式盖掉更新版本写的画。立墙②（es 此后绝不标脏 → 不会 autosave / 退出推）、不存、回图库。 */
 async function _leaveDocUnsaved(): Promise<void> {
+  // es._name 仍指着它（editor-session 没有「放手」动词），但：刷新只在干净时跑 → _dirty / _pushPending 此刻都是 false，
+  //   墙②让它永不再脏 → persist 的 need 门永远关着，不会写；下次 es.open(别的画) 的「先存旧画」同样 need=false。审计 2026-10-21 核过。
   _esMuted = true;
   _setActive(null); _recomputePhase();
   _enc.encrypted = false; _isLazyBlankSession = false; updateSaveStatus();
@@ -915,6 +947,8 @@ async function exitCanvasToGallery() {
   if (!(await leaveLocalDoc())) return;   // 无地且脏 → 问；取消 = 留在画布
   const name = _activeName();
   if (name) {
+    // 第二层：较新 app 写的画，退出 = 落盘 → 先确认；取消 = 留在画布（没有「不存就走」的动词，和无地家的取消同义）。
+    if ((es.isDirty() || es.isPushPending()) && !(await _gateNewerOverwrite())) { setStatus(t("ss.saveCancelled")); return; }
     // v409（D-Q6）：退出**只有内容脏/push-pending 才推**；只改 desk（无像素编辑）→ 不推不落本地，
     //   下次开 revert 到上次保存的快照。user 2026-07-14：「退出应该只有 contentdirty 才强制推云，workspace dirty 可抛」。
     await withBusy(t("ss.savingBusy", { name }), async () => {
@@ -945,7 +979,7 @@ async function exitCanvasToGallery() {
 async function newDoc({ name, w, h, layer0Name, layer0Pixels }: { name: string; w: number; h: number; layer0Name?: string; layer0Pixels?: Uint8ClampedArray }): Promise<boolean> {
   if (!(await _gateFillOnSwitch())) return false;   // 挽留门：fill 预览挂着 → 应用/丢弃/取消（user 2026-08-21）
   if (!(await leaveLocalDoc())) return false;   // 无地且脏 → 问；取消 = 不新建
-  if (es.isDirty()) await saveNow();
+  if (es.isDirty()) { if (!(await _gateNewerOverwrite())) { setStatus(t("ss.saveCancelled")); return false; } await saveNow(); }   // 较新 app 写的先确认，取消 = 不新建
   // busy 普查（v0.10.3）：load 灌入 + 首存 encode 是重活（照片导入的 layer0Pixels 是整幅位图）；
   //   交互门（上面的无地确认/脏保存）已过，此段无 sheet。
   return await withBusy(t("ss.creatingDocBusy", { name }), async () => {
@@ -1012,7 +1046,7 @@ async function openItem(item: { name: string }) {   // name = 裸名（gallery.t
   }
   if (!(await _gateFillOnSwitch())) return;   // 挽留门：fill 预览挂着 → 应用/丢弃/取消（user 2026-08-21）
   if (!(await leaveLocalDoc())) return;   // 无地且脏 → 问；取消 = 不开
-  if (es.isDirty()) await saveNow();
+  if (es.isDirty()) { if (!(await _gateNewerOverwrite())) { setStatus(t("ss.saveCancelled")); return; } await saveNow(); }   // 较新 app 写的先确认，取消 = 不开
   // 开画顺带把 4 个 settings/state collection 拉云对齐（v409，user 2026-07-14：「开画作的时候可以顺便
   //   并行 pullandreconcile 下，fire and forget 不用 await」）。**绝不 await**：对齐是锦上添花，
   //   不该让开画等网络（且离线/local-only 内部本就 no-op）。
@@ -1117,6 +1151,7 @@ function beginLazyBlank(): void {
   setName(galleryDefaultName(), { persist: false });
   _isLazyBlankSession = true; _recomputePhase();
   _enc.encrypted = false;
+  _loadedDocIsNewer = false; _loadedDocNewerConfirmed = false; _loadedDocWriterVer = null; updateNewerBanner();
   updateSaveStatus();
 }
 
@@ -1232,6 +1267,8 @@ export const session = {
    *  两个平行可选字段就是当年「无地双墙」一类事故的温床，联合类型让错分支在编译期死。 */
   get home() { return docHome(); },
   get loadingDoc() { return _loadingDoc; },
+  get loadedDocIsNewer() { return _loadedDocIsNewer; },               // 第二层（save-status 红边读）
+  get loadedDocNewerConfirmed() { return _loadedDocNewerConfirmed; },
   get dirty() { return _localHomeKind() ? fileDirty() : (es ? es.isDirty() : false); },   // 内存脏（save-status/beforeunload 用；file/transient 家走 keeper 脏轨）
   get pushPending() { return es ? es.isPushPending() : false; },   // 已落本地但没上云（徽章第四态；与 dirty 正交）
   get saving() { return _pushInFlight; },   // v0.5.9：saveAndPush 在飞（app 层过程态，徽章显转圈云）
@@ -1292,10 +1329,13 @@ export function initSession(ctx: AppContext) {
   editMode = ctx.editMode; rack = ctx.rack;
   referenceWindow = ctx.referenceWindow; paletteWindow = ctx.paletteWindow;
   configureFormatNotice(
-    (kind, msg) => { showNotice({ id: `format-${kind}`, level: "info", text: msg, dismissLabel: t("upd.dismiss"), autoHideMs: 10_000 }); },
-    (kind) => kind === "newer-minor" ? t("ss.docNewerMinor") : t("ss.docPartTooNew"));
+    // newer-minor 是「能用、有的看不到」→ info、10 s 自收；part-too-new / newer-app 关系到「你的改动存不存得下来」→ warning、不自收（关了还有红边 / 确认面兜）
+    (kind, msg, part) => { showNotice({ id: `format-${kind}${part ? "-" + part : ""}`, level: kind === "newer-minor" ? "info" : "warning", text: msg, dismissLabel: t("upd.dismiss"), ...(kind === "newer-minor" ? { autoHideMs: 10_000 } : {}) }); },
+    (kind, part) => kind === "newer-minor" ? t("ss.docNewerMinor")
+      : kind === "part-too-new" ? (part === "references" ? t("ref.carriedNoImport") : t("ss.docPartTooNew"))
+      : t("ss.docNewerWarning", { writer: String(_loadedDocWriterVer), version: WEEBPAINT_VERSION }));
   setStatus = ctx.setStatus; withBusy = ctx.withBusy;
-  updateSaveStatus = ctx.updateSaveStatus;
+  updateSaveStatus = ctx.updateSaveStatus; updateNewerBanner = ctx.updateNewerBanner;
   pullSettingsAndState = ctx.pullSettingsAndState;
   applyCheckerboard = ctx.applyCheckerboard; renderLayersPanel = ctx.renderLayersPanel;
   setGalleryOpen = ctx.setGalleryOpen;
@@ -1321,6 +1361,7 @@ export function initSession(ctx: AppContext) {
         adoptModel(loaded);
       },
       encode: async () => await _encodeCurrentOraWithPeek(),
+      mayWrite: () => !(_loadedDocIsNewer && !_loadedDocNewerConfirmed),   // 第二层的闸：较新 app 写的画，确认前 autosave / 失焦 / 关页 / 退出推云都不写
       // 字节落盘成功 → 作废该画的缩略图缓存 + 广播（gallery 在世 tile 原地重取，getPeek 本地优先
       //   = 刚写的字节）。覆盖显式保存/autosave/退出 flush 全路径（v0.10.2 缩略图冻结根修）。
       onSaved: (fullName: string) => { void invalidateCachedThumb(fullName); },   // 缩略图缓存 2026-10-21 起按身份（全名）键，和包一致

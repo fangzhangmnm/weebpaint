@@ -88,6 +88,12 @@ let _carriedRefFiles: ReferenceFiles | null = null;
 /** 新建 / 换画时清掉（session-state resetEditorState 调）：上一张画原样带着的参考目录绝不能写进下一张画。
  *  （2026-10-21 F-69 补：此前只有开画时 applyLoadedReferences 复位，新建画布不经过它 → 新画会继承上一张画带着的目录。） */
 export function clearCarriedReferences(): void { _carriedRefFiles = null; }
+/** 带着目录时任何「往参考里加东西」都拒（2026-10-21 审计第 4 条同类：保存写回的是带着的那份，新加的卡会被静默丢掉）。拒 = 状态行说清 + 不动。 */
+function _refuseWhileCarried(): boolean {
+  if (!_carriedRefFiles) return false;
+  setStatus(t("ref.carriedNoImport"), true);
+  return true;
+}
 
 /** 保存收集（session-state _buildOraMeta 调）：库编好的目录文件表，原样进 ora。 */
 export function collectReferenceFilesForSave(): Map<string, Uint8Array | Blob> {
@@ -147,6 +153,8 @@ export function initSideWindows(ctx: AppContext) {
   ref.addEventListener("itemschange", () => {
     // 参考集合变（翻页/删除/加 live 页/挪动）= sidecar 变（S5·ADR-0007：跟 ora 走 ∧ 不进 undo）
     window.dispatchEvent(new CustomEvent("wp:sidecarchange", { detail: { kind: "reference" } }));
+    // 带着目录时组件自己加的卡（＋ 菜单「画布镜像」不经本模块的漏斗）存不进去——状态行说清，别让人以为加上了（2026-10-21 审计）。
+    if (_carriedRefFiles && (referenceWindow.deck?.size ?? 0) > 0) setStatus(t("ref.carriedNoImport"), true);
   });
   ref.addEventListener("rectchange", (e) => {
     // 值没变就不写：RO 在程序性回灌/开窗后也 fire，回声不许误标脏（旧 _savePos 同款守卫）
@@ -261,6 +269,7 @@ export function initSideWindows(ctx: AppContext) {
 async function importReferenceFiles(files: File[]): Promise<void> {
   for (const f of files) {
     try {
+      if (_refuseWhileCarried()) return;
       if (f.type.startsWith("text/") || /\.(txt|md)$/i.test(f.name)) { referenceWindow.addText(await f.text(), { name: f.name }); refSetOpen(true); }
       else if (sniffKind(f) === "video") await addReferenceVideo(f);
       else await addReferenceImage(f);
@@ -271,6 +280,7 @@ async function importReferenceFiles(files: File[]): Promise<void> {
 /** 视频参考（参考窗 0.5.0）：走库的导入漏斗，只收视频；默认存法照库（视频 = 只放内存，不存进画里——user 10-21「音视频应该是当此有效」），
  *  不传 defaultRam 覆盖；＋ 菜单「只放内存」能改。逐帧在卡上（上一帧 / 下一帧）。不转码（浏览器能放就能用）。 */
 async function addReferenceVideo(file: File): Promise<void> {
+  if (_refuseWhileCarried()) return;
   const r = await referenceWindow.importFiles([file], { kinds: ["video"] });
   if (r.added.length || r.filled.length) { refSetOpen(true); setStatus(t("ref.videoAdded", { name: file.name || t("ref.kindVideo") })); return; }   // filled = 补回了「只放内存」的空位
   if (r.skipped.every((s) => s.why === "cancelled")) return;
@@ -282,6 +292,7 @@ async function addReferenceVideo(file: File): Promise<void> {
  *  压大保原）→ 追加为新页并翻到 → desk manifest 同步 + sidecar 标脏 + 状态行（压缩了就报 X→Y）。
  *  file input / 剪贴板 / 云盘 picker / import-image drop 路径全走这里。 */
 export async function addReferenceImage(file: File | Blob): Promise<void> {
+  if (_refuseWhileCarried()) return;
   // busy 普查（v0.10.3）：decode + 缩小 + jpeg 编码是秒级重活，且全程无交互段——整包 busy。
   const r = await withBusy(
     t("mi.importingBusy", { name: (file as File).name || t("mi.defaultImportName") }),

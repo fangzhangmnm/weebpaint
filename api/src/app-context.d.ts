@@ -99,6 +99,7 @@ export interface AppContext {
     withBusy: <T>(label: string, fn: () => Promise<T> | T) => Promise<T>;
     leftDial: LeftDialHandle;
     updateSaveStatus: () => void;
+    updateNewerBanner: () => void;
     isMidOperation: () => boolean;
     pullSettingsAndState: () => void;
     updateZoomLabel: () => void;

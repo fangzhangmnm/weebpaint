@@ -16,6 +16,10 @@
 | `synthetic/future-minor/all-parts.ora` | **拼** | 「更新的 minor 写的」（`gen-future.mjs`）：stack.xml minor 1、desk minor 2 + 顶层 `futureDesk`、录像 minor 1 + 顶层 `futureTimelapse`（无 mp4）、参考清单 minor 9 + 顶层 `futureDeck`、外加 `.weebpaint/future-notes.json`。测：打开 → 改一笔 → 存 → 未知的都还在 |
 | `synthetic/future-major/ora-4.ora` | **拼** | stack.xml `weebpaint:format="4"`：整张 major 更新 → 拒开、不写 |
 | `synthetic/future-major/desk-2.ora` | **拼** | ora 3.0.0、desk `version:2`（形状变了）：desk 按默认显示、存回原字节 |
+| `real/v1/reference-timelapse.ora` | **真** | format 1 最后一版写入器（commit bfb9f08，v0.12.6 时代，2026-08-30）真写的：非点 `weebpaint/reference.png` 单张参考（老视口在 desk `refPanel.viewport`）+ 根目录 `timelapse.mp4` + `.weebpaint/timelapse.json`。生成法 = `gen-v1-at-bfb9f08.mjs` 放进 `git archive bfb9f08` 解出的源码树里跑（本机 node 直接跑得了）。2026-10-21 审计第 2 条，Claude Fable 5.1 冻 |
+| `real/v1/plain.ora` | **真** | 同一写入器，没有参考没有录像；desk 导出 jpg / 白底 |
+| `synthetic/future-app/newer-app-same-format.ora` | **拼** | 拍子全是本版（3.0.0 / desk 1.0.0），只有 wrote-with = v9.9.9-future，`<layer>` 上多一个 `weebpaint:future-layer-flag`：第二层「较新 app 写的 → 说一次 + 落盘前确认」的样本；本版存一次那个属性就丢（test/format-stack-xml-unknown.test.mjs 钉住） |
+| `synthetic/future-major/references-2.ora` | **拼** | 参考清单 `version:2`（库只认到 1）：目录原样带着、这张画上不能再加参考、存回逐字节相同 |
 | `synthetic/v0/webpaint-dirs.ora` | **拼** | 无 `weebpaint:format` 戳时代的布局，按 ora.ts 当时读端路由表手工拼：`webpaint/state.json`、`webpaint/reference.png`、根目录 `timelapse.mp4`、`.webpaint/` 点目录 |
 | `synthetic/v1/weebpaint-nondot.ora` | **拼** | format 1：非点 `weebpaint/reference.png` + 根目录 mp4 + `.weebpaint/` 点目录 |
 

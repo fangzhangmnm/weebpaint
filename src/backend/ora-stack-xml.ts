@@ -91,7 +91,8 @@ export function canvasModeFromOra(op: string): string {
 //   旧文件无此属性 → 读端按 0 处理（完全可读）。
 // 2026-10-21 起三级拍子（家族格式版本纪律，F-69）：weebpaint:format 照旧是 major（老读者只认它），另加 weebpaint:format-minor /
 //   weebpaint:format-patch（缺 = 0）。SSoT = backend/format/migrate.ts FORMAT.ora；判决（major 新 → 整张只读、minor 新 → 提示一次）在 session-state。
-//   嵌在 stack.xml 已知元素里的未知属性不直通（家族规矩：要加子字段就改父字段的解析）——新东西请放 `.weebpaint/` 下的新 entry（那里直通）。
+//   嵌在 stack.xml 已知元素里的未知属性 / 子元素**不直通**（读一次写一次就没了；test/format-stack-xml-unknown.test.mjs 钉住）——
+//   同 major 内不准往这里加新东西，新东西请放 `.weebpaint/` 下的新 entry（那里直通）；兜底 = session-state「较新 app 写的画 → 覆盖前确认」。
 export const ORA_FORMAT_VERSION = FORMAT.ora.major;
 
 // ---- 写：doc 树 → stack.xml 字符串 ----

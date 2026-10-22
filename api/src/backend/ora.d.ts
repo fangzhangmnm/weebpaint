@@ -98,4 +98,5 @@ export interface DecodedPainting {
 export declare function encodeDocToOra(doc: EncodeDoc, opts: EncodeOpts): Promise<any>;
 /** Blob (.ora 明文) → DecodedPainting（json 形 + 内联 tile 字节 + sidecar）。 */
 export declare function decodeOraToPainting(blob: Blob): Promise<DecodedPainting>;
+export declare function parseAppVersion(s: string | null | undefined): number | null;
 export {};

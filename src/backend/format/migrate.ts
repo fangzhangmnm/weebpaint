@@ -23,6 +23,9 @@
 //   · 比本版小：major 小 = ora 走 layout.ts / JSON 走 STEPS 链式升级（纯函数，一步 +1）；minor / patch 小 = 缺的当默认，不用代码。
 //   · 同 major 内只加不改；删字段 = 保留读、停止写；真要删 = major +1 + 一条 STEP + 冻结样本。
 //   · 嵌在已知对象里的未知子键不直通（desk.refPanel.xxx 这种）：要加子字段就把它做成顶层键，或改父字段的解析。
+//   · **stack.xml 内部（<image> / <stack> / <layer> 的属性与子元素）没有直通**（test/format-stack-xml-unknown.test.mjs 钉住）：
+//     同一个 ora major 里不准往 stack.xml 加新属性 / 元素——要加就放 `.weebpaint/` 新 entry（直通）或 ora major +1。
+//     兜底的是第二层「写这画的 app 版本比我新 → 说一次 + 落盘前确认」（session-state；和拍子并存，2026-10-21 审计恢复）。
 // 物理形状：沿用整数 major 键（已发出去的老读者只认它，它们的 too-new 逻辑继续有效），再加两个可选整数键 `minor` / `patch`（缺 = 0）；
 //   stack.xml 是属性 `weebpaint:format`（major）+ `weebpaint:format-minor` / `weebpaint:format-patch`。不改成字符串。
 // 改格式 = ① FORMAT 里对应子结构 +1 ② major 变了：JSON 在 STEPS 登记一条 / ora 在 layout.ts 加一条归一化 ③ `node tools/freeze-format-sample.mjs <新目录>`

@@ -99,6 +99,8 @@ export declare const session: {
      *  两个平行可选字段就是当年「无地双墙」一类事故的温床，联合类型让错分支在编译期死。 */
     readonly home: Readonly<import("./doc-home.ts").DocHome> | null;
     readonly loadingDoc: boolean;
+    readonly loadedDocIsNewer: boolean;
+    readonly loadedDocNewerConfirmed: boolean;
     readonly dirty: boolean;
     readonly pushPending: boolean;
     readonly saving: boolean;

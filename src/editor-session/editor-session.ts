@@ -26,6 +26,10 @@ export interface EditorAdapter {
   // 可选：某身份的字节**成功落盘**后 fire（本地写成即算；push 与否不影响）。app 域用来作废派生缓存
   //   （如画作缩略图）。本模块仍 content-blind——只报「name 的字节变了」，不知道变了什么。
   onSaved?(name: string): void;
+  // 可选：本轮准不准落盘。false → persist 不 encode 不 save、内存脏 / push-pending 原样保住（下次再问）；缺 = 恒准。
+  //   用途（2026-10-21 审计）：「较新 app 写的画 → 覆盖前确认」那一层以前只拦 app 层的保存入口，本模块的 autosave / 失焦 /
+  //   关页 / 退出推云绕过了它——没确认就把旧格式写回去。闸放在 persist 咽喉，哪条触发都过它。
+  mayWrite?(): boolean;
 }
 
 /** editor-session 消费的 store 最小面（结构类型；真 sync-store 天然满足，测试可 mock）。 */
@@ -126,6 +130,7 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
   async function persist(tryPush: boolean, force = false): Promise<void> {
     const need = force || (tryPush ? (_dirty || _pushPending) : _dirty);
     if (!_name || !need || _saving) return;
+    if (editor.mayWrite && !editor.mayWrite()) return;   // 闸：app 层说这张画此刻不准写（较新 app 写的、还没确认覆盖）→ 什么都不动，脏保住
     _saving = true;
     let takeCloudReload = false;   // save 途中用户选了「云端覆盖本地」→ 收尾必须整体重载（见 finally 之后）
     // ★ 失败回滚用（v417）：下面会**先**乐观清脏、**再** await save()。save() 抛异常时若不还原，

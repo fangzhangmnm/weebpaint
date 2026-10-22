@@ -81,6 +81,16 @@ function _renderPanel(): void {
   if (s.supported === null) { body.appendChild(_note(t("tl.probing"))); return; }
 
   if (!s.exists) {
+    // 格式版本纪律（2026-10-21 审计）：录像是更新版本写的、原字节在检疫区——不给「开录」（开录 = 那段录像出所 = 丢）；先清除（确认）再开。
+    if (s.restoreIssue === "too-new") {
+      body.appendChild(_note(t("tl.quarantineNote")));
+      body.appendChild(_menuItem("trash-can", t("tl.quarantineClear"), "danger", async () => {
+        const ok = await openConfirmSheet(t("tl.clearConfirmTitle"), t("tl.quarantineClearMsg"));
+        if (!ok) return;
+        timelapseClear(); _renderPanel();
+      }));
+      return;
+    }
     // —— 设置面：比例 chips + 最长边（≈参考体积）+ 开录 ——
     body.appendChild(_label(t("tl.aspect")));
     body.appendChild(_chips(TIMELAPSE_ASPECTS.map(([w, h]) => ({

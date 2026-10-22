@@ -72,6 +72,11 @@ export function guardRackFormat(inner: RackPersistence): RackPersistence {
       return typeof def === "function" ? (def as () => V)() : def;
     },
     setItem(id: string, value: unknown): void {
+      // 值本身是更新 major（只可能来自导入；brushFromJSON 已先拒）→ 不写：盖本版拍写进去 = 把更新格式伪装成本版。
+      if (isObj(value) && judge(componentOf(id), readStamp(componentOf(id), value)) === "too-new") {
+        reportError(new Error(`[rack-format] not writing ${id}: the value is a newer major than this app (stamping it down would be a disguised downgrade)`), "log");
+        return;
+      }
       if (isTooNewInStore(inner, id)) {
         reportError(new Error(`[rack-format] not overwriting ${id}: stored entry is a newer major than this app`), "log");
         return;

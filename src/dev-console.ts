@@ -4,6 +4,7 @@
 import { fetchOraThumbnail } from "./gallery/cloud-thumbs.ts";
 import { requireStore } from "./app-store.ts";
 import { promptPassword } from "./crypto-state.ts";   // 探针用：F8 走一遍口令真表单（type=password / autocomplete / 账号字段 / 表单提交）
+import { session } from "./session-state.ts";   // 探针用：F12 读会话状态（家 / 脏 / 较新 app 写的 / 已确认）
 import { registerFilter, listFilters } from "./filters.ts";
 import { setColor } from "./color-panel.ts";
 import { registerExporter, listExporters } from "./exporters.ts";
@@ -40,6 +41,8 @@ export function initDevConsole() {
   //   await WeebPaint.pocFetchThumb()  默认拉云列表第一个 ora 验证
   const WP = (window.WeebPaint = window.WeebPaint || {});
   WP.fetchOraThumbnail = fetchOraThumbnail;
+  // 探针 / 调试：当前会话的只读快照（不暴露动词）。
+  WP.docState = () => ({ home: session.home, dirty: session.dirty, pushPending: session.pushPending, newer: session.loadedDocIsNewer, confirmed: session.loadedDocNewerConfirmed });
   WP.cloudThumbStats = () => ({ cache: { ...cloudThumbStats } });   // 路径分布（硬扫/CD/加密）已下沉进库 getPeek，不再从 app 暴露
   WP.cloudThumbResetStats = () => { cloudThumbResetStats(); };
   WP.cloudThumbSkipCache = (on = true) => {

@@ -110,7 +110,7 @@ WeebPaint 是家族里库最旧的一家（store 0.15.2 / gallery 0.1.0，WXHW /
 | workbench-elements | 0.1.2 → **0.1.3** | 外点关加「子弹层不算外面」（本仓 09-11 规则进包） | #2 收货（见 `20261021-workbench-elements-intake-handoff.md` 顶部） |
 
 同版顺手：#96 还原出厂按家规 2½（两步护栏、去硬拦、连壳清）；#93 的 CLAUDE.md 持久层白名单表 + `test/storage-whitelist.test.mjs`。验证同 §7（npm test 1503 / build 含新封口 lint / F1 F4 F8 F9 F10 / standalone smoke）。没做：登录后 pushAll（问题 3 没答）；F-69 格式版本纪律（#92，挑时机）；#97 口令面板真表单（下一版）。
-（后续，edited by Claude Opus 5.5 2026-10-21 夜：pushAll 问一次 = v0.14.42；口令真表单 = v0.14.43；F-69 = v0.14.46。）
+（后续，edited by Claude Opus 5.5 2026-10-21 夜：pushAll 问一次 = v0.14.42；口令真表单 = v0.14.43；F-69 = v0.14.46；对抗性审计 = v0.14.47，见 `20261021-format-discipline-adversarial-audit.md`。）
 
 ## 8. 要 user 一句话的
 
