@@ -87,6 +87,36 @@ describe("冻结样本 · real/v2（v0.14.20 写入器真写的 format 2）", ()
   });
 });
 
+describe("冻结样本 · real/v3（v0.14.44 写入器真写的 format 3；tools/freeze-format-sample.mjs，2026-10-21 Opus 5.5 冻）", () => {
+  it("references-live-timelapse：不用归一化；三张卡、像素、录像、desk 全对；往返语义一致、布局不变", async () => {
+    const dec = await decodeOraToPainting(load("real/v3/references-live-timelapse.ora"));
+    eq(dec._formatVersion, 3); eq(dec._layoutMigrated.length, 0, "format 3 就是当前布局");
+    const deck = await readDeck(dec);
+    eq(deck.size, 3); eq(deck.index, 2);
+    const cards = await cardSummary(deck);
+    eq(cards.map((c) => c.kind).join(","), "image,live,image");
+    eq(cards[0].bytes, JPEG_STUB); eq(cards[2].bytes, PNG_STUB); eq(cards[2].vp.rot, 0.25);
+    eq(dec._editorState.version, 1); eq(dec._editorState.refPanel.enabled, true); eq(dec._editorState.refPanel.position.left, 120);
+    eq(joined(dec._timelapseMp4), MP4_STUB);
+    const tj = JSON.parse(dec._timelapseJson); eq(tj.v, 1); eq(tj.n, 3); eq(tj.longEdge, 1080);
+    eq(pixels(dec).length, 2);
+    const before = await semantics(dec, deck);
+    const out = await rewrite(dec, deck);
+    const dec2 = await decodeOraToPainting(out);
+    eq(await semantics(dec2, await readDeck(dec2)), before, "往返语义逐字段一致");
+    eq(Object.keys(await zipUnpack(out)).join("|"), CURRENT_LAYOUT([REFERENCES_MANIFEST, `${REFERENCES_DIR}/r0.jpg`, `${REFERENCES_DIR}/r2.png`], true).join("|"));
+  });
+  it("plain：desk 的非默认值（导出 jpg / 白底）往返不丢", async () => {
+    const dec = await decodeOraToPainting(load("real/v3/plain.ora"));
+    eq(dec._formatVersion, 3); eq(dec._referenceFiles.size, 0);
+    eq(dec._editorState.export.format, "jpg"); eq(dec._editorState.export.bg, "#ffffff");
+    const deck = await readDeck(dec);
+    const dec2 = await decodeOraToPainting(await rewrite(dec, deck));
+    eq(await semantics(dec2, await readDeck(dec2)), await semantics(dec, deck));
+    eq(dec2._editorState.export.format, "jpg"); eq(dec2._editorState.export.bg, "#ffffff");
+  });
+});
+
 describe("冻结样本 · synthetic（按旧路由表拼的历史布局）", () => {
   it("v0 webpaint-dirs：无 format 戳、非点 webpaint/、.webpaint/、根目录 mp4 —— 全部归一化；单张参考带老视口；旧轨 state.json 还在", async () => {
     const dec = await decodeOraToPainting(load("synthetic/v0/webpaint-dirs.ora"));
