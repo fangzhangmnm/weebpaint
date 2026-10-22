@@ -16,7 +16,7 @@ import { t } from "./i18n/index.ts";
 import { WpReferenceWindow } from "@internal/reference-window";
 import type { RefLiveSource, RefPanelRect } from "@internal/reference-window";
 import { encodeDeck, decodeDeck, mimeForName, DeckManifestTooNewError, sniffKind } from "@internal/reference-window/deck";
-import { noteNewerMinor } from "./format-notice.ts";   // 参考窗 0.5.0 清单拍子：newer-minor 告诉用户一次
+import { noteNewerMinor, noteTooNewPart } from "./format-notice.ts";   // 参考窗 0.5.0 清单拍子：newer-minor / too-new 各告诉用户一次
 import { PaletteWindow } from "./palette.ts";
 import { els } from "./els.ts";
 import { decodeImageFile, imageSourceToBytes } from "./shell/image-io.ts";
@@ -85,6 +85,10 @@ const REF_KINDS = ["image", "live", "text", "video"] as const;   // 这个宿主
 /** 清单比库新时整个目录原样带着（读时装下、存时原样写回），直到用户在新版里打开。null = 正常态。 */
 let _carriedRefFiles: ReferenceFiles | null = null;
 
+/** 新建 / 换画时清掉（session-state resetEditorState 调）：上一张画原样带着的参考目录绝不能写进下一张画。
+ *  （2026-10-21 F-69 补：此前只有开画时 applyLoadedReferences 复位，新建画布不经过它 → 新画会继承上一张画带着的目录。） */
+export function clearCarriedReferences(): void { _carriedRefFiles = null; }
+
 /** 保存收集（session-state _buildOraMeta 调）：库编好的目录文件表，原样进 ora。 */
 export function collectReferenceFilesForSave(): Map<string, Uint8Array | Blob> {
   if (_carriedRefFiles) return _carriedRefFiles;
@@ -110,7 +114,7 @@ export async function applyLoadedReferences(files: ReferenceFiles): Promise<void
     if (e instanceof DeckManifestTooNewError) {
       _carriedRefFiles = files;
       deck.clear();
-      setStatus(t("ref.tooNew", { file: String(e.fileVersion), lib: String(e.libVersion) }), true);
+      noteTooNewPart("references", String(e.fileVersion), String(e.libVersion));   // 通知条（状态行会被「已打开」顶掉）
       reportError(new Error(`[side-windows] ${e.message}; carrying the references directory untouched`), "warning");
       return;
     }

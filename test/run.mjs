@@ -32,7 +32,6 @@ import "./similar-select.test.mjs";    // v0.7.21 同色全图内核 + OKLab/RGB
 import "./ramp-seg.test.mjs";          // v0.7.22 ramp-slider 分段步长模式（与 brush-size 段表互证）
 import "./sel-pen.test.mjs";           // v0.7.25 选区笔：变体装配 + disc 同核光栅 + 引擎动力学全链
 import "./iso-frame.test.mjs";         // isometric 透视模式：纯平行三轴/仿射度量/box
-import "./app-version.test.mjs";
 import "./page-title.test.mjs";        // 网页标题只是 WeebPaint（user 2026-10-14）
 import "./cpu-tile-pool.test.mjs";
 import "./soft-gl2-port.test.mjs";   // C8 SoftGl2Port：真消费类（栅格/合成/烤定）无 GL 跑通 + 对表纪律
@@ -64,6 +63,7 @@ import "./timelapse-ora.test.mjs";   // timelapse×ora：entry 进出/顺序契�
 import "./ora-references.test.mjs";       // 参考目录 × ora（format 3）：目录原样进出 / thumbnail 垫尾 / 停写非点 weebpaint/
 import "./format-layout.test.mjs";        // 2026-09-29 持久化立宪：布局归一化表 + 子结构版本链
 import "./format-samples.test.mjs";       // 2026-09-29 持久化立宪：冻结样本往返（老文件永远能开、语义无损、写成当前布局）
+import "./format-migrate.test.mjs";       // 2026-10-21 格式版本纪律 F-69：拍子表 / 判决 / 迁移链 / desk·录像直通袋 / 笔架咽喉
 import "./reference-transcode.test.mjs";  // 0830 参考图压缩政策纯函数（1024² 面积/豁免/拍平白底）
 import "./reference-icons.test.mjs";      // 0830 参考窗图标 SSoT：id 全在 sprite（零自绘几何那条 2026-09-29 随组件搬进库仓）
 import "./resample-bytes.test.mjs"; // 字节重采样：面积平均严格box/alpha加权/限幅

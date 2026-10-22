@@ -14,6 +14,8 @@ import {
 import type { DecodedPainting } from "./backend/ora.ts";
 import { muxTimelapse } from "./backend/timelapse/timelapse-mux.ts";
 import { reportError } from "./error-badge.ts";
+import { noteNewerMinor } from "./format-notice.ts";   // 格式版本纪律：timelapse.json 的 minor 比本版新 → 告诉用户一次
+import { FORMAT, fmt } from "./backend/format/migrate.ts";
 import { t } from "./i18n/index.ts";
 
 interface DocViewLike { layers: readonly unknown[]; width: number; height: number }
@@ -61,6 +63,7 @@ export function timelapseAdopt(loaded: { _timelapseJson?: string; _timelapseMp4?
   // 回读问题报 warning（护栏 B，2026-08-25：info 状态栏一闪即逝，静默关闭案的帮凶）。
   // 按 issue 分文案：mp4-missing/mismatch 是「素材受损但录制还活着」，corrupt 是「录像读不懂已停录（字节已检疫保留）」。
   if (_st.restoreIssue) reportError(t(_st.restoreIssue === "too-new" ? "tl.restoreTooNew" : _st.settings ? "tl.restoreDegraded" : "tl.restoreLost"), "warning");
+  if (_st.formatVerdict === "newer-minor" && _st.formatStamp) noteNewerMinor("timelapse", fmt(_st.formatStamp), fmt(FORMAT.timelapse));
   _detached = false;
   _needKey = true; _frameSeq = 0; _encoderStrikes = 0;
   _notifyUi();

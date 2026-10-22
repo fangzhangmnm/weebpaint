@@ -41,6 +41,7 @@ for r in $(seq 1 "$ROUNDS"); do
   step "F9 gallery-folder (round $r)" node tools/preflight/f9-gallery-folder.mjs   # 2026-10-21 迁库：OPFS 当本地文件夹图库，图库包 0.8.5 一圈（菜单出卡片 / 回收站 / 备份箱）
   step "F10 vue-precompiled (round $r)" node tools/preflight/f10-vue-precompiled.mjs   # 2026-10-21 #89：CSP 无 unsafe-eval 下本仓 Vue 组件逐个渲染出来、零拦截
   step "F11 reference-video (round $r)" node tools/preflight/f11-reference-video.mjs   # 2026-10-21 参考窗 0.5.0：清单 minor 更新提示一次 + 视频卡（只放内存、上一帧 / 下一帧）
+  step "F12 format-discipline (round $r)" node tools/preflight/f12-format-discipline.mjs   # 2026-10-21 F-69：major 更新拒开不写 / minor 更新改一笔存回未知部分都在 / desk major 更新原字节带回
 done
 
 say "ALL GREEN（$ROUNDS 轮）→ 夹具批通过。log=$LOG"

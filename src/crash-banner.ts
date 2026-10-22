@@ -64,12 +64,14 @@ async function _recover(m: CrashRecordMeta): Promise<void> {
       // 云关（Editor Only 姿态）：图库不可见——恢复为 transient（立即标脏 + 重挂 T-crash），
       //   用户经保存按钮 settle 成文件。落进看不见的图库 = 数据蟑螂旅馆，不做。
       const loaded = await withBusy(t("cb.recoveringBusy", { name: base }), () => decodeOraToPainting(recBytes));
+      if (session.refuseIfTooNew(loaded)) { void putBack(); return; }   // 更新 major 写的快照：拒开、快照放回（通知条已说）
       session.adoptAsTransient(loaded, base);
       setStatus(t("cb.recoveredTransient", { name: base }), true);
       return;
     }
     const name = await uniqueNameFor(`${base}${t("cb.recoveredSuffix")}`);
     const loaded = await withBusy(t("cb.recoveringBusy", { name }), () => decodeOraToPainting(recBytes));
+    if (session.refuseIfTooNew(loaded)) { void putBack(); return; }
     session.adoptAsNew(loaded, name);   // 新身份 + es 记脏：恢复出的 doc 视为 dirty 直到首次真保存
     await setGalleryOpen(false);
     setStatus(t("cb.recovered", { name }), true);

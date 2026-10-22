@@ -10,6 +10,8 @@
 //   组 LayerGroup：{ isGroup:true, id, name, visible, opacity, mode, clippingMask, children:[] }
 // 写入端额外读 doc.activeId / doc.referenceLayerId 决定 active / reference 标记。
 
+import { FORMAT, readOraStamp, type Stamp } from "./format/migrate.ts";   // 格式版本纪律：ora 的拍子 SSoT
+
 // 写入端读到的节点 / doc 的最小结构（doc.js 本体仍未类型化）。
 export interface OraNode {
   id: number;
@@ -86,8 +88,11 @@ export function canvasModeFromOra(op: string): string {
 //   3 = 持久化立宪（2026-09-29，user「weebpaint升级同意」）：参考清单从 editor-state.json 的 refPanels 独立成
 //       `.weebpaint/references/manifest.json`（契约归 @internal/reference-window）；desk 带 version 戳；
 //       读端布局归一化（backend/format/layout.ts）取代散落的兜底链。
-//   旧文件无此属性 → 读端按 0 处理（完全可读）。读到 > ORA_FORMAT_VERSION → 上层警告 + 覆盖守卫（session-state）。
-export const ORA_FORMAT_VERSION = 3;
+//   旧文件无此属性 → 读端按 0 处理（完全可读）。
+// 2026-10-21 起三级拍子（家族格式版本纪律，F-69）：weebpaint:format 照旧是 major（老读者只认它），另加 weebpaint:format-minor /
+//   weebpaint:format-patch（缺 = 0）。SSoT = backend/format/migrate.ts FORMAT.ora；判决（major 新 → 整张只读、minor 新 → 提示一次）在 session-state。
+//   嵌在 stack.xml 已知元素里的未知属性不直通（家族规矩：要加子字段就改父字段的解析）——新东西请放 `.weebpaint/` 下的新 entry（那里直通）。
+export const ORA_FORMAT_VERSION = FORMAT.ora.major;
 
 // ---- 写：doc 树 → stack.xml 字符串 ----
 
@@ -148,7 +153,7 @@ export function buildStackXml(doc: OraDoc, wroteWithVersion = ""): string {
   // 论证见 conversation v71→v72。
   const wroteWith = wroteWithVersion;
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<image version="0.0.3" w="${doc.width}" h="${doc.height}" xres="72" yres="72" xmlns:weebpaint="https://github.com/fangzhangmnm/weebpaint/ns" weebpaint:format="${ORA_FORMAT_VERSION}" weebpaint:wrote-with="${escapeXml(wroteWith)}">
+<image version="0.0.3" w="${doc.width}" h="${doc.height}" xres="72" yres="72" xmlns:weebpaint="https://github.com/fangzhangmnm/weebpaint/ns" weebpaint:format="${FORMAT.ora.major}" weebpaint:format-minor="${FORMAT.ora.minor}" weebpaint:format-patch="${FORMAT.ora.patch}" weebpaint:wrote-with="${escapeXml(wroteWith)}">
   <stack name="root">
 ${nodes.join("\n")}
   </stack>
@@ -213,7 +218,7 @@ function parseChildren(stackEl: Element): ParsedNode[] {
   return kids.map(parseNode);
 }
 
-export function parseStackXml(xmlText: string): { w: number; h: number; nodes: ParsedNode[]; wroteWith: string | null; formatVersion: number } {
+export function parseStackXml(xmlText: string): { w: number; h: number; nodes: ParsedNode[]; wroteWith: string | null; formatVersion: number; formatStamp: Stamp } {
   const dom = new DOMParser().parseFromString(xmlText, "application/xml");
   const err = dom.querySelector("parsererror");
   if (err) throw new Error("stack.xml parse failed: " + err.textContent);
@@ -226,6 +231,6 @@ export function parseStackXml(xmlText: string): { w: number; h: number; nodes: P
   const rootStack = [...image.children].find((c) => elemTag(c) === "stack");
   const nodes = rootStack ? parseChildren(rootStack) : [];
   const wroteWith = wpAttr(image, "wrote-with") || null;
-  const formatVersion = parseInt(wpAttr(image, "format") || "0", 10) || 0;   // 无戳（改名前存量）= 0
-  return { w, h, nodes, wroteWith, formatVersion };
+  const formatStamp = readOraStamp({ format: wpAttr(image, "format"), minor: wpAttr(image, "format-minor"), patch: wpAttr(image, "format-patch") });   // 无戳（改名前存量）= 0.0.0
+  return { w, h, nodes, wroteWith, formatVersion: formatStamp.major, formatStamp };
 }

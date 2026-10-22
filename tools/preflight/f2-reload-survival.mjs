@@ -22,7 +22,8 @@ await evClick(page, "menuButton");
 await evClick(page, "menuThemeBtn");
 await page.waitForTimeout(200);
 await page.evaluate(() => {
-  const btns = [...document.querySelectorAll("#menuThemeMenu button")];
+  // v0.12.20 起主题下拉 = workbench-elements popup-menu（#menuThemeMenu 那时就没了，本夹具从那以后一直红；2026-10-21 F-69 顺手修，Opus 5.5）
+  const btns = [...document.querySelectorAll(".popup-menu:not(.hidden) button")];
   const b = btns.find((x) => (x.textContent || "").includes("夜"));
   if (!b) throw new Error("theme 夜 option not found");
   b.click();

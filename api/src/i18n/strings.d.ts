@@ -3255,12 +3255,6 @@ export declare const S: {
         readonly ja: "この参考の元がありません";
         readonly tok: "ijo pi sitelen ni li lon ala";
     };
-    readonly "ref.tooNew": {
-        readonly zh: "参考清单是更新的版本写的（v{file}，本版只懂到 v{lib}）——先原样保留，请刷新升级后再看";
-        readonly en: "References were written by a newer version (v{file}; this build reads up to v{lib}) — kept untouched, refresh to upgrade";
-        readonly ja: "参考リストは新しいバージョンで書かれています（v{file}、この版は v{lib} まで）——そのまま保持、更新してください";
-        readonly tok: "lipu lukin li tan ilo sin (v{file}; ilo ni li sona e v{lib} taso) — mi awen e ona, o sin e ilo";
-    };
     readonly "cp.title": {
         readonly zh: "从图库选图";
         readonly en: "Pick an image from the gallery";
@@ -4428,24 +4422,6 @@ export declare const S: {
         readonly ja: "保存に失敗しました：{error}";
         readonly tok: "awen li pakala: {error}";
     };
-    readonly "ss.overwriteNewerTitle": {
-        readonly zh: "覆盖更新版本写的画？";
-        readonly en: "Overwrite artwork written by a newer version?";
-        readonly ja: "新しいバージョンで作成された作品を上書きしますか？";
-        readonly tok: "sitelen ni li tan ilo sin. sina wile ala wile awen e ona?";
-    };
-    readonly "ss.overwriteNewerMsg": {
-        readonly zh: "这画由 {writer} 写的，你是 {version}。保存会丢失新版本特有的属性（如新图层 flag 等）。建议先刷新升级。";
-        readonly en: "This artwork was written by {writer}; you're on {version}. Saving will lose properties specific to the newer version (such as new layer flags). Consider refreshing to upgrade first.";
-        readonly ja: "この作品は {writer} で作成されましたが、あなたは {version} です。保存すると新しいバージョン固有の属性（新しいレイヤーフラグなど）が失われます。先に更新してアップグレードすることをおすすめします。";
-        readonly tok: "ilo {writer} li sitelen e ona. taso sina kepeken e ilo {version}. sina awen la ijo pi ilo sin li weka. nasin pona: o open sin e mi lon tenpo open.";
-    };
-    readonly "ss.docNewerWarning": {
-        readonly zh: "这画由 {writer} 写的，你是 {version} —— 编辑保存会丢失新版特有的层属性。建议先刷新升级。";
-        readonly en: "This artwork was written by {writer}; you're on {version} — editing and saving will lose layer properties specific to the newer version. Consider refreshing to upgrade first.";
-        readonly ja: "この作品は {writer} で作成されましたが、あなたは {version} です —— 編集・保存すると新しいバージョン固有のレイヤー属性が失われます。先に更新してアップグレードすることをおすすめします。";
-        readonly tok: "ilo {writer} li sitelen e ona. taso sina kepeken e ilo {version}. sina ante la ijo pi ilo sin li weka. nasin pona: o open sin e mi.";
-    };
     readonly "ss.noDocCannotSave": {
         readonly zh: "没打开作品，无法保存";
         readonly en: "No artwork open; cannot save";
@@ -4523,12 +4499,6 @@ export declare const S: {
         readonly en: "Recovery failed: {err} (snapshot put back; you can retry)";
         readonly ja: "復元に失敗しました：{err}（スナップショットは戻したため再試行できます）";
         readonly tok: "kama sin li pakala: {err}. ona li awen. o sin.";
-    };
-    readonly "ss.notPushedNewer": {
-        readonly zh: "未推送：这画由更新版本写成，你取消了覆盖（本地与云端都保持原样）";
-        readonly en: "Not pushed: this artwork was written by a newer version and you cancelled the overwrite (local and cloud both left unchanged)";
-        readonly ja: "プッシュしていません：この作品は新しいバージョンで作成されており、上書きをキャンセルしました（ローカルとクラウドはどちらもそのまま）";
-        readonly tok: "mi pana ala: ilo sin li sitelen e ona. sina weka e awen. ilo ni en poki sewi li awen sama.";
     };
     readonly "ss.savedLocalIdb": {
         readonly zh: "已存本地：{name}（还没到图库——图库接通后会自动补推）";
@@ -4823,6 +4793,18 @@ export declare const S: {
         readonly en: "This painting was written by a newer WeebPaint: features this version lacks are kept when you save, just not shown";
         readonly ja: "この絵は新しい WeebPaint で書かれています。このバージョンにない機能は保存しても失われませんが、表示されません";
         readonly tok: "ilo WeebPaint sin li pali e sitelen ni. ilo ni li sona ala e ijo lili. sina awen e ona la ijo ni li moli ala. sina lukin ala e ona taso.";
+    };
+    readonly "ss.docTooNew": {
+        readonly zh: "这张画是更新版本的 WeebPaint 写的（格式 {file}，这版只认到 {app}）：这版打不开，也没有改动它。请先「强制更新」再打开";
+        readonly en: "This painting was written by a newer WeebPaint (format {file}; this version reads up to {app}): it can't be opened here and was left untouched. Use Force update first";
+        readonly ja: "この絵は新しい WeebPaint で書かれています（形式 {file}、この版は {app} まで）。この版では開けず、ファイルも変更していません。先に「強制更新」してください";
+        readonly tok: "ilo WeebPaint sin li pali e sitelen ni. ilo ni li ken ala open e ona li ante ala e ona. o sin wawa e ilo.";
+    };
+    readonly "ss.docPartTooNew": {
+        readonly zh: "这张画有一部分设置是更新版本写的，这版读不懂：先按默认显示，保存时那部分原样留着，不会丢";
+        readonly en: "Part of this painting's settings was written by a newer version that this one can't read: shown with defaults for now, and kept as-is when you save";
+        readonly ja: "この絵の設定の一部は新しいバージョンで書かれていて、この版では読めません。いまは既定値で表示し、保存してもその部分はそのまま残ります";
+        readonly tok: "ilo sin li pali e ijo lili pi sitelen ni. ilo ni li sona ala e ona. sina awen e sitelen la ijo ni li moli ala.";
     };
     readonly "ss.notOpenedNeedPasswordCancelled": {
         readonly zh: "未打开：需要密码解锁（已取消）";
@@ -6785,6 +6767,18 @@ export declare const S: {
         readonly en: "Deleting folder…";
         readonly ja: "フォルダ削除中…";
         readonly tok: "mi weka e poki…";
+    };
+    readonly "br.formatNewerMinor": {
+        readonly zh: "笔架里有更新版本写的笔：这版没有的设置保存时不会丢，只是看不到";
+        readonly en: "Some brushes were written by a newer version: settings this version lacks are kept when saved, just not shown";
+        readonly ja: "新しいバージョンで書かれたブラシがあります。この版にない設定は保存しても失われませんが、表示されません";
+        readonly tok: "ilo sin li pali e ilo sitelen lili. ilo ni li sona ala e ijo lili ona. taso ona li moli ala.";
+    };
+    readonly "br.formatTooNew": {
+        readonly zh: "笔架里有几支笔是更新版本写的，这版读不了：先不显示，也不会改动它们";
+        readonly en: "A few brushes were written by a newer version this one can't read: they're hidden here and left untouched";
+        readonly ja: "この版では読めない新しいバージョンのブラシがあります。ここでは表示せず、変更もしません";
+        readonly tok: "ilo sin li pali e ilo sitelen lili. ilo ni li ken ala lukin e ona li ante ala e ona.";
     };
     readonly "br.toolBrush": {
         readonly zh: "笔刷";

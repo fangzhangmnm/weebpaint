@@ -15,6 +15,9 @@ const { zipUnpack } = await import("../src/backend/zip.ts");
 const { REFERENCES_DIR, REFERENCES_MANIFEST } = await import("../src/backend/format/layout.ts");
 const { desk } = await import("../src/workbench-state.ts");
 const { createDeck, decodeDeck, encodeDeck, mimeForName } = await import("@internal/reference-window/deck");
+const { FORMAT, judge, FormatTooNewError } = await import("../src/backend/format/migrate.ts");
+const { TimelapseDocState } = await import("../src/backend/timelapse/timelapse-state.ts");
+const { WeebPaintBackend } = await import("../src/backend/weebpaint-backend.ts");
 
 const FIX = new URL("./fixtures/format/", import.meta.url);
 const load = (rel) => new Blob([readFileSync(new URL(rel, FIX))]);
@@ -117,6 +120,30 @@ describe("冻结样本 · real/v3（v0.14.44 写入器真写的 format 3；tools
   });
 });
 
+describe("冻结样本 · real/v3.0.0（v0.14.46 写入器真写的三级拍子：stack.xml / desk / 录像都带 minor / patch；2026-10-21 Opus 5.5 冻）", () => {
+  it("references-live-timelapse：拍子 3.0.0 / 1.0.0 / 1.0.0、判 same；往返语义一致、布局不变", async () => {
+    const dec = await decodeOraToPainting(load("real/v3.0.0/references-live-timelapse.ora"));
+    eq(JSON.stringify(dec._formatStamp), JSON.stringify({ major: 3, minor: 0, patch: 0 })); eq(judge("ora", dec._formatStamp), "same");
+    eq(dec._layoutMigrated.length, 0); eq(dec._extraEntries.size, 0, "本版写的文件没有未知 entry");
+    eq(dec._editorState.version, 1); eq(dec._editorState.minor, 0); eq(dec._editorState.patch, 0);
+    const tj = JSON.parse(dec._timelapseJson); eq(tj.v, 1); eq(tj.minor, 0); eq(tj.patch, 0);
+    const deck = await readDeck(dec);
+    eq(deck.size, 3); eq(deck.index, 2);
+    const before = await semantics(dec, deck);
+    const out = await rewrite(dec, deck);
+    const dec2 = await decodeOraToPainting(out);
+    eq(await semantics(dec2, await readDeck(dec2)), before, "往返语义逐字段一致");
+    eq(Object.keys(await zipUnpack(out)).join("|"), CURRENT_LAYOUT([REFERENCES_MANIFEST, `${REFERENCES_DIR}/r0.jpg`, `${REFERENCES_DIR}/r2.png`], true).join("|"));
+  });
+  it("plain：desk 非默认值往返不丢", async () => {
+    const dec = await decodeOraToPainting(load("real/v3.0.0/plain.ora"));
+    eq(dec._editorState.export.format, "jpg"); eq(dec._editorState.export.bg, "#ffffff");
+    const deck = await readDeck(dec);
+    const dec2 = await decodeOraToPainting(await rewrite(dec, deck));
+    eq(await semantics(dec2, await readDeck(dec2)), await semantics(dec, deck));
+  });
+});
+
 describe("冻结样本 · desk 结构等价（每份样本：文件里 desk 的每个顶层键，读 → 写 → 再读，值逐字段不变）", () => {
   // 家族格式版本纪律 F-69 护栏 1（统筹 10-21）：动 desk 读写之前，先钉住「现有每一种 desk 都原样往返」。
   //   比的是文件里（布局归一化之后）有的键：当前写入器会补上缺的默认组，那不算变化；version 归写入器自己（只写当前拍）。
@@ -172,5 +199,79 @@ describe("冻结样本 · synthetic（按旧路由表拼的历史布局）", () 
     const all = walk("");
     assert(all.length >= 4, `样本数 ${all.length}`);
     for (const rel of all) { const dec = await decodeOraToPainting(load(rel)); assert(dec.data.nodes.length > 0, rel); }
+  });
+});
+
+describe("冻结样本 · 未来版本写的（家族格式版本纪律 F-69 护栏 3 / 4；样本 = synthetic/future-*，gen-future.mjs 拼）", () => {
+  // 壳层的保存链路，每个子结构都走真写入器：desk.Serialize（直通袋）/ TimelapseDocState.serializeForSave（直通袋）/
+  //   encodeDeck（库的直通）/ extraEntries（`.weebpaint/` 不认识的 entry）。和 session-state _buildOraMeta + timelapseForSave 同形。
+  const dec8 = (u8) => new TextDecoder().decode(u8);
+  const entry = async (blob, p) => (await zipUnpack(blob))[p];
+
+  it("minor 更新的每一部分：打开 → 改一笔 → 存 → 再读，未知键 / 未知 entry 都还在，拍子写成本版的", async () => {
+    const dec = await decodeOraToPainting(load("synthetic/future-minor/all-parts.ora"));
+    eq(judge("ora", dec._formatStamp), "newer-minor");
+    eq([...dec._extraEntries.keys()].join("|"), ".weebpaint/future-notes.json");
+    // 打开（壳层同款）
+    desk.reset();
+    eq(desk.Unserialize(dec._editorState).verdict, "newer-minor");
+    const tl = TimelapseDocState.restore(dec._timelapseJson ?? null, dec._timelapseMp4 ?? null);
+    eq(tl.formatVerdict, "newer-minor"); eq(tl.restoreIssue, null);
+    const decoded = await decodeDeck({ app: "weebpaint", knownKinds: ["image", "live"], getFile: (p) => { const b = dec._referenceFiles.get(p); return b ? new Blob([b], { type: mimeForName(p) }) : null; } });
+    eq(decoded.verdict, "newer-minor");
+    const deck = createDeck(); deck.restore(decoded);
+    // 改一笔：底层 (3,0) 涂成绿
+    const base = dec.data.nodes.find((n) => n.id === 1);
+    const w = base.pixels.rect.w, i = (0 * w + 3) * 4;
+    base.pixels.bytes.set([0, 255, 0, 255], i);
+    // 存
+    const saved = await encodeDocToOra(paintingDataToEncodeDoc(dec.data), {
+      wroteWith: "v-test", desk: desk.Serialize(), referenceFiles: encodeDeck(deck.snapshot(), { app: "weebpaint" }),
+      timelapse: tl.serializeForSave(null, 4, 4), extraEntries: dec._extraEntries,
+    });
+    // 再读
+    const back = await decodeOraToPainting(saved);
+    eq(JSON.stringify(back._formatStamp), JSON.stringify(FORMAT.ora), "stack.xml 写本版拍");
+    eq(JSON.stringify(back._editorState.futureDesk), JSON.stringify({ gizmo: true, level: 3 }), "desk 未知键还在");
+    eq(back._editorState.minor, FORMAT.desk.minor, "desk 拍子写本版的");
+    const tlj = JSON.parse(back._timelapseJson);
+    eq(tlj.futureTimelapse, "keep me", "录像未知键还在"); eq(tlj.minor, FORMAT.timelapse.minor);
+    const man = JSON.parse(dec8(back._referenceFiles.get(REFERENCES_MANIFEST)));
+    eq(JSON.stringify(man.futureDeck), JSON.stringify(["a", "b"]), "参考清单未知键还在（库直通）");
+    eq(dec8(back._extraEntries.get(".weebpaint/future-notes.json")), JSON.stringify({ hello: "from a newer WeebPaint" }), "未知 entry 原样");
+    const names = Object.keys(await zipUnpack(saved));
+    eq(names[names.length - 1], "Thumbnails/thumbnail.png", "缩略图仍垫尾");
+    const b2 = back.data.nodes.find((n) => n.id === 1);
+    eq(Array.from(b2.pixels.bytes.slice((0 * b2.pixels.rect.w + 3) * 4, (0 * b2.pixels.rect.w + 3) * 4 + 4)).join(","), "0,255,0,255", "那一笔在");
+  });
+
+  it("整张 ora 的 major 更新：判 too-new；无头 backend.open 拒开（抛 FormatTooNewError）", async () => {
+    const bytes = new Uint8Array(readFileSync(new URL("synthetic/future-major/ora-4.ora", FIX)));
+    const dec = await decodeOraToPainting(new Blob([bytes]));
+    eq(judge("ora", dec._formatStamp), "too-new"); eq(dec._formatStamp.major, 4);
+    let err = null;
+    try { await WeebPaintBackend.open(bytes, { appVersion: "v-test" }); } catch (e) { err = e; }
+    assert(err instanceof FormatTooNewError, String(err)); eq(err.component, "ora");
+  });
+
+  it("只有 desk 的 major 更新：desk 抛；保存递原字节 → 写回的 editor-state.json 与文件逐字节相同", async () => {
+    const dec = await decodeOraToPainting(load("synthetic/future-major/desk-2.ora"));
+    eq(judge("ora", dec._formatStamp), "same");
+    let err = null; desk.reset();
+    try { desk.Unserialize(dec._editorState); } catch (e) { err = e; }
+    assert(err instanceof FormatTooNewError, String(err)); eq(err.component, "desk");
+    const saved = await encodeDocToOra(paintingDataToEncodeDoc(dec.data), { wroteWith: "v-test", desk: dec._editorStateBytes });
+    eq(joined(await entry(saved, ".weebpaint/editor-state.json")), joined(dec._editorStateBytes));
+  });
+
+  it("无头 backend（MCP 存盘路径）：open 的 sidecar 整份递回 encodeOra = desk / 录像 / 参考 / 未知 entry 全部原样", async () => {
+    const bytes = new Uint8Array(readFileSync(new URL("synthetic/future-minor/all-parts.ora", FIX)));
+    const { backend, sidecar } = await WeebPaintBackend.open(bytes, { appVersion: "v-test" });
+    const out = await backend.encodeOra({ editorSidecar: sidecar.editorStateBytes, referenceFiles: sidecar.referenceFiles, timelapse: sidecar.timelapse, extraEntries: sidecar.extraEntries });
+    const a = await zipUnpack(new Blob([bytes])), b = await zipUnpack(new Blob([out]));
+    for (const p of [".weebpaint/editor-state.json", ".weebpaint/timelapse.json", REFERENCES_MANIFEST, `${REFERENCES_DIR}/r0.png`, ".weebpaint/future-notes.json"]) {
+      assert(b[p], `missing ${p}`); eq(joined(b[p]), joined(a[p]), p);
+    }
+    backend.dispose();
   });
 });

@@ -44,7 +44,7 @@ export interface StoreLike {
     //   覆盖，内存里的 doc 是陈旧世界线 → persist 收尾必须整体重载（复用 open 管线）。旧 store 不回报
     //   此字段（undefined）→ 行为退化为修前现状，结构类型天然向后兼容。
     save(bytes: Blob, opts?: { tryPush?: boolean; hint?: unknown }): Promise<{ pushed: boolean; reason?: string; resolution?: string }>;
-    tryMove(to: string): Promise<TryMoveResult>;   // 改身份/移动唯一入口（含 nameOccupied 占用检查）——挂在 file 上
+    tryMove(to: string): Promise<TryMoveResult>;   // 改身份/移动唯一入口（含 occupied 占用检查）——挂在 file 上
     trash(): Promise<{ status: string }>;   // store 2.1.2 起叫 trash（删除 = 移进回收站）；status 不是「成功」的同义词（cancelled/noop 也走这里）
   };
 }
@@ -113,7 +113,7 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
   // adopted({create:true})（新建画布/import）→ 该身份的**首存**用 mode:"new"（撞名不覆盖），首存成功即转 existing。
   // ⚠ **per-name，不是会话级布尔**（v417 修）：旧版是 `let _createNext = false`，只在 save() **resolve** 后
   //   才复位，且 open() 从不复位它。于是任意一次 save 抛异常（比如导入一个重名 .ora）就把它永久钉在 true
-  //   直到关标签页——之后**每个文件的每次保存**都走 mode:"new" → create-store 的 nameOccupied 先查本地 →
+  //   直到关标签页——之后**每个文件的每次保存**都走 mode:"new" → store 的 occupied 先查本地 →
   //   刚打开的文件本地当然有 → 抛 CloudNameCollisionError（文案还说"云端同名"）。自我延续：让 flag 卡住的
   //   那个抛错，本身就是 flag 造成的。绑到具体身份上，跨文档泄漏就不可表示了。
   let _createFor: string | null = null;

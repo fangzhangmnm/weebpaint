@@ -27,7 +27,7 @@ WeebPaint 是家族里库最旧的一家（store 0.15.2 / gallery 0.1.0，WXHW /
 | 2.0.0 | 流式面显式开关 `streaming`（投机车道 / 卡住对冲 / 镜像）；`FileStream.status()`；修 0.18 的一个互等 | WeebPaint 不用 `openStream`（图片走 `open()` 整份） | 不传 `streaming` = 0.18 行为；作品那台引擎按构造不受影响（`test/engine-boundary-guard` 守着） | — | 不传 |
 | 2.1.0 | 公民等级进 `docKinds`（`tier` work / auto-backup / resource；`stem` 正则分行；每种 `validate`） | 只有一种公民 | `.ora` 不传 tier = `work` = 全套（冲突面 / 回收站 / 脏不驱逐）；**零行为变化**。WeebPaint 的自动快照环（`checkpoint-ring`）住 app 自己的 IDB、不进 store，所以没有二等那一行；图片（png/jpg）不在表里 = 按作品处理 = 和 0.15.2 一样 | — | 不传 tier |
 | 2.1.2 | `file.delete() → trash()`、`DelResult → TrashOutcome`；`Item` 带 `kind` / `tier`；`StoreTextKey` 多 `file.uploading` | app 自己不调 `delete()`（删除动词在 gallery 包里） | gallery 0.8.5 已改；`store-ui.ts` 的穷举表补 `file.uploading` | — | 机械 |
-| 0.15.1（已在） | `files.dirty.pushAll()` 推本地 at-rest 字节（加密件免密码） | 只在「切换图库」的 dirty 逃生 sheet 里用 | 同左 | 第 2 条（缩短没传的窗口） | **没加「登录后 pushAll」**——那是 WeebPaint 推云节奏的改变（autosave 只落本机、退出 / 显式存才推 = consent 政策），等 user 定（§3 末） |
+| 0.15.1（已在） | `files.dirty.pushAll()` 推本地 at-rest 字节（加密件免密码） | 只在「切换图库」的 dirty 逃生 sheet 里用 | 同左 | 第 2 条（缩短没传的窗口） | ~~没加「登录后 pushAll」~~ → **v0.14.42 加了「问一次」**（user 经统筹 10-21：全家「登录 / 回线后问一次」，点了才推；edited by Claude Opus 5.5）——那是 WeebPaint 推云节奏的改变（autosave 只落本机、退出 / 显式存才推 = consent 政策），等 user 定（§3 末） |
 
 ## 3. 2.x 开关：这次怎么定
 
@@ -44,7 +44,7 @@ WeebPaint 是家族里库最旧的一家（store 0.15.2 / gallery 0.1.0，WXHW /
 | `streaming` | `createStore` | 不传 | 不传 | 不传 | WeebPaint 没有三等资源的流式读。参考窗将来放视频再说。 |
 | `docKinds[].tier` | `createStore` | 不传 = work | 不传 | 不传 | 自动快照环不在 store；没有二等。 |
 | `offlineUploadReplay` | `createStore` | `manual` | 不传（= manual，和 0.15.2 一样） | 不动 | 离线新建的画回线要不要自动补推 = consent 政策，和下面一条一起定。 |
-| 登录后 / 回线后 `files.dirty.pushAll()` | app 侧 | — | **没加** | 建议加（WXHW `pushDirtyAll` 是样板） | 第 2 条：崩溃 / 关标签页前没走到退出推的画会留脏，直到下次打开它。加了 = 登录 / 回线那一刻把所有脏的推上去。但 WeebPaint 的政策是「autosave 只落本机，推云在退出 / 换稿 / 显式按存」——这会把推云提前到人没按存的时候，要 user 点头。 |
+| 登录后 / 回线后 `files.dirty.pushAll()` | app 侧 | — | **没加 → v0.14.42 问一次**（`app.ts` `offerPushLocalOnly`：回线 / 登录 / 挂上库各问一次「有 N 张画还没传上去，现在传吗？」，点了才 `pushAll`） | 建议加（WXHW `pushDirtyAll` 是样板） | 第 2 条：崩溃 / 关标签页前没走到退出推的画会留脏，直到下次打开它。加了 = 登录 / 回线那一刻把所有脏的推上去。但 WeebPaint 的政策是「autosave 只落本机，推云在退出 / 换稿 / 显式按存」——这会把推云提前到人没按存的时候，要 user 点头。 |
 
 ## 4. gallery 行为差异（0.1.0 → 0.8.5，用户在图库里看得见的）
 
@@ -110,9 +110,10 @@ WeebPaint 是家族里库最旧的一家（store 0.15.2 / gallery 0.1.0，WXHW /
 | workbench-elements | 0.1.2 → **0.1.3** | 外点关加「子弹层不算外面」（本仓 09-11 规则进包） | #2 收货（见 `20261021-workbench-elements-intake-handoff.md` 顶部） |
 
 同版顺手：#96 还原出厂按家规 2½（两步护栏、去硬拦、连壳清）；#93 的 CLAUDE.md 持久层白名单表 + `test/storage-whitelist.test.mjs`。验证同 §7（npm test 1503 / build 含新封口 lint / F1 F4 F8 F9 F10 / standalone smoke）。没做：登录后 pushAll（问题 3 没答）；F-69 格式版本纪律（#92，挑时机）；#97 口令面板真表单（下一版）。
+（后续，edited by Claude Opus 5.5 2026-10-21 夜：pushAll 问一次 = v0.14.42；口令真表单 = v0.14.43；F-69 = v0.14.46。）
 
 ## 8. 要 user 一句话的
 
 1. ~~§3 三个 transport 开关~~ user 10-21「没问题」→ v0.14.39 开了（`src/app-store.ts` `GRAPH_TRANSPORT`）。
-2. 登录后 / 回线后 `pushAll` 加不加（会把推云提前到人没按存的时候）。
+2. ~~登录后 / 回线后 `pushAll` 加不加~~ user 经统筹 10-21 定「问一次」→ v0.14.42。
 3. prod 不推（照 F-64：等用一段 dev）。

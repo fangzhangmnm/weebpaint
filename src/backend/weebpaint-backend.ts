@@ -34,6 +34,7 @@ import type { LayerPixels } from "./tiles/tile-layer.ts";
 import type { Gl2Port } from "../common/gl2-port.ts";
 import { renderNodesToBytes, type DocCompositorBytesFn } from "./doc-render.ts";
 import { encodeDocToOra, decodeOraToPainting, paintingDataToEncodeDoc, type DecodedPainting } from "./ora.ts";
+import { FORMAT, judge, FormatTooNewError } from "./format/migrate.ts";   // 格式版本纪律：ora 的 major 比本版新 → open 拒开
 import { encodePngFromBytes, decodePngToBytes, type RgbaPlane } from "./png-codec.ts";
 import { isGroupNode, type TreeNode } from "./workpiece/layer-tree.ts";
 import type {
@@ -73,8 +74,12 @@ export interface BackendInject {
 
 export interface BackendOpenResult {
   backend: WeebPaintBackend;
-  /** open 解出的壳 sidecar（backend 不解释，原样交壳）。 */
-  sidecar: { editorState?: unknown; legacyState?: unknown; referenceFiles: { path: string; bytes: Uint8Array }[]; wroteWith: string | null };
+  /** open 解出的壳 sidecar（backend 不解释，原样交壳）。整份递回 encodeOra 的同名字段 = 无损往返（MCP 存盘就这么做）。 */
+  sidecar: {
+    editorState?: unknown; legacyState?: unknown; referenceFiles: { path: string; bytes: Uint8Array }[]; wroteWith: string | null;
+    /** desk / 录像 / `.weebpaint/` 下不认识的 entry 的原字节（格式版本纪律：读不懂的也原样带回）。 */
+    editorStateBytes?: Uint8Array; timelapse?: { json: string; mp4: Uint8Array } | null; extraEntries?: { path: string; bytes: Uint8Array }[];
+  };
 }
 
 // ---- 魔数嗅探（open 路由归 backend）----
@@ -177,6 +182,8 @@ export class WeebPaintBackend implements WeebPaintBackendInterface {
     const fmt = sniffFormat(bytes);
     if (fmt === "ora-zip") {
       const dec: DecodedPainting = await decodeOraToPainting(new Blob([bytes as unknown as BlobPart]));
+      // 格式版本纪律：ora 的 major 比本版新 = 图层结构可能读错 → 拒开（无头没有「只读」这种态；壳层是整张只读，见 session-state）。
+      if (judge("ora", dec._formatStamp) === "too-new") throw new FormatTooNewError("ora", dec._formatStamp, FORMAT.ora);
       const backend = new WeebPaintBackend(dec.data, inject);
       return {
         backend,
@@ -184,6 +191,9 @@ export class WeebPaintBackend implements WeebPaintBackendInterface {
           editorState: dec._editorState, legacyState: dec._weebpaintState,
           referenceFiles: [...dec._referenceFiles].map(([path, bytes]) => ({ path, bytes })),
           wroteWith: dec._wroteWith,
+          editorStateBytes: dec._editorStateBytes,
+          timelapse: dec._timelapseJson != null ? { json: dec._timelapseJson, mp4: dec._timelapseMp4 ?? new Uint8Array(0) } : null,
+          extraEntries: [...dec._extraEntries].map(([path, bytes]) => ({ path, bytes })),
         },
       };
     }
@@ -225,8 +235,8 @@ export class WeebPaintBackend implements WeebPaintBackendInterface {
 
   // ── 字节面 ──
 
-  async encodeOra(opts: { editorSidecar?: object; referenceFiles?: { path: string; bytes: Uint8Array }[];
-                          timelapse?: { json: string; mp4: Uint8Array } | null } = {}): Promise<Uint8Array> {
+  async encodeOra(opts: { editorSidecar?: object | Uint8Array; referenceFiles?: { path: string; bytes: Uint8Array }[];
+                          timelapse?: { json: string; mp4: Uint8Array } | null; extraEntries?: { path: string; bytes: Uint8Array }[] } = {}): Promise<Uint8Array> {
     this._guard();
     // merged 合成（mergedimage/缩略图）：合成面可用则渲（per-tenant 注入，缺省全局接缝），GL 缺席 →
     // null → 透明占位（层数据完整，mergedimage 只是预览件——与 autosave GL-lost 兜底同语义）。
@@ -238,6 +248,7 @@ export class WeebPaintBackend implements WeebPaintBackendInterface {
       desk: opts.editorSidecar,
       referenceFiles: opts.referenceFiles ? new Map(opts.referenceFiles.map((f) => [f.path, f.bytes])) : undefined,
       timelapse: opts.timelapse,
+      extraEntries: opts.extraEntries ? new Map(opts.extraEntries.map((f) => [f.path, f.bytes])) : undefined,
     }) as Blob;
     return new Uint8Array(await blob.arrayBuffer());
   }

@@ -1,9 +1,10 @@
 // 冻结样本工具（家族格式版本纪律，`../ai-docs/20261021-format-version-discipline.md` §3；WXHW tools/freeze-format-sample.mjs 同用途）。
 //   created 2026-10-21 by Claude Opus 5.5
-// 用**当前**写入器（src/backend/ora.ts encodeDocToOra + desk.Serialize + @internal/reference-window encodeDeck + timelapse json）写两份小画，
+// 用**当前**写入器（src/backend/ora.ts encodeDocToOra + desk.Serialize + @internal/reference-window encodeDeck + TimelapseDocState.toJson）写两份小画，
 //   冻进 test/fixtures/format/real/<目录>/。规矩：只增不改——目录已存在就拒绝（要新样本 = 新目录）。
 // 什么时候跑：任何一个子结构（stack.xml 布局 / desk / timelapse / 参考清单）的拍子变了、或换了写法，发版前跑一次，再在 README 登记一行。
-// 用法：node tools/freeze-format-sample.mjs <目录名>      例：node tools/freeze-format-sample.mjs v3
+// 用法：node tools/freeze-format-sample.mjs <目录名>      例：node tools/freeze-format-sample.mjs v3.0.0（2026-10-21 起目录名 = ora 的三级拍子）
+// edited by Claude Opus 5.5 2026-10-21（F-69）：录像 json 改由 TimelapseDocState 真写出来（带 minor / patch），不再手拼。
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -22,6 +23,7 @@ const { encodeDocToOra } = await import("../src/backend/ora.ts");
 const { desk } = await import("../src/workbench-state.ts");
 const { WEEBPAINT_VERSION } = await import("../src/version.ts");
 const { createDeck, encodeDeck } = await import("@internal/reference-window/deck");
+const { TimelapseDocState } = await import("../src/backend/timelapse/timelapse-state.ts");
 
 // 4×4 的小画：左上 2×2 红、其余透明；第二层 1×1 蓝在 (3,3)。和 real/v2 同一张，往返测试能拿同一套断言比。
 const px = (w, h, paint) => { const d = new Uint8ClampedArray(w * h * 4); paint(d, w); return d; };
@@ -58,6 +60,8 @@ deck.add({ kind: "image", bytes: new Blob([JPEG_STUB], { type: "image/jpeg" }), 
 deck.add({ kind: "live", vp: { tx: 0, ty: 0, scale: 1, rot: 0 } });
 deck.add({ kind: "image", bytes: new Blob([PNG_STUB], { type: "image/png" }), vp: { tx: 4, ty: 5, scale: 6, rot: 0.25 } });
 deck.select(2);
-const timelapse = { json: JSON.stringify({ v: 1, on: true, aspect: [16, 9], longEdge: 1080, n: 3, motionSamples: 0 }), mp4: MP4_STUB };
+const tl = new TimelapseDocState();
+tl.startRecording({ aspectW: 16, aspectH: 9, longEdge: 1080 });
+const timelapse = { json: tl.toJson(0), mp4: MP4_STUB };   // 真写入器的 json（拍子 v / minor / patch）；mp4 桩字节只验原样带回
 await write("references-live-timelapse.ora", await encodeDocToOra(doc(), { wroteWith: WEEBPAINT_VERSION, desk: desk.Serialize(), referenceFiles: encodeDeck(deck.snapshot(), { app: "weebpaint" }), timelapse }));
 console.log(`writer = ${WEEBPAINT_VERSION}; now add a row to test/fixtures/format/README.md`);

@@ -2,7 +2,7 @@
 // created 2026-09-29 by Claude Fable 5.1（持久化立宪）
 import { describe, it, assert, eq } from "./runner.mjs";
 import { normalizeLayout, REFERENCES_MANIFEST, REFERENCES_DIR } from "../src/backend/format/layout.ts";
-import { migrateSubstructure, FormatTooNewError, SUBSTRUCTURE_VERSIONS } from "../src/backend/format/migrate.ts";
+import { migrate, FormatTooNewError, FORMAT } from "../src/backend/format/migrate.ts";
 
 const enc = new TextEncoder(), dec = new TextDecoder();
 const b = (...xs) => new Uint8Array(xs);
@@ -78,16 +78,16 @@ describe("布局归一化 · 旧路径 → 新路径", () => {
   });
 });
 
-describe("子结构版本链", () => {
-  it("缺 version 当 1；当前版原样通过；比 app 新 → FormatTooNewError 带两个版本号", () => {
-    eq(migrateSubstructure("desk", { a: 1 }).a, 1);
-    eq(migrateSubstructure("desk", { version: SUBSTRUCTURE_VERSIONS.desk, a: 2 }).a, 2);
+describe("子结构拍子（细节见 format-migrate.test.mjs）", () => {
+  it("desk 缺 version 当 1；当前版原样通过；major 比 app 新 → FormatTooNewError 带两份拍子", () => {
+    eq(migrate("desk", { a: 1 }).json.a, 1);
+    eq(migrate("desk", { version: FORMAT.desk.major, a: 2 }).json.a, 2);
     let err = null;
-    try { migrateSubstructure("desk", { version: SUBSTRUCTURE_VERSIONS.desk + 1 }); } catch (e) { err = e; }
+    try { migrate("desk", { version: FORMAT.desk.major + 1 }); } catch (e) { err = e; }
     assert(err instanceof FormatTooNewError, String(err));
-    eq(err.substructure, "desk"); eq(err.fileVersion, SUBSTRUCTURE_VERSIONS.desk + 1);
+    eq(err.component, "desk"); eq(err.fileStamp.major, FORMAT.desk.major + 1); eq(err.appStamp.major, FORMAT.desk.major);
   });
   it("不是对象的输入原样返回（壳层按缺失处理）", () => {
-    eq(migrateSubstructure("desk", undefined), undefined); eq(migrateSubstructure("desk", null), null);
+    eq(migrate("desk", undefined).json, undefined); eq(migrate("desk", null).json, null);
   });
 });

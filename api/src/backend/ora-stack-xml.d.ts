@@ -1,3 +1,4 @@
+import { type Stamp } from "./format/migrate.ts";
 export interface OraNode {
     id: number;
     name: string;
@@ -40,7 +41,7 @@ export type ParsedNode = (ParsedCommon & {
 });
 export declare function oraCompositeOp(canvasMode: string): string;
 export declare function canvasModeFromOra(op: string): string;
-export declare const ORA_FORMAT_VERSION = 3;
+export declare const ORA_FORMAT_VERSION: number;
 export declare function buildStackXml(doc: OraDoc, wroteWithVersion?: string): string;
 export declare function parseStackXml(xmlText: string): {
     w: number;
@@ -48,5 +49,6 @@ export declare function parseStackXml(xmlText: string): {
     nodes: ParsedNode[];
     wroteWith: string | null;
     formatVersion: number;
+    formatStamp: Stamp;
 };
 export {};

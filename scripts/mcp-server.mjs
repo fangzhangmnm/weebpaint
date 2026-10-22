@@ -39,6 +39,9 @@ import { WEEBPAINT_VERSION } from "../src/version.ts";
 
 // ---- 会话状态（单租户）----
 let be = null;
+// open_file 解出的 sidecar（desk / 参考 / 录像 / `.weebpaint/` 下不认识的 entry），encode_ora 原样递回 = 无损往返
+//   （格式版本纪律 F-69：更新版本写的东西本版读不懂也不许丢）。create = 空白画，没有 sidecar。
+let sidecar = null;
 
 // 栅格/合成域：server 级 SoftGl2Port（backend 的 stroke 域与 exportImage 合成面同一 Port——
 // 决定论同一软域；per-tenant 合成注入 = C7 v0.8.38 语义，全局接缝不碰）。
@@ -89,6 +92,7 @@ const TOOLS = {
     inputSchema: obj({ width: num, height: num }, ["width", "height"]),
     handler: (a) => {
       replaceBackend(WeebPaintBackend.blank({ width: a.width, height: a.height }, mkInject()));
+      sidecar = null;
       return be.docInfo();
     },
   },
@@ -96,15 +100,16 @@ const TOOLS = {
     description: "打开本地文件（.ora/.png/位图；魔数嗅探路由）；弃旧建新，返回 docInfo",
     inputSchema: obj({ path: str }, ["path"]),
     handler: async (a) => {
-      const { backend } = await WeebPaintBackend.open(new Uint8Array(fs.readFileSync(a.path)), mkInject());
-      replaceBackend(backend);
+      const opened = await WeebPaintBackend.open(new Uint8Array(fs.readFileSync(a.path)), mkInject());   // ora major 比本版新 → 抛（拒开）
+      replaceBackend(opened.backend);
+      sidecar = opened.sidecar;
       return be.docInfo();
     },
   },
   dispose: {
     description: "释放当前文档（open 事务 interrupt=cancel）",
     inputSchema: obj({}),
-    handler: () => { if (be && !be.disposed) be.dispose(); be = null; return { ok: true }; },
+    handler: () => { if (be && !be.disposed) be.dispose(); be = null; sidecar = null; return { ok: true }; },
   },
 
   // ── 读面 ──
@@ -187,9 +192,14 @@ const TOOLS = {
     handler: async (a) => bytesOut(await requireBackend().exportImage(a.fmt ?? "png"), a.path),
   },
   encode_ora: {
-    description: "编码 .ora（含 mergedimage 缩略图；决定论 zip）。path 给了写文件，否则返回 base64",
+    description: "编码 .ora（含 mergedimage 缩略图；决定论 zip；open_file 带来的 desk / 参考 / 录像 / 未知 entry 原样带回）。path 给了写文件，否则返回 base64",
     inputSchema: obj({ path: str }),
-    handler: async (a) => bytesOut(await requireBackend().encodeOra(), a.path),
+    handler: async (a) => bytesOut(await requireBackend().encodeOra(sidecar ? {
+      editorSidecar: sidecar.editorStateBytes ?? undefined,
+      referenceFiles: sidecar.referenceFiles,
+      timelapse: sidecar.timelapse ?? null,
+      extraEntries: sidecar.extraEntries,
+    } : {}), a.path),
   },
 };
 

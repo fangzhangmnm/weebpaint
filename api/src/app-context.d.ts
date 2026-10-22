@@ -102,7 +102,6 @@ export interface AppContext {
     isMidOperation: () => boolean;
     pullSettingsAndState: () => void;
     updateZoomLabel: () => void;
-    updateNewerBanner: () => void;
     _suppressTransientPanels: (mode: string) => void;
     _restoreTransientPanels: () => void;
     _bringPanelTop: (el: HTMLElement | null) => void;

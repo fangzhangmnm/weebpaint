@@ -285,10 +285,13 @@ async function importOraFileAsNew(file: File) {
     onPasswordVerified(nm, got.pw);
   }
   // busy 普查（v0.10.3）：解码大 ora + adopt（wp2.load 灌入）是重活；上面的解锁循环（交互）已在 busy 外。
+  let refused = false;
   await withBusy(t("mi.importingBusy", { name: nm }), async () => {
     const loaded = await decodeOraToPainting(plain);
+    if (session.refuseIfTooNew(loaded)) { refused = true; return; }   // 更新 major 的画：导入同样会读错 → 拒（通知条已说）
     session.adoptAsNew(loaded, nm);
   });
+  if (refused) return;
   setStatus(t("mi.imported", { name: nm }));
   setGalleryOpen(false);
 }

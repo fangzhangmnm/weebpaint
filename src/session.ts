@@ -70,7 +70,7 @@ export async function thumbBlobFromBytes(merged: { data: Uint8ClampedArray; w: n
 // 本地 session 列举（listSessions / isTrashKey / _detectEncrypted）已删（v415）：它读的 `sessions`
 //   object store **早已没有写入者**（putSession 在 store cutover 后成死码），于是恒返空数组——
 //   四个消费方（图库底栏占用 / uniqueLocalName / 找加密作品解锁 / 复制改名去重）全在静默失效。
-//   现在各走真 SSoT：store.files.usage() / store.files.nameOccupied() / gallery.requestUnlock()
+//   现在各走真 SSoT：store.files.usage() / store.files.occupied() / gallery.requestUnlock()
 //   （当前夹）/ gallery 手上的 watchFolder 单夹快照。**不要再引入任何"列全库"的函数**——
 //   列举唯一面 = store.files.watchFolder(当前夹)。
 // 本地 session trash 生命周期（listTrashedSessions / trashSession / restoreSession / purgeFromTrash /

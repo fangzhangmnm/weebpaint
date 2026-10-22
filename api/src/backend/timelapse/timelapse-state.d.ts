@@ -1,3 +1,4 @@
+import { type Verdict, type Stamp } from "../format/migrate.ts";
 import type { TimelapseSettings } from "./timelapse-core.ts";
 import { TimelapseSampler } from "./timelapse-core.ts";
 import type { TimelapseSample } from "./timelapse-mux.ts";
@@ -9,6 +10,8 @@ export interface TimelapseJsonV1 {
     n: number;
     motionSamples: number;
 }
+/** 本版认识的 timelapse.json 顶层键（拍子三键之外）。其余 = 更新的 minor 加的 → 直通袋原样带回。 */
+export declare const KNOWN_TIMELAPSE_FIELDS: readonly string[];
 /** too-new = 清单是更新的 WeebPaint 写的（持久化立宪：不猜不降级，字节进检疫区原样带回；壳层说「新版本写的」而不是「损坏」）。 */
 export type TimelapseRestoreIssue = "corrupt-json" | "corrupt-mp4" | "mp4-missing" | "sample-count-mismatch" | "too-new";
 /**
@@ -34,6 +37,11 @@ export declare class TimelapseDocState {
     quarantineMp4: Uint8Array | null;
     /** motion 里已经进过 lastMp4 的前缀长度（「待保存帧数」= motion.length - 这个；冻结保存不动它）。 */
     savedMotionCount: number;
+    /** 直通袋：timelapse.json 里本版不认识的顶层键（更新的 minor 加的），toJson 先铺它再铺已知键。新开录 / 清除时清空。 */
+    extra: Record<string, unknown>;
+    /** 回读出的文件拍子判决（壳层：newer-minor → 告诉用户一次）。null = 没读过 / 读不懂。 */
+    formatVerdict: Verdict | null;
+    formatStamp: Stamp | null;
     /** 开录：pin 取景框。已有录像时不准换设置（要换=先 clear，UI 负责引导）。
      *  用户明确开新录 = 检疫字节出所（旧的读不懂的 entry 被新录像取代）。 */
     startRecording(s: TimelapseSettings): void;

@@ -27,6 +27,7 @@ import { t, lang } from "./i18n/index.ts";
 import type { Brush, BrushRackData } from "./brush-types.ts";
 import type { AnimCurve } from "./common/anim-curve.ts";
 import { reportError } from "./error-badge.ts";
+import { stampFields } from "./backend/format/migrate.ts";   // 格式版本纪律：出厂种子盖本版拍
 
 // getInitData 的初始项形状（与 store 的 CollectionInitItem 结构等价；不 import 库类型免耦合）。
 export interface BrushInitItem { id: string; value: unknown; }
@@ -219,20 +220,21 @@ export async function builtinBrushes(): Promise<Brush[]> {
 
 // —— .meta（per-folder 有序 brushId）纯操作（无副作用，node 可测）——
 export function emptyMeta(): RackMeta { return { folderOrder: [], order: {} }; }
+// 格式版本纪律（F-69）：下面的纯函数都 `...meta` 起手——更新的 minor 往 .meta 里加的键本版不认识，改顺序时原样带着（拍子由 rack-format-guard 写时重盖）。
 
 // 追加 id 到 folder 列表末尾（folder 不在则登记）；已在该 folder 则原样返回。
 export function metaAppend(meta: RackMeta, folder: string, id: string): RackMeta {
   const folderOrder = meta.folderOrder.includes(folder) ? meta.folderOrder : [...meta.folderOrder, folder];
   const cur = meta.order[folder] || [];
   const list = cur.includes(id) ? cur : [...cur, id];
-  return { folderOrder, order: { ...meta.order, [folder]: list } };
+  return { ...meta, folderOrder, order: { ...meta.order, [folder]: list } };
 }
 
 // 从所有 folder 列表移除 id。
 export function metaRemove(meta: RackMeta, id: string): RackMeta {
   const order: Record<string, string[]> = {};
   for (const f of Object.keys(meta.order)) order[f] = meta.order[f].filter((x) => x !== id);
-  return { folderOrder: meta.folderOrder, order };
+  return { ...meta, folderOrder: meta.folderOrder, order };
 }
 
 // 把 id 挪到 target folder（先从各处摘除，再追加到 target 末尾）。
@@ -250,7 +252,7 @@ export function metaPrependBuiltins(meta: RackMeta, builtinsByFolder: Record<str
     order[f] = [...builtins, ...rest];
   }
   for (const f of Object.keys(meta.order)) if (!(f in order)) order[f] = meta.order[f];
-  return { folderOrder: folders, order };
+  return { ...meta, folderOrder: folders, order };
 }
 
 // 从一组笔攒初始 .meta（按 folder 保序分组）。
@@ -268,9 +270,10 @@ export async function builtinBrushInitData(): Promise<BrushInitItem[]> {
   const brushes = await loadBuiltinBrushes();
   if (!brushes) return [];
   const meta = buildInitMeta(brushes);
+  // 种子走 collection 自己的 getInitData、不经过 rack-format-guard → 拍子在这里盖（写入器只写当前拍）。
   return [
-    ...brushes.map((b) => ({ id: b.id, value: b as unknown })),
-    { id: RACK_META_ID, value: meta as unknown },
+    ...brushes.map((b) => ({ id: b.id, value: { ...b, ...stampFields("brush") } as unknown })),
+    { id: RACK_META_ID, value: { ...meta, ...stampFields("rackMeta") } as unknown },
   ];
 }
 

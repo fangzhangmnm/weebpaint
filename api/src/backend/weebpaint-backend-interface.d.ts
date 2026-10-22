@@ -45,11 +45,21 @@ export interface WeebPaintBackendInterface {
     dispose(): void;
     readonly disposed: boolean;
     encodeOra(opts?: {
-        /** 壳 sidecar（不透明携带，backend 不解释）：desk struct → .weebpaint/editor-state.json。 */
-        editorSidecar?: object;
+        /** 壳 sidecar（不透明携带，backend 不解释）：desk struct → .weebpaint/editor-state.json；字节 = 原样写回。 */
+        editorSidecar?: object | Uint8Array;
         /** 参考目录（format 3）：`.weebpaint/references/` 下的文件原样写入（manifest.json + 字节；契约归
          *  @internal/reference-window，backend 不解释）。 */
         referenceFiles?: {
+            path: string;
+            bytes: Uint8Array;
+        }[];
+        /** 录像两件（.weebpaint/timelapse.json + .mp4）原样写入。 */
+        timelapse?: {
+            json: string;
+            mp4: Uint8Array;
+        } | null;
+        /** `.weebpaint/` 下本版不认识的 entry（open 的 sidecar.extraEntries），原样写回。 */
+        extraEntries?: {
             path: string;
             bytes: Uint8Array;
         }[];

@@ -31,6 +31,7 @@ export function setOraLogReporter(fn: (msg: string) => void): void { _oraLog = f
 const reportError = (err: unknown, _level?: string) => _oraLog(String(err instanceof Error ? err.message : err));
 import { zipPack, zipUnpack } from "./zip.ts";
 import { normalizeLayout, REFERENCES_DIR } from "./format/layout.ts";
+import type { Stamp } from "./format/migrate.ts";
 import { areaResampleBytes } from "./algorithms/resample-bytes.ts";
 import { encodePngFromBytes, decodePngToBytes } from "./png-codec.ts";
 // 纯树↔stack.xml 序列化（嵌套组 + id + active）抽到独立深模块（无 canvas 依赖，可纯 node 测）。
@@ -105,13 +106,26 @@ export function paintingDataToEncodeDoc(data: PaintingData): EncodeDoc {
 /** 参考目录的文件表：路径 → 字节（路径全在 REFERENCES_DIR 下）。 */
 export type ReferenceFiles = Map<string, Uint8Array>;
 
+// ---- 未知 entry 直通（家族格式版本纪律 §3，F-69）：`.weebpaint/` 是 WeebPaint 的私有命名空间——更新的 minor 往里加的新 entry
+//   本版不认识，读进来原样收着、保存时原样写回（排在缩略图之前）。认识的三个 entry 归各自的写入器，参考目录归参考窗库。
+//   命名空间之外的 entry（别的 ORA 工具留的、旧轨 webpaint/state.json）照旧不带——那不是「更新的 WeebPaint 写的」。
+export const WEEBPAINT_DIR = ".weebpaint/";
+export const KNOWN_WEEBPAINT_ENTRIES: readonly string[] = [".weebpaint/timelapse.mp4", ".weebpaint/timelapse.json", ".weebpaint/editor-state.json"];
+export type ExtraEntries = Map<string, Uint8Array>;
+const isExtraEntryPath = (p: string): boolean =>
+  p.startsWith(WEEBPAINT_DIR) && !p.endsWith("/") && !KNOWN_WEEBPAINT_ENTRIES.includes(p) && !p.startsWith(REFERENCES_DIR + "/");
+
 // encode opts：wroteWith 必填（C7：版本戳是壳知识，backend 不 import version.ts）+ 可选 WeebPaint 私有扩展。
 interface EncodeOpts {
   wroteWith: string;   // stack.xml weebpaint:wrote-with 版本戳（壳传 WEEBPAINT_VERSION；backend 装配传注入的 appVersion）
   mergedBytes?: { data: Uint8ClampedArray; w: number; h: number } | null;   // S9/C3：调用方渲好的合成字节（GL renderNodesToBytes）；缺省=透明占位
   /** 参考目录（format 3）：路径 → 字节，原样写入；路径必须在 .weebpaint/references/ 下（不透明，codec 不解释）。 */
   referenceFiles?: Map<string, Uint8Array | Blob>;
-  desk?: object;   // desk.Serialize() → .weebpaint/editor-state.json（desk per-doc；不向后兼容旧轨 webpaint/state.json）
+  /** desk.Serialize() → .weebpaint/editor-state.json（desk per-doc；不向后兼容旧轨 webpaint/state.json）。
+   *  字节 = 原样带回（desk 的 major 比本版新：读不了也不许改，session-state 把文件里的原字节递回来）。 */
+  desk?: object | Uint8Array;
+  /** `.weebpaint/` 下本版不认识的 entry（decode 的 _extraEntries），原样写回。路径必须在 `.weebpaint/` 下且不是认识的那几个。 */
+  extraEntries?: ExtraEntries;
   // timelapse 录像（spec=ai-docs/20260819-timelapse-spec.md，ora entry consent 2026-08-19）：
   //   mp4 = 直接可播的完整录像（TimelapseDocState.serializeForSave 产物；空 Uint8Array=还没帧，只落 json）
   timelapse?: { json: string; mp4: Uint8Array } | null;
@@ -126,10 +140,14 @@ export interface DecodedPainting {
   _layoutMigrated: string[];
   _weebpaintState?: unknown;
   _editorState?: unknown;   // .weebpaint/editor-state.json → desk.Unserialize()
+  _editorStateBytes?: Uint8Array;   // 同一 entry 的原字节（desk major 比本版新时原样带回用）
+  /** `.weebpaint/` 下本版不认识的 entry（更新的 minor 加的），保存时原样写回。没有 → 空表。 */
+  _extraEntries: ExtraEntries;
   _timelapseJson?: string;      // .weebpaint/timelapse.json 原文（TimelapseDocState.restore 消费，含自愈）
   _timelapseMp4?: Uint8Array;   // timelapse.mp4 原字节（新家 .weebpaint/ 优先，根目录兜底）
   _wroteWith: string | null;
-  _formatVersion: number;   // stack.xml weebpaint:format（私有扩展 schema 版本；无戳存量=0）
+  _formatVersion: number;   // stack.xml weebpaint:format = ora 的 major（无戳存量 = 0）
+  _formatStamp: Stamp;      // ora 的完整拍子（format / format-minor / format-patch；backend/format/migrate.ts 判）
 }
 // 加密对本 codec **不可见**（v235 起）：encode 永远出明文 ora、decode 永远收明文 ora。
 // 包壳/解壳全在 store 深模块（flow.save/load/push/pull 自动处理；密码经 crypt seam）。
@@ -237,8 +255,17 @@ export async function encodeDocToOra(doc: EncodeDoc, opts: EncodeOpts) {
     }
   }
   // desk struct（desk per-doc）→ .weebpaint/editor-state.json（旧轨 webpaint/state.json v0.8.21 停写）。
-  if (opts.desk && typeof opts.desk === "object") {
+  if (opts.desk instanceof Uint8Array) {
+    entries.push({ path: ".weebpaint/editor-state.json", data: opts.desk });   // 原字节带回（major 比本版新）
+  } else if (opts.desk && typeof opts.desk === "object") {
     entries.push({ path: ".weebpaint/editor-state.json", data: JSON.stringify(opts.desk) });
+  }
+  // 直通：更新的 minor 加的 `.weebpaint/` entry，原样写回（缩略图之前）。
+  if (opts.extraEntries) {
+    for (const [path, data] of opts.extraEntries) {
+      if (!isExtraEntryPath(path)) throw new Error(`[ora] extra entry must be an unknown path under ${WEEBPAINT_DIR}: ${path}`);
+      entries.push({ path, data });
+    }
   }
 
   // thumbnail 末尾（云端 byte-range 优化）——必须是最后一个 entry，见上方 reference.png 注释。
@@ -321,13 +348,19 @@ export async function decodeOraToPainting(blob: Blob): Promise<DecodedPainting> 
   }
 
   const referenceFiles: ReferenceFiles = new Map();
-  for (const p of Object.keys(files)) if (p.startsWith(REFERENCES_DIR + "/")) referenceFiles.set(p, files[p]);
+  const extraEntries: ExtraEntries = new Map();
+  for (const p of Object.keys(files)) {
+    if (p.startsWith(REFERENCES_DIR + "/")) referenceFiles.set(p, files[p]);
+    else if (isExtraEntryPath(p)) extraEntries.set(p, files[p]);
+  }
   const out: DecodedPainting = {
     data: { width: meta.w, height: meta.h, activeId, referenceLayerId, nodes },
     _referenceFiles: referenceFiles,
+    _extraEntries: extraEntries,
     _layoutMigrated: migrated,
     _wroteWith: meta.wroteWith || null,
-    _formatVersion: meta.formatVersion ?? 0,
+    _formatVersion: meta.formatVersion,
+    _formatStamp: meta.formatStamp,
   };
   // WeebPaint 私货（可有可无）。历史布局已在上面归一化，这里只认当前路径。
   // 旧轨 state.json（v0.8.21 停写，只读，原样留在文件里）。
@@ -346,6 +379,7 @@ export async function decodeOraToPainting(blob: Blob): Promise<DecodedPainting> 
   // desk struct（desk per-doc）；缺失（老画作/不向后兼容）→ 留 undefined，adopt 时 reset 到默认。
   const deskJson = files[".weebpaint/editor-state.json"];
   if (deskJson) {
+    out._editorStateBytes = deskJson;
     try {
       out._editorState = JSON.parse(bytesToString(deskJson));
     } catch (e) {
@@ -355,18 +389,3 @@ export async function decodeOraToPainting(blob: Blob): Promise<DecodedPainting> 
   return out;
 }
 
-// 把版本号字符串解析成可比较的整数，横跨新旧两种命名制（0.4 纪元换制）：
-//   新制 "v0.4.0-2026-07-22" / "v0.4.0" → (major*100+minor)*1e6+patch
-//   旧制 "v438-2026-07-18" / "v438"     → 统一归入 0.3 纪元（= v0.3.438），与新制全序可比
-// （旧制 patch 是单调单序列，所以 v438 < v0.4.0 < v0.4.10 < v0.5.0 成立。）
-// 失败 → null（caller 跳过比较；零信息时不警告）
-export function parseAppVersion(s: string | null | undefined): number | null {
-  if (!s) return null;
-  const str = String(s);
-  const dotted = str.match(/^v(\d+)\.(\d+)\.(\d+)/);
-  if (dotted) {
-    return (parseInt(dotted[1], 10) * 100 + parseInt(dotted[2], 10)) * 1_000_000 + parseInt(dotted[3], 10);
-  }
-  const legacy = str.match(/^v(\d+)/);
-  return legacy ? 3 * 1_000_000 + parseInt(legacy[1], 10) : null;
-}

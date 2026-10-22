@@ -1,8 +1,8 @@
-// 职责（单一）：顶栏 save 按钮 **3 态**渲染 + 文档版本 newer banner。
+// 职责（单一）：顶栏 save 按钮 **3 态**渲染。
 //   - computeSaveState：session.dirty + isSignedIn → dirty | synced | local-only。
 //     （store cutover 后**不再读 busy/cloud**——sync 脏进列举，不是徽章热路径。旧注释说的"4 态/读 store"已不是事实。）
 //   - updateSaveStatus：渲染成顶栏 save 按钮的 icon/title/data-state（gallery-first 无 session 时隐）。
-//   - updateNewerBanner：文档版本警告 banner（doc.body.dataset.docNewer 给 CSS 染色）。
+//   （文档版本 newer banner 2026-10-21 退役：格式版本纪律下更新 major 的画拒开、minor 更新只提示一次，没有「开着一张新版画」的态。）
 // 依赖全是单例/leaf，直接 import：isSignedIn ← app-store.ts，session ← session-state.ts，els ← els.ts。
 import { els } from "./els.ts";
 import { isSignedIn } from "./app-store.ts";
@@ -12,14 +12,6 @@ import { assertNever, type DocHome } from "./doc-home.ts";
 import { t, tLatin } from "./i18n/index.ts";
 import { iconHtml } from "@internal/workbench-elements";
 
-// 文档版本警告：在 setStatus 之上再呈现一个持久 banner（用 doc.body.dataset 给 CSS 染色）
-export function updateNewerBanner() {
-  if (session.loadedDocIsNewer && !session.loadedDocNewerConfirmed) {
-    document.body.dataset.docNewer = "1";
-  } else {
-    delete document.body.dataset.docNewer;
-  }
-}
 
 // v45 新语义：
 //   **Ctrl+S / 点 save 按钮 = "save local + push cloud" 一把梭**（user 显式 consent）。

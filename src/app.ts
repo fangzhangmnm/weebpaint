@@ -54,6 +54,7 @@ import { initPressureToast } from "./pressure-toast.ts";   // 2026-09-02 压感�
 import { initFiltersAdjust } from "./filters-adjust.ts";
 import { initToolbar, RACK_PANEL_BY_TOOL, pickOnce, pickHoldBegin, pickHoldEnd, isPicking } from "./toolbar.ts";
 import { closePopupMenu } from "@internal/workbench-elements";
+import { configureRackFormatNotice } from "./rack-format-guard.ts";   // 格式版本纪律：笔架条目拍子的用户提示
 import { showNotice } from "@internal/workbench-elements";   // 2026-09-02 C7 通知栈   // 2026-09-02 C1：下笔一把关所有 popup（组槽/变体/stepper/主菜单/⋯）
 import { setColor, initColorPanel } from "./color-panel.ts";
 import { session, initSession, setSessionGallery } from "./session-state.ts";   // candidate 3 · 活动文档生命周期 SSoT
@@ -65,7 +66,7 @@ import { selectionToNewLayer, initSelectionOps } from "./selection-ops.ts";
 import { initFillMode } from "./fill-mode.ts";
 import { initPerspEdit } from "./persp-edit.ts";
 import { initShapeToolbar } from "./shape-toolbar.ts";   // 形状条（ADR-0005；2026-09-18 回滚复活：独立顶栏动词位 + 工厂上下文条；ADR-0013 几何 extension 已删）
-import { updateSaveStatus, updateNewerBanner } from "./save-status.ts";
+import { updateSaveStatus } from "./save-status.ts";
 import { initErrorBadge, reportError } from "./error-badge.ts";
 import { initDiagLog, note as diagNote } from "./diag-log.ts";   // 黑匣子（2026-08-31）
 import { initDiagLogSheet } from "./diag-log-sheet.ts";           // dev 页「诊断日志」窗口
@@ -205,6 +206,11 @@ const { state, dialReactive } = useDials();
 // 取代旧的 updateSidebarBrushIndicator / _sidebarBrushBtn 手势 / showSizePopup / 两个 slider 监听 / applyToolState 的 slider-DOM-push。
 // 笔架深模块（src/brush-rack-controller.ts）。持久化/云同步走 brushRackCollection（红线在库内）。
 // editMode 走 thunk（构造早于 editMode）；DOM/panels 晚绑 init()。
+// 格式版本纪律：笔架里第一次见到更新版本写的笔（major 更新 = 藏起来不碰；minor 更新 = 照用、未知字段带着）各说一次。
+configureRackFormatNotice((kind) => showNotice({
+  id: `rack-format-${kind}`, level: "info", text: t(kind === "too-new" ? "br.formatTooNew" : "br.formatNewerMinor"),
+  dismissLabel: t("upd.dismiss"), autoHideMs: 10_000,
+}));
 const rack = new BrushRackController({
   collection: brushRackCollection,
   state, dialReactive,
@@ -361,7 +367,7 @@ const ctx: AppContext = freezeCtx({
   backend,
   state, dialReactive, currentBrush, editMode, doc, board, input, history, layers, wp2, layerTiles: wp2.layerTiles, isMidOperation,
   rack, setStatus, withBusy, leftDial,
-  updateSaveStatus, updateZoomLabel, updateNewerBanner, pullSettingsAndState,
+  updateSaveStatus, updateZoomLabel, pullSettingsAndState,
   _suppressTransientPanels, _restoreTransientPanels, _bringPanelTop,
   _commitTransform, _cancelTransform, selectionToNewLayer,
   importImageAsLayer,   // selection-ops 的 Ctrl+V 粘贴 / drop 用（hoisted function）

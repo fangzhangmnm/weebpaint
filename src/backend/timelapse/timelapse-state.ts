@@ -3,20 +3,23 @@
 //   timelapse.mp4            全部样本 mux 成的直接可播 mp4（中部大块区，thumbnail 保持最后）
 //   .weebpaint/timelapse.json 录制状态（开关 sticky / pin 的取景框 / n / motionSamples）
 // 自愈原则（spec §3）：任何回读失败 = 止损——录像作废、画照画、ora 照存，绝不 throw 出保存/加载路径。
-import { migrateSubstructure, FormatTooNewError } from "../format/migrate.ts";
+import { migrate, splitExtra, stampFields, FormatTooNewError, FORMAT, type Verdict, type Stamp } from "../format/migrate.ts";
 import type { TimelapseSettings } from "./timelapse-core.ts";
 import { TIMELAPSE_LONG_EDGES, TIMELAPSE_ASPECTS, TimelapseSampler } from "./timelapse-core.ts";
 import type { TimelapseSample } from "./timelapse-mux.ts";
 import { muxTimelapse, demuxTimelapse } from "./timelapse-mux.ts";
 
 export interface TimelapseJsonV1 {
-  v: 1;
+  v: 1;                     // major（拍子 = v / minor / patch，backend/format/migrate.ts FORMAT.timelapse；写入器在 toJson 盖本版拍）
   on: boolean;              // sticky：跨 session 续录开关
   aspect: [number, number]; // pin 的比例（开录烤死）
   longEdge: number;         // pin 的最长边
   n: number;                // 累计 commit 计数（衰减 park 中仍持久化，复议时无缝续）
   motionSamples: number;    // mp4 里前多少个样本是运动帧（其余=尾帧，回读时截掉）
 }
+
+/** 本版认识的 timelapse.json 顶层键（拍子三键之外）。其余 = 更新的 minor 加的 → 直通袋原样带回。 */
+export const KNOWN_TIMELAPSE_FIELDS: readonly string[] = ["on", "aspect", "longEdge", "n", "motionSamples"];
 
 /** too-new = 清单是更新的 WeebPaint 写的（持久化立宪：不猜不降级，字节进检疫区原样带回；壳层说「新版本写的」而不是「损坏」）。 */
 export type TimelapseRestoreIssue = "corrupt-json" | "corrupt-mp4" | "mp4-missing" | "sample-count-mismatch" | "too-new";
@@ -44,6 +47,11 @@ export class TimelapseDocState {
   quarantineMp4: Uint8Array | null = null;
   /** motion 里已经进过 lastMp4 的前缀长度（「待保存帧数」= motion.length - 这个；冻结保存不动它）。 */
   savedMotionCount = 0;
+  /** 直通袋：timelapse.json 里本版不认识的顶层键（更新的 minor 加的），toJson 先铺它再铺已知键。新开录 / 清除时清空。 */
+  extra: Record<string, unknown> = {};
+  /** 回读出的文件拍子判决（壳层：newer-minor → 告诉用户一次）。null = 没读过 / 读不懂。 */
+  formatVerdict: Verdict | null = null;
+  formatStamp: Stamp | null = null;
 
   /** 开录：pin 取景框。已有录像时不准换设置（要换=先 clear，UI 负责引导）。
    *  用户明确开新录 = 检疫字节出所（旧的读不懂的 entry 被新录像取代）。 */
@@ -55,6 +63,7 @@ export class TimelapseDocState {
     this.sampler = new TimelapseSampler(0);
     this.on = true;
     this.quarantineJson = null; this.quarantineMp4 = null; this.restoreIssue = null;
+    this.extra = {};
   }
 
   pause(): void { this.on = false; }
@@ -67,6 +76,7 @@ export class TimelapseDocState {
     this.motion = []; this.avcC = null; this.lastMp4 = null; this.restoreIssue = null;
     this.savedMotionCount = 0;
     this.quarantineJson = null; this.quarantineMp4 = null;
+    this.extra = {};
   }
 
   /** 录制中收到一个有可见变化的 commit：返回要不要采这帧。 */
@@ -118,7 +128,7 @@ export class TimelapseDocState {
       v: 1, on: this.on, aspect: [s.aspectW, s.aspectH], longEdge: s.longEdge,
       n: this.sampler?.n ?? 0, motionSamples: sampleCount,
     };
-    return JSON.stringify(j);
+    return JSON.stringify({ ...this.extra, ...j, ...stampFields("timelapse") });   // 直通袋 → 已知键 → 本版拍（已知键与拍子永远赢）
   }
 
   /**
@@ -132,10 +142,12 @@ export class TimelapseDocState {
     const st = new TimelapseDocState();
     if (json == null) return st;   // 从没开过录：健康空态
     let j: TimelapseJsonV1;
+    let verdict: Verdict, stamp: Stamp;
     try {
-      // 持久化立宪：先走版本链（v 键；缺 = 1），比 app 新 → FormatTooNewError（下面单独定性）；旧版链式升到当前版。
-      j = migrateSubstructure("timelapse", JSON.parse(json)) as TimelapseJsonV1;
-      if (j.v !== 1 || !Array.isArray(j.aspect) || typeof j.longEdge !== "number"
+      // 格式版本纪律：先按拍子升到本版 major（v 键；缺 = 1），major 比本版新 → FormatTooNewError（下面单独定性）。
+      const r = migrate("timelapse", JSON.parse(json));
+      j = r.json as TimelapseJsonV1; verdict = r.verdict; stamp = r.stamp;
+      if (j.v !== FORMAT.timelapse.major || !Array.isArray(j.aspect) || typeof j.longEdge !== "number"
           || typeof j.n !== "number" || typeof j.motionSamples !== "number") throw new Error("shape");
     } catch (e) {
       st.restoreIssue = e instanceof FormatTooNewError ? "too-new" : "corrupt-json";
@@ -145,6 +157,8 @@ export class TimelapseDocState {
     st.settings = { aspectW: j.aspect[0], aspectH: j.aspect[1], longEdge: j.longEdge };
     st.sampler = new TimelapseSampler(j.n);
     st.on = !!j.on;
+    st.extra = splitExtra("timelapse", j, KNOWN_TIMELAPSE_FIELDS);
+    st.formatVerdict = verdict; st.formatStamp = stamp;
     if (mp4Bytes == null || mp4Bytes.length === 0) {
       if (j.motionSamples > 0) st.restoreIssue = "mp4-missing";   // 素材丢了：报警但录制身份保命，从零续录
       return st;

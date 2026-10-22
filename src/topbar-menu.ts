@@ -307,6 +307,7 @@ export function initTopbarMenu(ctx: AppContext) {
       const ageMin = checkpointAgeMinutes(cp.at, Date.now());
       // cp.blob 已是**明文**：加密作品的快照按密文容器存，readCheckpointEntry 里用内存密码解好了。
       const loaded = await decodeOraToPainting(cp.blob);
+      if (session.refuseIfTooNew(loaded)) return;   // 更新 major 写的快照：拒（通知条已说），当前画不动
       if (home.kind === "file") {
         session.adoptIntoCurrentFileHome(loaded);   // 内容换、家不变（handle/牌照旧）、已标脏
       } else {
@@ -388,7 +389,7 @@ export async function runSaveAsFlow(): Promise<void> {
   editMode.applyPendingTransient();
   // file 家（spec §7）：另存为 = 收编入库 → 建议名用本地文件 stem（不是「无题 副本」）；
   //   且没有「与当前名字相同」可言——文件 stem 不是 store 身份，同名入库合法
-  //   （撞已有作品由下面 nameOccupied 预检 + mode:"new" 护栏兜）。
+  //   （撞已有作品由下面 files.occupied 预检 + mode:"new" 护栏兜）。
   const home = session.home;
   const isFileHome = home?.kind === "file";
   const oldName = home?.kind === "gallery" ? home.path : t("nd.untitled");
@@ -399,7 +400,7 @@ export async function runSaveAsFlow(): Promise<void> {
     const trimmed = input.trim();
     if (!trimmed) { setStatus(t("tm.nameEmpty"), true); candidate = ""; continue; }
     if (!isFileHome && trimmed === oldName) { setStatus(t("tm.nameSameAsCurrent"), true); candidate = trimmed; continue; }
-    const occ = await sessionNameConflict(trimmed);   // 统一 store.files.nameOccupied（boolean：local + 在线 remote）
+    const occ = await sessionNameConflict(trimmed);   // 统一 store.files.occupied（boolean：local + 在线 remote）
     if (occ) { setStatus(t("tm.nameExists", { name: trimmed }), true); candidate = trimmed; continue; }
     // 极端 race（预检后到落盘间被占）→ file(name,{mode:"new"}) 的护栏抛 CloudNameCollisionError，
     //   下面 catch 兜底循环重问。另存为 = 写新身份、旧的不动（本地存 + 云端 best-effort 推）。

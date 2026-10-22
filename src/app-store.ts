@@ -6,6 +6,7 @@ import { createStore, createOneDriveProvider, createFolderProvider, isCached, re
 import type { GraphTransportOptions } from "@internal/store";
 import { detectStoreAbsent } from "./store-absent.ts";
 import { createDeviceRackSlot } from "./device-rack-slot.ts";   // A2 终案：无库笔架器官（reload 不丢）
+import { guardRackFormat } from "./rack-format-guard.ts";   // 格式版本纪律：笔架条目的拍子咽喉（读判拍、写盖拍）
 import type { RackPersistence } from "./brush-rack-controller.ts";   // 脑定义 port（type-only 无环）
 import { embeddedBlobUrl } from "./standalone-html.ts";   // P6 单文件内嵌读口（msal 逃生舱）
 import type { Store, Collection as _Coll } from "@internal/store";
@@ -18,7 +19,7 @@ import { appEncryption } from "./encryption.ts";   // 加密器官（store 收�
 import { getPassword } from "./crypto-state.ts";
 import { wirePreferences, initPreferences, setGalleryLayerLive } from "./app-prefs.ts";
 import { wireAppState, initAppState, appState } from "./app-state.ts";
-import { readSlate } from "@internal/gallery";   // activeFileName 守卫输入（P5：本机回执条真相）
+import { readSlate } from "@internal/gallery";   // activeIdentifier 守卫输入（P5：本机回执条真相）
 import { builtinBrushInitData } from "./brushes.ts";
 import { isImagePath, imageBasename } from "@internal/gallery";
 import { naturalCompare } from "@internal/gallery";
@@ -59,7 +60,7 @@ const _createRealStore = (provider: _Prov, signedIn: () => boolean, databaseId?:
   persistence: "app-managed",
   // 薄命名（身份=全名）：**app 不再注入 fileName/encFileName**——库默认 fileName 恒等（身份即云端文件名）、
   //   encFileName 追加 .zip（加密容器外扩展名 ADR-0012）。app 在**边界**用 sessionFileName 把裸 session 名转成全名
-  //   （X→X.ora）再传库（见 session-state 的 _file / editor-session 的 name；OUT 侧 itemToG 用 stripSessionExt 还原显示）。
+  //   （X→X.ora）再传库（见 session-state 的 _file / editor-session 的 name；OUT 侧 gallery.ts 的身份 ↔ 裸名边界用 stripSessionExt 还原显示）。
   //   加密件云端 = X.ora.zip（追加，无损可逆），由库据字节加密态自动翻转，app 只管明文全名。
   //   身份从出生即全名——无迁移（无用户/无后向兼容，2026-07-13 清 tax；migration 框架留库内待将来）。
   encryption: appEncryption,   // EncryptionPort（0.7.0 必填表态；app 与 store 共用同一实例）
@@ -159,12 +160,12 @@ function _wireCollections(): void {
     //   无地平台自动纯内存降级诚实上报。memory-collection 器官同日退役——「兜底 store/memory store」否决案）。
     wirePreferences(undefined);
     wireAppState(undefined);
-    brushRackCollection = createDeviceRackSlot({ getInitData: rackSeed ? async () => rackSeed : builtinBrushInitData });
+    brushRackCollection = guardRackFormat(createDeviceRackSlot({ getInitData: rackSeed ? async () => rackSeed : builtinBrushInitData }));
     return;
   }
   wirePreferences(s.collection("synced-user-preference"));
   wireAppState(s.collection("synced-app-state"));
-  brushRackCollection = s.collection("brush-rack", { getInitData: rackSeed ? async () => rackSeed : builtinBrushInitData });
+  brushRackCollection = guardRackFormat(s.collection("brush-rack", { getInitData: rackSeed ? async () => rackSeed : builtinBrushInitData }));
 }
 _wireCollections();   // eval 装配 = kind:none（内存笔架 + prefs/state undefined 对）；attach 经 _swapStoreForGallery 重灌
 setGalleryLayerLive(false);   // P6 cascade：**恒无库起步**（gallery scope 落 device 层）；boot attach 的 swap 翻 true

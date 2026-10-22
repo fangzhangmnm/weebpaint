@@ -4,7 +4,7 @@
 // 三粒度拍板：画 = `yyyymmdd-hex4`（日粒度+消歧码，v217 惯例沿用）；下载版本 = `名-YYYYMMDD-HHMM`；
 //   项目=月粒度（不归本器官）。**禁「未命名」**：空输入/默认值一律落日期名，不落 untitled 字面。
 // 撞名 -1/-2：只有能探测占用的去向才做得到（云 sink = cloud-image-model.nextFreeExportName 绑
-//   store.files.nameOccupied；本地下载探测不了磁盘，浏览器自己补 (1)）——后缀逻辑留在有占用谓词的
+//   store.files.occupied；本地下载探测不了磁盘，浏览器自己补 (1)）——后缀逻辑留在有占用谓词的
 //   sink 侧，本器官只出基名。
 // 纯模块（now 可注入 → node 可测）；提拔自 gallery-shell._newDocName + export-import-menu.stampNow，
 //   两处原件已删，别再各自长一份。

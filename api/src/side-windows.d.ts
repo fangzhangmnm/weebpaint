@@ -3,6 +3,9 @@ import { PaletteWindow } from "./palette.ts";
 import type { ReferenceFiles } from "./backend/ora.ts";
 import type { AppContext } from "./app-context.ts";
 export declare const referenceWindow: WpReferenceWindow;
+/** 新建 / 换画时清掉（session-state resetEditorState 调）：上一张画原样带着的参考目录绝不能写进下一张画。
+ *  （2026-10-21 F-69 补：此前只有开画时 applyLoadedReferences 复位，新建画布不经过它 → 新画会继承上一张画带着的目录。） */
+export declare function clearCarriedReferences(): void;
 /** 保存收集（session-state _buildOraMeta 调）：库编好的目录文件表，原样进 ora。 */
 export declare function collectReferenceFilesForSave(): Map<string, Uint8Array | Blob>;
 /** 载入恢复（session-state adopt 时调）：ora 交来的参考目录 → 库解清单（含它自己的版本迁移）→ 牌组整副换掉。

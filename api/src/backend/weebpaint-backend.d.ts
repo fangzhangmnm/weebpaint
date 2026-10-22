@@ -38,7 +38,7 @@ export interface BackendInject {
 }
 export interface BackendOpenResult {
     backend: WeebPaintBackend;
-    /** open 解出的壳 sidecar（backend 不解释，原样交壳）。 */
+    /** open 解出的壳 sidecar（backend 不解释，原样交壳）。整份递回 encodeOra 的同名字段 = 无损往返（MCP 存盘就这么做）。 */
     sidecar: {
         editorState?: unknown;
         legacyState?: unknown;
@@ -47,6 +47,16 @@ export interface BackendOpenResult {
             bytes: Uint8Array;
         }[];
         wroteWith: string | null;
+        /** desk / 录像 / `.weebpaint/` 下不认识的 entry 的原字节（格式版本纪律：读不懂的也原样带回）。 */
+        editorStateBytes?: Uint8Array;
+        timelapse?: {
+            json: string;
+            mp4: Uint8Array;
+        } | null;
+        extraEntries?: {
+            path: string;
+            bytes: Uint8Array;
+        }[];
     };
 }
 export declare class WeebPaintBackend implements WeebPaintBackendInterface {
@@ -81,7 +91,7 @@ export declare class WeebPaintBackend implements WeebPaintBackendInterface {
     dispose(): void;
     private _guard;
     encodeOra(opts?: {
-        editorSidecar?: object;
+        editorSidecar?: object | Uint8Array;
         referenceFiles?: {
             path: string;
             bytes: Uint8Array;
@@ -90,6 +100,10 @@ export declare class WeebPaintBackend implements WeebPaintBackendInterface {
             json: string;
             mp4: Uint8Array;
         } | null;
+        extraEntries?: {
+            path: string;
+            bytes: Uint8Array;
+        }[];
     }): Promise<Uint8Array>;
     exportImage(fmt: "png" | "jpg"): Promise<Uint8Array>;
     docInfo(): BackendDocInfo;

@@ -17,6 +17,9 @@ declare function openLocalFile(handle: LocalFileHandle): Promise<File | null>;
  *  （settle 落 download=责任移交未安家 → 同样不放行离开，用户要么 FSA 真安家要么显式丢弃）。
  *  ⚠ 只清家，**不清 _esMuted**——残影墙要等 es 重新绑定身份（_esRebound）才解除。 */
 declare function leaveLocalDoc(): Promise<boolean>;
+/** 格式版本纪律：ora 的 major 比本版新 = 图层结构可能读错 → **拒开**。每个打开入口解完码、动任何状态之前调。
+ *  true = 拒了（通知条已告诉用户；画布、身份、磁盘、云端什么都没碰）。 */
+declare function refuseIfTooNew(loaded: LoadedDoc): boolean;
 /** 外部导入：装入一个解好的 doc，作为**新身份**。首存 mode:"new"（撞名抛，不静默覆盖）。 */
 declare function adoptAsNew(loaded: LoadedDoc, name: string): void;
 /** A1（user 2026-08-28 拍板 a）：挂库成功后，开着的 transient 画自动安家进新图库——
@@ -96,8 +99,6 @@ export declare const session: {
      *  两个平行可选字段就是当年「无地双墙」一类事故的温床，联合类型让错分支在编译期死。 */
     readonly home: Readonly<import("./doc-home.ts").DocHome> | null;
     readonly loadingDoc: boolean;
-    readonly loadedDocIsNewer: boolean;
-    readonly loadedDocNewerConfirmed: boolean;
     readonly dirty: boolean;
     readonly pushPending: boolean;
     readonly saving: boolean;
@@ -116,6 +117,8 @@ export declare const session: {
     saveAndPush: typeof saveAndPush;
     adoptAsNew: typeof adoptAsNew;
     adoptAsExisting: typeof adoptAsExisting;
+    /** 格式版本纪律：解完码、装入之前调（导入 / 崩溃恢复 / 回滚快照等 session 外的打开入口）。true = 拒开，调用方别再往下走。 */
+    refuseIfTooNew: typeof refuseIfTooNew;
     adoptAsTransient: typeof adoptAsTransient;
     adoptTransientIntoGallery: typeof adoptTransientIntoGallery;
     rename: typeof renameCurrentSession;

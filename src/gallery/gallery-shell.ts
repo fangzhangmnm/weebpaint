@@ -203,7 +203,7 @@ export async function checkQuotaAndWarn() {
 //   本地那份逐字节复制的 humanSize 也删了 2026-08-21——统一 import gallery-view-model 那份，单位 KiB/MiB。）
 
 // 拿一个不占用的名字（X / X 1 / X 2 / ...）。
-//   走 store.files.nameOccupied = **唯一权威**占用检查（本地 + 在线时云端；本地命中即短路，
+//   走 store.files.occupied = **唯一权威**占用检查（本地 + 在线时云端；本地命中即短路，
 //   常见 0-1 次网络往返）。不列举任何文件夹——全库 list 是被否决的退化设计。
 //   （旧名 uniqueLocalName 撒谎：它现在也查云端。且旧实现读死了的 sessions 库 → 恒不撞名。）
 //   上限 20（旧 100）：每次未命中最坏一次 fetchMeta，别让「新建」确认卡在上百次往返上；
@@ -592,7 +592,7 @@ export function initGalleryShell(ctx: AppContext) {
     // 点确定即刻锁屏（含「已存在」预检的网络往返也在锁内）——修「新建文件夹延迟锁屏 F」。
     //   withBusy 可重入（ref-count），内层 store.flow.newFolder 再包一层 busy 不会提前解锁。
     await withBusy(t("gs.creatingFolder", { name: trimmed }), async () => {
-      // 统一走 store.nameOccupied（唯一占用检查）：同名文件占了 → 提示；纯文件夹已存在则 ensureFolder 幂等（复用无害）。
+      // 统一走 store.files.occupied（唯一占用检查）：同名文件占了 → 提示；纯文件夹已存在则 ensureFolder 幂等（复用无害）。
       if (await requireStore().files.occupied(fullPath)) { setStatus(t("gs.folderExists", { name: trimmed }), true); return; }
       // 走 store.flow.newFolder（深模块窄接口）而非裸 ensureSubfolder——锁屏/单飞守卫由库内强制。
       try { await requireStore().files.newFolder(fullPath); setStatus(t("gs.folderCreated", { name: trimmed })); }

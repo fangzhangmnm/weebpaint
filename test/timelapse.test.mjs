@@ -8,7 +8,7 @@ import {
 } from "../src/backend/timelapse/timelapse-core.ts";
 import { muxTimelapse, demuxTimelapse, avcCodecString } from "../src/backend/timelapse/timelapse-mux.ts";
 import { TimelapseDocState } from "../src/backend/timelapse/timelapse-state.ts";
-import { SUBSTRUCTURE_VERSIONS } from "../src/backend/format/migrate.ts";
+import { FORMAT, MAJOR_KEY } from "../src/backend/format/migrate.ts";
 import {
   setTimelapseEncoderCtor, timelapseProbeSupport, TimelapseMotionEncoder, encodeTailFrame,
 } from "../src/backend/timelapse/timelapse-encoder.ts";
@@ -233,8 +233,8 @@ describe("timelapse · 录制态", () => {
     const noV = JSON.parse(out.json); delete noV.v;
     const back2 = TimelapseDocState.restore(JSON.stringify(noV), out.mp4);
     assert(back2.restoreIssue !== "too-new" && back2.restoreIssue !== "corrupt-json", `缺 v 不该当损坏或太新：${back2.restoreIssue}`);
-    // 表里登记了 timelapse，且版本键是 v
-    eq(SUBSTRUCTURE_VERSIONS.timelapse, 1);
+    // 拍子表里登记了 timelapse，major 键是 v
+    eq(FORMAT.timelapse.major, 1); eq(MAJOR_KEY.timelapse, "v");
   });
 });
 

@@ -1,3 +1,4 @@
+import { type Stamp, type Verdict } from "./backend/format/migrate.ts";
 import type { EditorRuntimeState, DialReactive, ToolDial } from "./app-context.ts";
 export type EditorState = EditorRuntimeState;
 export declare function useDials(): {
@@ -18,7 +19,6 @@ export interface EditorViewport {
     rot: number;
 }
 declare function freshGroups(): {
-    version: number;
     export: {
         format: string;
         target: string;
@@ -184,6 +184,8 @@ declare function freshGroups(): {
     menuTab: string;
 };
 export type EditorGroups = ReturnType<typeof freshGroups>;
+/** 本版认识的 desk 顶层键（已知 + 退役；拍子三键 migrate.ts 另排除）。不在里面的 = 更新版本写的 → 直通袋。 */
+export declare function deskKnownKeys(): string[];
 interface EngineBind {
     getSize(): number;
     setSize(v: number): void;
@@ -358,8 +360,11 @@ export declare const desk: {
     pixelGrid: boolean;
     longPressPick: boolean;
     menuTab: string;
-    Serialize(): EditorGroups;
-    Unserialize(json: unknown): void;
+    Serialize(): EditorGroups & Record<string, unknown>;
+    Unserialize(json: unknown): {
+        stamp: Stamp;
+        verdict: Verdict;
+    };
     reset(): void;
     readonly toolDials: unknown;
     readonly palette: unknown;

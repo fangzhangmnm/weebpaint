@@ -134,7 +134,6 @@ export interface AppContext {
   // 组合根拥有（它是唯一同时认识 app-prefs 和 app-state 的地方）。**fire-and-forget，调用方别 await。**
   pullSettingsAndState: () => void;
   updateZoomLabel: () => void;
-  updateNewerBanner: () => void;   // v319：真实现无参（save-status.ts）
 
   // transient 面板 / 变换护栏（transient-panels.ts）
   _suppressTransientPanels: (mode: string) => void;   // v319：真实现 mode 必填（allow[mode]），原 reason?: 太松
@@ -156,7 +155,7 @@ export interface AppContext {
   renderLayersPanel: () => void;
   setGalleryOpen: (open: boolean) => void;
   checkQuotaAndWarn: () => Promise<void>;   // v319：真实现 gallery-shell，async 无参无返回值
-  uniqueNameFor: (stem: string) => Promise<string>;    // 取一个不占用的名字（走 store.files.nameOccupied；本地+在线云端）
+  uniqueNameFor: (stem: string) => Promise<string>;    // 取一个不占用的名字（走 store.files.occupied；本地+在线云端）
   showFullscreenBusy: (msg?: string) => void;   // v319：真实现 fullscreen-busy
   hideFullscreenBusy: () => void;
 

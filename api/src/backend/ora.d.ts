@@ -1,4 +1,5 @@
 export declare function setOraLogReporter(fn: (msg: string) => void): void;
+import type { Stamp } from "./format/migrate.ts";
 import type { PaintingData } from "./workpiece/painting-workpiece.ts";
 export interface EncodeLeaf {
     isGroup: false;
@@ -38,6 +39,9 @@ type EncodeDoc = {
 export declare function paintingDataToEncodeDoc(data: PaintingData): EncodeDoc;
 /** 参考目录的文件表：路径 → 字节（路径全在 REFERENCES_DIR 下）。 */
 export type ReferenceFiles = Map<string, Uint8Array>;
+export declare const WEEBPAINT_DIR = ".weebpaint/";
+export declare const KNOWN_WEEBPAINT_ENTRIES: readonly string[];
+export type ExtraEntries = Map<string, Uint8Array>;
 interface EncodeOpts {
     wroteWith: string;
     mergedBytes?: {
@@ -47,7 +51,11 @@ interface EncodeOpts {
     } | null;
     /** 参考目录（format 3）：路径 → 字节，原样写入；路径必须在 .weebpaint/references/ 下（不透明，codec 不解释）。 */
     referenceFiles?: Map<string, Uint8Array | Blob>;
-    desk?: object;
+    /** desk.Serialize() → .weebpaint/editor-state.json（desk per-doc；不向后兼容旧轨 webpaint/state.json）。
+     *  字节 = 原样带回（desk 的 major 比本版新：读不了也不许改，session-state 把文件里的原字节递回来）。 */
+    desk?: object | Uint8Array;
+    /** `.weebpaint/` 下本版不认识的 entry（decode 的 _extraEntries），原样写回。路径必须在 `.weebpaint/` 下且不是认识的那几个。 */
+    extraEntries?: ExtraEntries;
     timelapse?: {
         json: string;
         mp4: Uint8Array;
@@ -61,10 +69,14 @@ export interface DecodedPainting {
     _layoutMigrated: string[];
     _weebpaintState?: unknown;
     _editorState?: unknown;
+    _editorStateBytes?: Uint8Array;
+    /** `.weebpaint/` 下本版不认识的 entry（更新的 minor 加的），保存时原样写回。没有 → 空表。 */
+    _extraEntries: ExtraEntries;
     _timelapseJson?: string;
     _timelapseMp4?: Uint8Array;
     _wroteWith: string | null;
     _formatVersion: number;
+    _formatStamp: Stamp;
 }
 /** doc → Blob (.ora)
  *
@@ -86,5 +98,4 @@ export interface DecodedPainting {
 export declare function encodeDocToOra(doc: EncodeDoc, opts: EncodeOpts): Promise<any>;
 /** Blob (.ora 明文) → DecodedPainting（json 形 + 内联 tile 字节 + sidecar）。 */
 export declare function decodeOraToPainting(blob: Blob): Promise<DecodedPainting>;
-export declare function parseAppVersion(s: string | null | undefined): number | null;
 export {};

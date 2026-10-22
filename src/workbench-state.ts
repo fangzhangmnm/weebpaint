@@ -17,7 +17,7 @@
 //   反应式（Vue 组件 computed 自动追踪 → 当前笔重派生）。
 //   （全局 pressureToSize/Opacity 已 deprecate 2026-07-14 → 每笔自带的 sizeCoeff/opaCoeff，见 brush.ts:397。）
 
-import { migrateSubstructure } from "./backend/format/migrate.ts";   // 持久化立宪：desk 版本链（比 app 新 → 抛 FormatTooNewError，壳层接）
+import { migrate, splitExtra, stampFields, type Stamp, type Verdict } from "./backend/format/migrate.ts";   // 格式版本纪律：desk 的拍子（major 比本版新 → 抛 FormatTooNewError，壳层接）
 import { reactive } from "../vendor/vue/vue.esm-browser.prod.js";
 import type { EditorRuntimeState, DialReactive, ToolDial } from "./app-context.ts";
 
@@ -136,9 +136,8 @@ export interface EditorViewport { tx: number; ty: number; scale: number; rot: nu
 // 序列化形状 = `.weebpaint/editor-state.json` 的内容（freshGroups() 即 defaults SSoT）。
 function freshGroups() {
   return {
-    // 持久化立宪（2026-09-29）：desk 这段 JSON 自己的版本戳（backend/format/migrate.ts SUBSTRUCTURE_VERSIONS.desk）。
-    //   读到比 app 新的 → session-state 走「新版本写的」警告 + 覆盖守卫；旧文件缺此键 = 1。
-    version:       1,
+    // （拍子 version / minor / patch 不在这里：写入器在 Serialize 里盖本版拍 = backend/format/migrate.ts FORMAT.desk；
+    //   读到 major 比本版新的 → Unserialize 抛 FormatTooNewError，session-state 原字节带回；旧文件缺 version = 1。）
     // #8（user 2026-08-23「png导出默认defringe」）：键 defringe→defringePng、默认 false→true。
     //   键改名 = 存量 doc 里的旧 defringe（几乎全是老默认 false，正是这条要求要消灭的状态）被
     //   mergeInto 静默忽略、统一升级到默认开——precedent 同 v0.10.11 lineartInk→lineartInkTh。
@@ -233,8 +232,17 @@ function freshGroups() {
 }
 export type EditorGroups = ReturnType<typeof freshGroups>;
 
+// 退役键（认识、已停写——家族格式规矩「删字段 = 保留读、停止写」）：不进直通袋，否则会被永远带着走。
+//   出处见 freshGroups 里各条注释：refPanels（format 3 搬去 references/manifest.json）/ bucket（v0.5.11）/ selPen（v0.7.26）/
+//   fill（v0.7.40 蚂蚁线组）/ pressureDisabled（2026-08-28 sunset）/ ruler（2026-09-18 回滚）。
+const RETIRED_DESK_KEYS = ["refPanels", "bucket", "selPen", "fill", "pressureDisabled", "ruler"] as const;
+/** 本版认识的 desk 顶层键（已知 + 退役；拍子三键 migrate.ts 另排除）。不在里面的 = 更新版本写的 → 直通袋。 */
+export function deskKnownKeys(): string[] { return [...Object.keys(freshGroups()), ...RETIRED_DESK_KEYS]; }
+
 // ── 私有可变态 ─────────────────────────────────────────────────────────────────────────
-const S = { g: freshGroups() };       // mutable holder（reset 时整份换，访问器每次 deref S.g → reset 生效）
+// g = 认识的那部分（reset 时整份换，访问器每次 deref S.g → reset 生效）；
+// extra = 文件里本版不认识的顶层键（更新的 minor 加的），原样带回：Serialize 先铺 extra 再铺已知键（已知键永远赢）。
+const S = { g: freshGroups(), extra: {} as Record<string, unknown> };
 
 // ── 反应式引擎绑定（stage5）：brushTool(size/opacity/activeBrushId/color) + colorPicker.layerMode 是引擎**每笔读**的
 //   反应式态。desk 作 SSoT 接口，底层存储绑到 useDials 的 reactive state —— 引擎一行不改、
@@ -392,18 +400,26 @@ export const desk = {
 
   // ── 除各字段外仅此四法 ──
   // 深拷贝：与 live 解耦；即 .weebpaint/editor-state.json 内容。绑定字段（brushTool/pickMode）从引擎 live 取。
-  Serialize(): EditorGroups {
+  //   形状 = { ...直通袋, ...已知键, version / minor / patch = 本版拍 }（拍子永远是自己的，直通袋里不会有）。
+  Serialize(): EditorGroups & Record<string, unknown> {
     const out = JSON.parse(JSON.stringify(S.g)) as EditorGroups;
     if (_bind) {
       out.brushTool = { activeBrushId: _bind.getActiveBrushId(), size: _bind.getSize(), opacity: _bind.getOpacity(), color: _bind.getColor() };
       out.colorPicker = { layerMode: _bind.getPickMode() };
     }
-    return out;
+    return { ...JSON.parse(JSON.stringify(S.extra)), ...out, ...stampFields("desk") };
   },
-  // 载入：合并进 S.g，再把绑定字段灌进反应式引擎。
-  Unserialize(json: unknown): void { const d = freshGroups(); mergeInto(d, migrateSubstructure("desk", json)); S.g = d; applyBoundFromGroups(d); },
-  // 开新文件必调：回默认 + 灌引擎。
-  reset(): void { S.g = freshGroups(); applyBoundFromGroups(S.g); },
+  // 载入：先按拍子升到本版 major（major 比本版新 → 抛 FormatTooNewError，什么都不改，调用方接），合并进 S.g，
+  //   不认识的顶层键进直通袋，再把绑定字段灌进反应式引擎。返回文件的拍子与判决（newer-minor → 调用方告诉用户一次）。
+  Unserialize(json: unknown): { stamp: Stamp; verdict: Verdict } {
+    const r = migrate("desk", json);
+    const d = freshGroups(); mergeInto(d, r.json);
+    S.g = d; S.extra = splitExtra("desk", r.json, deskKnownKeys());
+    applyBoundFromGroups(d);
+    return { stamp: r.stamp, verdict: r.verdict };
+  },
+  // 开新文件必调：回默认 + 清直通袋 + 灌引擎。
+  reset(): void { S.g = freshGroups(); S.extra = {}; applyBoundFromGroups(S.g); },
 
   // 载入回灌读口（T5：旧轨 state.json 停写后这三样的新家；session-state 在 Unserialize 后消费）。
   get toolDials(): unknown { return S.g.toolDials; },
