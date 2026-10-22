@@ -20,6 +20,8 @@ import { encodeDocToOra, decodeOraToPainting, paintingDataToEncodeDoc, parseAppV
 import { applyLoadedReferences, collectReferenceFilesForSave } from "./side-windows.ts";   // 参考目录（format 3）：载入灌注/保存收集
 import { ORA_FORMAT_VERSION } from "./backend/ora-stack-xml.ts";
 import { SUBSTRUCTURE_VERSIONS, FormatTooNewError } from "./backend/format/migrate.ts";   // 持久化立宪：子结构版本
+import { configureFormatNotice, beginFormatNotice } from "./format-notice.ts";   // 「更新版本写的」每张画最多说一次（家族格式版本纪律）
+import { showNotice } from "@internal/workbench-elements";   // 「更新版本写的」走通知条
 import { flattenViewLeaves } from "./backend/workpiece/painting-view.ts";
 import { tLatin } from "./i18n/index.ts";
 import { requireStore, galleryBackend } from "./app-store.ts";
@@ -486,6 +488,7 @@ let es: EditorSession;
 // adoptModel：把解出的 doc 渲进画布（模型 + UI + 编辑器状态 + 版本降级检测）。**不碰 name/es/checkpoint**。
 function adoptModel(loaded: LoadedDoc) {
   _loadingDoc = true;
+  beginFormatNotice();   // 换了一张画：「更新版本写的」这张还没说过
   try {
     timelapseDetach();          // 串扰墙：换文档期间的 histchange（clearHistory/load）不得进旧录像
     input.clearHistory();       // 先清：弃开着的令牌 + drop floats + lasso 取消（load 要开新令牌）
@@ -1280,6 +1283,7 @@ export function initSession(ctx: AppContext) {
   state = ctx.state; doc = ctx.doc; board = ctx.board; input = ctx.input; wp2 = ctx.wp2;   // 装载/换文档 = wp2.load（令牌写；T3b-2）
   editMode = ctx.editMode; rack = ctx.rack;
   referenceWindow = ctx.referenceWindow; paletteWindow = ctx.paletteWindow;
+  configureFormatNotice((msg) => { showNotice({ id: "format-newer-minor", level: "info", text: msg, dismissLabel: t("upd.dismiss"), autoHideMs: 10_000 }); }, () => t("ss.docNewerMinor"));
   setStatus = ctx.setStatus; withBusy = ctx.withBusy;
   updateSaveStatus = ctx.updateSaveStatus; updateNewerBanner = ctx.updateNewerBanner;
   pullSettingsAndState = ctx.pullSettingsAndState;

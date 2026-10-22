@@ -3076,10 +3076,10 @@ export declare const S: {
         readonly tok: "o wan e lipu ale tawa lipu sin";
     };
     readonly "ref.load": {
-        readonly zh: "导入图片…";
-        readonly en: "Import image…";
-        readonly ja: "画像を読み込む…";
-        readonly tok: "o kama jo e sitelen";
+        readonly zh: "导入图片 / 视频…";
+        readonly en: "Import image / video…";
+        readonly ja: "画像 / 動画を読み込む…";
+        readonly tok: "o kama jo e sitelen e sitelen tawa";
     };
     readonly "ref.live": {
         readonly zh: "画布镜像";
@@ -3200,6 +3200,54 @@ export declare const S: {
         readonly en: "Text";
         readonly ja: "テキスト";
         readonly tok: "nimi";
+    };
+    readonly "ref.kindVideo": {
+        readonly zh: "视频";
+        readonly en: "Video";
+        readonly ja: "動画";
+        readonly tok: "sitelen tawa";
+    };
+    readonly "ref.play": {
+        readonly zh: "播放";
+        readonly en: "Play";
+        readonly ja: "再生";
+        readonly tok: "o open";
+    };
+    readonly "ref.pause": {
+        readonly zh: "暂停";
+        readonly en: "Pause";
+        readonly ja: "一時停止";
+        readonly tok: "o pini lili";
+    };
+    readonly "ref.loop": {
+        readonly zh: "循环";
+        readonly en: "Loop";
+        readonly ja: "ループ";
+        readonly tok: "o sin e ona";
+    };
+    readonly "ref.rate": {
+        readonly zh: "速度";
+        readonly en: "Speed";
+        readonly ja: "速度";
+        readonly tok: "tenpo";
+    };
+    readonly "ref.prevFrame": {
+        readonly zh: "上一帧";
+        readonly en: "Previous frame";
+        readonly ja: "前のフレーム";
+        readonly tok: "sitelen pini";
+    };
+    readonly "ref.nextFrame": {
+        readonly zh: "下一帧";
+        readonly en: "Next frame";
+        readonly ja: "次のフレーム";
+        readonly tok: "sitelen kama";
+    };
+    readonly "ref.videoAdded": {
+        readonly zh: "已加视频参考「{name}」（只放内存，不存进画里；＋ 菜单能改）";
+        readonly en: "Added video reference “{name}” (memory only, not saved in the painting; change it in the ＋ menu)";
+        readonly ja: "動画の参考「{name}」を追加しました（メモリのみ・絵には保存しません。＋ メニューで変更できます）";
+        readonly tok: "mi pana e sitelen tawa \"{name}\". ona li lon ilo ni taso. mi awen ala e ona lon sitelen. sina ken ante e ni lon nasin +.";
     };
     readonly "ref.linkMissing": {
         readonly zh: "这条参考的来源已不在";
@@ -4770,6 +4818,12 @@ export declare const S: {
         readonly ja: "それでも終了する（この変更を破棄）";
         readonly tok: "weka (ante li moli)";
     };
+    readonly "ss.docNewerMinor": {
+        readonly zh: "这张画是更新版本的 WeebPaint 写的：这版没有的功能保存时不会丢，只是看不到";
+        readonly en: "This painting was written by a newer WeebPaint: features this version lacks are kept when you save, just not shown";
+        readonly ja: "この絵は新しい WeebPaint で書かれています。このバージョンにない機能は保存しても失われませんが、表示されません";
+        readonly tok: "ilo WeebPaint sin li pali e sitelen ni. ilo ni li sona ala e ijo lili. sina awen e ona la ijo ni li moli ala. sina lukin ala e ona taso.";
+    };
     readonly "ss.notOpenedNeedPasswordCancelled": {
         readonly zh: "未打开：需要密码解锁（已取消）";
         readonly en: "Not opened: password required to unlock (cancelled)";
@@ -5845,16 +5899,16 @@ export declare const S: {
         readonly tok: "o pini e sitelen ni. o ante e poki sitelen lon tenpo kama";
     };
     readonly "pushAll.askTitle": {
-        readonly zh: "有 {n} 张画只在本机";
-        readonly en: "{n} painting(s) exist only on this device";
-        readonly ja: "この端末にしかない絵が {n} 枚あります";
-        readonly tok: "sitelen {n} li lon ilo ni taso";
+        readonly zh: "有 {n} 张画还没传上去，现在传吗？";
+        readonly en: "{n} painting(s) not uploaded yet — upload now?";
+        readonly ja: "まだ送信していない絵が {n} 枚あります。今送信しますか？";
+        readonly tok: "sitelen {n} li lon ala poki sewi. sina wile ala wile pana e ona lon tenpo ni?";
     };
     readonly "pushAll.askMsg": {
-        readonly zh: "传上云端吗？传了别的设备也能看到。撞上云端已有的同名文件不会覆盖，会留在图库里让你处理。";
-        readonly en: "Upload them now? Other devices will see them. If a cloud file with the same name already exists it will not be overwritten; it stays in the gallery for you to resolve.";
-        readonly ja: "クラウドに送信しますか？他の端末でも見られるようになります。同名のファイルがクラウドにある場合は上書きせず、ギャラリーに残して処理を待ちます。";
-        readonly tok: "sina wile ala wile pana e ona tawa poki sewi? ilo ante li ken lukin e ona. nimi sama li lon poki sewi la mi awen ala e ona lon ona. ona li awen lon tomo sitelen la sina pona e ona.";
+        readonly zh: "传了别的设备也能看到。撞上云端已有的同名文件不会覆盖，会留在图库里让你处理。";
+        readonly en: "Other devices will see them afterwards. If a cloud file with the same name already exists it will not be overwritten; it stays in the gallery for you to resolve.";
+        readonly ja: "送信すると他の端末でも見られるようになります。同名のファイルがクラウドにある場合は上書きせず、ギャラリーに残して処理を待ちます。";
+        readonly tok: "ilo ante li ken lukin e ona. nimi sama li lon poki sewi la mi awen ala e ona lon ona. ona li awen lon tomo sitelen la sina pona e ona.";
     };
     readonly "pushAll.ok": {
         readonly zh: "传上去";

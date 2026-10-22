@@ -602,7 +602,7 @@ export const S = {
   "lp.foot.importClipboard":{ zh: "导入剪贴板", en: "Import from clipboard", ja: "クリップボードから読み込む", tok: "o kama jo tan poki kipisi" },
   "lp.foot.importCloud":{ zh: "从云盘导入…", en: "Import from cloud…", ja: "クラウドから読み込む…", tok: "o kama jo tan poki sewi…" },
   "lp.foot.stampAll":   { zh: "合并全部为新层", en: "Collapse all into new layer", ja: "すべてを結合して新規レイヤーへ", tok: "o wan e lipu ale tawa lipu sin" }, 
-  "ref.load":        { zh: "导入图片…", en: "Import image…", ja: "画像を読み込む…", tok: "o kama jo e sitelen" },
+  "ref.load":        { zh: "导入图片 / 视频…", en: "Import image / video…", ja: "画像 / 動画を読み込む…", tok: "o kama jo e sitelen e sitelen tawa" },
   "ref.live":        { zh: "画布镜像", en: "Canvas mirror", ja: "キャンバスミラー", tok: "sama supa sitelen" },
   "ref.cloud":       { zh: "从图库选图…", en: "Pick from gallery…", ja: "ギャラリーから選ぶ…", tok: "o kama jo tan poki sitelen" },
   "ref.paste":       { zh: "粘贴剪贴板", en: "Paste clipboard", ja: "クリップボードを貼り付け", tok: "o pana e sitelen awen" },
@@ -624,6 +624,15 @@ export const S = {
   "ref.jump":        { zh: "跳到某一张", en: "Jump to a reference", ja: "参考へジャンプ", tok: "o tawa sitelen ante" },
   "ref.kindImage":   { zh: "图片", en: "Image", ja: "画像", tok: "sitelen" },
   "ref.kindText":    { zh: "文字", en: "Text", ja: "テキスト", tok: "nimi" },
+  // 参考窗 0.5.0 视频卡（2026-10-21 收货；措辞对齐 MoonSinger / WXHW）
+  "ref.kindVideo":   { zh: "视频", en: "Video", ja: "動画", tok: "sitelen tawa" },
+  "ref.play":        { zh: "播放", en: "Play", ja: "再生", tok: "o open" },
+  "ref.pause":       { zh: "暂停", en: "Pause", ja: "一時停止", tok: "o pini lili" },
+  "ref.loop":        { zh: "循环", en: "Loop", ja: "ループ", tok: "o sin e ona" },
+  "ref.rate":        { zh: "速度", en: "Speed", ja: "速度", tok: "tenpo" },
+  "ref.prevFrame":   { zh: "上一帧", en: "Previous frame", ja: "前のフレーム", tok: "sitelen pini" },
+  "ref.nextFrame":   { zh: "下一帧", en: "Next frame", ja: "次のフレーム", tok: "sitelen kama" },
+  "ref.videoAdded":  { zh: "已加视频参考「{name}」（只放内存，不存进画里；＋ 菜单能改）", en: "Added video reference “{name}” (memory only, not saved in the painting; change it in the ＋ menu)", ja: "動画の参考「{name}」を追加しました（メモリのみ・絵には保存しません。＋ メニューで変更できます）", tok: "mi pana e sitelen tawa \"{name}\". ona li lon ilo ni taso. mi awen ala e ona lon sitelen. sina ken ante e ni lon nasin +." },
   "ref.linkMissing": { zh: "这条参考的来源已不在", en: "This reference's source is gone", ja: "この参考の元がありません", tok: "ijo pi sitelen ni li lon ala" },
   "ref.tooNew":      { zh: "参考清单是更新的版本写的（v{file}，本版只懂到 v{lib}）——先原样保留，请刷新升级后再看", en: "References were written by a newer version (v{file}; this build reads up to v{lib}) — kept untouched, refresh to upgrade", ja: "参考リストは新しいバージョンで書かれています（v{file}、この版は v{lib} まで）——そのまま保持、更新してください", tok: "lipu lukin li tan ilo sin (v{file}; ilo ni li sona e v{lib} taso) — mi awen e ona, o sin e ilo" },
 
@@ -917,6 +926,8 @@ export const S = {
   "ss.localSaveIncompleteMsg": { zh: "「{name}」的修改还没写进本地存储（保存失败或被取消）。直接退出会丢这些修改。", en: "Changes to \"{name}\" haven't been written to local storage (save failed or was cancelled). Exiting now will lose these changes.", ja: "「{name}」の変更はまだローカルストレージに書き込まれていません（保存に失敗またはキャンセルされました）。このまま終了すると変更が失われます。", tok: "ante pi sitelen \"{name}\" li awen ala lon ilo ni (awen li pakala anu weka). sina tawa weka la ante ni li moli." }, 
   "ss.retrySave": { zh: "重试保存", en: "Retry save", ja: "保存を再試行", tok: "o awen sin" }, 
   "ss.exitDiscard": { zh: "仍要退出（丢弃本次修改）", en: "Exit anyway (discard these changes)", ja: "それでも終了する（この変更を破棄）", tok: "weka (ante li moli)" }, 
+  // 家族格式版本纪律（2026-10-21）：某个子结构 minor 比本版新 = 能开能改能存，不认识的部分原样带回——每次打开最多说一次（format-notice.ts）
+  "ss.docNewerMinor": { zh: "这张画是更新版本的 WeebPaint 写的：这版没有的功能保存时不会丢，只是看不到", en: "This painting was written by a newer WeebPaint: features this version lacks are kept when you save, just not shown", ja: "この絵は新しい WeebPaint で書かれています。このバージョンにない機能は保存しても失われませんが、表示されません", tok: "ilo WeebPaint sin li pali e sitelen ni. ilo ni li sona ala e ijo lili. sina awen e ona la ijo ni li moli ala. sina lukin ala e ona taso." },
   "ss.notOpenedNeedPasswordCancelled": { zh: "未打开：需要密码解锁（已取消）", en: "Not opened: password required to unlock (cancelled)", ja: "開いていません：ロック解除にパスワードが必要です（キャンセルしました）", tok: "open ala: nimi len li wile (pali li weka)" }, 
   "ss.opened": { zh: "已打开：{name}", en: "Opened: {name}", ja: "開きました：{name}", tok: "open li pini: {name}" }, 
   "ss.openFailed": { zh: "打开失败：{error}", en: "Open failed: {error}", ja: "開くのに失敗しました：{error}", tok: "open li pakala: {error}" },

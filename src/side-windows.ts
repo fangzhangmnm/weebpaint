@@ -15,7 +15,8 @@
 import { t } from "./i18n/index.ts";
 import { WpReferenceWindow } from "@internal/reference-window";
 import type { RefLiveSource, RefPanelRect } from "@internal/reference-window";
-import { encodeDeck, decodeDeck, mimeForName, DeckManifestTooNewError } from "@internal/reference-window/deck";
+import { encodeDeck, decodeDeck, mimeForName, DeckManifestTooNewError, sniffKind } from "@internal/reference-window/deck";
+import { noteNewerMinor } from "./format-notice.ts";   // 参考窗 0.5.0 清单拍子：newer-minor 告诉用户一次
 import { PaletteWindow } from "./palette.ts";
 import { els } from "./els.ts";
 import { decodeImageFile, imageSourceToBytes } from "./shell/image-io.ts";
@@ -80,7 +81,7 @@ function composeLiveFrame(): RefLiveSource | null {
 
 // ---- 参考目录进出（format 3；契约归 @internal/reference-window）----
 const REF_APP = "weebpaint";                          // 目录 = .weebpaint/references/（库按 app 名算）
-const REF_KINDS = ["image", "live", "text"] as const;   // 这个宿主画得出来的种类（0.3.1 起文字卡：设定 / 台词贴进参考窗）；其余的库原样带着
+const REF_KINDS = ["image", "live", "text", "video"] as const;   // 这个宿主画得出来的种类（0.3.1 起文字卡：设定 / 台词贴进参考窗；0.5.0 起视频卡：照着动画逐帧画）；其余的库原样带着（音频卡本仓不收）
 /** 清单比库新时整个目录原样带着（读时装下、存时原样写回），直到用户在新版里打开。null = 正常态。 */
 let _carriedRefFiles: ReferenceFiles | null = null;
 
@@ -103,6 +104,8 @@ export async function applyLoadedReferences(files: ReferenceFiles): Promise<void
       getFile: (path) => { const b = files.get(path); return b ? new Blob([b as unknown as BlobPart], { type: mimeForName(path) }) : null; },
     });
     deck.restore(decoded);
+    // 0.5.0 清单拍子（家族格式版本纪律）：minor 比本库新 = 能开能存、不认识的键库原样带回 → 告诉用户一次（format-notice 按这张画去重）
+    if (decoded.verdict === "newer-minor") noteNewerMinor("references", `${decoded.stamp.major}.${decoded.stamp.minor}.${decoded.stamp.patch}`, "reference-window 0.5.0");
   } catch (e) {
     if (e instanceof DeckManifestTooNewError) {
       _carriedRefFiles = files;
@@ -215,8 +218,11 @@ export function initSideWindows(ctx: AppContext) {
     prev: t("ref.prevRef"), next: t("ref.nextRef"), menu: t("ref.menu"), move: t("ref.move"),
     resize: t("ref.resize"), resizeAria: t("ref.resizeAria"),
     moveEarlier: t("ref.moveEarlier"), moveLater: t("ref.moveLater"), jump: t("ref.jump"),
-    kindNames: { image: t("ref.kindImage"), live: t("ref.live"), text: t("ref.kindText") },
+    kindNames: { image: t("ref.kindImage"), live: t("ref.live"), text: t("ref.kindText"), video: t("ref.kindVideo") },
     linkMissing: t("ref.linkMissing"),
+    // 参考窗 0.5.0 视频卡（照着动画逐帧画）：播放 / 暂停、＋ 菜单的循环 / 速度、上一帧 / 下一帧（图标 = 库里的 skip-prev / skip-next，user「逐帧按钮先不用」= 不另画）
+    play: t("ref.play"), pause: t("ref.pause"), loop: t("ref.loop"), rate: t("ref.rate"),
+    prevFrame: t("ref.prevFrame"), nextFrame: t("ref.nextFrame"),
   };
   // 粘贴归焦点（库 0.3.1，user 2026-09-30「这个看 focus 吧」「ctrl v 文字 图片 或者 txt md 图片…是最高频的核心使用场景」）：
   //   参考窗有焦点（点窗身 / 从菜单打开时自动给）→ Ctrl+V 的文字 / 图片 / txt·md 文件进参考窗；焦点在别处 → selection-ops 照旧贴成图层。
@@ -247,14 +253,25 @@ export function initSideWindows(ctx: AppContext) {
   });
 }
 
-/** 文件进参考窗的分流（file input / 粘贴 / 拖放同一条）：txt·md / text/* → 文字卡；其余走 addReferenceImage 漏斗（图片政策不变）。 */
+/** 文件进参考窗的分流（file input / 粘贴 / 拖放同一条）：txt·md / text/* → 文字卡；视频 → 库的导入漏斗（0.5.0 视频卡，默认只放内存）；其余走 addReferenceImage 漏斗（图片政策不变）。 */
 async function importReferenceFiles(files: File[]): Promise<void> {
   for (const f of files) {
     try {
       if (f.type.startsWith("text/") || /\.(txt|md)$/i.test(f.name)) { referenceWindow.addText(await f.text(), { name: f.name }); refSetOpen(true); }
+      else if (sniffKind(f) === "video") await addReferenceVideo(f);
       else await addReferenceImage(f);
     } catch (err) { setStatus(t("mi.referenceLoadFailed", { err: errMsg(err) })); }
   }
+}
+
+/** 视频参考（参考窗 0.5.0）：走库的导入漏斗，只收视频；默认存法照库（视频 = 只放内存，不存进画里——user 10-21「音视频应该是当此有效」），
+ *  不传 defaultRam 覆盖；＋ 菜单「只放内存」能改。逐帧在卡上（上一帧 / 下一帧）。不转码（浏览器能放就能用）。 */
+async function addReferenceVideo(file: File): Promise<void> {
+  const r = await referenceWindow.importFiles([file], { kinds: ["video"] });
+  if (r.added.length || r.filled.length) { refSetOpen(true); setStatus(t("ref.videoAdded", { name: file.name || t("ref.kindVideo") })); return; }   // filled = 补回了「只放内存」的空位
+  if (r.skipped.every((s) => s.why === "cancelled")) return;
+  const why = r.skipped.map((s) => s.message || s.why).join("; ") || "unsupported";
+  setStatus(t("mi.referenceLoadFailed", { err: why }), true);
 }
 
 /** 导入唯一漏斗（spec §5；genai era 同入口）：转码政策（1024² / 小图原样豁免 / 拍平白底 jpeg /

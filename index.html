@@ -106,7 +106,7 @@
     <!-- ICON-SPRITE:BEGIN — 由 tools/inline-sprites.py 生成，勿手改 -->
 <svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none">
 <!--
-  153 icons extracted from the family icon library (../20260708 SVG Icons/icons.svg) by extract-icons.py — do not hand-edit; re-run the script instead.
+  155 icons extracted from the family icon library (../20260708 SVG Icons/icons.svg) by extract-icons.py — do not hand-edit; re-run the script instead.
   Family SVG Icons — MIT License, Copyright (c) 2026 fangzhangmnm.
   Contains work derived from (per-icon provenance in data-src):
     Bootstrap Icons — MIT License, Copyright (c) 2019-2024 The Bootstrap Authors · https://github.com/twbs/icons
@@ -307,6 +307,10 @@
   <symbol id="play" data-cat="media" data-src="own" data-note="播放:实心右向三角 ▶(IEC 60417 磁带机惯例统一实心, 描边同色叠加得圆角); 20260819 media 批入库" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8.2 5.4 L18.8 12 L8.2 18.6 Z" fill="currentColor"/></symbol>
   <!-- pause — 暂停:双竖杠 ⏸(粗 3.2 圆帽, brush-width 同款加粗手法); 20260819 media 批入库 -->
   <symbol id="pause" data-cat="media" data-src="own" data-note="暂停:双竖杠 ⏸(粗 3.2 圆帽, brush-width 同款加粗手法); 20260819 media 批入库" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><g stroke-width="3.2"><path d="M8.3 5.5 V18.5"/><path d="M15.7 5.5 V18.5"/></g></symbol>
+  <!-- skip-prev — 上一曲 ⏮: skip-next 的精确镜像(translate+scale(-1,1), 同 replay 画法)。20260821 入库 -->
+  <symbol id="skip-prev" data-cat="media" data-src="own" data-note="上一曲 ⏮: skip-next 的精确镜像(translate+scale(-1,1), 同 replay 画法)。20260821 入库" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(24,0) scale(-1,1)"><path d="M5.5 6.4 L14.7 12 L5.5 17.6 Z" fill="currentColor"/><path d="M17.9 7.0 V17.0" stroke-width="2.8"/></g></symbol>
+  <!-- skip-next — 下一曲 ⏭(BR 播放器): 实心右三角+竖杠(stroke 2.8 圆帽), 体量对齐 fast-forward; 与 fast-forward(双三角=快进)分工。20260821 甲方拍板候选1号入库(实心 rect 杠版/轻量版落选) -->
+  <symbol id="skip-next" data-cat="media" data-src="own" data-note="下一曲 ⏭(BR 播放器): 实心右三角+竖杠(stroke 2.8 圆帽), 体量对齐 fast-forward; 与 fast-forward(双三角=快进)分工。20260821 甲方拍板候选1号入库(实心 rect 杠版/轻量版落选)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 6.4 L14.7 12 L5.5 17.6 Z" fill="currentColor"/><path d="M17.9 7.0 V17.0" stroke-width="2.8"/></symbol>
   <!-- file -->
   <!-- export — 导出:向上箭头离开托盘(import 的上下镜像) -->
   <symbol id="export" data-cat="file" data-src="own" data-note="导出:向上箭头离开托盘(import 的上下镜像)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21 v-11"/><polyline points="7 15, 12 10, 17 15"/> <path d="M4 7 v-3 a1 1 0 0 1 1 -1 h14 a1 1 0 0 1 1 1 v3"/></symbol>
@@ -1101,7 +1105,7 @@
       </div>
     </wp-reference-window>
     <!-- 参考图文件 input（只 image，不接 .ora） -->
-    <input type="file" id="referenceFileInput" accept="image/*" style="display:none" />
+    <input type="file" id="referenceFileInput" accept="image/*,video/*" style="display:none" />
 
     <!-- v109: brushPanel 浮动面板撤了 —— 平滑参数现在 per-preset，进 brush settings 调 -->
 
@@ -1542,6 +1546,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-29df87e2c236.mjs"></script>
+    <script type="module" src="./dist/weebpaint-24bc305ba0a8.mjs"></script>
   </body>
 </html>
