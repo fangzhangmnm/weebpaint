@@ -72,3 +72,5 @@ Procreate 级绘画 PWA。UI 中文。iPad 是手感的最终裁判。
 4. **commit bundle + push**：`git add dist index.html && git commit -m "vN: dev bundle (weebpaint-<hash>) — <一句话> smoke" && git push origin main`。
 
 跑测试：`npm test`（node test runner；全量 ~30s，每条自带耗时）。`bump.sh` 的 sed 目标是 `src/version.ts`（v315 起 .js→.ts，别再回 .js）。
+
+- **2026-10-26 收 store 2.2.1 / gallery 0.8.8（v0.14.48，Claude Fable 5.1；家族周账 F-98「救火」，user「收，救火」）**：2.2.1 = 刷新前改过 + 登录前恢复 → 谱系丢 → 盲推 409 当撞名 = 假「云端有新版本」面的根，推前先问云端（默认开）；面的 cloudState 按真相；`dirty.pushAll` 多返 `failures`。0.8.8 = 要处理的卡片一粒可见「处理…」钮 + 顶部「有 N 份没同步好 → 看列表」筛选、「处理…」不包在宿主 busy 里。本版只收包 + 换 gallery.css，app 代码零改动；登录后「问一次 → pushAll」的框按 F-88 改列表口径另记。复盘 = 家族根 `ai-docs/20261026-cloud-conflict-ux-postmortem.md`。
