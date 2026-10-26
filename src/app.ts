@@ -547,11 +547,11 @@ function _seedGalleryRegistry(): void {
     }).catch((e) => reportError(new Error("[gallery-registry] seed failed (soft): " + String(e)), "log"));
   } catch (e) { reportError(new Error("[gallery-registry] seed failed (soft): " + String(e)), "log"); }
 }
-// ── 只在本机的画：登录后 / 回线 / 挂上库后问一次再补推（2026-10-21 user 答统筹稿问题 3「登录 / 回线后问一次」，全家同款 = JRB v0.2.20 offerPushLocalOnly）──
-//   为什么要它：WeebPaint 的推云只在退出 / 换稿 / 显式保存；崩溃、关标签页、离线时存下的画会一直留脏，以前靠图库卡片「推送到云端」，那个钮 v0.14.37 起
-//   不在词汇表上了。这里 = 把 consent 接到这批画上：问一次、人点了才 files.dirty.pushAll()（If-Match / 撞名不覆盖；撞上的留在图库「处理…」）。
-//   每次打开 app 最多问一次（「先不传」= 这次不再问，下次打开再问）；不上遮罩（库推送的 busy 键 sync.pushing 走安静通知条）。
-//   库只有 dirty.count()（标量、不列名）：数的是全部没传上去的，含「传过但又改了」的那批——那批本来也该推，If-Match 守着。
+// ── 没同步好的画：登录后 / 回线 / 挂上库后提一次（2026-10-26 改，家族周账 F-98 / F-88；user 10-26「列表面」「收，救火」；CatsUp 同形）──
+//   10-21 的「问一次 → files.dirty.pushAll()」是 / 否框撤了：它说「还没传上去」对「传过、后来改了没传」只说对了一半，批量传完失败只剩一条状态行、没有动作。
+//   现在：有没同步好的 → 一条带「去处理」钮的常驻通知 → 开图库进「要处理的」视图（gallery 0.8.8：顶部横幅 + 每张卡一粒可见的「处理…」，点了当场弹库的三选一面）。
+//   不自动盖住正在画的（别把人踢出去）；每次打开 app 最多提一次。不再自己批量推：每一张都由人在面里选用哪边。
+//   store 2.2.1 起「刷新前改过 + 登录前恢复」那种谱系丢了的脏画推前会先问云端、没人动就直接推成——所以这里数到的多半是真要人选的。
 let askedPushLocalOnly = false;
 async function offerPushLocalOnly(): Promise<void> {
   if (askedPushLocalOnly || !isSignedIn() || navigator.onLine === false) return;
@@ -560,16 +560,12 @@ async function offerPushLocalOnly(): Promise<void> {
   const n = await be.store.files.dirty.count().catch((e: unknown) => { reportError(new Error("[pushAll] dirty.count failed: " + String(e)), "log"); return 0; });
   if (n <= 0) return;
   askedPushLocalOnly = true;
-  diagNote("sync", `unpushed paintings after sign-in/online: ${n} → ask`);
-  const pick = await openChoiceSheet<"push">(t("pushAll.askTitle", { n: String(n) }), t("pushAll.askMsg"), [{ label: t("pushAll.ok"), value: "push", primary: true }]);
-  if (pick !== "push") { diagNote("sync", "local-only paintings: user said not now"); return; }
-  try {
-    const r = await be.store.files.dirty.pushAll();
-    diagNote("sync", `dirty.pushAll: pushed=${r.pushed} failed=${r.failed.length}${r.failed.length ? " [" + r.failed.join(", ") + "]" : ""}`);
-    if (r.failed.length) setStatus(t("pushAll.failed", { n: String(r.failed.length) }), true);
-    else if (r.pushed) setStatus(t("pushAll.done", { n: String(r.pushed) }));
-  } catch (e) { reportError(e instanceof Error ? e : new Error(String(e)), "warning"); }
-  if (!els.galleryFull.classList.contains("hidden")) gallery.refresh();
+  diagNote("sync", `unsynced paintings after sign-in/online: ${n} → notice`);
+  if (!els.galleryFull.classList.contains("hidden")) gallery.setAttentionOnly(true);   // 已经在图库里：直接切到「要处理的」
+  showNotice({
+    id: "unsynced", text: `${t("pushAll.askTitle", { n: String(n) })} ${t("pushAll.askMsg")}`,
+    actions: [{ label: t("pushAll.ok"), primary: true, onClick: () => { void setGalleryOpen(true).then(() => gallery.setAttentionOnly(true)); } }],
+  });
 }
 // auth 可观察 seam（候选1）：接缝 app-store 在**每个** auth 转变（登录回来/后台silent/登出/过期F2）fire wp:auth-changed（库 0.1.0 起不碰 window 事件，接缝订阅 onAuthChanged 转发）。
 // UI 订阅一次 → 按钮蓝/灰、save 图标、云列表 全自动同步，永不漂移、不再靠散落手 poke。
