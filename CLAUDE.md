@@ -31,10 +31,12 @@ Procreate 级绘画 PWA。UI 中文。iPad 是手感的最终裁判。
 | `src/device-rack-slot.ts` | IDB `weebpaint-bd6cece69075d759.device-rack` | 无库笔架单槽——四等 |
 | `src/device-kv.ts` | localStorage `weebpaint-bd6cece69075d759:*` | device 层标量唯一器官（resume-slate / 黑匣子 / 偏好）——四等；`theme-guard.js` 首帧前只读主题键；`src/boot-snapshot.ts` 清扫旧键 `weebpaint.boot.lang` |
 | `src/store-absent.ts` | localStorage 探针 + `weebpaint.nostore` | 缺席平台探测 / dev 开关 |
+| `src/instance-locks.ts` | Web Locks `weebpaint-bd6cece69075d759.doc-lock:<gallery-id>:<相对path>`（2026-11-03 加前缀 token） | 双实例互认（建议性护栏，不是存储）；BroadcastChannel 现在零个，要开先登记带前缀的名字（同一个测试守） |
 | `service-worker.js` + `src/shell-reset.ts` | Cache Storage `weebpaint-<hash>` | app 壳；强制更新 / 还原出厂只动自己前缀、只注销自己的 SW（家族 2026-10-01） |
 | `src/factory-reset.ts` | 以上全部（删） | 还原出厂 = 变成新的（家族 2½）：库的 wipeAppNamespace（typed consent）+ 自家 GUID 库 + 壳 → reload |
 | `vendor/msal/msal-browser.min.js` | IDB / localStorage / sessionStorage | MSAL token 缓存，由库的 auth 配置驱动 |
 
+- **部署方式只认一次**（2026-11-03 家族规则书 `../ai-docs/20261103-three-shapes-rulebook.md` §1 第 9 条 / §2，工单 B；added by Claude Opus 5.5）：「装在哪 / 被套着没有」只问 `src/deployment.ts`（官网 / itch / 备用版 = site / itch / local；itch 那份由 `scripts/pack-standalone.mjs` 往 index.html 烤 `<meta name="deployment" content="itch" />`），「给不给某功能」只问 `src/deployment-policy.ts` 的开关（网盘 / 文件夹图库 / 记住口令 + 共桶披露 / 离线壳 / 去官网）。别处不许看 `location.protocol` / `window.top` / 那个标记；加开关 = 改表 + 改 `test/deployment-guard.test.mjs` + 接真消费者（没读者的开关测试红）。官网网址只在 `src/config.ts` 的 `SITE_URL`，前缀 token 只在 `APP_NS`。`isStandaloneHtml()` 只回答「资产内嵌了没」。
 - `journal/cached feedback.md` = 人类专属反馈日志，AI 只读，永不写。
 - **宣发（launch）已分仓（2026-08-21）**：素材源件 + 宣发工单 + 台账在兄弟目录 `../20260821 WeebPaint宣发/`（私有孵化仓）。B1-B4 前置工单、itch/og/截图交付槽位表、图片素材工单**都在那边**，本仓 ai-docs 已不再持有（`20260821-launch-prep-workorders.md` 已迁出）。起手读那仓的 `ai-docs/20260821-material-inventory-and-doc-index.md`。本仓仍持有的宣发相关件：`ai-docs/20260821-icon-tiers.md`（图标档位+两条别再踩回去的线）、图标输出档（`icon-*.png` / `icon.svg` 的 SSoT 在本仓根，美术 `.ora` 源在宣发仓）。
 - 人类钉死的区域：手感（streamline/taper/压感 gamma）、UI/UX 决策、store model。其余按 greenfield 标准大胆重构。

@@ -15,6 +15,7 @@
 // 结构：契约逻辑（拒删/原子领养/单帧覆盖）走 CrashKV port → node 可测（Map 假件）；
 //   IDB 适配器只做搬运，原子性落在 port 的 take（get+delete 同事务，防双领养）。
 
+import { APP_NS } from "./config.ts";   // 自家前缀 token（仓里一处常量；值 = "weebpaint-bd6cece69075d759" 不变）
 export type LuggageTag = string;
 export type CrashRecordState = "crash" | "pending-adoption";
 
@@ -83,7 +84,7 @@ export function createCrashStore(kv: CrashKV): CrashStore {
 
 // ─── IDB 适配器（浏览器；node 测试用 Map 假件替代本段）────────────────────
 // 库名带 GUID 命名空间前缀（verdicts §2.9：file:// 共桶防撞；纪律：永不枚举非自己前缀的库）。
-const DB_NAME = "weebpaint-bd6cece69075d759.crash";
+const DB_NAME = `${APP_NS}.crash`;
 const STORE = "records";   // key = 行李牌 tag
 
 let _dbPromise: Promise<IDBDatabase> | null = null;

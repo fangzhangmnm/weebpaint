@@ -11,6 +11,7 @@
 //   setItem 同步改内存 + 同步 fire onChange + 400ms 防抖落盘；deleteItem = 真删（无跨设备墓碑需求）；
 //   getInitData 只在槽**空**时 seed（同 collection eager-seed 约定：内置笔即刻可用）。
 import type { RackPersistence, RackEntry } from "./brush-rack-controller.ts";   // 脑定义 port（type-only，无运行时环）
+import { APP_NS } from "./config.ts";   // 自家前缀 token（仓里一处常量；值 = "weebpaint-bd6cece69075d759" 不变）
 
 /** 槽的持久化 kv（注入口给 node 测试；prod 默认 = IDB 单键实现）。 */
 export interface RackSlotKv {
@@ -18,7 +19,7 @@ export interface RackSlotKv {
   put(v: { items: { id: string; uat: number; value: unknown }[] }): Promise<void>;
 }
 
-const DB_NAME = "weebpaint-bd6cece69075d759.device-rack";
+const DB_NAME = `${APP_NS}.device-rack`;
 const STORE = "slot";
 const KEY = "rack";
 

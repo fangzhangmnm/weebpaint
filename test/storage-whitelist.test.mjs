@@ -4,7 +4,7 @@
 //   新文件一碰持久层就红——想加就来这里登记并同步 CLAUDE.md「持久层白名单」表。created 2026-10-21 by Claude Fable 5.1
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { describe, it, assert } from "./runner.mjs";
+import { describe, it, eq, assert } from "./runner.mjs";
 
 const ALLOW = {
   "src/storage.ts": "IDB `weebpaint`（裸名）：gallery-thumbs / image-thumbs 缩略图派生缓存 + checkpoint-ring（revert 快照环）；全删可再生 / 可丢（二等）",
@@ -61,5 +61,62 @@ describe("storage-whitelist", () => {
       for (const [name, allowed] of Object.entries(LIB_HANDLES)) if (new RegExp(`\\b${name}\\b`).test(code) && !allowed.includes(p)) bad.push(`${p}: ${name}`);
     }
     assert(bad.length === 0, "library-held IndexedDB handle used outside its seam:\n" + bad.join("\n"));
+  });
+});
+
+// ---- 2026-11-03 家族规则书 §1 第 3 条 / §4 第 2 项（工单 B 第 4 步，Claude Opus 5.5）：锁名、广播频道名、SW 也只用自家名字 ----
+//   itch 上所有网页游戏共一个源、Chromium 里所有双击打开的网页共一个桶：锁管理器 / BroadcastChannel / SW 注册都是这个源里共用的，
+//   裸名（"weebpaint-doc:"）会和别人撞。前缀 token = src/config.ts 的 APP_NS（仓里一处字面量）。
+const { APP_NS } = await import("../src/config.ts");
+const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/(^|\s)\/\/.*$/, "")).join("\n");
+const SRC_FILES = () => [...walk("src")].map((p) => p.replace(/\\/g, "/"));
+const LIB_FILES = () => { try { return [...walk("node_modules/@internal")].map((p) => p.replace(/\\/g, "/")); } catch { return []; } };
+
+describe("storage-whitelist · 自家前缀（锁 / 频道 / SW）", () => {
+  it("前缀 token 在 src 里只有 config.ts 一处字面量；theme-guard.js 照抄的那份和它一致", () => {
+    eq(APP_NS, "weebpaint-bd6cece69075d759");
+    const bad = SRC_FILES().filter((p) => p !== "src/config.ts" && stripComments(readFileSync(p, "utf8")).includes(APP_NS));
+    assert(bad.length === 0, "APP_NS literal outside src/config.ts (import it instead):\n" + bad.join("\n"));
+    const tg = stripComments(readFileSync("theme-guard.js", "utf8"));
+    const m = tg.match(/localStorage\.getItem\("([^"]+):pref:color-theme"\)/);
+    assert(m && m[1] === APP_NS, "theme-guard.js theme key must be `${APP_NS}:pref:color-theme` (device-kv prefix)");
+  });
+  // 用 Web Locks 的文件：每个都登记、写明锁名长什么样；锁名一律经 _key()（= `${APP_NS}.doc-lock:` + gallery-id + 相对 path）。
+  const LOCKS = { "src/instance-locks.ts": "`${APP_NS}.doc-lock:<gallery-id>:<相对path>`（双实例互认，建议性护栏）" };
+  it("navigator.locks 只在登记过的文件里用，锁名带自家前缀", () => {
+    const bad = [];
+    for (const p of [...SRC_FILES(), ...LIB_FILES()]) {
+      const c = stripComments(readFileSync(p, "utf8"));
+      if (/\bnavigator\.locks\b|\blocks\.(request|query)\s*\(/.test(c) && !(p in LOCKS)) bad.push(p);
+    }
+    assert(bad.length === 0, "Web Locks used outside the registry (register the lock name with the APP_NS prefix here):\n" + bad.join("\n"));
+    const il = stripComments(readFileSync("src/instance-locks.ts", "utf8"));
+    assert(/const LOCK_PREFIX = `\$\{APP_NS\}\.doc-lock:`;/.test(il), "LOCK_PREFIX must be `${APP_NS}.doc-lock:`");
+    const requests = (il.match(/\blocks\.request\s*\(/g) || []).length, keyed = (il.match(/\blocks\.request\s*\(\s*_key\(/g) || []).length;
+    assert(requests > 0 && requests === keyed, `every locks.request must take _key(...) (requests ${requests}, keyed ${keyed})`);
+    assert(/const _key = [^\n]*=> `\$\{LOCK_PREFIX\}/.test(il), "_key() must start with LOCK_PREFIX");
+  });
+  // BroadcastChannel：现在一个都没有（本仓 + @internal 库）。要开就来这里登记名字，名字必须以 APP_NS 开头。
+  const CHANNELS = {};
+  it("new BroadcastChannel(...) 只在登记过的文件里、名字带自家前缀（现状：零个）", () => {
+    const bad = [];
+    for (const p of [...SRC_FILES(), ...LIB_FILES()]) {
+      const c = stripComments(readFileSync(p, "utf8"));
+      if (/\bnew\s+BroadcastChannel\s*\(/.test(c) && !(p in CHANNELS)) bad.push(p);
+    }
+    assert(bad.length === 0, "BroadcastChannel opened without a registered APP_NS-prefixed name:\n" + bad.join("\n"));
+  });
+  // SW：scope 是网址路径不是名字——在共用源（itch / 双击）上根本不注册（policy.serviceWorker = false，test/deployment-guard 钉表）；
+  //   官网上注册相对 ./service-worker.js、不另给 scope（= app 自己那一层目录，/ 或 /dev/）；壳缓存名按家族命名规矩 `weebpaint-<hash>`、只动自己前缀。
+  it("SW：只在 pwa-shell 注册、门上挂 policy.serviceWorker、不给 scope、壳缓存名都是 weebpaint- 开头", () => {
+    const regs = SRC_FILES().filter((p) => /serviceWorker\.register\s*\(/.test(stripComments(readFileSync(p, "utf8"))));
+    eq(regs.join(","), "src/pwa-shell.ts");
+    const ps = stripComments(readFileSync("src/pwa-shell.ts", "utf8"));
+    assert(/if \(currentPolicy\(\)\.serviceWorker && [^\n]*\n[\s\S]*?serviceWorker\.register\("\.\/service-worker\.js"\)/.test(ps), "register must sit behind currentPolicy().serviceWorker and use the relative script with no scope option");
+    assert(!/serviceWorker\.register\([^)]*scope/.test(ps), "no explicit scope");
+    const sw = stripComments(readFileSync("service-worker.js", "utf8"));
+    const names = [...sw.matchAll(/CACHE_NAME = (["`])([^"`]*)\1/g)].map((m) => m[2]);
+    assert(names.length >= 2 && names.every((n) => n.startsWith("weebpaint-")), "every CACHE_NAME assignment starts with weebpaint- : " + names.join(", "));
+    for (const m of sw.matchAll(/caches\.keys\(\)\)?\.filter\(\(k\) => ([^\n]+)/g)) assert(/k\.startsWith\("weebpaint-"\)/.test(m[1]), "caches.keys() must be filtered to our own prefix: " + m[1]);
   });
 });

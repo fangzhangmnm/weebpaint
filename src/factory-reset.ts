@@ -18,11 +18,12 @@ import { openConfirmSheet, openInputSheet } from "./sheets.ts";
 import { clearOwnShell } from "./shell-reset.ts";   // 2026-10-21：变成新的 = 数据 + 自己的离线壳一起清（统筹转述 user「点了之后变成新的」）
 import { t } from "./i18n/index.ts";
 import { reportError } from "./error-badge.ts";
+import { APP_NS } from "./config.ts";   // 自家前缀 token（仓里一处常量；值 = "weebpaint-bd6cece69075d759" 不变）
 
 const APP_ID = "weebpaint";
 const BARE_APP_DB = "weebpaint";                              // storage.ts：缩略图缓存 + checkpoint ring
-const GUID_DB_PREFIX = "weebpaint-bd6cece69075d759.";         // crash / gallery-registry（verdicts §2.9 命名空间）
-const GUID_LS_PREFIX = "weebpaint-bd6cece69075d759:";         // device-kv（P5 器官）
+const GUID_DB_PREFIX = `${APP_NS}.`;         // crash / gallery-registry（verdicts §2.9 命名空间）
+const GUID_LS_PREFIX = `${APP_NS}:`;         // device-kv（P5 器官）
 const BLOCKED_TIMEOUT_MS = 2000;
 
 const _isOurDb = (name: string) => name === BARE_APP_DB || name.startsWith(GUID_DB_PREFIX);

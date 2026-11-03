@@ -11,7 +11,7 @@
 //   · isDocLockedElsewhere(name) —— query() 查该 doc 的锁是否被**别的** browsing context 持有。
 //
 // 命名契约：调用方统一传 **app 层裸 session 名**（sessionBareName 归一化后同款；裸名↔全名一一对应，
-//   锁身份等价）。锁名 = "weebpaint-doc:<gallery-id>:<相对path>"（P3 锁名改造，verdicts §2.5 拍板：
+//   锁身份等价）。锁名 = "weebpaint-bd6cece69075d759.doc-lock:<gallery-id>:<相对path>"（2026-11-03 加前缀 token；P3 锁名改造，verdicts §2.5 拍板：
 //   防将来多 gallery 同 path 假阳性互锁；P3 registry 铸 id 前 gallery-id 恒 SOLE_GALLERY_ID）。
 //   ⚠ 升级过渡窗：旧 bundle tab 持旧格式锁（无 gallery-id 段）→ 新旧互不识别，dev 渠道可接受。
 //
@@ -21,8 +21,11 @@
 
 import { reportError } from "./error-badge.ts";
 import { activeGalleryId } from "@internal/gallery";
+import { APP_NS } from "./config.ts";   // 自家前缀 token（仓里一处常量；值 = "weebpaint-bd6cece69075d759" 不变）
 
-const LOCK_PREFIX = "weebpaint-doc:";
+// 2026-11-03（家族规则书 §1 第 3 条 / 工单 B 第 4 步，Claude Opus 5.5）：锁名也带自家前缀 token——itch 上所有游戏、Chromium 里所有双击打开的网页
+//   共一个锁管理器，"weebpaint-doc:" 这种裸名会撞车。旧 bundle 的 tab 持旧名锁 → 升级过渡窗新旧互不认（建议性护栏，同 P3 锁名改造的口径）。
+const LOCK_PREFIX = `${APP_NS}.doc-lock:`;
 // P3：锁名 = gallery-id:相对path（verdicts §2.5——防跨 gallery 假阳性互锁）。当前 gallery id 的
 //   唯一真相 = active-gallery.ts（attachment 器官是唯一写手）；未挂/legacy = SOLE_GALLERY_ID（零迁移）。
 const _key = (name: string, galleryId: string = activeGalleryId()) => `${LOCK_PREFIX}${galleryId}:${name}`;

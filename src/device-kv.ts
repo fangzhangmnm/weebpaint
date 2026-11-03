@@ -7,7 +7,8 @@
 //   （survey §5.3；本 session 内行为完整，只是不跨刷新——无地拍板接受）。
 // key 前缀带 GUID 命名空间（verdicts §2.9 同源：file:// 共桶防撞；纪律：永不碰非自己前缀的键）。
 
-const PREFIX = "weebpaint-bd6cece69075d759:";
+import { APP_NS } from "./config.ts";   // 自家前缀 token（仓里一处常量；值 = "weebpaint-bd6cece69075d759" 不变）
+const PREFIX = `${APP_NS}:`;
 
 // 降级内存层：localStorage 不可用时的 session 级兜底（读写都走它，保证同 session 一致）。
 const _mem = new Map<string, string>();
