@@ -1,6 +1,8 @@
 import { createOneDriveProvider } from "@internal/store";
 import type { RackPersistence } from "./brush-rack-controller.ts";
 import type { Store } from "@internal/store";
+/** 为什么没存储（null = 在场）：只探一次，storeAbsent 和「这个浏览器存不住」那句（site-hint）共用这一份。 */
+export declare const storeAbsentReason: import("./store-absent.ts").StoreAbsentReason;
 export declare const storeAbsent: boolean;
 type _Auth = ReturnType<typeof createOneDriveProvider>["auth"];
 export declare const cloudEnabled: boolean;

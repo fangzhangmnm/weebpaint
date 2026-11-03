@@ -5904,6 +5904,42 @@ export declare const S: {
         readonly ja: "ファイルを直接開いた状態（file://）では Microsoft サインインは使えません——ローカル http 環境が必要です。このファイルのフォルダーでターミナルを開き、\n\n    python -m http.server 8000\n\nを実行し、ブラウザで http://localhost:8000/{file} を開いてから OneDrive に接続してください。（ローカルフォルダーのギャラリーはそのまま使えます。）";
         readonly tok: "lipu li open tan ilo la sina ken ala kepeken OneDrive. o open e ilo toki lon poki pi lipu ni. o kepeken: python -m http.server 8000. o open e http://localhost:8000/{file}. poki lipu li ken awen.";
     };
+    readonly "rn.title": {
+        readonly zh: "「{name}」云端那份和这台的对不上";
+        readonly en: "“{name}”: the cloud copy does not match this device";
+        readonly ja: "「{name}」：クラウドの版がこの端末と合いません";
+        readonly tok: "{name}: lipu lon kon li sama ala lipu lon ilo ni";
+    };
+    readonly "rn.body.diverged": {
+        readonly zh: "你要把「{from}」改名成「{to}」，但云端的「{from}」被别的设备改过、这台的改动还没传上去。新名字「{to}」会传上去；云端那份旧的要搬进回收站（能恢复），还是留着（两份都在）？";
+        readonly en: "You are renaming “{from}” to “{to}”, but the cloud copy of “{from}” was changed on another device and this device's edits are not uploaded. “{to}” will be uploaded; should the old cloud copy go to the trash (recoverable) or stay (both kept)?";
+        readonly ja: "「{from}」を「{to}」に改名しますが、クラウドの「{from}」は別の端末で変更されており、この端末の変更は未送信です。「{to}」は送信します。クラウドの旧版はゴミ箱へ（復元可）、それとも残しますか（両方残る）？";
+        readonly tok: "sina ante e nimi {from} tawa {to}. taso ilo ante li ante e {from} lon kon, en ilo ni li pana ala e ante sina. mi pana e {to}. lipu majuna lon kon li tawa poki weka (sina ken kama jo sin e ona) anu awen (lipu tu li lon)?";
+    };
+    readonly "rn.body.unknown": {
+        readonly zh: "你要把「{from}」改名成「{to}」，但这台不知道自己这份是从云端哪一版改出来的。新名字「{to}」会传上去；云端那份旧的要搬进回收站（能恢复），还是留着（两份都在）？";
+        readonly en: "You are renaming “{from}” to “{to}”, but this device cannot tell which cloud version its copy came from. “{to}” will be uploaded; should the old cloud copy go to the trash (recoverable) or stay (both kept)?";
+        readonly ja: "「{from}」を「{to}」に改名しますが、この端末の版がクラウドのどの版から来たのか分かりません。「{to}」は送信します。クラウドの旧版はゴミ箱へ（復元可）、それとも残しますか（両方残る）？";
+        readonly tok: "sina ante e nimi {from} tawa {to}. taso ilo ni li sona ala e ni: lipu ni li kama tan lipu seme lon kon. mi pana e {to}. lipu majuna lon kon li tawa poki weka (sina ken kama jo sin e ona) anu awen (lipu tu li lon)?";
+    };
+    readonly "rn.note": {
+        readonly zh: "搬进回收站不是删除，随时能恢复。取消 = 不改名，什么都不动。";
+        readonly en: "Trash is not delete; it can be restored any time. Cancel = no rename, nothing changes.";
+        readonly ja: "ゴミ箱は削除ではなく、いつでも復元できます。キャンセル＝改名せず何も変えません。";
+        readonly tok: "poki weka li weka ala: sina ken kama jo sin e ona. o pini = nimi li ante ala, ala li ante.";
+    };
+    readonly "rn.act.trash": {
+        readonly zh: "搬走旧的（进回收站）";
+        readonly en: "Move the old one to trash";
+        readonly ja: "旧版をゴミ箱へ";
+        readonly tok: "o pana e lipu majuna tawa poki weka";
+    };
+    readonly "rn.act.keep": {
+        readonly zh: "留着旧的";
+        readonly en: "Keep the old one";
+        readonly ja: "旧版を残す";
+        readonly tok: "o awen e lipu majuna";
+    };
     readonly "gm.cloudOnSiteSub": {
         readonly zh: "去官网 {site}";
         readonly en: "Use it at {site}";
@@ -5927,6 +5963,18 @@ export declare const S: {
         readonly en: "This copy can't use cloud drives: keep works in a local folder gallery or save them as downloaded files. The full version is at {site}.";
         readonly ja: "このコピーはクラウドを使えません。作品はローカルフォルダーのギャラリーか、ダウンロードしたファイルに保存できます。完全版は {site}。";
         readonly tok: "lipu ni li ken ala kepeken poki kon. sitelen sina li ken awen lon poki lipu pi ilo sina. ilo ale li lon {site}.";
+    };
+    readonly "boot.storageBlocked": {
+        readonly zh: "这个浏览器我们没测过：在这里存不住设置和崩溃备份（关页就没了），作品记得存成文件。遇到问题请到 {issues} 告诉我们。";
+        readonly en: "We haven't tested this browser: it can't keep settings or crash backups here (they're gone when you close the page), so save your work as files. Please report problems at {issues}.";
+        readonly ja: "このブラウザは未検証です。ここでは設定とクラッシュ時のバックアップを保存できません（ページを閉じると消えます）。作品はファイルとして保存してください。問題は {issues} へお知らせください。";
+        readonly tok: "mi lukin ala e ilo lukin ni. lon ni la ona li ken ala awen e nasin sina e lipu pi pakala (sina pini e lipu la ona li weka). o awen e sitelen sina lon lipu. ike li lon la o toki tawa mi lon {issues}.";
+    };
+    readonly "boot.reportIssue": {
+        readonly zh: "去报告";
+        readonly en: "Report";
+        readonly ja: "報告する";
+        readonly tok: "o toki";
     };
     readonly "gm.srcFolder": {
         readonly zh: "本地文件夹";

@@ -1,4 +1,6 @@
 import type { CheckpointRecord } from "./checkpoint-policy.ts";
+/** 2026-11-03 之前的库名。同源的老 bundle（正式版没升级之前）还会继续写它 → 搬家要能一遍遍重复跑。 */
+export declare const LEGACY_DB_NAME = "weebpaint";
 export declare function getThumb(key: string): Promise<unknown>;
 export declare function setThumb(key: string, value: unknown): Promise<void>;
 export declare function deleteThumb(key: string): Promise<void>;
@@ -23,3 +25,20 @@ export declare function ringDelete(ids: string[]): Promise<void>;
 /** 按 docKey 清整份 ring（改名/删除作品、file 家正常关闭随行李牌焚）。 */
 export declare function ringDeleteByDoc(docKey: string): Promise<void>;
 export { type CheckpointTrigger as RingTrigger };
+export type LegacyAppDbMigration = {
+    outcome: "none";
+} | {
+    outcome: "migrated";
+    moved: Record<string, number>;
+    copied: Record<string, number>;
+} | {
+    outcome: "kept";
+    why: string;
+    moved: Record<string, number>;
+    copied: Record<string, number>;
+};
+/** 把老库 `weebpaint` 的「回到之前」历史搬进新库，全部核过才删老库。没有老库 = 什么都不建（outcome "none"）。 */
+export declare function migrateLegacyAppDb(opts?: {
+    idb?: IDBFactory;
+    blockedTimeoutMs?: number;
+}): Promise<LegacyAppDbMigration>;
