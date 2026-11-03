@@ -21,7 +21,8 @@ import { reportError } from "./error-badge.ts";
 import { APP_NS } from "./config.ts";   // 自家前缀 token（仓里一处常量；值 = "weebpaint-bd6cece69075d759" 不变）
 
 const APP_ID = "weebpaint";
-const BARE_APP_DB = "weebpaint";                              // storage.ts：缩略图缓存 + checkpoint ring
+const BARE_APP_DB = "weebpaint";                              // storage.ts 2026-11-03 之前的裸名库（缩略图 + checkpoint ring）；新库 `${APP_NS}.app` 走下面的前缀。
+                                                              //   老 bundle（同源的正式版）还会写它 → 还原出厂照样一起删
 const GUID_DB_PREFIX = `${APP_NS}.`;         // crash / gallery-registry（verdicts §2.9 命名空间）
 const GUID_LS_PREFIX = `${APP_NS}:`;         // device-kv（P5 器官）
 const BLOCKED_TIMEOUT_MS = 2000;
@@ -50,7 +51,7 @@ function _listOurLsKeys(): string[] {
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k && k.startsWith(GUID_LS_PREFIX)) out.push(k);
+      if (k && (k.startsWith(GUID_LS_PREFIX) || k.startsWith(GUID_DB_PREFIX))) out.push(k);   // `${APP_NS}:`（device-kv）+ `${APP_NS}.`（2026-11-03 起的开关键 / 探针键）
     }
   } catch { /* file:// Safari 等：localStorage 访问器可抛 → 无键可清 */ }
   return out;

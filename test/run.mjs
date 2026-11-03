@@ -35,6 +35,7 @@ import "./iso-frame.test.mjs";         // isometric 透视模式：纯平行三�
 import "./page-title.test.mjs";        // 网页标题只是 WeebPaint（user 2026-10-14）
 import "./deployment-guard.test.mjs";  // 部署方式只认一次 + policy = 家族规则书 §2 逐格 + 每个开关有消费者 + SITE_URL 一处（2026-11-03 工单 B）
 import "./store-ui-rename-old.test.mjs"; // store 2.2.2 改名面：照抄 gallery 三句、人没点不回答、库在等答案时不动旧的（2026-11-03 工单 B2）
+import "./legacy-app-db.test.mjs";      // 老库 weebpaint → 带前缀新库的一次性搬家：条数相等、老库删、没老库不建、可重复跑、失败留着（2026-11-03 工单 B2）
 import "./cpu-tile-pool.test.mjs";
 import "./soft-gl2-port.test.mjs";   // C8 SoftGl2Port：真消费类（栅格/合成/烤定）无 GL 跑通 + 对表纪律
 import "./fill-lockalpha.test.mjs";  // v0.9.12 lockAlpha 真 atop：α 不动/α=0 不写隐形色/erase 不受锁（fill 像素路径首次进 npm test）

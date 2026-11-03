@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { describe, it, eq, assert } from "./runner.mjs";
 const { policy } = await import("../src/deployment-policy.ts");
 const { classifyDeployment, deployment, embedded, localFileName, DEPLOYMENT_META } = await import("../src/deployment.ts");
-const { SITE_URL, SITE_HOST } = await import("../src/config.ts");
+const { SITE_URL, SITE_HOST, ISSUES_URL, ISSUES_HOST } = await import("../src/config.ts");
 
 function* walk(dir) { for (const f of readdirSync(dir)) { const p = join(dir, f); if (statSync(p).isDirectory()) yield* walk(p); else if (/\.(ts|js|mjs)$/.test(f) && !f.endsWith(".d.ts")) yield p.replace(/\\/g, "/"); } }
 // 剥注释（块注释 + 行注释；行注释只剥 `//` 前面是行首或空白的，URL 里的 // 在字符串里不剥）
@@ -88,6 +88,14 @@ describe("SITE_URL · 一处", () => {
     eq(SITE_URL, "https://weebpaint.com"); eq(SITE_HOST, "weebpaint.com");
     const bad = SRC.filter((p) => p !== "src/config.ts" && /weebpaint\.com/.test(code(p)));
     assert(bad.length === 0, "site URL literal outside src/config.ts:\n" + bad.join("\n"));
+  });
+  it("④ 报告入口 ISSUES_URL 也只在 src/config.ts（2026-11-03 工单 B2；「浏览器不给存」那句插值 {issues}，四种语言都带）", async () => {
+    eq(ISSUES_URL, "https://github.com/fangzhangmnm/weebpaint/issues"); eq(ISSUES_HOST, "github.com/fangzhangmnm/weebpaint/issues");
+    // 只认 issues 这条（.ora 的 XML 命名空间 https://github.com/fangzhangmnm/weebpaint/ns 是格式契约，不是网址，不归这里管）
+    const bad = SRC.filter((p) => p !== "src/config.ts" && /github\.com\/fangzhangmnm\/weebpaint\/issues/.test(code(p)));
+    assert(bad.length === 0, "issues URL literal outside src/config.ts:\n" + bad.join("\n"));
+    const { S } = await import("../src/i18n/strings.ts");
+    for (const lang of ["zh", "en", "ja", "tok"]) assert(S["boot.storageBlocked"]?.[lang]?.includes("{issues}"), `boot.storageBlocked.${lang} must interpolate {issues}`);
   });
   it("「去官网」那几句都带 {site} 占位（四种语言）", async () => {
     const { S } = await import("../src/i18n/strings.ts");

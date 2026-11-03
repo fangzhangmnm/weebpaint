@@ -1,6 +1,6 @@
 // 单文件两种形态的 headless smoke（Chromium；playwright 档，不进 npm test 硬线）。
 // created 2026-08-27 by Claude Fable 5（file: 形）· 2026-11-03 Claude Opus 5.5 加 itch 形（家族规则书 §4 第 9 项 / 工单 B 第 5 步）
-// 用法：bash scripts/build-standalone.sh && node tools/standalone-smoke.mjs [site|local|itch]（不给 = 三个都跑）
+// 用法：bash scripts/build-standalone.sh && node tools/standalone-smoke.mjs [site|local|local-blocked|itch]（不给 = 全跑）
 //   site = 官网形态对照（仓根经 http://127.0.0.1 服 index.html，同 tools/preflight/harness.mjs）：网盘入口是真入口、不灰、没有开局一行——「不退化」那一列。
 //
 // 两种形态 = 家族规则书 §2 的两列（同一份字节，itch 那份 <head> 多烤一行部署标记，scripts/pack-standalone.mjs 第 7 步）：
@@ -216,14 +216,81 @@ async function runSite(browser) {
   if (p.deploymentMeta !== null) fail(shape, "官网不该有 itch 标记");
   if (!p.cloudEntry || p.cloudEntryGrey) fail(shape, "官网的「连接 OneDrive…」应是真入口（在、不灰）");
   if (p.siteHint) fail(shape, "官网不该出开局一行");
+
+  // 老库搬家（2026-11-03 工单 B2；src/storage.ts migrateLegacyAppDb，开机后空闲片里跑）——真 Chromium 里核同一段代码：
+  //   ① 首启（新 context）不长出裸名库 `weebpaint`；② 塞一个老库（4 个 store，ring 2 条 + 单槽 1 条 + 缩略图 1 条）→ 重开 →
+  //   新库 `<APP_NS>.app` 里 ring 2 / 单槽 1 / 缩略图 0，老库没了。（测试这边枚举库名是为了核，app 代码里不枚举。）
+  const NEW_DB = "weebpaint-bd6cece69075d759.app";
+  const dbNames = () => page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name).sort());
+  await settle(1500);
+  const freshNames = await dbNames();
+  p.freshHasBareDb = freshNames.includes("weebpaint");
+  await page.evaluate(() => new Promise((res, rej) => {
+    const r = indexedDB.open("weebpaint", 5);
+    r.onupgradeneeded = () => { for (const s of ["gallery-thumbs", "image-thumbs", "checkpoints", "checkpoint-ring"]) r.result.createObjectStore(s); };
+    r.onerror = () => rej(r.error);
+    r.onsuccess = () => {
+      const db = r.result, tx = db.transaction(["gallery-thumbs", "checkpoints", "checkpoint-ring"], "readwrite");
+      tx.objectStore("gallery-thumbs").put({ t: 1 }, "猫.ora");
+      tx.objectStore("checkpoints").put({ v: 1, bytes: new Blob(["cp"]) }, "猫.ora:open");
+      for (const id of ["smoke-r1", "smoke-r2"]) tx.objectStore("checkpoint-ring").put({ id, docKey: "猫.ora", at: Date.now(), trigger: "open", size: 2, bytes: new Blob([id]) }, id);
+      tx.oncomplete = () => { db.close(); res(); };
+      tx.onerror = () => rej(tx.error);
+    };
+  }));
+  await page.reload({ waitUntil: "load" });
+  let names = [];
+  for (let i = 0; i < 40; i++) { await settle(500); names = await dbNames(); if (!names.includes("weebpaint") && names.includes(NEW_DB)) break; }
+  p.migratedNames = names;
+  p.migratedCounts = await page.evaluate((db) => new Promise((res) => {
+    const r = indexedDB.open(db);
+    r.onsuccess = () => {
+      const d = r.result, out = {};
+      const st = ["checkpoint-ring", "checkpoints", "gallery-thumbs"].filter((n) => d.objectStoreNames.contains(n));
+      const tx = d.transaction(st, "readonly");
+      for (const n of st) { const q = tx.objectStore(n).count(); q.onsuccess = () => { out[n] = q.result; }; }
+      tx.oncomplete = () => { d.close(); res(out); };
+    };
+    r.onerror = () => res(null);
+  }), NEW_DB);
+  console.log(`[${shape}] migration: ` + JSON.stringify({ freshHasBareDb: p.freshHasBareDb, names: p.migratedNames, counts: p.migratedCounts }));
+  if (p.freshHasBareDb) fail(shape, "首启长出了裸名库 weebpaint（搬家探测不该建库）: " + freshNames.join(","));
+  if (names.includes("weebpaint")) fail(shape, "老库 weebpaint 没被搬走删掉: " + names.join(","));
+  const c = p.migratedCounts || {};
+  if (c["checkpoint-ring"] !== 2 || c["checkpoints"] !== 1) fail(shape, "新库里「回到之前」历史条数不对: " + JSON.stringify(c));
+  if (c["gallery-thumbs"] !== 0) fail(shape, "缩略图不该搬（新库里重建）: " + JSON.stringify(c));
   if (errors.length) fail(shape, "页面错误：\n" + errors.join("\n"));
   await context.close(); srv.close();
+}
+
+// 浏览器不给存（Safari 双击打开的样子；2026-11-03 工单 B2，规则书 §1 第 12 条）：Chromium 里模拟不了 Safari 本身，
+//   用 init script 让 localStorage 一写就抛 SecurityError——走的是同一条「存储探针炸了 → 只在内存」老路。核：开得起来、
+//   「没测过 + 存不住 + 报告入口」那句在、「去报告」钮在、正文带 issues 地址。
+async function runLocalBlocked(browser) {
+  const shape = "local-blocked";
+  const context = await browser.newContext();
+  await context.addInitScript(() => { Storage.prototype.setItem = function () { throw new DOMException("The operation is insecure.", "SecurityError"); }; });
+  const page = await context.newPage();
+  const errors = [];
+  page.on("pageerror", (e) => errors.push("pageerror: " + e.message));
+  await page.goto("file://" + resolve("dist/weebpaint-standalone.html"), { waitUntil: "load" }); await settle();
+  const p = await page.evaluate(() => {
+    const n = [...document.querySelectorAll("[data-notice-id]")].find((x) => x.dataset.noticeId === "storage-blocked");
+    return { hasCanvas: !!document.querySelector("canvas"), notice: n?.textContent ?? null, reportBtn: !!n && [...n.querySelectorAll("button")].some((b) => /报告|Report|報告|toki/.test(b.textContent || "")) };
+  });
+  console.log(`[${shape}] ` + JSON.stringify(p, null, 2));
+  if (!p.hasCanvas) fail(shape, "白屏（浏览器不给存时也要开得起来）");
+  if (!p.notice?.includes("github.com/fangzhangmnm/weebpaint/issues")) fail(shape, "「没测过 + 存不住 + 报告入口」那句没出（或没带 issues 地址）");
+  if (!p.reportBtn) fail(shape, "没有「去报告」钮");
+  if (errors.length) fail(shape, "页面错误：\n" + errors.join("\n"));
+  await context.close();
 }
 
 const browser = await chromium.launch();
 try {
   if (which === "all" || which === "site") await runSite(browser);
   if (which === "all" || which === "local") await runLocal(browser);
+  if (which === "all" || which === "local-blocked") await runLocalBlocked(browser);
   if (which === "all" || which === "itch") await runItch(browser);
 } finally { await browser.close(); }
 if (failures.length) { console.error(`\nSMOKE FAIL (${failures.length})`); process.exit(1); }

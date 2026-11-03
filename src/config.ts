@@ -13,6 +13,10 @@
 export const SITE_URL = "https://weebpaint.com";
 /** SITE_URL 给人看的那段（「weebpaint.com」）。 */
 export const SITE_HOST = SITE_URL.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+// 报告入口（家族规则书 §1 第 12 条「没验过的明说 + 报告入口」；工单 B2，Fable 2026-11-03）：本仓 GitHub issues。和 SITE_URL 同规矩——
+//   只准在这里出现（test/deployment-guard.test.mjs ④），文案插值 {issues}。消费者 = src/site-hint.ts（浏览器不给存那句）。added by Claude Opus 5.5
+export const ISSUES_URL = "https://github.com/fangzhangmnm/weebpaint/issues";
+export const ISSUES_HOST = ISSUES_URL.replace(/^https?:\/\//, "");
 
 // 自家前缀 token（家族规则书 §1 第 3 条 / §4 第 1 项：库名、键名、锁名、频道名都带它；永不碰、永不枚举别人的前缀）。
 //   仓里只有这一处字面量（test/storage-whitelist.test.mjs 守：src 里别处出现这串 = 红）。theme-guard.js 是首帧前的经典脚本、

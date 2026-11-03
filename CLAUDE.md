@@ -26,11 +26,11 @@ Procreate 级绘画 PWA。UI 中文。iPad 是手感的最终裁判。
 | `@internal/store`（经 `src/app-store.ts`） | IDB `weebpaint.<databaseId>`（2.2.0 起流式暂存区另库 `.staging`，本仓没用）+ localStorage `weebpaint.<databaseId>.*`（含 2.1.4 `internal.upload-session:*` 上传会话记忆） | 作品 / 回收站 / 备份箱 / collections / 同步态——一等；app 只经接缝 |
 | `@internal/gallery`（经 `src/gallery-pkg-init.ts` 配名） | IDB `weebpaint-bd6cece69075d759.gallery-registry` | 这台设备的图库名册（device-local、永不同步；ADR-0024）——四等 |
 | `@internal/encryption`（建 `src/encryption.ts`、递 `src/app.ts`、用 `src/remember-password.ts`） | IDB `weebpaint-bd6cece69075d759.remember` | 在这台设备上记住图库密码（opt-in、≤ 30 天；ADR-0015）——四等 |
-| `src/storage.ts` | IDB `weebpaint`（裸名）：gallery-thumbs / image-thumbs / checkpoint-ring | 缩略图派生缓存 + revert 快照环——全删可再生 / 可丢（二等） |
+| `src/storage.ts` | IDB `weebpaint-bd6cece69075d759.app`：gallery-thumbs / image-thumbs / checkpoint-ring / checkpoints（2026-11-03 起；之前叫裸名 `weebpaint`，开机后空闲片里一次性把快照搬过来、核过才删老库，`src/legacy-app-db.ts`） | 缩略图派生缓存 + revert 快照环——全删可再生 / 可丢（二等） |
 | `src/crash-store.ts` | IDB `weebpaint-bd6cece69075d759.crash` | T-crash 崩溃快照——二等 |
 | `src/device-rack-slot.ts` | IDB `weebpaint-bd6cece69075d759.device-rack` | 无库笔架单槽——四等 |
 | `src/device-kv.ts` | localStorage `weebpaint-bd6cece69075d759:*` | device 层标量唯一器官（resume-slate / 黑匣子 / 偏好）——四等；`theme-guard.js` 首帧前只读主题键；`src/boot-snapshot.ts` 清扫旧键 `weebpaint.boot.lang` |
-| `src/store-absent.ts` | localStorage 探针 + `weebpaint.nostore` | 缺席平台探测 / dev 开关 |
+| `src/store-absent.ts` | localStorage 探针 `weebpaint-bd6cece69075d759.storage-probe` + 开关 `weebpaint-bd6cece69075d759.nostore`（2026-11-03 由裸名改来，零迁移：开发开关要重设一次） | 缺席平台探测 / dev 开关 |
 | `src/instance-locks.ts` | Web Locks `weebpaint-bd6cece69075d759.doc-lock:<gallery-id>:<相对path>`（2026-11-03 加前缀 token） | 双实例互认（建议性护栏，不是存储）；BroadcastChannel 现在零个，要开先登记带前缀的名字（同一个测试守） |
 | `service-worker.js` + `src/shell-reset.ts` | Cache Storage `weebpaint-<hash>` | app 壳；强制更新 / 还原出厂只动自己前缀、只注销自己的 SW（家族 2026-10-01） |
 | `src/factory-reset.ts` | 以上全部（删） | 还原出厂 = 变成新的（家族 2½）：库的 wipeAppNamespace（typed consent）+ 自家 GUID 库 + 壳 → reload |

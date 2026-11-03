@@ -1,4 +1,4 @@
-// app 自己的 IndexedDB（库名 `weebpaint`）。**注意和 store 的库分开**：
+// app 自己的 IndexedDB（库名 `weebpaint-bd6cece69075d759.app`；2026-11-03 之前叫裸名 `weebpaint`，见文末「老库搬家」）。**注意和 store 的库分开**：
 //   作品字节在 store 的 `weebpaint.defaultStore` 库（分区 files/trash/backup/collections）；
 //   这里只放 app 专属、store 管不着的东西。
 //
@@ -9,8 +9,13 @@
 //   （sessions —— v415 删；meta —— 2026-07 已删。都别加回来。）
 
 import type { CheckpointRecord } from "./checkpoint-policy.ts";
+import { APP_NS } from "./config.ts";   // 自家前缀 token
 
-const DB_NAME = "weebpaint";
+// 2026-11-03（家族规则书 §1 第 3 条；工单 B2，Fable 裁定「改，带一次性搬家」；Claude Opus 5.5）：裸名 `weebpaint` → 带前缀。
+//   itch 上所有网页游戏共一个源、Chromium 双击打开的网页共一个桶，裸名会和别人撞；而且它就落在 store 自己 `weebpaint.` 命名空间的边上。
+const DB_NAME = `${APP_NS}.app`;
+/** 2026-11-03 之前的库名。同源的老 bundle（正式版没升级之前）还会继续写它 → 搬家要能一遍遍重复跑。 */
+export const LEGACY_DB_NAME = "weebpaint";
 // 版本史：v4（2026-07-18）建 checkpoints + 删 sessions；v5（2026-08-20，cloud-image-picker spec §6）建 image-thumbs。
 // ⚠ v0.9.31（QA ②）起**不再硬编码 DB 版本**：prod（/）和 dev（/dev/）同源共享这个库，
 //   硬编码版本 = dev 升库后旧渠道 open(旧版本号) 直接 VersionError，缩略图/revert 整库打不开。
@@ -26,9 +31,9 @@ const REQUIRED_STORES = [STORE_THUMBS, STORE_IMAGE_THUMBS, STORE_CHECKPOINTS, ST
 
 let _dbPromise: Promise<IDBDatabase> | null = null;
 
-function _openRaw(version?: number): Promise<IDBDatabase> {
+function _openRaw(idb: IDBFactory, version?: number): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = version == null ? indexedDB.open(DB_NAME) : indexedDB.open(DB_NAME, version);
+    const req = version == null ? idb.open(DB_NAME) : idb.open(DB_NAME, version);
     req.onupgradeneeded = (ev) => {
       const db = (ev.target as IDBOpenDBRequest).result;
       for (const s of REQUIRED_STORES) if (!db.objectStoreNames.contains(s)) db.createObjectStore(s);
@@ -44,12 +49,12 @@ function _openRaw(version?: number): Promise<IDBDatabase> {
   });
 }
 
-async function _openAdaptive(): Promise<IDBDatabase> {
-  let db = await _openRaw();                                    // 无版本号：现有库什么版本都打得开
+async function _openAdaptive(idb: IDBFactory = indexedDB): Promise<IDBDatabase> {   // idb 参数只为单测注入假工厂（test/legacy-app-db.test.mjs）
+  let db = await _openRaw(idb);                                 // 无版本号：现有库什么版本都打得开
   if (!REQUIRED_STORES.every((s) => db.objectStoreNames.contains(s))) {
     const next = db.version + 1;                                // 缺 store（新装/新增 store 的版本）→ 最小步升级补建
     db.close();
-    db = await _openRaw(next);
+    db = await _openRaw(idb, next);
   }
   // 别的 tab 要升级时主动让路（旧代码不让路是 onblocked 挂死的根源，新代码别再当拦路者）；
   //   让路后清缓存，下次调用按新版本重开。
@@ -252,3 +257,117 @@ export async function ringDeleteByDoc(docKey: string): Promise<void> {
   await ringDelete(all.filter((r) => r.docKey === docKey).map((r) => r.id));
 }
 export { type CheckpointTrigger as RingTrigger };
+
+// ── 老库搬家（2026-11-03，家族工单 B2；Fable 裁定的规矩逐条照做；added by Claude Opus 5.5）──────────────────────────
+// 搬什么：checkpoint-ring + checkpoints（「回到之前」的历史）；两个缩略图 store 不搬（派生缓存，新库里自己重建）。
+// 规矩：① 不用 indexedDB.databases() 枚举（家规：永不枚举别人的前缀）——老库在不在用「无版本号 open + onupgradeneeded 里
+//   oldVersion === 0 就 abort 这次升级」探：没有就不会被建出来；② 只在开机后的空闲片里跑（src/legacy-app-db.ts 排期），
+//   **全部搬进新库、逐键核过才删老库**，任何一步不对就留着老库、下次开机再来（进黑匣子）；③ 可重复跑：同源的老 bundle 还会往老库写，
+//   新库里已经有的键不覆盖（新库的那条更新），只补没有的。
+// 和 Fable 原话的一处出入（报告 B2 节写明）：老库**不在**时不顺手 deleteDatabase——探完到删之间老 bundle 恰好新建了它的话，会把
+//   还没搬的新记录删掉；探测时被 abort 的那次新建浏览器自己会丢弃，用不着补删。
+const MIGRATED_STORES = [STORE_RING, STORE_CHECKPOINTS] as const;
+export type LegacyAppDbMigration =
+  | { outcome: "none" }                                                                     // 没有老库：什么都没建、什么都没动
+  | { outcome: "migrated"; moved: Record<string, number>; copied: Record<string, number> }  // 搬完、核过、老库删了
+  | { outcome: "kept"; why: string; moved: Record<string, number>; copied: Record<string, number> };   // 老库留着，下次再来
+
+/** 老库在就打开（只读用），不在 = null，并且不把它建出来。 */
+function _openLegacyIfExists(idb: IDBFactory): Promise<IDBDatabase | null> {
+  return new Promise((resolve, reject) => {
+    let absent = false;
+    const req = idb.open(LEGACY_DB_NAME);                       // 无版本号：老库什么版本都打得开；不在 = 触发 oldVersion 0 的升级
+    req.onupgradeneeded = (ev) => {
+      if ((ev as IDBVersionChangeEvent).oldVersion === 0) { absent = true; req.transaction?.abort(); }   // 本来没有 → 撤销这次新建
+    };
+    req.onsuccess = () => {
+      const db = req.result;
+      if (absent) { db.close(); resolve(null); return; }       // 理论不可达（abort 之后不会 success），保险
+      db.onversionchange = () => db.close();                   // 别人要删 / 升级它（老 bundle、还原出厂）→ 让路
+      resolve(db);
+    };
+    req.onerror = (ev) => {
+      if (absent) { (ev as Event).preventDefault?.(); resolve(null); return; }   // 我们自己 abort 的那次 = 「没有」
+      reject(req.error);
+    };
+  });
+}
+
+const _keyStr = (k: IDBValidKey): string => (typeof k === "string" ? "s:" + k : "j:" + JSON.stringify(k));
+
+function _readAll(db: IDBDatabase, store: string): Promise<{ key: IDBValidKey; value: unknown }[]> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readonly");
+    const s = tx.objectStore(store);
+    const kq = s.getAllKeys(), vq = s.getAll();                // 同一事务、同一 store：两者按键序一一对应
+    tx.oncomplete = () => resolve((kq.result as IDBValidKey[]).map((key, i) => ({ key, value: (vq.result as unknown[])[i] })));
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error ?? new Error("legacy read aborted"));
+  });
+}
+
+/** 新库里没有这个键才写（新库已有的那条更新，不覆盖）。返回实际写了几条。事务 complete 才算数。 */
+function _putIfAbsent(db: IDBDatabase, store: string, entries: { key: IDBValidKey; value: unknown }[]): Promise<number> {
+  if (!entries.length) return Promise.resolve(0);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readwrite");
+    const s = tx.objectStore(store);
+    let written = 0;
+    for (const e of entries) {
+      const c = s.count(e.key);
+      c.onsuccess = () => { if (c.result === 0) { s.put(e.value, e.key); written++; } };
+    }
+    tx.oncomplete = () => resolve(written);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error ?? new Error("copy into new DB aborted"));
+  });
+}
+
+function _keySet(db: IDBDatabase, store: string): Promise<Set<string>> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readonly");
+    const q = tx.objectStore(store).getAllKeys();
+    tx.oncomplete = () => resolve(new Set((q.result as IDBValidKey[]).map(_keyStr)));
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+function _deleteDb(idb: IDBFactory, name: string, blockedTimeoutMs: number): Promise<"deleted" | "blocked" | "error"> {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (r: "deleted" | "blocked" | "error") => { if (!done) { done = true; clearTimeout(timer); resolve(r); } };
+    const timer = setTimeout(() => finish("blocked"), blockedTimeoutMs);   // 老 tab 不让路：这次算没删成（已搬的记录留在新库，下次再删）
+    const req = idb.deleteDatabase(name);
+    req.onsuccess = () => finish("deleted");
+    req.onerror = () => finish("error");
+  });
+}
+
+/** 把老库 `weebpaint` 的「回到之前」历史搬进新库，全部核过才删老库。没有老库 = 什么都不建（outcome "none"）。 */
+export async function migrateLegacyAppDb(opts: { idb?: IDBFactory; blockedTimeoutMs?: number } = {}): Promise<LegacyAppDbMigration> {
+  const idb = opts.idb ?? indexedDB;
+  const legacy = await _openLegacyIfExists(idb);
+  if (!legacy) return { outcome: "none" };
+  const moved: Record<string, number> = {}, copied: Record<string, number> = {};
+  const shared = idb === globalThis.indexedDB;                 // 正式路径用本模块共用的那条连接（不关）；单测注入的工厂另开另关
+  let own: IDBDatabase | null = null;
+  try {
+    const target = shared ? await openDB() : (own = await _openAdaptive(idb));
+    for (const st of MIGRATED_STORES) {
+      if (!legacy.objectStoreNames.contains(st)) { moved[st] = 0; copied[st] = 0; continue; }
+      const entries = await _readAll(legacy, st);
+      moved[st] = entries.length;
+      copied[st] = await _putIfAbsent(target, st, entries);
+      const have = await _keySet(target, st);
+      const missing = entries.filter((e) => !have.has(_keyStr(e.key))).length;
+      if (missing) return { outcome: "kept", why: `${st}: ${missing} record(s) not in the new DB after copy`, moved, copied };
+    }
+    legacy.close();
+    const del = await _deleteDb(idb, LEGACY_DB_NAME, opts.blockedTimeoutMs ?? 5000);
+    if (del !== "deleted") return { outcome: "kept", why: `old DB delete ${del} (records already copied; retry next boot)`, moved, copied };
+    return { outcome: "migrated", moved, copied };
+  } finally {
+    try { legacy.close(); } catch { /* 已关 */ }
+    try { own?.close(); } catch { /* 已关 */ }
+  }
+}

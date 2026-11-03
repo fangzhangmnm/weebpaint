@@ -4,7 +4,7 @@
 //   （localSettings/syncedSettings 那两面已于 2026-07-13 删除 —— 全部 KV 化进 collection。别照旧注释找。）
 import { createStore, createOneDriveProvider, createFolderProvider, isCached, requestStoragePersistence, DEFAULT_GRAPH_TIMEOUTS } from "@internal/store";
 import type { GraphTransportOptions } from "@internal/store";
-import { detectStoreAbsent } from "./store-absent.ts";
+import { detectStoreAbsentReason } from "./store-absent.ts";
 import { createDeviceRackSlot } from "./device-rack-slot.ts";   // A2 终案：无库笔架器官（reload 不丢）
 import { guardRackFormat } from "./rack-format-guard.ts";   // 格式版本纪律：笔架条目的拍子咽喉（读判拍、写盖拍）
 import type { RackPersistence } from "./brush-rack-controller.ts";   // 脑定义 port（type-only 无环）
@@ -28,7 +28,9 @@ import { naturalCompare } from "@internal/gallery";
 // ============ 显式装配（v0.8.7 · B 骑士；2026-08-27 替身退役）============
 // store = 插件不是地基：按 detectStoreAbsent()（?nostore / 平台探针）选真装配或 kind:"none"。
 // 缺席模式下 createOneDriveProvider/createStore **完全不被调用**（零 IDB/localStorage 命名空间副作用）。
-export const storeAbsent = detectStoreAbsent();
+/** 为什么没存储（null = 在场）：只探一次，storeAbsent 和「这个浏览器存不住」那句（site-hint）共用这一份。 */
+export const storeAbsentReason = detectStoreAbsentReason();
+export const storeAbsent = storeAbsentReason != null;
 
 // Graph 传输层三个显式开关（store 0.17.2 默认全关 = 行为变更默认关；user 2026-10-21「没问题」开；取舍 = ai-docs/20261021-store-2x-gallery-08x-migration.md §3）：
 //   timeouts：每个 Graph 请求带超时（meta 30 s / 一块 5 MiB 120 s / byte-range 60 s / 整文件 15 min）。iPad 锁屏后在途 fetch 常常永远挂着，

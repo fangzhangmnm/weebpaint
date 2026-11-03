@@ -7,12 +7,12 @@ import { join } from "node:path";
 import { describe, it, eq, assert } from "./runner.mjs";
 
 const ALLOW = {
-  "src/storage.ts": "IDB `weebpaint`（裸名）：gallery-thumbs / image-thumbs 缩略图派生缓存 + checkpoint-ring（revert 快照环）；全删可再生 / 可丢（二等）",
+  "src/storage.ts": "IDB `weebpaint-bd6cece69075d759.app`：gallery-thumbs / image-thumbs 缩略图派生缓存 + checkpoint-ring / checkpoints（revert 快照）；全删可再生 / 可丢（二等）。2026-11-03 起由裸名 `weebpaint` 一次性搬来（migrateLegacyAppDb：只搬快照、不枚举、核过才删老库）",
   "src/crash-store.ts": "IDB `weebpaint-bd6cece69075d759.crash`：T-crash 崩溃快照（二等；还原出厂自扫）",
   "src/device-rack-slot.ts": "IDB `weebpaint-bd6cece69075d759.device-rack`：无库笔架单槽（reload 不丢；四等设备态）",
   "src/device-kv.ts": "localStorage `weebpaint-bd6cece69075d759:*`：device 层标量唯一器官（resume-slate / diag-log / 偏好；四等）",
   "src/boot-snapshot.ts": "localStorage：boot 语言快照旧键 `weebpaint.boot.lang` 只读 + 清扫（升级兜底；新键经 device-kv）",
-  "src/store-absent.ts": "localStorage：缺席平台探针（写读删一次）+ `weebpaint.nostore` 开关（dev / 测试）",
+  "src/store-absent.ts": "localStorage：缺席平台探针 `weebpaint-bd6cece69075d759.storage-probe`（写读删一次）+ `weebpaint-bd6cece69075d759.nostore` 开关（dev / 测试；2026-11-03 由裸名改来，零迁移）",
   "src/gallery/gallery-shell.ts": "navigator.storage.estimate 只读：图库底栏配额提示",
   "src/shell-reset.ts": "Cache Storage 删键 + SW 注销：只动自己前缀 `weebpaint-` 的壳缓存、只注销管着当前页面的 SW（强制更新 / 还原出厂共用）",
   "src/factory-reset.ts": "还原出厂：indexedDB.deleteDatabase 自家 GUID 库 + 裸 `weebpaint` 库、localStorage 自家前缀键；store 命名空间经库的 wipeAppNamespace（typed consent）",
@@ -118,5 +118,20 @@ describe("storage-whitelist · 自家前缀（锁 / 频道 / SW）", () => {
     const names = [...sw.matchAll(/CACHE_NAME = (["`])([^"`]*)\1/g)].map((m) => m[2]);
     assert(names.length >= 2 && names.every((n) => n.startsWith("weebpaint-")), "every CACHE_NAME assignment starts with weebpaint- : " + names.join(", "));
     for (const m of sw.matchAll(/caches\.keys\(\)\)?\.filter\(\(k\) => ([^\n]+)/g)) assert(/k\.startsWith\("weebpaint-"\)/.test(m[1]), "caches.keys() must be filtered to our own prefix: " + m[1]);
+  });
+});
+
+// 2026-11-03（工单 B2）：裸名 `weebpaint` 当库名只准出现在两处——搬家的 LEGACY_DB_NAME（src/storage.ts）和还原出厂删老库（src/factory-reset.ts）；
+//   store 的 appId "weebpaint"（库自己命名 `weebpaint.<databaseId>`，家族口径算带前缀）另算。别处再开裸名库 / 裸名键 = 红。
+describe("storage-whitelist · 裸名只剩搬家和还原出厂", () => {
+  it("src 里 \"weebpaint\" 这个字面量只在 storage.ts（LEGACY_DB_NAME）/ factory-reset.ts（BARE_APP_DB、APP_ID）/ app-store.ts（appId）/ side-windows.ts（参考窗目录 app 名，不是存储）", () => {
+    const ALLOWED = new Set(["src/storage.ts", "src/factory-reset.ts", "src/app-store.ts", "src/side-windows.ts"]);
+    const bad = SRC_FILES().filter((p) => !ALLOWED.has(p) && /["'`]weebpaint["'`]/.test(stripComments(readFileSync(p, "utf8"))));
+    assert(bad.length === 0, "bare \"weebpaint\" literal (storage name?) outside the allowed places:\n" + bad.join("\n"));
+    const st = stripComments(readFileSync("src/storage.ts", "utf8"));
+    assert(/const DB_NAME = `\$\{APP_NS\}\.app`;/.test(st), "storage.ts DB_NAME must be `${APP_NS}.app`");
+    eq((st.match(/["'`]weebpaint["'`]/g) || []).length, 1, "storage.ts: the bare name appears once (LEGACY_DB_NAME)");
+    const sa = stripComments(readFileSync("src/store-absent.ts", "utf8"));
+    assert(!/["'`]weebpaint\./.test(sa), "store-absent.ts keys must be APP_NS-prefixed");
   });
 });

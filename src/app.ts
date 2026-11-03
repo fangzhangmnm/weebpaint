@@ -38,7 +38,8 @@ import { hasVerifier, checkVerifier } from "./password-verifier.ts";
 import { wireRememberPassword, restoreRemembered, rememberChoice, setRememberChoice, rememberAvailable, rememberSharedBucket } from "./remember-password.ts";   // 2026-10-17 在这台设备上记住密码（≤ 30 天）
 import { rememberDayText } from "./remember-day.ts";
 import { currentPolicy } from "./deployment-policy.ts";   // 家族规则书 §2：记住口令 / 共桶披露按部署方式
-import { sayHintOnce } from "./site-hint.ts";   // itch / 备用版开局一行「去官网」
+import { sayHintOnce, sayStorageBlockedOnce } from "./site-hint.ts";   // itch / 备用版开局一行「去官网」；浏览器不给存那句
+import { migrateLegacyAppDbWhenIdle } from "./legacy-app-db.ts";   // 2026-11-03 老库搬家（空闲片里跑一次）
 import { sessionFileName } from "./config.ts";   // 边界：裸 session 名 → 库全名（薄库身份=X.ora）
 import { ensureUnlocked } from "./enc-thumbs.ts";   // 交互解锁（busy 外）——图库 host.unlock 用
 import { els } from "./els.ts";
@@ -92,7 +93,7 @@ import { initCrashBanner } from "./crash-banner.ts";            // T-crash 恢�
 //   每个调色器在 src/plugins/ 自成一文件，import 时自注册
 import "./plugins/index.ts";    // 触发 HSB / ColorBalance / Curves / SharpenBlur 自注册
 // candidate 2：导出格式 = 注册表插件（含第一方 ora/psd/png/jpg 自注册）
-import { isAuthConfigured, initAuth, isSignedIn, retrySilentSignIn, getActiveAccount, brushRackCollection, requireStore, galleryBackend } from "./app-store.ts";   // cut-over：cloud/auth/graph 全走 lib
+import { isAuthConfigured, initAuth, isSignedIn, retrySilentSignIn, getActiveAccount, brushRackCollection, requireStore, galleryBackend, storeAbsent, storeAbsentReason } from "./app-store.ts";   // cut-over：cloud/auth/graph 全走 lib
 import { galleryOnline } from "./gallery-capability.ts";   // 库在线 SSoT（0828 folder 无云 bug 修）
 import { galleryRegistry, activeGalleryId } from "@internal/gallery";     // P3 名册器官（播种接线在 boot 收尾段）；activeGalleryId = 口令真表单的账号字段
 import { setAttachmentGate, galleryAttachment } from "./gallery-attachment-host.ts";   // P3 挂载器官（收口开画 gate + 笔架重挂接线在 rack 构造后）
@@ -521,6 +522,7 @@ els.topEncLock?.addEventListener("click", () => session.decryptCurrent());
 // ---- 启动收尾：尝试加载上次的 session（异步，不阻塞 UI 显示） ----
 setStatus(t("status.ready"));
 sayHintOnce({ folderGallery: canPickFolderGallery() });   // itch / 备用版：开局一行「这一份连不了网盘……完整版在 weebpaint.com」（官网什么都不说）
+if (storeAbsentReason === "storage-blocked") sayStorageBlockedOnce();   // 浏览器不给存（Safari 双击等）：「没测过 + 存不住设置和崩溃备份 + 报告入口」（2026-11-03 工单 B2）
 updateZoomLabel();
 updateSaveStatus();
 updateCloudAuthUI();
@@ -642,7 +644,9 @@ void prefsReady.then(() => {
 // 2026-10-17：这台设备记着密码 → 先和 verifier 比、对了就解锁（要在开上次那幅画之前，不然加密作品先开成锁着的）。没记 = 一次 IDB 读。
 void prefsReady
   .then(() => restoreRemembered().then((r) => { if (r === "stale") setStatus(t("enc.rememberedStale"), true); }, (e) => reportError(new Error("[remember] restore failed: " + String(e)), "log")))
-  .then(() => bootRestoreSession(ctx)).catch((e) => reportError(new Error("[boot] restore failed: " + String(e)), "log"));
+  .then(() => bootRestoreSession(ctx)).catch((e) => reportError(new Error("[boot] restore failed: " + String(e)), "log"))
+  // 2026-11-03 工单 B2：老库 `weebpaint` 的「回到之前」历史搬进带前缀的新库——开完上次那幅画之后、空闲时、一页一次（src/legacy-app-db.ts）。
+  .finally(() => { if (!storeAbsent) migrateLegacyAppDbWhenIdle(); });
 // T-crash 恢复横幅（P2 2026-08-26）：扫 crash 库，有崩溃快照 → 非模态浮卡叠画布（不挡 boot、不 await）。
 initCrashBanner(ctx);
 // N3：启动时若在线+已登录，排空上次离线攒下的删除队列（fresh boot 不触发 online 事件，故此处补一刀）。
