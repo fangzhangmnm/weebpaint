@@ -1,13 +1,15 @@
 <!doctype html>
 <!-- itch iframe 测试夹具（P6；0825 verdicts §2.9「iframe 测试夹具进工单」）。
      created 2026-08-27 by Claude Fable 5.
-     用法：先 `bash scripts/build-standalone.sh`，再本目录起个静态服务（如 `python3 -m http.server`），
+     用法：先 `bash scripts/build-standalone.sh`（出 standalone + itch 两份），再本目录起个静态服务（如 `python3 -m http.server`），
      开 http://localhost:8000/tools/itch-iframe-fixture.html。
      近似 itch 的 iframe 沙箱（allow-scripts + allow-same-origin? itch 实际给的是同源 iframe 于
      html.itch.zone 子域 + 无 clipboard allow）。本夹具验的是：iframe 内 boot 不炸、paste 降级链、
-     IDB 分区行为——真 itch 行为仍以真机批为准。 -->
+     IDB 分区行为——真 itch 行为仍以真机批为准。
+     2026-11-03（Claude Opus 5.5）：改装 itch 那份（dist/weebpaint-itch.html，带部署标记 → 网盘 / 记口令 / 文件夹图库按家族规则书 §2 关）。
+     注意本页和被装的那份同源（同端口）= 比真 itch 宽松；自动化的跨站版在 tools/standalone-smoke.mjs itch（两个端口两个 host）。 -->
 <meta charset="utf-8" />
 <title>WeebPaint itch iframe fixture</title>
 <style>body{margin:0;background:#222;color:#ccc;font:13px system-ui} .bar{padding:6px 10px} iframe{display:block;width:100vw;height:calc(100vh - 30px);border:0}</style>
-<div class="bar">itch iframe 夹具 —— 装载 ../dist/weebpaint-standalone.html（allow 列表模拟 itch：无 clipboard-write）</div>
-<iframe src="../dist/weebpaint-standalone.html" allow="fullscreen; gamepad"></iframe>
+<div class="bar">itch iframe 夹具 —— 装载 ../dist/weebpaint-itch.html（allow 列表模拟 itch：无 clipboard-write）</div>
+<iframe src="../dist/weebpaint-itch.html" allow="fullscreen; gamepad"></iframe>

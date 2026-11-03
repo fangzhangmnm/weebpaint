@@ -89,7 +89,9 @@ const ITCH_META = '<meta name="deployment" content="itch" />';
 const charsetRe = /(<meta charset="UTF-8" \/>)/i;
 if (!charsetRe.test(html)) die("找不到 <meta charset>，itch 标记没处放");
 const itchHtml = html.replace(charsetRe, (m) => `${m}\n    ${ITCH_META}`);
-if ((itchHtml.match(/name="deployment"/g) || []).length !== 1) die("itch 标记必须恰好一处");
+// 自检：烤前烤后恰好多一处、就在 charset 后面（bundle 里本来就有 deployment.ts 的选择器串，那在 <script> 里，HTML 解析器不当元素）。
+if (itchHtml.split(ITCH_META).length - html.split(ITCH_META).length !== 1) die("itch 标记必须恰好多烤一处");
+if (!itchHtml.slice(0, itchHtml.indexOf("<script")).includes(ITCH_META)) die("itch 标记必须在第一个 <script> 之前（<head> 里）");
 writeFileSync(resolve(root, "dist/weebpaint-itch.html"), itchHtml);
 console.log("[pack-standalone] ✓ dist/weebpaint-itch.html（同一份 + itch 部署标记）");
 console.log("[pack-standalone] 验法：双击 file:// 开（Chromium/Firefox）；itch 上传该文件；夹具 = tools/itch-iframe-fixture.html");
