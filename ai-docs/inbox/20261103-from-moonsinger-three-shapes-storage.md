@@ -10,3 +10,5 @@
   - 崩溃影子（`crash-store.ts`）在 itch 版落在 itch 公共网址，别的 itch 游戏读得到；08-25「知情接受」只说过 file:// 共桶。
   - 形态判定散在 `isStandaloneHtml()` / `detectStoreAbsent()` / `pickerAllowedInFrame()` / `isAuthConfigured()` 四处，没有一处回答「这个形态给不给」；`gallery-capability.ts` 只答「现在挂没挂着图库」。08-21 定过方向的「启用云端功能」开关（`src/cloud-capability.ts` 单一接缝 + lint）也没做 = 推荐稿 §3 里的 `cloud` 位。
 - **优先级**：待 user 拍板；WeebPaint 按自己的账走（之前那张 `20261103-from-moonsinger-double-click-folder.md` 是同一串的前半）。
+
+- **11-03 稍后 user 拍板，本便条上面几条按此更正**（家族规范已改写，以那份为准）：itch 内嵌 = 整站 zip（「不要把鸡蛋放在一个篮子里」）；**共用存储的威胁模型 = 命名空间混乱，不是偷窥；只有用户加密的才有防扫描的语义**——所以「itch 版崩溃影子落在 itch 公共网址」**不算缺口**（不加密的照存，加密件 WeebPaint 本来就只存密文）；备用版本地文件夹图库 = 保留（「和weebpaint对齐，然后能记住吗」）；Safari 不验、留报告入口。还算缺口的：OneDrive 入口在单文件 / itch 露但登不上；形态判定散四处。
