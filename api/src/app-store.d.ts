@@ -3,6 +3,7 @@ import type { RackPersistence } from "./brush-rack-controller.ts";
 import type { Store } from "@internal/store";
 export declare const storeAbsent: boolean;
 type _Auth = ReturnType<typeof createOneDriveProvider>["auth"];
+export declare const cloudEnabled: boolean;
 export declare const provider: import("@internal/store").CloudProvider | null;
 export type AppStorePort = Pick<Store, "file" | "zip" | "files" | "collection" | "identifiers">;
 export type GalleryBackend = {

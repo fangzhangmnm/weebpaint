@@ -5904,6 +5904,30 @@ export declare const S: {
         readonly ja: "ファイルを直接開いた状態（file://）では Microsoft サインインは使えません——ローカル http 環境が必要です。このファイルのフォルダーでターミナルを開き、\n\n    python -m http.server 8000\n\nを実行し、ブラウザで http://localhost:8000/{file} を開いてから OneDrive に接続してください。（ローカルフォルダーのギャラリーはそのまま使えます。）";
         readonly tok: "lipu li open tan ilo la sina ken ala kepeken OneDrive. o open e ilo toki lon poki pi lipu ni. o kepeken: python -m http.server 8000. o open e http://localhost:8000/{file}. poki lipu li ken awen.";
     };
+    readonly "gm.cloudOnSiteSub": {
+        readonly zh: "去官网 {site}";
+        readonly en: "Use it at {site}";
+        readonly ja: "{site} で使えます";
+        readonly tok: "o kepeken lon {site}";
+    };
+    readonly "gm.cloudOnSiteHelp": {
+        readonly zh: "这一份连不了 OneDrive（微软登录回不到这里）。要用网盘，去官网 {site}。";
+        readonly en: "This copy can't connect OneDrive (Microsoft sign-in can't come back here). For cloud drives, use {site}.";
+        readonly ja: "このコピーは OneDrive に接続できません（Microsoft のサインインがここに戻れません）。クラウドを使うには {site} へ。";
+        readonly tok: "lipu ni li ken ala kepeken OneDrive. sina wile e ni la o tawa {site}.";
+    };
+    readonly "boot.siteHintNoFolder": {
+        readonly zh: "这一份连不了网盘：作品存成下载的文件，开作品就选文件。完整版在 {site}。";
+        readonly en: "This copy can't use cloud drives: works save as downloaded files, and you open them by picking a file. The full version is at {site}.";
+        readonly ja: "このコピーはクラウドを使えません。作品はダウンロードしたファイルとして保存し、開くときはファイルを選びます。完全版は {site}。";
+        readonly tok: "lipu ni li ken ala kepeken poki kon. sitelen sina li awen lon lipu pi ilo sina. ilo ale li lon {site}.";
+    };
+    readonly "boot.siteHintFolder": {
+        readonly zh: "这一份连不了网盘：作品可以放在本地文件夹图库，或存成下载的文件。完整版在 {site}。";
+        readonly en: "This copy can't use cloud drives: keep works in a local folder gallery or save them as downloaded files. The full version is at {site}.";
+        readonly ja: "このコピーはクラウドを使えません。作品はローカルフォルダーのギャラリーか、ダウンロードしたファイルに保存できます。完全版は {site}。";
+        readonly tok: "lipu ni li ken ala kepeken poki kon. sitelen sina li ken awen lon poki lipu pi ilo sina. ilo ale li lon {site}.";
+    };
     readonly "gm.srcFolder": {
         readonly zh: "本地文件夹";
         readonly en: "Local folder";
@@ -5929,22 +5953,22 @@ export declare const S: {
         readonly tok: "o pini e sitelen ni. o ante e poki sitelen lon tenpo kama";
     };
     readonly "pushAll.askTitle": {
-        readonly zh: "有 {n} 张画还没传上去，现在传吗？";
-        readonly en: "{n} painting(s) not uploaded yet — upload now?";
-        readonly ja: "まだ送信していない絵が {n} 枚あります。今送信しますか？";
-        readonly tok: "sitelen {n} li lon ala poki sewi. sina wile ala wile pana e ona lon tenpo ni?";
+        readonly zh: "有 {n} 张画没同步好（只在这台设备上，或改了还没传上去）。";
+        readonly en: "{n} painting(s) are not in sync (only on this device, or edited and not uploaded).";
+        readonly ja: "同期できていない絵が {n} 枚あります（この端末だけにある、または変更が未送信）。";
+        readonly tok: "sitelen {n} li lon ala poki sewi.";
     };
     readonly "pushAll.askMsg": {
-        readonly zh: "传了别的设备也能看到。撞上云端已有的同名文件不会覆盖，会留在图库里让你处理。";
-        readonly en: "Other devices will see them afterwards. If a cloud file with the same name already exists it will not be overwritten; it stays in the gallery for you to resolve.";
-        readonly ja: "送信すると他の端末でも見られるようになります。同名のファイルがクラウドにある場合は上書きせず、ギャラリーに残して処理を待ちます。";
-        readonly tok: "ilo ante li ken lukin e ona. nimi sama li lon poki sewi la mi awen ala e ona lon ona. ona li awen lon tomo sitelen la sina pona e ona.";
+        readonly zh: "到图库里逐张「处理…」，每一张都会问你用云端的还是这台的。";
+        readonly en: "Resolve them one by one in the gallery; each one asks you which side to keep.";
+        readonly ja: "ギャラリーで一枚ずつ「処理…」してください。どちらを残すかはその都度たずねます。";
+        readonly tok: "o pona e ona lon tomo sitelen. ona li toki e ni tawa sina: sina wile e seme?";
     };
     readonly "pushAll.ok": {
-        readonly zh: "传上去";
-        readonly en: "Upload";
-        readonly ja: "送信する";
-        readonly tok: "o pana";
+        readonly zh: "去处理";
+        readonly en: "Resolve them";
+        readonly ja: "対応する";
+        readonly tok: "o pona e ona";
     };
     readonly "pushAll.done": {
         readonly zh: "已传上 {n} 张";
@@ -6305,6 +6329,12 @@ export declare const S: {
         readonly en: "Remember on this device for 30 days (anyone who can unlock this device can open your encrypted works)";
         readonly ja: "この端末で30日間記憶する（この端末のロックを解除できる人は暗号化作品を開けます）";
         readonly tok: "o awen e nimi len lon ilo ni lon tenpo mun wan. jan li ken open e ilo ni la ona li ken lukin e sitelen len sina.";
+    };
+    readonly "enc.rememberDeviceSharedBucket": {
+        readonly zh: "在这台设备上记住 30 天（能解锁这台设备的人就能打开你的加密作品；这台电脑上双击打开的别的网页也拿得到这把钥匙）";
+        readonly en: "Remember on this device for 30 days (anyone who can unlock this device can open your encrypted works; other web pages you open by double-clicking on this computer can also get this key)";
+        readonly ja: "この端末で30日間記憶する（この端末のロックを解除できる人は暗号化作品を開けます。このパソコンでダブルクリックして開いた他のウェブページもこの鍵を取得できます）";
+        readonly tok: "o awen e nimi len lon ilo ni lon tenpo mun wan. jan li ken open e ilo ni la ona li ken lukin e sitelen len sina. lipu ante pi ilo ni li ken kama jo e ona.";
     };
     readonly "enc.rememberedToast": {
         readonly zh: "这台设备会记住密码到 {date}（图库菜单里能忘记）";
