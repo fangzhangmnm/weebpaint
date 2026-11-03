@@ -1,4 +1,5 @@
-// StoreUI adapter —— WeebPaint 给 sync-store 的 ui bundle（createStore 必填 busy/resolveConflict/reportError + 可选 offlineEscape）。
+// StoreUI adapter —— WeebPaint 给 sync-store 的 ui bundle（createStore 必填 busy/resolveConflict/reportError + 可选 offlineEscape / resolveRenameOld）。
+//   ⚠ 债（总账 #103）：这一份和 @internal/gallery 的 storeUIFor 是两套同形的面，以后迁过去只留一套；2026-11-03 没迁。
 //   cutover：freshness 逻辑进引擎（freshness.ts）后，旧 cloud-freshness.ts 幸存的那点 UI——
 //   ① 冲突二选一 sheet（ADR-0009 冲突必 surface）② 「跳过到离线」逃生闸（iOS 老 token fetchMeta 挂死的唯一逃生）
 //   ③ 错误 surface——塌进这一个模块。app 只在 app-store 装配时把它传进 createStore。
@@ -52,6 +53,35 @@ async function quietBusy<T>(label: string, fn: () => Promise<T>): Promise<T> {
   }
 }
 
+// 改名 / 移动撞上「不知道云端旧的该不该搬」（store 2.2.2 ui.resolveRenameOld；家族工单 B2，Fable 2026-11-03 裁定「接」；added by Claude Opus 5.5）：
+//   这台有没传的改动 ∧ 云端那份对不上（diverged = 别的设备改过 / unknown-lineage = 这台说不清自己从哪一版改来）→ 动字节之前问人。
+//   三个选项照抄 @internal/gallery 0.8.10 storeUIFor（搬走旧的〔进回收站，能恢复〕/ 留着旧的〔两份〕/ 取消〔不改名、什么都不动〕），
+//   不加第四个、没有删除。**人没点就不回答**：共用的同步门可能被别的流程从外面 settleSyncGate(null) 收掉——那不是人点的，
+//   重新摆出来，绝不把它当「取消」替人答（库在等答案期间一个字节不动，test/store-ui-rename-old.test.mjs 钉）。
+//   主按钮标在「搬走旧的」上 = 和 gallery 同形，只是视觉强调：同步门不认回车，没有默认答案。
+//   门注入（gate 参数）只为单测（本仓 DOM shim 点不了按钮）；正式装配传 lockSyncGate。
+export type RenameOldAnswer = "trash" | "keep" | "cancel";
+export function makeResolveRenameOld(gate: typeof lockSyncGate = lockSyncGate) {
+  return async ({ oldName, newName, reason }: { oldName: string; newName: string; reason: "diverged" | "unknown-lineage" }): Promise<RenameOldAnswer> => {
+    const from = stripSessionExt(oldName), to = stripSessionExt(newName);
+    for (;;) {
+      const v = await gate<RenameOldAnswer | null>({
+        title: t("rn.title", { name: from }),
+        message: reason === "diverged" ? t("rn.body.diverged", { from, to }) : t("rn.body.unknown", { from, to }),
+        note: t("rn.note"),
+        showSpinner: false,
+        actions: [
+          { label: t("rn.act.trash"), value: "trash", primary: true },
+          { label: t("rn.act.keep"), value: "keep" },
+          { label: t("common.cancel"), value: "cancel" },
+        ],
+      });
+      if (v === "trash" || v === "keep" || v === "cancel") return v;
+      // 走到这里 = 门被外面收了（不是人点的）→ 再摆一次
+    }
+  };
+}
+
 export const storeUI: StoreUI = {
   // 用户态写流：按 key 路由——后台节律走 notice（不遮罩），用户动作走全屏遮罩（可重入 ref-count）。
   busy: (label, fn, key) => (key && QUIET_KEYS.has(key) ? quietBusy(label, fn) : withBusy(label, fn)),
@@ -101,6 +131,8 @@ export const storeUI: StoreUI = {
         });
     return choice ?? "cancel";
   },
+
+  resolveRenameOld: makeResolveRenameOld(),
 
   // 错误必 surface（ADR-0009 绝不吞 console）。接统一 error-badge：error/warning→顶层 banner、info→状态栏、log→仅 console。
   //   CloudNetworkError（库 2026-08-25 起：provider fetch 网络层 throw 的类型化封装，Safari 原文是裸
