@@ -1,6 +1,7 @@
 // 单文件两种形态的 headless smoke（Chromium；playwright 档，不进 npm test 硬线）。
 // created 2026-08-27 by Claude Fable 5（file: 形）· 2026-11-03 Claude Opus 5.5 加 itch 形（家族规则书 §4 第 9 项 / 工单 B 第 5 步）
-// 用法：bash scripts/build-standalone.sh && node tools/standalone-smoke.mjs [local|itch]（不给 = 两个都跑）
+// 用法：bash scripts/build-standalone.sh && node tools/standalone-smoke.mjs [site|local|itch]（不给 = 三个都跑）
+//   site = 官网形态对照（仓根经 http://127.0.0.1 服 index.html，同 tools/preflight/harness.mjs）：网盘入口是真入口、不灰、没有开局一行——「不退化」那一列。
 //
 // 两种形态 = 家族规则书 §2 的两列（同一份字节，itch 那份 <head> 多烤一行部署标记，scripts/pack-standalone.mjs 第 7 步）：
 //   local（备用版）= dist/weebpaint-standalone.html 以 file:// 顶层打开（双击）。
@@ -190,8 +191,38 @@ async function runItch(browser) {
   inner.close(); outer.close();
 }
 
+async function runSite(browser) {
+  const shape = "site";
+  const { startServer } = await import("./preflight/harness.mjs");
+  const srv = await startServer();
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const errors = [];
+  page.on("pageerror", (e) => errors.push("pageerror: " + e.message));
+  await page.goto(srv.url, { waitUntil: "load" }); await settle(4000);   // 仓根 index.html（harness 的 url 已带结尾斜杠）
+  const p = await page.evaluate(() => {
+    const box = document.getElementById("galleryConnectBox");
+    const items = box ? [...box.querySelectorAll(".menu-item")] : [];
+    const cloud = items.find((b) => b.querySelector("svg use")?.getAttribute("href") === "#cloud");
+    return {
+      hasCanvas: !!document.querySelector("canvas"),
+      deploymentMeta: document.querySelector('meta[name="deployment"]')?.getAttribute("content") ?? null,
+      cloudEntry: !!cloud, cloudEntryGrey: !!cloud?.classList.contains("menu-item-unavailable"),
+      siteHint: !![...document.querySelectorAll("[data-notice-id]")].find((n) => n.dataset.noticeId === "site-hint"),
+    };
+  });
+  console.log(`[${shape}] ` + JSON.stringify(p, null, 2));
+  if (!p.hasCanvas) fail(shape, "无 canvas（boot 挂了）");
+  if (p.deploymentMeta !== null) fail(shape, "官网不该有 itch 标记");
+  if (!p.cloudEntry || p.cloudEntryGrey) fail(shape, "官网的「连接 OneDrive…」应是真入口（在、不灰）");
+  if (p.siteHint) fail(shape, "官网不该出开局一行");
+  if (errors.length) fail(shape, "页面错误：\n" + errors.join("\n"));
+  await context.close(); srv.close();
+}
+
 const browser = await chromium.launch();
 try {
+  if (which === "all" || which === "site") await runSite(browser);
   if (which === "all" || which === "local") await runLocal(browser);
   if (which === "all" || which === "itch") await runItch(browser);
 } finally { await browser.close(); }
