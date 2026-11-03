@@ -4,6 +4,7 @@
 // 这里只有：能力探测 / picker / 句柄读写 / mtime / drop·launchQueue 提取 / WeebPaint 痕迹检测（纯函数，node 可测）。
 // 数据安全：写走 createWritable（浏览器临时文件、close 时原子替换）；陈旧检查（mtime 对表）由调用方在写前做。
 // 核心路径不依赖 PWA：picker 和 drop 句柄在浏览器标签页全功能；launchQueue/file_handlers 是安装态锦上添花。
+import { embedded } from "./deployment.ts";   // 被套在别人页面里没有（唯一回答处）
 
 /** File System Access 句柄的最小面（lib.dom 版本差异大，自带声明 + 运行时探测）。 */
 export interface LocalFileHandle {
@@ -16,17 +17,10 @@ export interface LocalFileHandle {
 
 /** 跨源子框架里 FSA picker 一律被浏览器禁（itch 内嵌实锤 2026-08-28：SecurityError "Cross origin sub
  *  frames aren't allowed to show a file picker"）——探针必须把这层算进去，否则「有函数」是谎报能力：
- *  settle 会撞 SecurityError 死在弹框上。同源 iframe 不受限；顶层窗口恒放行。 */
-export function pickerAllowedInFrame(): boolean {
-  try {
-    if (window.self === window.top) return true;
-    void (window.top as Window).location.href;   // 跨源访问 top 会 throw → 禁 picker
-    return true;
-  } catch { return false; }
-}
-
+ *  settle 会撞 SecurityError 死在弹框上。「被套着没有」只问 deployment.ts 的 embedded()（家族规则书 §1 第 9 条：
+ *  别处不许看 window.top；2026-11-03 起取代本文件自己的 pickerAllowedInFrame，同源 iframe 现在也算被套着）。 */
 export function supportsFileSystemAccess(): boolean {
-  return pickerAllowedInFrame() && typeof (globalThis as { showOpenFilePicker?: unknown }).showOpenFilePicker === "function";
+  return !embedded() && typeof (globalThis as { showOpenFilePicker?: unknown }).showOpenFilePicker === "function";
 }
 
 /** 系统文件选择器挑一个 .ora。用户取消 → null（不是错误）。 */
@@ -48,7 +42,7 @@ export async function pickLocalOraFile(): Promise<LocalFileHandle | null> {
 
 /** showSaveFilePicker 在场探测（Chromium 桌面）。与 open 侧分开探——两 API 支持面可能不同。 */
 export function supportsSaveFilePicker(): boolean {
-  return pickerAllowedInFrame() && typeof (globalThis as { showSaveFilePicker?: unknown }).showSaveFilePicker === "function";
+  return !embedded() && typeof (globalThis as { showSaveFilePicker?: unknown }).showSaveFilePicker === "function";
 }
 
 /** 系统「另存为」框挑 .ora 落点（2026-08-21，「导出与另存」hub 的本地去向用）。

@@ -923,6 +923,11 @@ div.version-slim { transform-origin: left center; }   /* 图库菜单的 info �
   white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto;   /* 空间不够时 sub 先缩（带省略号），不许把行撑爆 */
 }
+/* 这一份给不了的功能（家族规则书 §1 第 6 条：画灰 + 一句话指路；2026-11-03 工单 B）：标签和图标变淡，副标题「去官网 …」保持可读；
+   仍可点——点了说清楚为什么（不是 :disabled，那样说明就够不着了）。 */
+.menu-item.menu-item-unavailable .menu-item-label,
+.menu-item.menu-item-unavailable > svg { opacity: 0.45; }
+.menu-item.menu-item-unavailable { cursor: help; }
 /* v124 wrench → ⋯（user：「导入导出用 ⋯ 更合适，扳手 SVG 留备用」）
    .menu-item-wrench class 名留着——只是字符换了，将来想换回扳手只改 HTML 里那个字符即可 */
 .menu-item-wrench {

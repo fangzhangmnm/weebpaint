@@ -28,7 +28,7 @@ bash scripts/build-standalone.sh          # 从当前 dist bundle 打单文件�
 node tools/standalone-smoke.mjs
 cp dist/weebpaint-standalone.html "dist/weebpaint-standalone-$VER.html"
 rm -rf tmp/itch-pack && mkdir -p tmp/itch-pack
-cp dist/weebpaint-standalone.html tmp/itch-pack/index.html
+cp dist/weebpaint-itch.html tmp/itch-pack/index.html   # 2026-11-03：itch 那份 = 单文件 + 部署标记（pack-standalone.mjs 第 7 步；家族规则书 §2 的 itch 列）
 (cd tmp/itch-pack && zip -q -X "../../dist/weebpaint-itch-$VER.zip" index.html)
 git push origin main:prod
 echo "[push-prod] ✓ prod 已快进到 main（$FULLVER）"

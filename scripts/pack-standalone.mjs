@@ -81,4 +81,15 @@ writeFileSync(out, html);
 const mb = statSync(out).size / 1024 / 1024;
 if (mb > 25) die(`体积超限 ${mb.toFixed(1)}MB > 25MB（TiddlyWiki 经验 ~20MB 起明显变慢）`);
 console.log(`[pack-standalone] ✓ dist/weebpaint-standalone.html（${version}，${mb.toFixed(2)} MB）`);
+
+// ---- 7. itch 那份（2026-11-03 家族规则书 §3 / 工单 B，Claude Opus 5.5）：同一份字节，<head> 里多烤一行部署标记 → src/deployment.ts 认出 "itch"
+//   （网盘 / 文件夹图库 / 记住口令 / 离线壳按规则书 §2 关、开局一行「去官网」）。push-prod.sh 把它改名 index.html 打进 itch zip。
+//   双击打开的备用版 = 上面那份没有标记的（file: 本来就认得出）。标记串和 deployment.ts 的 DEPLOYMENT_META 逐字一致（test/deployment-guard.test.mjs 核）。
+const ITCH_META = '<meta name="deployment" content="itch" />';
+const charsetRe = /(<meta charset="UTF-8" \/>)/i;
+if (!charsetRe.test(html)) die("找不到 <meta charset>，itch 标记没处放");
+const itchHtml = html.replace(charsetRe, (m) => `${m}\n    ${ITCH_META}`);
+if ((itchHtml.match(/name="deployment"/g) || []).length !== 1) die("itch 标记必须恰好一处");
+writeFileSync(resolve(root, "dist/weebpaint-itch.html"), itchHtml);
+console.log("[pack-standalone] ✓ dist/weebpaint-itch.html（同一份 + itch 部署标记）");
 console.log("[pack-standalone] 验法：双击 file:// 开（Chromium/Firefox）；itch 上传该文件；夹具 = tools/itch-iframe-fixture.html");

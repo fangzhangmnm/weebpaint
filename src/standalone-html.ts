@@ -5,7 +5,7 @@
 //   本模块是**唯一读口**。常规 build 无该全局 → 一切走原路——「html build = 全量 build 运行时 gate」
 //   拍板：不做阉割 build，同一个 bundle 两种壳。
 // 消费方：sevenzip（7zz.umd.js blob 注入 + wasm bytes）/ app-store（msal blob URL，逃生舱 localhost 用）/
-//   brushes、canvas-templates、color-name（json 文本）/ pwa-shell（单文件 = SW 全家放弃，survey §5.3）。
+//   brushes、canvas-templates、color-name（json 文本）/ pwa-shell（单文件旁边没有 service-worker.js，survey §5.3）。
 // file:// 能力依据（survey §5.1 实测）：blob classic script ✅、wasm instantiate(ArrayBuffer) ✅、
 //   内联 module ✅；fetch("./…") 在 file:// 必死——这正是本接缝存在的理由。
 
@@ -14,7 +14,9 @@ const _embed = (): Record<string, string> | null => {
   return g.__WEEBPAINT_EMBED__ ?? null;
 };
 
-/** 单文件形态？（= 打包器灌过资产。⚠ 不等于 file://——单文件也可能被 http 服（itch/逃生舱）。） */
+/** 资产内嵌了没（= 打包器灌过资产）。**只回答这一件事**——2026-11-03 起（家族规则书 §1 第 9 条，工单 B）不再拿它做部署决定：
+ *  装在哪 / 被套着没有问 deployment.ts，给不给某功能问 deployment-policy.ts。仍合法的读法 = 「旁边有没有别的文件」
+ *  （pwa-shell：单文件旁边没有 service-worker.js）。⚠ 不等于 file://——单文件也可能被 http 服（itch / 逃生舱）。 */
 export const isStandaloneHtml = (): boolean => _embed() != null;
 
 /** 文本资产原文（json/js 源）。缺 = null（常规 build 恒 null → 调用方走 fetch 原路）。 */

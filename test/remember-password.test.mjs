@@ -3,11 +3,12 @@
 import { describe, it, eq, assert } from "./runner.mjs";
 const { createPasswordKeeper } = await import("@internal/encryption");
 const { setPassword, lock, getPassword } = await import("../src/crypto-state.ts");
-const { wireRememberPassword, restoreRemembered, forgetRemembered, rememberedUntil, setRememberChoice, rememberAvailable } = await import("../src/remember-password.ts");
+const { wireRememberPassword, restoreRemembered, forgetRemembered, rememberedUntil, setRememberChoice, rememberAvailable, rememberSharedBucket } = await import("../src/remember-password.ts");
+const { policy } = await import("../src/deployment-policy.ts");
 
 const DAY = 86400_000;
 function memStore() { let rec; return { get: async () => rec, put: async (r) => { rec = r; }, delete: async () => { rec = undefined; }, peek: () => rec }; }
-function setup({ verifierPw = "real pw", enabled = true } = {}) {
+function setup({ verifierPw = "real pw", enabled = true, sharedBucket = false } = {}) {
   const clock = { t: 1_700_000_000_000 }; const now = () => clock.t;
   const store = memStore();
   const keeper = createPasswordKeeper({ dbName: "test", store, now });
@@ -15,7 +16,7 @@ function setup({ verifierPw = "real pw", enabled = true } = {}) {
   const remembered = [], errors = [];
   lock();
   wireRememberPassword({
-    enabled, keeper: () => keeper, now,
+    enabled, sharedBucket, keeper: () => keeper, now,
     hasVerifier: () => v.pw != null,
     checkVerifier: async (pw) => (v.pw == null ? "none" : pw === v.pw ? "ok" : "bad"),
     setPassword: (pw) => setPassword(pw),
@@ -78,7 +79,28 @@ describe("remember-password · 跟着统一密码走", () => {
   });
 });
 
-describe("remember-password · 单文件 html / itch 关掉（同源的不只我们）", () => {
+describe("remember-password · 按部署方式（家族规则书 §2；2026-11-03：备用版改成开 + 共桶披露，itch 关）", () => {
+  it("开关来自 deployment-policy：官网开不披露 · 备用版开 + 披露 · itch 关", () => {
+    eq(policy("site").rememberPassword, true); eq(policy("site").rememberPasswordSharedBucket, false);
+    eq(policy("local").rememberPassword, true); eq(policy("local").rememberPasswordSharedBucket, true);
+    eq(policy("itch").rememberPassword, false);
+  });
+  it("备用版（enabled + sharedBucket）：给勾、勾旁要披露；记 / 恢复和官网一模一样（同一个 30 天上限）", async () => {
+    const s = setup({ sharedBucket: true });
+    eq(rememberAvailable(), true); eq(rememberSharedBucket(), true);
+    setRememberChoice(true); setPassword("real pw");
+    assert(await until(async () => (await s.keeper.recall()) === "real pw"), "remembered");
+    eq(rememberedUntil(), s.clock.t + 30 * DAY);
+    lock(); await forgetRemembered();
+  });
+  it("官网：给勾、不披露", () => { setup(); eq(rememberAvailable(), true); eq(rememberSharedBucket(), false); });
+  it("关着的形态哪怕 sharedBucket 递了 true 也不披露（不给勾就没有勾旁）", () => {
+    wireRememberPassword({ enabled: false, sharedBucket: true, keeper: () => { throw new Error("no"); }, hasVerifier: () => false, checkVerifier: async () => "none", setPassword: () => {}, onError: () => {} });
+    eq(rememberAvailable(), false); eq(rememberSharedBucket(), false);
+  });
+});
+
+describe("remember-password · itch 关掉（试用版：只少网盘和记口令两处）", () => {
   it("enabled:false → 不给勾、不恢复、不跟、不碰存储（keeper 一碰就炸）", async () => {
     const touched = [];
     const bomb = new Proxy({}, { get: (_, k) => () => { touched.push(String(k)); throw new Error("keeper touched"); } });

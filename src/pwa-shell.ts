@@ -8,7 +8,8 @@
 //   （"encountered a problem"）。dev 用 network-first：在线永远先抓网（"改完即见"/强制更新不变），离线才回退缓存。
 //   完整设计 + 这个坑见 ai-docs/20260630-pwa-offline-dev-sw.md。
 
-import { isStandaloneHtml } from "./standalone-html.ts";   // P6：单文件 = SW 全家放弃
+import { isStandaloneHtml } from "./standalone-html.ts";   // 资产内嵌了没（单文件 = 旁边没有 service-worker.js 可注册）
+import { currentPolicy } from "./deployment-policy.ts";   // 家族规则书 §2：离线壳只在官网（itch / 备用版 ✗）
 import { reportError } from "./error-badge.ts";
 
 export interface PwaShellDeps {
@@ -69,8 +70,10 @@ export class PwaShell {
     });
 
     // 注册 SW：prod 和 dev(/dev/)都装（worker 按 scope 分 cache-first / network-first）；只跳 localhost（dev server 无 SW 文件）。
-    // P6 单文件形态 = SW 全家放弃（survey §5.3：file:// origin 'null' 注册必死；itch 域也没有 service-worker.js 可拉）。
-    if (!isStandaloneHtml() && "serviceWorker" in navigator && !LOCAL_DEV_HOSTS.has(location.hostname)) {
+    // 两道门（2026-11-03 家族工单 B 起分开说，Claude Opus 5.5）：
+    //   ① 部署方式的开关 policy.serviceWorker（规则书 §2：itch / 备用版没有离线壳）；
+    //   ② 资产内嵌了没——单文件 html 旁边没有 service-worker.js（survey §5.3），哪怕它被 http 服着（逃生舱 / 别人自己架）也注册不了。
+    if (currentPolicy().serviceWorker && !isStandaloneHtml() && "serviceWorker" in navigator && !LOCAL_DEV_HOSTS.has(location.hostname)) {
       navigator.serviceWorker.addEventListener("message", (e: MessageEvent) => { if (e.data?.type === "asset-updated") this.show(); });
       navigator.serviceWorker.register("./service-worker.js").then((registration) => {
         this.reg = registration;

@@ -9,6 +9,7 @@ import { createDeviceRackSlot } from "./device-rack-slot.ts";   // A2 终案：�
 import { guardRackFormat } from "./rack-format-guard.ts";   // 格式版本纪律：笔架条目的拍子咽喉（读判拍、写盖拍）
 import type { RackPersistence } from "./brush-rack-controller.ts";   // 脑定义 port（type-only 无环）
 import { embeddedBlobUrl } from "./standalone-html.ts";   // P6 单文件内嵌读口（msal 逃生舱）
+import { currentPolicy } from "./deployment-policy.ts";   // 规则书 §1 第 11 条：宿主按部署方式把「网盘」开关传进 store 装配（store 不 import 部署）
 import type { Store, Collection as _Coll } from "@internal/store";
 import { sessionFileName } from "./config.ts";
 import { storeUI } from "./store-ui.ts";
@@ -104,9 +105,13 @@ const _createRealStore = (provider: _Prov, signedIn: () => boolean, databaseId?:
 
 // 缺席平台（storeAbsent）= 三个 null，不再造 dormant/null 替身（2026-08-27 ambient store 退役：
 //   替身的每个 benign no-op 都是一个没被迫回答的问题——现在由类型逼每个消费点表态）。
-const _asm: { provider: _Prov | null; auth: _Auth | null } = storeAbsent
-  ? { provider: null, auth: null }
-  : _assembleReal();
+// 网盘开关关着（itch / 备用版，家族规则书 §2；2026-11-03 工单 B，Claude Opus 5.5）= 同一个分叉：OneDrive provider 不建 → MSAL 不载、
+//   initAuth / signIn 无事可做、isAuthConfigured() = false（登录钮、设置里的账号段整段不出）；文件夹图库照常（createFolderProvider 不经这里）。
+//   网盘入口的灰 +「去官网」由 gallery-manage-ui 按同一个开关画。
+export const cloudEnabled = !storeAbsent && currentPolicy().cloud;
+const _asm: { provider: _Prov | null; auth: _Auth | null } = cloudEnabled
+  ? _assembleReal()
+  : { provider: null, auth: null };
 export const provider = _asm.provider;
 const _auth: _Auth | null = _asm.auth;
 

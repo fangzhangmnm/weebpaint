@@ -8,6 +8,17 @@
 //   - Tenant ID:     c1fef054-68f1-48db-9097-61acbe59b8ac
 //   - Redirect URIs: SPA × 2（dev https://weebpaint.com/dev/ / prod https://weebpaint.com/）
 //
+// 官网网址（家族规则书 20261103 §1 第 6 条：一个 app 一处常量；「去官网」文案全部插值它，不许散写进 UI / i18n 字符串）。
+//   消费者 = src/site-hint.ts（开局一行）+ src/gallery/gallery-manage-ui.ts（灰入口副标题 / 说明）。added by Claude Opus 5.5 2026-11-03
+export const SITE_URL = "https://weebpaint.com";
+/** SITE_URL 给人看的那段（「weebpaint.com」）。 */
+export const SITE_HOST = SITE_URL.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+
+// 自家前缀 token（家族规则书 §1 第 3 条 / §4 第 1 项：库名、键名、锁名、频道名都带它；永不碰、永不枚举别人的前缀）。
+//   仓里只有这一处字面量（test/storage-whitelist.test.mjs 守：src 里别处出现这串 = 红）。theme-guard.js 是首帧前的经典脚本、
+//   不进 bundle，只读 device-kv 的主题键，那里照抄一份，守卫同样核它一致。added by Claude Opus 5.5 2026-11-03
+export const APP_NS = "weebpaint-bd6cece69075d759";
+
 // CLIENT_ID 占位时（"REPLACE_ME..."）走纯离线，不去碰 MSAL bundle。
 export const CLIENT_ID = "18c496a6-5d86-4ff5-8dd0-67d565480a3e";
 

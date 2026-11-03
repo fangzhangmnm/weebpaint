@@ -11,7 +11,8 @@ import { galleryRegistry } from "@internal/gallery";
 import { galleryAttachment } from "./gallery-attachment-host.ts";
 import { storeAbsent, _swapStoreForGallery, signIn, getActiveAccount, isSignedIn } from "./app-store.ts";
 import { deviceKvGet, deviceKvSet } from "./device-kv.ts";
-import { pickerAllowedInFrame } from "./local-file-session.ts";
+import { embedded } from "./deployment.ts";   // 被跨源套着 → 浏览器不给选文件夹框
+import { currentPolicy } from "./deployment-policy.ts";   // 规则书 §2：文件夹图库 官网 ✓ / itch ✗ / 备用版 ✓
 import { reportError } from "./error-badge.ts";
 import { note as diagNote } from "./diag-log.ts";   // 黑匣子面包屑：boot 挂库结果
 import { createFlowLock } from "./flow-lock.ts";
@@ -35,7 +36,8 @@ export async function ensureFolderPermission(entry: GalleryEntry, opts: { reques
 
 // ---- 动词 ----
 const _picker = () => (globalThis as { showDirectoryPicker?: (o?: unknown) => Promise<unknown> }).showDirectoryPicker;
-export const canPickFolderGallery = (): boolean => !storeAbsent && pickerAllowedInFrame() && typeof _picker() === "function";   // 跨源 iframe 禁 picker（itch 内嵌实锤 0828）
+// 三道：部署方式给不给（policy.folderGallery）· 浏览器能不能（没被套着 + 有选文件夹框；跨源 iframe 禁 picker，itch 内嵌实锤 0828）· 存储没被没收。
+export const canPickFolderGallery = (): boolean => !storeAbsent && currentPolicy().folderGallery && !embedded() && typeof _picker() === "function";
 
 /** 铸/复用 = 与挂载分离（UI 在两步之间问「继承 or 出厂」并走绿灯门）。created = 这次真铸了新条目。 */
 export interface MintResult { entry: GalleryEntry; created: boolean }

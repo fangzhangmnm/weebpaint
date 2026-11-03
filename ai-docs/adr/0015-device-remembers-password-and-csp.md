@@ -23,3 +23,12 @@
 
 ## 验证（2026-10-17）
 npm test 1495（含 `test/remember-password.test.mjs` 9 条、`test/csp-guard.test.mjs` 6 条）；build（tsc 门 + lint）；preflight F1 / **F8（新：首启不建库、真 IDB 上开页恢复路径、菜单一圈 CSP 零拦截）** OK；standalone 打包 + `tools/standalone-smoke.mjs` OK。F4 三条红在改动前的 HEAD 上同样红（总账 #90）。**勾上 → 重开不用输**这一段要有图库 + verifier，无头里接不上 → 节点单测 + 真机。
+
+## 追加注 2026-11-03：备用版（双击打开的单文件）改成给记住口令 + 共桶披露；itch 照旧不给
+
+> added 2026-11-03 by Claude Opus 5.5（家族工单 B）。上面「单文件 html / itch 形态不提供」那条原文不改，按这条读。
+
+- **user 11-03 知情同意**（家族规则书 `ai-docs/20261103-three-shapes-rulebook.md` §1 第 8 条、§2「记住口令」行；原话见规则书 §9 与 WeebPaint 便条 `ai-docs/inbox/20261103-from-moonsinger-three-shapes-storage.md` 第三轮）：「备用版（本地双击）支持、itch 不开」「itch版的语义应该更像试用版，玩一下」。规则书这一格写的是「✓ + 共桶披露」「勾选框旁明说：Chromium 双击打开的别的网页也拿得到这把钥匙」——同一个存储桶里的别的网页拿得到那把不可导出的钥匙、能直接解出密码（10-17 关掉它的理由本身没变），现在改成明说、由用户自己决定勾不勾。
+- **现在的形态表**（`src/deployment-policy.ts`，`test/deployment-guard.test.mjs` 逐格钉）：官网 ✓（≤ 30 天）；备用版（`file:`）✓ + 勾旁换成带披露的那句「……这台电脑上双击打开的别的网页也拿得到这把钥匙」（i18n `enc.rememberDeviceSharedBucket`）；itch ✗（不给勾、不恢复、不跟、不碰存储，`enabled: false` 的老路径）。
+- **判定换了来源**：不再看 `isStandaloneHtml()`（「资产内嵌了没」），改看 `src/deployment.ts` 的部署方式（`file:` → 备用版；itch 那份 index.html 里烤的 `<meta name="deployment" content="itch">` → itch）。所以同一份单文件被 `http://localhost` 服（逃生舱）= 按官网走：给勾、不披露（http 源不和别的双击网页共桶）。
+- 上限、默认不勾、锁定即忘、还原出厂删库这些都没动。验证：`test/remember-password.test.mjs`（备用版记 / 恢复和官网同一个 30 天上限、披露只在给勾时为真、itch 一碰就炸）+ `tools/standalone-smoke.mjs`（file: 形态：塞一条记录、重开 → 被读过（没 verifier 就忘掉）；itch 夹具：原样不动）。

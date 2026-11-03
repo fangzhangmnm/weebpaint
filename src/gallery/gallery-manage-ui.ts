@@ -24,7 +24,10 @@ import { galleryAttachment } from "../gallery-attachment-host.ts";
 import { galleryRegistry } from "@internal/gallery";
 import type { GalleryEntry } from "@internal/gallery";
 import { mintFolderByPicker, mintOneDriveByAccount, mintOneDriveSwitchAccount, oneDriveInteractMode, attachGallery, ensureFolderPermission, canPickFolderGallery, hasFreshPendingOneDriveConnect, clearPendingOneDriveConnect, galleryFlow, type MintResult } from "../gallery-connect.ts";
-import { requireStore, signIn, signOut, isSignedIn, isAuthConfigured, _seedNextRackInitData, _buildStoreForGalleryEntry, brushRackCollection } from "../app-store.ts";
+import { requireStore, signIn, signOut, isSignedIn, isAuthConfigured, cloudEnabled, _seedNextRackInitData, _buildStoreForGalleryEntry, brushRackCollection } from "../app-store.ts";
+import { currentPolicy } from "../deployment-policy.ts";   // 规则书 §2：网盘 官网 ✓ / itch、备用版 ✗ 灰 +「去官网」
+import { localFileName } from "../deployment.ts";          // 备用版的文件名（逃生舱说明里要提）
+import { SITE_HOST } from "../config.ts";
 import { getAllBrushes, getMeta, RACK_META_ID } from "../brushes.ts";
 import { preferences, PREF_REGISTRY, flushPreferences, type PrefKey } from "../app-prefs.ts";
 import { flushAppState } from "../app-state.ts";   // #60-C：redirect 前 flush
@@ -230,7 +233,10 @@ function renderConnectContent(box: HTMLElement): void {
   // 连接动词（网盘在前，user 0830）。OneDrive 只此一条、**永远弹微软账号选择页**（user 0830 终形拍板
   //   「永远都是 connect to another account，防止误点」）：快速回常用库走下面的 history——同时规避
   //   「SSO 静默连错账号」与 pinned 账号重连连错人两个坑；label 不用「换一个账号」相对措辞（唯一动词）。
-  if (isAuthConfigured()) box.appendChild(_menuItem(t("gm.connectOneDrive"), "cloud", () => { void onOneDrivePick(); }));
+  // 网盘入口（家族规则书 §1 第 6 条，2026-11-03 工单 B，Claude Opus 5.5）：开关开着 + 配了 client id → 真入口；
+  //   开关关着（itch / 备用版）→ 画灰 + 副标题「去官网 weebpaint.com」，点了说清楚为什么（不露着却点不动）。
+  if (cloudEnabled && isAuthConfigured()) box.appendChild(_menuItem(t("gm.connectOneDrive"), "cloud", () => { void onOneDrivePick(); }));
+  else if (!currentPolicy().cloud) box.appendChild(_unavailableCloudItem());
   if (canPickFolderGallery()) box.appendChild(_menuItem(t("gm.connectFolder"), "folder-open", () => { void onFolderPick(); }));
   // history（VS Code「Open Recent」形制，user 0830 拍板回归）：分隔线 + 说明行 + 名册行（✕=忘记，
   //   「用户对隐私有掌握」）。folder 行=存的句柄直接复活（最多补权限），不走 picker——名册买回来的东西。
@@ -293,15 +299,29 @@ async function redirectAfterFlush(go: () => void): Promise<void> {
   ]);
 }
 
+/** 网盘开关关着时的入口：灰 + 「去官网」副标题；点了弹一句为什么。备用版（双击打开的文件）再接上 0825 拍板、0828 落地的
+ *  逃生舱说明（在文件旁起本地 http 服务——那样打开就是 http 源，按官网走，能连 OneDrive）。itch 上没有这个文件可服，只说去官网。 */
+function _unavailableCloudItem(): HTMLButtonElement {
+  const b = _menuItem(t("gm.connectOneDrive"), "cloud", () => {
+    _closePopup();
+    const fn = localFileName();
+    const msg = t("gm.cloudOnSiteHelp", { site: SITE_HOST }) + (fn ? "\n\n" + t("gm.fileProtoCloudHelp", { file: fn }) : "");
+    void openChoiceSheet<true>(t("gm.connectTitle"), msg, [{ label: t("common.ok"), value: true, primary: true }]);
+  });
+  b.classList.add("menu-item-unavailable");
+  b.setAttribute("aria-disabled", "true");
+  if (currentPolicy().siteHint) {
+    const sub = document.createElement("span");
+    sub.className = "menu-item-sub";
+    sub.textContent = t("gm.cloudOnSiteSub", { site: SITE_HOST });
+    b.appendChild(sub);
+  }
+  return b;
+}
+
 async function onOneDrivePick(): Promise<void> {
   _closePopup();
-  // 逃生舱 helper（0825 拍板→0828 落地）：file:// 下微软登录无解（redirect 需要 http origin）——
-  //   不起跳，改弹「怎么开本地服务器」的文字指路。folder 图库不受影响。
-  if (typeof location !== "undefined" && location.protocol === "file:") {
-    const fn = (() => { try { return decodeURIComponent(location.pathname.split("/").pop() || "weebpaint-standalone.html"); } catch { return "weebpaint-standalone.html"; } })();
-    await openConfirmSheet(t("gm.connectTitle"), t("gm.fileProtoCloudHelp", { file: fn }));
-    return;
-  }
+  // （0828 的 file:// 逃生舱分支 2026-11-03 搬进 _unavailableCloudItem：备用版的网盘开关关着，这个函数在那里根本不会被挂上。）
   // 永远弹账号选择页（select_account；点击同步栈起跳保手势）。桌面 = popup：选完账号弹回，
   //   minted 直接续 switchFlow（全程不离页）；移动 = redirect：页面即离开，回程由
   //   resumePendingOneDriveConnect 续办 mint+switchFlow——选了同账号由「已是当前图库」短路。
