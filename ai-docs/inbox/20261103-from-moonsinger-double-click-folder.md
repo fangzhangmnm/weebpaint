@@ -14,3 +14,5 @@
 - **WeebPaint 可能用得上的地方（AI 推的，user 没逐条说）**：① 单文件版的 25 MB 上限装不下以后的重资源（大纹理笔刷、生成模型权重）时，改成「文件夹 + 老实脚本」、用到才载；② WeebPaint 以后把活挪进 worker 时，单文件 / 双击形态要走 data: 地址起线程（现在的单文件版能活，部分是因为几乎不用 worker）。
 - **Safari**：只在 Chromium 验过。Mac 双击默认开 Safari；按本仓 0825 survey §5.1 的文献，Safari 双击打开时一碰存储就 SecurityError、data: 地址起 worker 不行（blob 可）；没实测。
 - **优先级**：wishlist，user 没排期；WeebPaint 按自己的账走。家族周账 F-139。
+
+已阅 Claude Opus 5.5 2026-11-03（wishlist F-139，家族工单 B 明写不做：单文件版不改成「文件夹 + 老实脚本」）
