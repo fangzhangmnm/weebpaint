@@ -83,6 +83,10 @@ export interface EditorSession {
   //   与 isDirty 正交：isDirty=false ∧ isPushPending=true 是最要命的组合——「存过了」但「没上云」，
   //   而 v432 之前它没有任何渲染面，于是徽章照画云朵对勾（用户报的「远端文件不一样而 UI 从没说过」）。
   isPushPending(): boolean;
+  /** 人按过存、当时没推成、之后没再改。回来时可以自动续传（完成已有的同意，ADR-0018）；只是编辑过、自动保存过的不算。 */
+  isPushOwed(): boolean;
+  /** 库替这份推上去了（回来问一次 → dirty.pushAll）：别再记着欠一推。内存还脏就不算。 */
+  noteExternallyPushed(): void;
   start(): void;                                  // 挂 autosave timer + 失焦/pagehide 监听（按 policy）；DOM 无则 no-op
   dispose(): void;                                // 拆监听 + 停 timer
 }
@@ -97,6 +101,7 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
   let _editEpoch = 0;                              // 编辑代数：onChange 单调递增。persist 用「freeze 时的代数」判定
                                                    //   清脏是否合法——encode/save 的 await 窗口里进来的编辑绝不被
                                                    //   乐观清脏吞掉（QA 2026-08-21：busy 期键盘 undo 曾被静默宣布已落盘）。
+  let _pushOwed = false;                           // 人按过存、当时没推成、之后没再改（规则书第 15 条 (b)：回来自动续传的依据；_pushPending 每次编辑都置 true，分不出这个）
   let _pushPending = false;                        // 推-pending：自上次成功推后编辑过（驱动退出推；≠内存脏，flushLocal 清内存脏但留 push-pending）
   let _saving = false;                             // 落盘中（防重入/竞态）
   let _timer: ReturnType<typeof setInterval> | null = null;
@@ -108,7 +113,7 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
     if (_onChangeWired) return;
     _onChangeWired = true;
     editor.onChange(() => {
-      _dirty = true; _pushPending = true; _editEpoch++;
+      _dirty = true; _pushPending = true; _pushOwed = false; _editEpoch++;
       if (pushOn.has("idle")) scheduleIdle();
     });
   }
@@ -155,7 +160,7 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
       //    那个队列永不 drain。）
       //   `res?.pushed !== true` 而非 `!res.pushed`：store 没报告结果（旧适配器/mock）时**假定没推上去**，
       //   保住 push-pending 下次重试。宁可多推一次，也不要静默清干净（优先级②）。
-      if (tryPush) _pushPending = res?.pushed !== true || _editEpoch !== epochAtFreeze;   // 推上去的是 freeze 快照——之后的编辑还欠一推
+      if (tryPush) { _pushPending = res?.pushed !== true || _editEpoch !== epochAtFreeze; if (!_pushPending) _pushOwed = false; }   // 推上去的是 freeze 快照——之后的编辑还欠一推
       takeCloudReload = res?.resolution === "takeCloud";   // 换世界线标记（重载在 finally 之后做，_saving 已放开）
       if (_createFor === _name) _createFor = null;   // 首存成功 → 这个身份已建，后续都是编辑
       // 落盘成功 → 通知 app 域字节变了（缩略图等派生缓存作废）。save() 能 resolve = 本地已写成
@@ -204,7 +209,7 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
     if (!blob) return false;                     // false = 文件缺失/锁定，doc 未装入（caller 据此回图库、别改活动名）
     await editor.adopt(blob);
     _name = name;
-    _dirty = false; _pushPending = false;        // 刚 adopt = 干净（本会话未编辑；desk 由 Unserialize 载入）
+    _dirty = false; _pushPending = false; _pushOwed = false;        // 刚 adopt = 干净（本会话未编辑；desk 由 Unserialize 载入）
     if (_createFor === name) _createFor = null;  // 这个名字已能从 store 打开 → 身份已建，不该再走 mode:"new"
     return true;
   }
@@ -219,6 +224,8 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
     currentName: () => _name,
     isDirty: () => _dirty,
     isPushPending: () => _pushPending,
+    isPushOwed: () => _pushOwed,
+    noteExternallyPushed(): void { if (!_dirty) { _pushPending = false; _pushOwed = false; } },
 
     async open(name: string): Promise<boolean> {
       if (_name && _name !== name) await persist(pushOn.has("exit"));   // 切 doc 前先存旧的（退出语义）
@@ -229,15 +236,15 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
     adopted(name: string, opts?: { create?: boolean }): void {   // new-doc/import：编辑器内容由 app 装入（非 store.open）→ 当前 + 脏
       wireOnChange();
       _name = name;
-      _dirty = true; _pushPending = true;          // 新内容未落盘/未推；desk=默认（reset 过）
+      _dirty = true; _pushPending = true; _pushOwed = false;          // 新内容未落盘/未推；desk=默认（reset 过）
       _createFor = opts?.create ? name : null;     // 新建画布/import → **该身份**首存 mode:"new"（撞名不覆盖）；纯 adopt(revert/切名) 不设 = existing
     },
 
-    markDirty(): void { _dirty = true; _pushPending = true; },   // app 驱动内容变化（onChange 之外）→ 标脏
+    markDirty(): void { _dirty = true; _pushPending = true; _pushOwed = false; },   // app 驱动内容变化（onChange 之外）→ 标脏
 
     flushLocal: () => persist(false),
     flushAndPush: () => persist(true),
-    forceSaveAndPush: () => persist(true, true),   // 用户显式按 save：无条件 encode+推（v409）
+    forceSaveAndPush: async () => { await persist(true, true); _pushOwed = _name != null && _pushPending && !_dirty; },   // 用户显式按 save：无条件 encode+推（v409）；没推成且期间没再改 = 记下欠的这一推
 
     async rename(newName: string): Promise<TryMoveResult> {
       if (!_name) return { ok: true };
@@ -250,7 +257,7 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
     async delete(): Promise<void> {
       if (!_name) return;
       const n = _name;
-      _name = null; _dirty = false; _pushPending = false;
+      _name = null; _dirty = false; _pushPending = false; _pushOwed = false;
       await fileOf(n).trash();
     },
 

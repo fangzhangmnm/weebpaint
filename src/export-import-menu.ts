@@ -247,9 +247,20 @@ export function initExportImportMenu(ctx: AppContext) {
   //   加密作品出**明文**（内存本就是解密态）——入口文案用 tm.hubSaveLocalOraPlain + sheet message 说清。
   //   顺序纪律：先开 OS 保存框再 encode——showSaveFilePicker 要吃 user-gesture 活化，
   //   encode 的 await（大画可能秒级）不能排在 picker 前面耗活化窗口。
-  const saveLocalOraCopy = async () => {
+  const saveLocalOraCopy = async (plain = false) => {
     try {
       const base = exportBaseName();
+      // 加密作品默认给容器（规则书 §1 第 5 条，user 11-03）：原样搬 at-rest 字节，不解不封。明文是显式选项（hub 上单独一行，写着那句话）。
+      if (session.enc.encrypted && !plain) {
+        const fileName = `${base}.ora.zip`;
+        const h = supportsSaveFilePicker() ? await pickSaveOraFile(fileName, { encrypted: true }) : null;
+        if (supportsSaveFilePicker() && !h) return;
+        const cipher = await session.readEncryptedBytes();
+        if (!cipher) { setStatus(t("tm.exportNoCipher"), true); return; }
+        if (h) await writeHandleBlob(h, cipher); else triggerDownload(cipher, fileName);
+        setStatus(t("tm.localOraSavedEnc", { name: h?.name ?? fileName }));
+        return;
+      }
       if (supportsSaveFilePicker()) {
         const h = await pickSaveOraFile(`${base}.ora`);
         if (!h) return;   // 用户取消 OS 保存框（AbortError → null，不是错误）
@@ -274,18 +285,22 @@ export function initExportImportMenu(ctx: AppContext) {
     setMenuOpen(false);
     const cfg = document.getElementById("menuExportImageSub")?.textContent || desk.export.format.toUpperCase();
     const enc = session.enc.encrypted;
-    const choice = await openChoiceSheet<"image" | "local" | "gallery">(
+    // 加密作品：默认（主按钮）= 加密文件；给别的软件的格式、明文另存都写明（规则书 §1 第 5 条，user 11-03）。.ora 工程格式走「导出图片」也是容器，不算明文。
+    const imagePlain = enc && _getExpImg().format !== "ora";
+    const choice = await openChoiceSheet<"image" | "local" | "localPlain" | "gallery">(
       t("tm.hubTitle"),
       enc ? t("tm.hubEncryptedPlainNote") : "",
       [
-        { label: t("tm.hubExportImage", { cfg }), value: "image", primary: true },
-        { label: enc ? t("tm.hubSaveLocalOraPlain") : t("tm.hubSaveLocalOra"), value: "local" },
+        ...(enc ? [{ label: t("tm.hubSaveLocalOraEnc"), value: "local" as const, primary: true }] : []),
+        { label: imagePlain ? t("tm.hubExportImagePlain", { cfg }) : t("tm.hubExportImage", { cfg }), value: "image" as const, ...(enc ? {} : { primary: true }) },
+        enc ? { label: t("tm.hubSaveLocalOraPlain"), value: "localPlain" as const } : { label: t("tm.hubSaveLocalOra"), value: "local" as const },
         // 云功能关 → 图库不可见，「复制一份到图库」一并收（cloud-capability v1.1 gating）
         ...(hasGallery() ? [{ label: t("tm.hubCopyToGallery"), value: "gallery" as const }] : []),
       ],
     );
     if (choice === "image") await runConfiguredExport();
     else if (choice === "local") await saveLocalOraCopy();
+    else if (choice === "localPlain") await saveLocalOraCopy(true);
     else if (choice === "gallery") await runSaveAsFlow();
   });
   // v0.5.19（user）：「导入图片」出主菜单——导入文件/剪贴板收进图层窗口 + 菜单（import-image.ts 接线）。

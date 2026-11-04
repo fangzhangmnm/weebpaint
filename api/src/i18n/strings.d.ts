@@ -4945,10 +4945,28 @@ export declare const S: {
         readonly tok: "o awen e lipu .ora lon ilo ni";
     };
     readonly "tm.hubSaveLocalOraPlain": {
-        readonly zh: "存为本地 .ora 文件（明文）";
-        readonly en: "Save a local .ora file (plaintext)";
-        readonly ja: "ローカル .ora ファイルに保存（平文）";
+        readonly zh: "存为本地 .ora 文件（这份是明文、没有加密）";
+        readonly en: "Save a local .ora file (plaintext, not encrypted)";
+        readonly ja: "ローカル .ora ファイルに保存（平文、暗号化なし）";
         readonly tok: "o awen e lipu .ora lon ilo ni (len ala)";
+    };
+    readonly "tm.hubSaveLocalOraEnc": {
+        readonly zh: "存为本地加密文件（.ora.zip，原口令才能打开）";
+        readonly en: "Save an encrypted local file (.ora.zip; opens with the same password)";
+        readonly ja: "暗号化したローカルファイルに保存（.ora.zip、同じパスワードで開けます）";
+        readonly tok: "o awen e lipu len lon ilo ni (.ora.zip)";
+    };
+    readonly "tm.hubExportImagePlain": {
+        readonly zh: "导出图片（{cfg}；这份是明文、没有加密）";
+        readonly en: "Export image ({cfg}; plaintext, not encrypted)";
+        readonly ja: "画像を書き出す（{cfg}、平文、暗号化なし）";
+        readonly tok: "o pana e sitelen ({cfg}; len ala)";
+    };
+    readonly "tm.localOraSavedEnc": {
+        readonly zh: "已存为加密文件：{name}（原口令才能打开）";
+        readonly en: "Saved encrypted file: {name} (opens with the same password)";
+        readonly ja: "暗号化ファイルに保存しました：{name}（同じパスワードで開けます）";
+        readonly tok: "mi awen e lipu len {name}";
     };
     readonly "tm.hubCopyToGallery": {
         readonly zh: "复制一份到图库";
@@ -4957,10 +4975,10 @@ export declare const S: {
         readonly tok: "o awen e sitelen sama tawa tomo sitelen";
     };
     readonly "tm.hubEncryptedPlainNote": {
-        readonly zh: "加密作品在编辑时已解密：「存为本地 .ora 文件」导出的是明文副本。";
-        readonly en: "Encrypted artwork is decrypted while editing: \"Save a local .ora file\" exports a plaintext copy.";
-        readonly ja: "暗号化された作品は編集中は復号されています。「ローカル .ora ファイルに保存」は平文のコピーを書き出します。";
-        readonly tok: "sitelen ni li jo e len. taso tenpo ni la ona li len ala. awen lon ilo ni la lipu li len ala.";
+        readonly zh: "这幅画是加密的。工程文件默认给加密的；图片这类给别的软件的格式只能是明文。";
+        readonly en: "This artwork is encrypted. Project files stay encrypted by default; images and other formats for other software can only be plaintext.";
+        readonly ja: "この作品は暗号化されています。作品ファイルは既定で暗号化のまま、画像など他のソフト向けの形式は平文になります。";
+        readonly tok: "sitelen ni li len. lipu pali li awen len. sitelen pi ilo ante li ken ala len.";
     };
     readonly "tm.localOraSaved": {
         readonly zh: "已存为本地文件：{name}";
@@ -6000,17 +6018,53 @@ export declare const S: {
         readonly ja: "ギャラリーを切り替える前に、現在の絵を閉じてください";
         readonly tok: "o pini e sitelen ni. o ante e poki sitelen lon tenpo kama";
     };
-    readonly "pushAll.askTitle": {
-        readonly zh: "有 {n} 张画没同步好（只在这台设备上，或改了还没传上去）。";
-        readonly en: "{n} painting(s) are not in sync (only on this device, or edited and not uploaded).";
-        readonly ja: "同期できていない絵が {n} 枚あります（この端末だけにある、または変更が未送信）。";
-        readonly tok: "sitelen {n} li lon ala poki sewi.";
+    readonly "pushAll.askOnly": {
+        readonly zh: "有 {a} 份只在这台设备，现在传上去？";
+        readonly en: "{a} only on this device. Upload now?";
+        readonly ja: "{a} 件はこの端末にしかありません。今アップロードしますか？";
+        readonly tok: "sitelen {a} li lon ilo ni taso. o pana ala pana?";
     };
-    readonly "pushAll.askMsg": {
-        readonly zh: "到图库里逐张「处理…」，每一张都会问你用云端的还是这台的。";
-        readonly en: "Resolve them one by one in the gallery; each one asks you which side to keep.";
-        readonly ja: "ギャラリーで一枚ずつ「処理…」してください。どちらを残すかはその都度たずねます。";
-        readonly tok: "o pona e ona lon tomo sitelen. ona li toki e ni tawa sina: sina wile e seme?";
+    readonly "pushAll.askMixed": {
+        readonly zh: "有 {a} 份只在这台设备，还有 {c} 份改过没传。现在全传？";
+        readonly en: "{a} only on this device, and {c} changed but not uploaded. Upload all now?";
+        readonly ja: "{a} 件はこの端末にしかなく、ほかに {c} 件は変更後未アップロードです。今すべてアップロードしますか？";
+        readonly tok: "sitelen {a} li lon ilo ni taso. sitelen {c} li ante li tawa ala. o pana ale ala pana?";
+    };
+    readonly "pushAll.askNote": {
+        readonly zh: "别的设备改过的不会被盖掉，会留给你选。";
+        readonly en: "Anything changed on another device won't be overwritten; you get to choose.";
+        readonly ja: "ほかの端末で変更されたものは上書きされません。あとで選べます。";
+        readonly tok: "ilo ante li ante e ijo la mi weka ala e ona. sina ken wile.";
+    };
+    readonly "pushAll.now": {
+        readonly zh: "现在传";
+        readonly en: "Upload now";
+        readonly ja: "今アップロード";
+        readonly tok: "o pana";
+    };
+    readonly "pushAll.later": {
+        readonly zh: "稍后";
+        readonly en: "Later";
+        readonly ja: "あとで";
+        readonly tok: "tenpo kama";
+    };
+    readonly "pushAll.inList": {
+        readonly zh: "{n} 份没传上去，在「要处理」列表里";
+        readonly en: "{n} not uploaded; they're in the to-handle list";
+        readonly ja: "未アップロード {n} 件は「対応が必要」の一覧にあります";
+        readonly tok: "sitelen {n} li tawa ala. ona li lon lipu pali";
+    };
+    readonly "pushAll.allDone": {
+        readonly zh: "{n} 份都传上去了";
+        readonly en: "All {n} uploaded";
+        readonly ja: "{n} 件すべてアップロードしました";
+        readonly tok: "sitelen {n} ale li tawa poki sewi";
+    };
+    readonly "pushAll.partial": {
+        readonly zh: "传上去 {pushed} 份，还有 {left} 份没传成{names}：别的设备改过的要你选，网络问题的之后再试。";
+        readonly en: "Uploaded {pushed}; {left} not uploaded{names}. Ones changed on another device need your choice; network problems retry later.";
+        readonly ja: "{pushed} 件アップロード、{left} 件は未完了{names}。ほかの端末で変更されたものは選んでください。通信の問題はあとで再試行します。";
+        readonly tok: "mi pana e {pushed}. {left} li tawa ala{names}.";
     };
     readonly "pushAll.ok": {
         readonly zh: "去处理";
@@ -6761,6 +6815,24 @@ export declare const S: {
         readonly en: "“{name}” is encrypted and a fork would leave an unencrypted copy, so it was set aside. It is still updating; open it from the gallery when it's done.";
         readonly ja: "「{name}」は暗号化されていて、分岐すると平文が残るため閉じました。更新が終わったらギャラリーから開いてください。";
         readonly tok: "{name} li len. sitelen sin li len ala la mi pini e ona. o open e ona lon tomo sitelen.";
+    };
+    readonly "ss.saveAsLockedEnc": {
+        readonly zh: "这幅画是加密的、现在锁着：先解锁再另存（不存明文）";
+        readonly en: "This artwork is encrypted and locked: unlock it before saving a copy (no plaintext copies)";
+        readonly ja: "この作品は暗号化されロック中です。複製する前に解除してください（平文では保存しません）";
+        readonly tok: "sitelen ni li len li pini. o open e ona.";
+    };
+    readonly "enc.plainNote": {
+        readonly zh: "这份是明文、没有加密";
+        readonly en: "This copy is plaintext, not encrypted";
+        readonly ja: "このファイルは平文で、暗号化されていません";
+        readonly tok: "lipu ni li len ala";
+    };
+    readonly "enc.plainVideoMsg": {
+        readonly zh: "录像给别的软件用，只能是明文：拿到文件的人都能看。";
+        readonly en: "Videos are for other software and can only be plaintext: anyone with the file can watch it.";
+        readonly ja: "動画は他のソフト向けで平文になります。ファイルを持つ人は誰でも見られます。";
+        readonly tok: "sitelen tawa li ken ala len. jan ale li ken lukin.";
     };
     readonly "cf.cloudNewerTitle": {
         readonly zh: "云端有新版本";

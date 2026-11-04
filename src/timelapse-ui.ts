@@ -29,9 +29,11 @@ let _selAspect: readonly [number, number] = [TIMELAPSE_DEFAULT_SETTINGS.aspectW,
 let _selLongEdge = TIMELAPSE_DEFAULT_SETTINGS.longEdge;
 let _moreOpen = false;          // ⋯ 溢出行开合（session 态，不持久化）
 let _currentDocName: () => string = () => "";
+let _isEncrypted: () => boolean = () => false;
 
-export function initTimelapseUi(currentDocName: () => string): void {
+export function initTimelapseUi(currentDocName: () => string, isEncrypted: () => boolean = () => false): void {
   _currentDocName = currentDocName;
+  _isEncrypted = isEncrypted;
   els.menuTimelapse.addEventListener("click", () => { setMenuOpen(false); _openPanel(); });
   els.tlRecChip.addEventListener("click", () => _openPanel());
   els.tlPanelClose.addEventListener("click", () => _win?.close());
@@ -174,6 +176,8 @@ async function _freshMp4(): Promise<Uint8Array | null> {
 }
 
 async function _exportFresh(): Promise<void> {
+  // 加密的画：录像给别的软件用、只能明文 → 下载前明说一句（规则书 §1 第 5 条，user 11-03）
+  if (_isEncrypted() && !(await openConfirmSheet(t("enc.plainNote"), t("enc.plainVideoMsg")))) return;
   const bytes = await _freshMp4();
   if (!bytes) return;
   // Uint8Array → 独立 ArrayBuffer 拷贝（防 BlobPart 收窄/共享 buffer 偏移坑）

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // test/probes/probe-cloud-gate.mjs —— 工单 G 无头验收：闸门（设计稿 §7）+ F-147 B（点「有新版本」前）+ F-148（第二台第一次开纯云端加密画）。created 2026-11-03 by Claude Opus 5.5
 //   真 bundle、真库、真 7z；假的只有两头：MSAL 脚本（静默续签结果可控）和 Graph（内存小网盘，可挂起、可计数）。headless。
-//   用法：bash scripts/build.sh 之后 `node test/probes/probe-cloud-gate.mjs [gate|reload|enc]`（不给 = 全跑，≈ 90 s；⑤′ 真等 8 s）。
+//   用法：bash scripts/build.sh 之后 `node test/probes/probe-cloud-gate.mjs [gate|reload|enc|exit|back]`（不给 = 全跑，≈ 90 s；⑤′ 真等 8 s）。
 import { createRequire } from "node:module";
 import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
@@ -221,7 +221,7 @@ if (only === "all" || only === "reload") {
     eq(drive.puts.length, n0, "干净的画：一次写都没有");
     eq(drive.items.get(`${p}.ora`)?.eTag, e0, "干净的画：云端 eTag 没变");
     eq(st.storeDirty, 0, "干净的画：store 不脏");
-    ok(!/没同步好/.test(await d.page.evaluate(() => document.body.innerText)), "干净的画：不弹「没同步好」");
+    ok(!/没传上去/.test(await d.page.evaluate(() => document.body.innerText)), "干净的画：不弹「没同步好」");
   }
   {
     await d.draw(5);
@@ -239,7 +239,7 @@ if (only === "all" || only === "reload") {
     const st = await d.state();
     ok(drive.puts.length > n0, "存好再刷新：推上去了");
     eq(st.storeDirty, 0, "存好再刷新：store 不脏");
-    ok(!/没同步好/.test(await d.page.evaluate(() => document.body.innerText)), "存好再刷新：不弹「没同步好」");
+    ok(!/没传上去/.test(await d.page.evaluate(() => document.body.innerText)), "存好再刷新：不弹「没同步好」");
   }
   {
     await d.draw(9);
@@ -251,7 +251,7 @@ if (only === "all" || only === "reload") {
     await nav; await d.ready(); await sleep(400); await d.settled(); await sleep(1200);
     eq(drive.puts.length, n0, "先不传：没推（WeebPaint 的推送 = 人按存）");
     eq((await d.state()).storeDirty, 1, "先不传：这一笔落在本机，store 记着");
-    ok(/没同步好/.test(await d.page.evaluate(() => document.body.innerText)), "先不传：刷新后如实提醒");
+    ok(/没传上去/.test(await d.page.evaluate(() => document.body.innerText)), "先不传：刷新后如实提醒");
     await d.page.evaluate(() => globalThis.__wpProbe.session.saveAndPush()); await d.settled();
   }
   {
@@ -353,6 +353,149 @@ if (only === "all" || only === "enc") {
     await C.ctx.close(); await D.ctx.close();
   }
   await A.ctx.close();
+}
+
+/** 用库自己的判据（真字节进页面问 appEncryption.isEncryptedBlob），不在探针里抄魔数。 */
+const isContainerOn = (d, b) => !b ? Promise.resolve(false) : d.page.evaluate(async (b64) => {
+  const bin = atob(b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return globalThis.__wpProbe.isEncryptedBlob(new Blob([u8]));
+}, Buffer.from(b).toString("base64"));
+const dirtyDiag = (d) => d.page.evaluate(() => document.body.innerText.match(/[^\n]*没传上去[^\n]*/)?.[0] ?? "");
+
+// ─────────────────────────────── 出门规则（规则书 §1 第 5 条；工单 G2）───────────────────────────────
+if (only === "all" || only === "exit") {
+  console.log("加密作品另存 / 导出：默认容器，明文要显式、写明");
+  const drive = fakeDrive();
+  const A = await device(drive);
+  const p = await A.prepare();
+  await A.page.evaluate((v) => globalThis.__wpProbe.setPassword(v), PW);
+  await A.page.evaluate(() => globalThis.__wpProbe.session.encryptCurrent()); await A.settled(); await sleep(500);
+  ok(await isContainerOn(A, drive.items.get(`${p}.ora.zip`)?.bytes), "前提：云端是容器");
+
+  await A.page.evaluate(() => globalThis.__wpProbe.session.saveAs("副本")); await A.settled(); await sleep(500);
+  ok(await isContainerOn(A, drive.items.get("副本.ora.zip")?.bytes), "另存为：云端新文件是容器");
+  ok(!drive.items.has("副本.ora"), "另存为：云端没有明文 .ora");
+  ok(await A.page.evaluate(async () => { const b = await globalThis.__wpProbe.requireStore().zip("副本.ora", { mode: "existing" }).getEncryptedBlob(); return !!b; }), "另存为：本地字节也是容器");
+  eq((await A.state()).enc, true, "另存为之后：认得是加密的");
+  eq((await A.state()).home, "副本", "另存为之后：开着新的这份");
+  await A.draw(7);
+  await A.page.evaluate(() => globalThis.__wpProbe.session.saveAndPush()); await A.settled(); await sleep(300);
+  ok(await isContainerOn(A, drive.items.get("副本.ora.zip")?.bytes) && !drive.items.has("副本.ora"), "另存后再存一笔：云端还是容器");
+
+  await A.page.evaluate(() => { window.showSaveFilePicker = undefined; });
+  const hub = async () => { await A.page.evaluate(() => document.getElementById("menuExportImage").click()); await A.page.getByText("存为本地加密文件").waitFor(); return A.page.evaluate(() => [...document.querySelectorAll("button")].filter((b) => b.offsetParent && /存为本地|导出图片|复制一份/.test(b.textContent)).map((b) => ({ t: b.textContent.trim(), primary: !b.classList.contains("ghost") }))); };
+  const rows = await hub();
+  ok(rows.find((r) => r.primary)?.t.includes("存为本地加密文件"), `主按钮 = 加密文件（${rows.map((r) => r.t).join(" / ")}）`);
+  ok(rows.find((r) => r.t.includes("存为本地 .ora"))?.t.includes("这份是明文、没有加密"), "明文 .ora：按钮上写着那句话");
+  ok(rows.find((r) => r.t.includes("导出图片"))?.t.includes("这份是明文、没有加密"), "导出图片（PNG）：按钮上写着那句话");
+  const dl1 = A.page.waitForEvent("download");
+  await A.page.getByText("存为本地加密文件").click();
+  const d1 = await dl1;
+  ok(d1.suggestedFilename().endsWith(".ora.zip"), `默认那个：文件名 ${d1.suggestedFilename()}`);
+  ok(await isContainerOn(A, readFileSync(await d1.path())), "默认那个：下载的字节是容器");
+  await hub();
+  const dl2 = A.page.waitForEvent("download");
+  await A.page.getByText("这份是明文、没有加密").first().waitFor();
+  await A.page.locator("button", { hasText: "存为本地 .ora" }).click();
+  const d2 = await dl2;
+  ok(d2.suggestedFilename().endsWith(".ora") && !(await isContainerOn(A, readFileSync(await d2.path()))), `显式明文：${d2.suggestedFilename()}`);
+  await A.ctx.close();
+}
+
+// ─────────────────────────────── 回来时没传的分三种（规则书 §1 第 15 条，11-03 夜改写；工单 G2）───────────────────────────────
+if (only === "all" || only === "back") {
+  console.log("回来：(c) 不传不问进列表；(b) 续传不问；(a) 问一次；a + c 面上都说");
+  const drive = fakeDrive();
+  const d = await device(drive);
+  const p = await d.prepare();
+  const off = async () => {
+    await d.reload("interaction");
+    await d.page.waitForFunction(() => document.querySelectorAll("#syncGateActions button").length === 2);
+    await d.gateClick("离线继续"); await d.settled();
+    ok(await d.offline(), "前提：离线继续");
+  };
+  const back = async () => {
+    await d.page.evaluate(() => { localStorage.setItem("__fake_msal", "ok"); window.dispatchEvent(new Event("online")); });
+    await d.page.waitForFunction(() => !globalThis.__wpProbe.isUserOffline());
+    await sleep(1800);   // 走一遍文件夹（settle 800 ms）+ 该弹的弹出来
+  };
+  const autosave = async () => { await d.hide(); await sleep(300); await d.show(); await sleep(200); };
+  { // (c)
+    await off(); await d.draw(3); await autosave();
+    eq((await d.state()).storeDirty, 1, "(c) 前提：改动落了本机");
+    const n0 = drive.puts.length;
+    await back();
+    eq(drive.puts.length, n0, "(c) 不传");
+    ok(!(await d.gateUp()), "(c) 不问");
+    ok(/1 份没传上去/.test(await dirtyDiag(d)), `(c) 进列表：${await dirtyDiag(d)}`);
+    eq((await d.state()).storeDirty, 1, "(c) 还脏着");
+    await d.page.evaluate(() => globalThis.__wpProbe.session.saveAndPush()); await d.settled();
+    eq((await d.state()).storeDirty, 0, "(c) 人按存之后传上去");
+  }
+  { // (b)
+    await off(); await d.draw(6);
+    await d.page.evaluate(() => globalThis.__wpProbe.session.saveAndPush()); await d.settled();
+    eq(await d.page.evaluate(() => globalThis.__wpProbe.session.pushOwed), true, "(b) 前提：按过存，没传成");
+    const n0 = drive.puts.length;
+    await back(); await d.settled();
+    ok(drive.puts.length > n0, "(b) 自动续传");
+    ok(!(await d.gateUp()), "(b) 不问");
+    const st = await d.state();
+    eq(st.storeDirty, 0, "(b) 传完不脏"); eq(st.pp, false, "(b) 不再显示没上云");
+  }
+  { // 按过存又改了 = (c)
+    await off(); await d.draw(9);
+    await d.page.evaluate(() => globalThis.__wpProbe.session.saveAndPush()); await d.settled();
+    await d.draw(12); await autosave();
+    eq(await d.page.evaluate(() => globalThis.__wpProbe.session.pushOwed), false, "按存之后又改：不算欠");
+    const n0 = drive.puts.length;
+    await back();
+    eq(drive.puts.length, n0, "按存之后又改：不自动传");
+    await d.page.evaluate(() => globalThis.__wpProbe.session.saveAndPush()); await d.settled();
+  }
+  { // (a)
+    await off();
+    await d.page.evaluate(() => globalThis.__wpProbe.session.newDoc({ name: "离线新建", w: 64, h: 64 })); await d.settled();
+    await d.draw(2);
+    await d.page.evaluate(() => globalThis.__wpProbe.session.saveAndPush()); await d.settled();
+    const n0 = drive.puts.length;
+    await back();
+    await d.page.waitForFunction(() => /只在这台设备/.test(document.getElementById("syncGateTitle").textContent) && document.getElementById("syncGateSheet").hasAttribute("data-open"));
+    const face = await d.gateText();
+    ok(/有 1 份只在这台设备，现在传上去？/.test(face) && /现在传/.test(face) && /稍后/.test(face), `(a) 问：${face}`);
+    eq(drive.puts.length, n0, "(a) 没点之前一次都没传");
+    ok(!drive.items.has("离线新建.ora"), "(a) 云端还没有");
+    await d.gateClick("现在传"); await d.settled(); await sleep(800);
+    ok(drive.items.has("离线新建.ora"), "(a) 点了传上去");
+    const st = await d.state();
+    eq(st.storeDirty, 0, "(a) 传完不脏"); eq(st.pp, false, "(a) 开着的这份不再显示没上云");
+  }
+  { // a + c，稍后
+    await d.page.evaluate((x) => globalThis.__wpProbe.session.open({ name: x }), p); await d.settled();
+    await off(); await d.draw(4); await autosave();
+    await d.page.evaluate(() => globalThis.__wpProbe.session.newDoc({ name: "离线新建二", w: 64, h: 64 })); await d.settled();
+    await d.draw(1); await autosave();
+    eq((await d.state()).storeDirty, 2, "a + c 前提：两份脏");
+    const n0 = drive.puts.length;
+    await back();
+    await d.page.waitForFunction(() => /只在这台设备/.test(document.getElementById("syncGateTitle").textContent) && document.getElementById("syncGateSheet").hasAttribute("data-open"));
+    ok(/有 1 份只在这台设备，还有 1 份改过没传。现在全传？/.test(await d.gateText()), `a + c 面上都说：${await d.gateText()}`);
+    await d.page.keyboard.press("Escape"); await sleep(500);
+    ok(!(await d.gateUp()), "Esc = 稍后：面收了");
+    eq(drive.puts.length, n0, "稍后：什么都不推");
+    ok(/2 份没传上去/.test(await dirtyDiag(d)), `稍后：都进列表（${await dirtyDiag(d)}）`);
+    await d.page.evaluate(() => window.dispatchEvent(new Event("online"))); await sleep(1500);
+    ok(!(await d.gateUp()), "这一页不再问");
+    eq(drive.puts.length, n0, "这一页也不自己推");
+    // 下一页再问；这回点
+    await d.page.reload({ waitUntil: "load" }); await d.ready();
+    await d.page.waitForFunction(() => /只在这台设备/.test(document.getElementById("syncGateTitle").textContent) && document.getElementById("syncGateSheet").hasAttribute("data-open"), null, { timeout: 15000 });
+    ok(true, "下一页：再问一次");
+    await d.gateClick("现在传"); await d.settled(); await sleep(1000);
+    eq((await d.state()).storeDirty, 0, "点了：两份都传上去");
+    ok(drive.items.has("离线新建二.ora"), "点了：从没传过的那份在云端");
+  }
+  await d.ctx.close();
 }
 
 await browser.close();

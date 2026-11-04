@@ -43,7 +43,8 @@ import { sessionFileName, sessionBareName, stripSessionExt } from "./config.ts";
 import { serializedToolStatePatch, desk } from "./workbench-state.ts";
 import { getBlenderSyncState, applyBlenderSyncState } from "./blender-sync.ts";
 import { ensureNewPassword, ensureUnlocked, unlockImportedContainer, isFreshPasswordSetup, rollbackFreshPassword } from "./enc-thumbs.ts";
-import { setPassword, getPassword } from "./crypto-state.ts";
+import { setPassword, getPassword, setFilePassword } from "./crypto-state.ts";
+import { sealForSaveAs } from "./exit-seal.ts";
 import { note as diagNote } from "./diag-log.ts";
 import { shouldCapture, checkpointKey, planRingEviction, ringBudget, isNewSitting, type CheckpointTrigger, type RingEntryMeta } from "./checkpoint-policy.ts";
 import { getCheckpoint, deleteCheckpoint, ringPut, ringGet, ringAll, ringDelete, ringDeleteByDoc, mintRingId } from "./storage.ts";
@@ -761,6 +762,20 @@ async function saveNow(opts: { implicit?: boolean; commitPending?: boolean } = {
 // v0.5.9（user）：保存/推送在飞标志——纯 app 层内存态，不碰 store 契约。
 //   没有它，保存瞬间 dirty 已翻 false、pushPending 还挂着 → 徽章闪「问号虚云」（unpushed 终态），语义不对。
 let _pushInFlight = false;
+/** 回来时（规则书第 15 条 (b)）：开着的这份人按过存、当时没传成、之后没再改 → 续传，不问。从没传过的（(a)）不在这里：它要问。 */
+async function resumeOwedPush(neverUploaded: ReadonlySet<string>): Promise<void> {
+  const name = _activeName();
+  if (!name || !es?.isPushOwed() || neverUploaded.has(toFull(name))) return;
+  _pushInFlight = true;
+  updateSaveStatus();
+  try {
+    await es.flushAndPush();
+    await _refreshEncrypted();   // 撞上别的设备、在库的面里选了「云端覆盖本地」= 整份换了
+    gallery.refresh();
+  } catch (e) { reportError(new Error("[cloud] resume owed push failed: " + String(e)), "log"); }
+  finally { _pushInFlight = false; updateSaveStatus(); }
+}
+
 async function saveAndPush() {
   if (_fileHome()) { await saveLocalFileNow(); return; }   // file 家：Ctrl+S/save 按钮 = 写回文件（无云腿；= saveRoute 的 file-writeback）
   // 空白守卫先行（lazyblank / 空白 transient）：es 未绑或无内容——不拦的话 lazyblank 会谎报
@@ -1178,13 +1193,26 @@ function beginLazyBlank(): void {
 // 无地模式下另存为 = **收编入库**：无地 doc 获得 store 身份，本地文件留在原处不再跟踪。
 async function saveAs(newName: string): Promise<void> {
   _applyPendingForExplicitSave();   // 显式保存：fill 预览也收口（topbar 侧只 apply 了 transient）
+  // 加密的画另存 = 新身份也是容器（规则书 §1 第 5 条：加密作品出门默认容器；WeebPaint 06-11 就是这么定的，saveAs 这条路漏了）。
+  //   store 对「已是容器」原样透传，新文件落本地、上云都是密文；明文一个字节都不落。
+  const wasEncrypted = _enc.encrypted;
+  const active = _activeName();
+  const pw = wasEncrypted ? (active ? getPassword(toFull(active)) : getPassword(null)) : null;
+  if (wasEncrypted && !pw) throw new Error(t("ss.saveAsLockedEnc"));   // 先拦：下面 encode 大画要秒级，别白跑
   const { bytes, peek } = await _encodeCurrentOraWithPeek();
   // 另存为=写**新身份** → mode:"new"（撞名不静默覆盖；topbar 已 files.occupied 预检，这里 store 层再兜底红线）。
-  await requireStore().zip(toFull(newName), { mode: "new" }).save(bytes, { tryPush: true, hint: peek ? { peek } : undefined });
+  if (wasEncrypted) {
+    const container = await sealForSaveAs(bytes, peek, stripSessionExt(newName), pw, { pack: (o) => appEncryption.packContainer(o), isContainer: (b) => appEncryption.isEncryptedBlob(b) }, () => new Error(t("ss.saveAsLockedEnc")));
+    if (getPassword(toFull(newName)) !== pw) setFilePassword(toFull(newName), pw!);   // 这幅用的不是统一口令：新身份记同一把，之后的保存才封得对
+    await requireStore().zip(toFull(newName), { mode: "new" }).save(container, { tryPush: true });
+  } else {
+    await requireStore().zip(toFull(newName), { mode: "new" }).save(bytes, { tryPush: true, hint: peek ? { peek } : undefined });
+  }
   if (_fileHome()) { _homeAuth.setHome(null); _dropLuggage(); }   // 收编：内容已进库（就是刚写的字节），不算丢弃，无需问
   _setActive(newName); _isLazyBlankSession = false; _recomputePhase();
   es.adopted(toFull(newName));   // es 切到新名（内容即新名的；下轮 autosave 若跑=同内容 re-save，无害）。边界转全名。
   _esRebound();
+  await _refreshEncrypted();   // 以新身份的字节为准（F-148）
   void _captureCheckpoint(newName, "save-as");   // 新身份的「打开态」= 此刻
   updateSaveStatus(); gallery.refresh();
 }
@@ -1317,7 +1345,7 @@ async function flushBeforeReload(): Promise<boolean> {
 
 // 逃生分叉：saveAs = 现成深模块（mode:"new" 撞名护栏 + checkpoint + 切身份 + push）。秒级撞名重试一次。
 async function _forkAfterEscape(origName: string): Promise<void> {
-  // 加密的画不分叉：saveAs 写的是新身份 = 明文（规则书 §1 第 5 条；家族 F-148）。放下回图库（拉取只发生在干净文档上，放下不丢东西），它还在后台更新。
+  // 加密的画不分叉（和 CatsUp 一致，Fable 审过）：放下回图库（拉取只发生在干净文档上，放下不丢东西），它还在后台更新。saveAs 现在封口了，不再写明文，但分叉一份加密件要跑 7z，这里没必要。
   await _refreshEncrypted();
   if (_enc.encrypted) {
     setStatus(t("ss.encNoFork", { name: origName }), true);
@@ -1368,7 +1396,10 @@ export const session = {
   get loadedDocIsNewer() { return _loadedDocIsNewer; },               // 第二层（save-status 红边读）
   get loadedDocNewerConfirmed() { return _loadedDocNewerConfirmed; },
   get dirty() { return _localHomeKind() ? fileDirty() : (es ? es.isDirty() : false); },   // 内存脏（save-status/beforeunload 用；file/transient 家走 keeper 脏轨）
-  get pushPending() { return es ? es.isPushPending() : false; },   // 已落本地但没上云（徽章第四态；与 dirty 正交）
+  /** 回来问一次的「现在传」跑完了：打开着的这份没在失败名单里 = 传上去了，别再显示没上云。 */
+  noteAllPushed(failed: readonly string[]) { const a = _activeName(); if (a && !failed.includes(toFull(a))) es?.noteExternallyPushed(); updateSaveStatus(); },
+  get pushPending() { return es ? es.isPushPending() : false; },
+  get pushOwed() { return es ? es.isPushOwed() : false; },   // 已落本地但没上云（徽章第四态；与 dirty 正交）
   get saving() { return _pushInFlight; },   // v0.5.9：saveAndPush 在飞（app 层过程态，徽章显转圈云）
   openLocalFile, leaveLocalDoc,
   // app 驱动内容变化（revert 回滚；blender 冗余双标无害）→ 标脏。参考图已迁 wp:sidecarchange（S5）。
@@ -1384,7 +1415,7 @@ export const session = {
   // 显式换文档挽留门（fill 预览三选；user 2026-08-21）——给 session 外的换内容入口复用
   //   （import-image 的 .ora 导入为新身份）。session 内的 openItem/newDoc/openLocalFile 已内联。
   gateFillOnSwitch: _gateFillOnSwitch,
-  save: saveNow, saveAndPush,
+  save: saveNow, saveAndPush, resumeOwedPush,
   // adopt 的两个意图显式分开（别再合成一个带 flag 的）：import=新身份 / revert=既有身份。
   adoptAsNew, adoptAsExisting,
   /** 格式版本纪律：解完码、装入之前调（导入 / 崩溃恢复 / 回滚快照等 session 外的打开入口）。true = 拒开，调用方别再往下走。 */
@@ -1394,9 +1425,14 @@ export const session = {
   rename: renameCurrentSession, exit: exitCanvasToGallery, newDoc, open: openItem, unload: unloadItem,
   /** 当前作品的 at-rest **密文**字节（原样，不解壳、不要密码）。非加密件 → null。
    *  先 saveNow()：at-rest 字节是「上次保存」的内容，不先落盘就会导出成旧版本。 */
-  async readEncryptedBytes(): Promise<EncryptedBlob | null> {
+  async readEncryptedBytes(): Promise<EncryptedBlob | Blob | null> {
     const name = _activeName();
-    if (!name) return null;
+    if (!name) {   // 加密的文件家：磁盘上就是容器，按现在的内容封一份（口令不在 = null，绝不给明文）
+      const fh = _fileHome();
+      if (!fh || !_enc.encrypted || !getPassword(null)) return null;
+      const { bytes, peek } = await _encodeCurrentOraWithPeek();
+      return _packFileHomeContainer(bytes, peek, fh.fileName);
+    }
     await saveNow();                              // 未保存编辑先落盘（seal 会在写入前包壳 → 落地即密文）
     return await _file(name).getEncryptedBlob();
   },

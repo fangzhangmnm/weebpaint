@@ -41,6 +41,7 @@ interface SyncGateOpts<T = string> {
     actions: SyncGateAction<T>[];
     note?: string;
     quietStart?: boolean;
+    escValue?: T;
 }
 export declare function lockSyncGate<T = string>(opts: SyncGateOpts<T>): Promise<T>;
 /** 要自己收（闸门的罩子、拉取罩子）：拿句柄，别用 settleSyncGate（那个收的是最上面那张，不一定是你的）。 */

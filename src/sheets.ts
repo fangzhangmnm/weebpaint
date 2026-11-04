@@ -160,7 +160,7 @@ export function openChoiceSheet<T>(title: string, message: string, choices: { la
 // 2026-11-03 工单 G：改成栈（gate-stack.ts）。开机闸门的「核对中」上面会叠冲突面 / 拉取罩子：单槽版第二张一来第一张的 Promise 就永远不回。
 //   开着 = 交互锁 gate（键盘绑在 window 上，遮罩挡不住）。
 interface SyncGateAction<T = string> { label: string; value: T; primary?: boolean; onPick?: () => void }
-interface SyncGateOpts<T = string> { title: string; message: string; showSpinner?: boolean; actions: SyncGateAction<T>[]; note?: string; quietStart?: boolean }
+interface SyncGateOpts<T = string> { title: string; message: string; showSpinner?: boolean; actions: SyncGateAction<T>[]; note?: string; quietStart?: boolean; escValue?: T }
 const syncGate = {
   sheet: $("syncGateSheet") as HTMLElement,
   title: $("syncGateTitle") as HTMLElement,
@@ -193,7 +193,9 @@ const _gate = createGateStack((top) => {
     syncGate.actions.appendChild(btn);
   });
   // gate band + 允许穿透 busy（冲突必 surface；不可 dismiss——决策只能按钮选）
-  openModalSheet(syncGate.sheet, { band: "gate", allowDuringBusy: true, dismissible: false });
+  const esc = top.escValue;
+  openModalSheet(syncGate.sheet, esc === undefined ? { band: "gate", allowDuringBusy: true, dismissible: false }
+    : { band: "gate", allowDuringBusy: true, dismissible: true, onDismiss: () => _gate.settleTop(esc) });
   _releaseGateLock ??= acquireLock("gate");
 });
 export function lockSyncGate<T = string>(opts: SyncGateOpts<T>): Promise<T> { return _gate.open<T>(opts).result as Promise<T>; }

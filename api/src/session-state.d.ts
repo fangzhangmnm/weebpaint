@@ -54,6 +54,8 @@ declare function saveNow(opts?: {
     implicit?: boolean;
     commitPending?: boolean;
 }): Promise<void>;
+/** 回来时（规则书第 15 条 (b)）：开着的这份人按过存、当时没传成、之后没再改 → 续传，不问。从没传过的（(a)）不在这里：它要问。 */
+declare function resumeOwedPush(neverUploaded: ReadonlySet<string>): Promise<void>;
 declare function saveAndPush(): Promise<void>;
 declare function encryptCurrent(): Promise<void>;
 declare function decryptCurrent(): Promise<void>;
@@ -116,7 +118,10 @@ export declare const session: {
     readonly loadedDocIsNewer: boolean;
     readonly loadedDocNewerConfirmed: boolean;
     readonly dirty: boolean;
+    /** 回来问一次的「现在传」跑完了：打开着的这份没在失败名单里 = 传上去了，别再显示没上云。 */
+    noteAllPushed(failed: readonly string[]): void;
     readonly pushPending: boolean;
+    readonly pushOwed: boolean;
     readonly saving: boolean;
     openLocalFile: typeof openLocalFile;
     leaveLocalDoc: typeof leaveLocalDoc;
@@ -133,6 +138,7 @@ export declare const session: {
     gateFillOnSwitch: typeof _gateFillOnSwitch;
     save: typeof saveNow;
     saveAndPush: typeof saveAndPush;
+    resumeOwedPush: typeof resumeOwedPush;
     adoptAsNew: typeof adoptAsNew;
     adoptAsExisting: typeof adoptAsExisting;
     /** 格式版本纪律：解完码、装入之前调（导入 / 崩溃恢复 / 回滚快照等 session 外的打开入口）。true = 拒开，调用方别再往下走。 */
@@ -146,7 +152,7 @@ export declare const session: {
     unload: typeof unloadItem;
     /** 当前作品的 at-rest **密文**字节（原样，不解壳、不要密码）。非加密件 → null。
      *  先 saveNow()：at-rest 字节是「上次保存」的内容，不先落盘就会导出成旧版本。 */
-    readEncryptedBytes(): Promise<EncryptedBlob | null>;
+    readEncryptedBytes(): Promise<EncryptedBlob | Blob | null>;
     /** 当前 doc 的完整 .ora 字节（**明文**；2026-08-21「导出与另存」hub 的「存为本地 .ora」用）。
      *  与显式保存同一落盘形（_encodeCurrentOraWithPeek：meta+timelapse+mergedimage）；加密作品也出
      *  明文——内存本就是解密态，入口 sheet 文案已说清。纯导出副本：不落库、不碰 es/_fileHome() 身份。 */

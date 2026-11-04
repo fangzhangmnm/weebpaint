@@ -40,7 +40,10 @@ import { rememberDayText } from "./remember-day.ts";
 import { currentPolicy } from "./deployment-policy.ts";   // 家族规则书 §2：记住口令 / 共桶披露按部署方式
 import { sayHintOnce, sayStorageBlockedOnce } from "./site-hint.ts";   // itch / 备用版开局一行「去官网」；浏览器不给存那句
 import { migrateLegacyAppDbWhenIdle } from "./legacy-app-db.ts";   // 2026-11-03 老库搬家（空闲片里跑一次）
-import { sessionFileName } from "./config.ts";   // 边界：裸 session 名 → 库全名（薄库身份=X.ora）
+import { sessionFileName, stripSessionExt } from "./config.ts";
+import { planReturn, neverUploadedIds } from "./cloud-return.ts";
+import { appEncryption } from "./encryption.ts";
+import { snapshotFolderOnce, walkLibrary } from "@internal/gallery";   // 边界：裸 session 名 → 库全名（薄库身份=X.ora）
 import { ensureUnlocked } from "./enc-thumbs.ts";   // 交互解锁（busy 外）——图库 host.unlock 用
 import { els } from "./els.ts";
 import type { AppContext } from "./app-context.ts";
@@ -57,7 +60,7 @@ import { initFiltersAdjust } from "./filters-adjust.ts";
 import { initToolbar, RACK_PANEL_BY_TOOL, pickOnce, pickHoldBegin, pickHoldEnd, isPicking } from "./toolbar.ts";
 import { closePopupMenu } from "@internal/workbench-elements";
 import { configureRackFormatNotice } from "./rack-format-guard.ts";   // 格式版本纪律：笔架条目拍子的用户提示
-import { showNotice } from "@internal/workbench-elements";   // 2026-09-02 C7 通知栈   // 2026-09-02 C1：下笔一把关所有 popup（组槽/变体/stepper/主菜单/⋯）
+import { showNotice, closeNotice } from "@internal/workbench-elements";   // 2026-09-02 C7 通知栈   // 2026-09-02 C1：下笔一把关所有 popup（组槽/变体/stepper/主菜单/⋯）
 import { setColor, initColorPanel } from "./color-panel.ts";
 import { session, initSession, setSessionGallery } from "./session-state.ts";   // candidate 3 · 活动文档生命周期 SSoT
 import { setDocCompositor, setDocCompositorBytes } from "./backend/doc-render.ts";
@@ -408,7 +411,7 @@ initPlatformGuards(ctx);
 initTimelapse(doc, (nodes, w, h) => board.compositeDisplayBytes(nodes, w, h));   // 采帧=WYSIWYG（含 fill 预览/调整替身）
 // 导出 mp4 文件名与其它导出 sink 同源（exportBaseName）：无地本地文件模式 session.name 恒 null
 //   （双墙设计），基名用打开的本地文件 stem——录像跟着 ora 走，无地当然全量支持（user 2026-08-21）。
-initTimelapseUi(() => exportBaseName());
+initTimelapseUi(() => exportBaseName(), () => session.enc.encrypted);
 
 // 笔架异步 boot（fire-and-forget；ctx 已建好）。
 initRackBoot(ctx);
@@ -581,25 +584,58 @@ function _seedGalleryRegistry(): void {
     }).catch((e) => reportError(new Error("[gallery-registry] seed failed (soft): " + String(e)), "log"));
   } catch (e) { reportError(new Error("[gallery-registry] seed failed (soft): " + String(e)), "log"); }
 }
-// ── 没同步好的画：登录后 / 回线 / 挂上库后提一次（2026-10-26 改，家族周账 F-98 / F-88；user 10-26「列表面」「收，救火」；CatsUp 同形）──
-//   10-21 的「问一次 → files.dirty.pushAll()」是 / 否框撤了：它说「还没传上去」对「传过、后来改了没传」只说对了一半，批量传完失败只剩一条状态行、没有动作。
-//   现在：有没同步好的 → 一条带「去处理」钮的常驻通知 → 开图库进「要处理的」视图（gallery 0.8.8：顶部横幅 + 每张卡一粒可见的「处理…」，点了当场弹库的三选一面）。
-//   不自动盖住正在画的（别把人踢出去）；每次打开 app 最多提一次。不再自己批量推：每一张都由人在面里选用哪边。
-//   store 2.2.1 起「刷新前改过 + 登录前恢复」那种谱系丢了的脏画推前会先问云端、没人动就直接推成——所以这里数到的多半是真要人选的。
+// ── 回来（开机登录好 / 网回来）时没传的东西（规则书 §1 第 15 条，2026-11-03 夜改写；家族工单 G2；分法见 cloud-return.ts）──
+//   (b) 开着那份按过存没传成 → 续传不问，每次回来都看。(a) 从没传过 → 问一次，点了才传。(c) 只是自动保存 → 不传不问，进「要处理」列表。一页只问一次。
+//   WeebPaint 的传的时机（按「存」或退出）不变。pushAll 这条自动路径只有「现在传」一处（守卫核）；a、c 同时有时面上两样都说，人点了一起传（Fable 11-03 拍）。
+//   吸取 10-26 的两条（user「弹了一个需要处理然后就什么交互都没了」）：话说真的；传完没传成的带名单、带「去处理」钮。
 let askedPushLocalOnly = false;
-async function offerPushLocalOnly(): Promise<void> {
-  if (askedPushLocalOnly || !isSignedIn() || !cloudOnline() || gateHost.gate.isRunning()) return;   // 闸门罩着：放行时再提（afterPass）
+let _offerRun: Promise<void> | null = null;
+function offerPushLocalOnly(): Promise<void> { return (_offerRun ??= _offerOnce().finally(() => { _offerRun = null; })); }
+async function _offerOnce(): Promise<void> {
+  if (!isSignedIn() || !cloudOnline() || gateHost.gate.isRunning()) return;   // 闸门罩着：放行时再看（afterPass）
+  if (askedPushLocalOnly && !session.pushOwed) return;
   const be = galleryBackend();
-  if (be.kind !== "live") return;
-  const n = await be.store.files.dirty.count().catch((e: unknown) => { reportError(new Error("[pushAll] dirty.count failed: " + String(e)), "log"); return 0; });
-  if (n <= 0) return;
+  if (be.kind !== "live") return;   // 店还没挂上：wp:gallery-changed 那一刀再试
+  const files = be.store.files;
+  const dirty = await files.dirty.count().catch((e) => { reportError(new Error("dirty.count: " + String(e)), "log"); return 0; });
+  if (dirty <= 0) return;
+  let never: Set<string>;
+  try {
+    const manifest = await walkLibrary((folder) => snapshotFolderOnce((f, cb) => files.watchFolder(f, cb), folder));
+    never = neverUploadedIds(manifest.files);
+  } catch (e) { reportError(new Error("list never-uploaded: " + String(e)), "log"); return; }
+  await session.resumeOwedPush(never);
+  if (askedPushLocalOnly) return;
+  const plan = planReturn(await files.dirty.count().catch(() => dirty), never.size);
+  diagNote("sync", `back with unsynced: ${JSON.stringify(plan)}`);
+  if (plan.kind === "none") return;
   askedPushLocalOnly = true;
-  diagNote("sync", `unsynced paintings after sign-in/online: ${n} → notice`);
-  if (!els.galleryFull.classList.contains("hidden")) gallery.setAttentionOnly(true);   // 已经在图库里：直接切到「要处理的」
-  showNotice({
-    id: "unsynced", text: `${t("pushAll.askTitle", { n: String(n) })} ${t("pushAll.askMsg")}`,
-    actions: [{ label: t("pushAll.ok"), primary: true, onClick: () => { void setGalleryOpen(true).then(() => gallery.setAttentionOnly(true)); } }],
+  const openList = (): void => { closeNotice("unsynced"); void setGalleryOpen(true).then(() => gallery.setAttentionOnly(true)); };
+  const showInList = (n: number): void => {
+    if (!els.galleryFull.classList.contains("hidden")) gallery.setAttentionOnly(true);   // 已经在图库里：直接切到「要处理的」
+    showNotice({ id: "unsynced", text: t("pushAll.inList", { n: String(n) }), actions: [{ label: t("pushAll.ok"), primary: true, onClick: openList }] });
+  };
+  if (plan.kind === "list") { showInList(plan.total); return; }
+  const v = await lockSyncGate<"now" | "later">({
+    title: plan.others > 0 ? t("pushAll.askMixed", { a: String(plan.neverUploaded), c: String(plan.others) }) : t("pushAll.askOnly", { a: String(plan.neverUploaded) }),
+    message: t("pushAll.askNote"), showSpinner: false,
+    actions: [{ label: t("pushAll.now"), value: "now", primary: true }, { label: t("pushAll.later"), value: "later" }],
+    escValue: "later",
   });
+  diagNote("sync", `push ask → ${v ?? "closed"}`);
+  const total = plan.neverUploaded + plan.others;
+  if (v !== "now") { showInList(total); return; }   // 稍后 = 全部进列表，什么都不推；这一页不再问
+  const r = await files.dirty.pushAll().catch((e) => { reportError(e instanceof Error ? e : new Error(String(e)), "warning"); return null; });
+  const left = await files.dirty.count().catch(() => total);
+  diagNote("sync", `push ask: pushed=${r?.pushed ?? "-"} failed=${r?.failed.length ?? "-"} left=${left}`);
+  if (r) session.noteAllPushed(r.failed);
+  if (left === 0) showNotice({ id: "unsynced", text: t("pushAll.allDone", { n: String(r?.pushed ?? total) }), autoHideMs: 4000 });
+  else {
+    const named = (r?.failed ?? []).slice(0, 3).map((x) => stripSessionExt(x)).join("、");
+    if (!els.galleryFull.classList.contains("hidden")) gallery.setAttentionOnly(true);
+    showNotice({ id: "unsynced", level: "warning", text: t("pushAll.partial", { pushed: String(r?.pushed ?? 0), left: String(left), names: named ? `（${named}${left > 3 ? " …" : ""}）` : "" }), tapToDismiss: false, actions: [{ label: t("pushAll.ok"), primary: true, onClick: openList }] });
+  }
+  if (!els.galleryFull.classList.contains("hidden")) gallery.refresh();
 }
 // auth 可观察 seam（候选1）：接缝 app-store 在**每个** auth 转变（登录回来/后台silent/登出/过期F2）fire wp:auth-changed（库 0.1.0 起不碰 window 事件，接缝订阅 onAuthChanged 转发）。
 // UI 订阅一次 → 按钮蓝/灰、save 图标、云列表 全自动同步，永不漂移、不再靠散落手 poke。
@@ -777,4 +813,4 @@ setInterval(() => {
 }, GALLERY_POLL_MS);
 
 // 无头探针钩子（test/probes/probe-cloud-gate.mjs；不是 API）。
-(globalThis as { __wpProbe?: unknown }).__wpProbe = { pwaReload: () => pwaShell._reload(), allows, gateTune: gateHost.tune, session, gate: gateHost.gate, isUserOffline, requireStore, galleryBackend, galleryAttachment, setGalleryOpen, setPassword, getPassword, lockPasswords: () => lockPasswords(), diag: () => diagText() };
+(globalThis as { __wpProbe?: unknown }).__wpProbe = { isEncryptedBlob: (b: Blob) => appEncryption.isEncryptedBlob(b), pwaReload: () => pwaShell._reload(), allows, gateTune: gateHost.tune, session, gate: gateHost.gate, isUserOffline, requireStore, galleryBackend, galleryAttachment, setGalleryOpen, setPassword, getPassword, lockPasswords: () => lockPasswords(), diag: () => diagText() };

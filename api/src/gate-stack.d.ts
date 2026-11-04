@@ -10,6 +10,8 @@ export interface GateView<T = unknown> {
     message?: string;
     note?: string;
     showSpinner?: boolean;
+    /** 按 Esc / 点背板 = 这个值（「稍后」这类不用决定的面）；不给 = 只能按按钮。 */
+    escValue?: T;
     /** 开头一小段不显形：核对很快时看不出闪了一下（输入从第一帧就锁着）。 */
     quietStart?: boolean;
     /** 不可点外面关掉（决策只能按钮选）；空数组 = 没有按钮的纯罩子——调用方必须自己保证有出口。 */

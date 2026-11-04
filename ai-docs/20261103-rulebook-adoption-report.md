@@ -215,3 +215,33 @@
 ### Fable 要看的 diff
 
 `src/cloud-gate.ts` `runBefore`（CatsUp 没有的那段）· `src/session-state.ts` `flushBeforeReload`、`checkCloudOnce`、`_forkAfterEscape` · `src/sheets.ts` 闸门段 · `src/app.ts` 的 `catchUp`。
+
+## G2（Fable 排的，v0.14.53）
+
+> as-of v0.14.53 / 2026-11-04，Claude Opus 5.5
+
+### 一、加密作品出门（规则书第 5 条）
+
+- **堵了一个真漏洞**：加密的画走「复制一份到图库 / 另存为」，以前写的是**明文**，本地和云端都是。现在封成容器再存；锁着或打不出容器就拒，不回落明文。之前 G 节写「加密的画不分叉、因为 saveAs 写明文」绕开过，这次是根治。
+- 「存为本地」：加密作品默认给容器（主按钮）；明文是单独一行，按钮上写着「这份是明文、没有加密」。
+- 导出图片 / psd 按钮写那句话；录像下载前面上明说，取消不导。
+
+### 二、回来时没传的分三种（规则书第 15 条，11-03 夜改写）
+
+- (a) 从没传过 → 问一次；(b) 按过存没传成 → 开着那份续传不问；(c) 只是自动保存 → 不传不问进列表。
+- **`pushPending` 分不出 (b)、(c)**（每次编辑都置 true），所以 `EditorSession` 加了一个 `isPushOwed`：按存时没推成，且之后没再改。比 Fable 拍的「比 `_editSerial`」多走一步：`_editSerial` 只数文件家的编辑，图库里的画不走它，所以放在 es 里（`_editEpoch` 那个口径）。
+- **没有 float 之外的筛选**：a、c 同时有时，面上两样都说「有 A 份只在这台设备，还有 C 份改过没传。现在全传？」，人点了 `pushAll` 一起传（Fable 拍）。稍后 = 全部进列表，什么都不推。
+- 一页只问一次；(b) 每次回来都看。
+- 守卫：`dirty.pushAll(` 全仓两处：问一次的「现在传」、断开网盘时人点的「下载备份」（那是人点的逃生，之前就在，没动）。
+
+### 验证
+
+- 单测 1646 过 / 0 红。新增 `test/exit-rule.test.mjs`、`test/cloud-return.test.mjs`（`isPushOwed` 五种情况）。
+- 无头探针（假 MSAL + 假网盘，真加密库）：`probe-cloud-gate.mjs` gate 15、reload 15、enc 33、**exit 13、back 34** 条全过。
+  - exit：另存后云端 / 本地 / 再存一笔都是容器（过 `isEncryptedBlob`），云端没有明文 .ora；hub 主按钮 = 加密文件，下载字节是容器；显式明文一行下载的不是容器。
+  - back：(c)、(b)、按存后又改、(a)、a + c、Esc、这一页不再问、下一页再问、点了都传。
+- **没验**：录像下载前那句话只有守卫，没跑探针；FSA 文件选择框那条路（探针走的是无选择框的下载路）；真机。
+
+### 真机项（攒批，不催）
+
+iPad Edge 上加密作品「存为本地加密文件」走下载；回线时那张面的两个按钮。

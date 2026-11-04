@@ -287,10 +287,23 @@ describe("守卫（设计稿 §8）", () => {
   it("闸门上的「重新登录」在点击的同步栈里起跳（iOS 红线）", () => {
     assert(/value: "signin", primary: true, onPick: \(\) => b\.signIn\(\)/.test(read("src/cloud-gate-host.ts")));
   });
-  it("从离线回来不自己批量推：WeebPaint 的推送 = 人按「存」（10-26「列表面」）", () => {
+  it("回线不自己批量推：只问一次，点了才传（规则书第 15 条）", () => {
     const body = app.slice(app.indexOf("catchUp: async () => {"), app.indexOf("afterPass: () => {"));
     assert(body.length > 0 && !/pushAll/.test(body));
     assert(/offerPushLocalOnly\(\)/.test(body));
+  });
+  it("全仓 pushAll 只有两处：问一次面点了「现在传」、断开网盘时人点的「下载备份」", () => {
+    const sites = [];
+    for (const p of walk("src")) { if (!p.endsWith(".ts")) continue; const n = strip(read(p)).split("dirty.pushAll(").length - 1; if (n) sites.push(`${p}:${n}`); }
+    eq(sites.sort().join(" "), "src/app.ts:1 src/gallery/gallery-manage-ui.ts:1");
+    const ask = app.slice(app.indexOf("async function _offerOnce"), app.indexOf("// auth 可观察 seam"));
+    assert(ask.indexOf("lockSyncGate") >= 0 && ask.indexOf("lockSyncGate") < ask.indexOf("dirty.pushAll("), "先问才推");
+    assert(/if \(v !== "now"\) \{[\s\S]*?return;\s*\}[\s\S]*dirty\.pushAll\(/.test(ask), "不是「现在传」就不推");
+    assert(/askedPushLocalOnly = true;[\s\S]*lockSyncGate/.test(ask), "一页只问一次");
+    assert(/escValue: "later"/.test(ask), "Esc = 稍后");
+    assert(/plan\.kind === "list"\) \{ showInList\(plan\.total\); return; \}/.test(ask), "没有从没传过的：不问不推，进列表");
+    assert(ask.indexOf("session.resumeOwedPush(never)") < ask.indexOf("planReturn("), "(b) 先续传再数");
+    assert(/if \(askedPushLocalOnly\) return;\s*const plan/.test(ask), "已问过的页：只续传，不再问");
   });
 });
 

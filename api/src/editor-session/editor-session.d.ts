@@ -67,6 +67,10 @@ export interface EditorSession {
     currentName(): string | null;
     isDirty(): boolean;
     isPushPending(): boolean;
+    /** 人按过存、当时没推成、之后没再改。回来时可以自动续传（完成已有的同意，ADR-0018）；只是编辑过、自动保存过的不算。 */
+    isPushOwed(): boolean;
+    /** 库替这份推上去了（回来问一次 → dirty.pushAll）：别再记着欠一推。内存还脏就不算。 */
+    noteExternallyPushed(): void;
     start(): void;
     dispose(): void;
 }
