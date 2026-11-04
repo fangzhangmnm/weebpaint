@@ -16,7 +16,8 @@ export interface PwaShellDeps {
   /** 有新版本 → 请消费者弹通知（2026-09-02 C7：壳不碰 toast DOM；app 接 ui/notice）。 */
   showUpdateNotice: (h: { onReload: () => void; onDismiss: () => void }) => void;
   envChip: HTMLElement | null;
-  onBeforeReload: () => Promise<void>;
+  /** false = 人在挽留面上取消了，这次不刷新（F-147 B）。 */
+  onBeforeReload: () => Promise<boolean | void>;
   onForeground: () => void;
 }
 
@@ -31,7 +32,7 @@ export class PwaShell {
     this.d.showUpdateNotice({ onReload: () => { void this._reload(); }, onDismiss: () => { this.dismissed = true; } });
   }
   async _reload() {
-    await this.d.onBeforeReload();
+    if ((await this.d.onBeforeReload()) === false) return;
     // skip-waiting 推给 WAITING SW（不是 controller），听 controllerchange 再 reload。
     const reg = this.reg || await navigator.serviceWorker?.getRegistration();
     if (!reg || !reg.waiting) { location.reload(); return; }

@@ -13,6 +13,7 @@ import { currentPolicy } from "./deployment-policy.ts";   // 规则书 §1 第 1
 import type { Store, Collection as _Coll } from "@internal/store";
 import { sessionFileName } from "./config.ts";
 import { storeUI } from "./store-ui.ts";
+import { cloudOnline } from "./user-offline.ts";
 import { CLIENT_ID, SCOPES, AUTHORITY } from "./config.ts";
 import { DOC_KINDS } from "./identifiers.ts";   // 文档种类表（store 0.16）：身份怎么切、云端名是不是加密容器，全由它推导
 import { zipReadEntry } from "./backend/zip.ts";
@@ -53,8 +54,9 @@ function _assembleReal(): { provider: _Prov | null; auth: _Auth } {
 
 // 唯一 store（薄库）。app 建它（含 ui bundle）；migration 内部自跑（createStore 隐形，app 不 await）。
 // P3：databaseId 参数化（registry 条目的 dbId；缺省 = 库默认 "defaultStore" = legacy OneDrive 库）。
-const _createRealStore = (provider: _Prov, signedIn: () => boolean, databaseId?: string): Store => createStore({
+const _createRealStore = (provider: _Prov, signedIn: () => boolean, databaseId?: string, isOnline?: () => boolean): Store => createStore({
   provider,
+  ...(isOnline ? { isOnline } : {}),
   ...(databaseId ? { databaseId } : {}),
   ui: storeUI,
   appId: "weebpaint",   // 本 origin 内唯一命名空间（databaseId 默认 "defaultStore"）：IDB 库 weebpaint.defaultStore + localStorage weebpaint.defaultStore.* 键，与兄弟 PWA(JRP 等)隔离
@@ -208,7 +210,8 @@ export function _buildStoreForGalleryEntry(entry: { kind: "onedrive" | "folder";
   const prov = entry.homeAccountId
     ? createOneDriveProvider({ clientId: CLIENT_ID, scopes: SCOPES, authority: AUTHORITY, msalUrl: embeddedBlobUrl("msal-browser.min.js", "text/javascript") ?? "./vendor/msal/msal-browser.min.js", homeAccountId: entry.homeAccountId, transport: GRAPH_TRANSPORT }).provider
     : provider;
-  return _createRealStore(prov, () => auth.isSignedIn(), entry.dbId === "defaultStore" ? undefined : entry.dbId);
+  // isOnline：选了「离线继续」库一条网都不打（store 2.2.4 起 collection 也一起，工单 G）。只给 OneDrive：文件夹图库本地即在线，不吃这个。
+  return _createRealStore(prov, () => auth.isSignedIn(), entry.dbId === "defaultStore" ? undefined : entry.dbId, cloudOnline);
 }
 
 // ============ auth（转发；_auth=null = 缺席平台，dormant 替身已退役 2026-08-27）============

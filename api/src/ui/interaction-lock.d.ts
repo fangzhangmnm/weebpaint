@@ -1,4 +1,4 @@
-export type LockKind = "busy" | "readonly";
+export type LockKind = "busy" | "readonly" | "gate";
 export type Intent = "pointer:draw" | "pointer:navigate" | "pointer:pick" | "key:shortcut" | "key:modifier" | "paste" | "copy" | "doc:mutate" | "persist" | "export:read" | "menu" | "dialog" | "gate" | "notice";
 export interface IntentCtx {
     shortcutCategory?: string;

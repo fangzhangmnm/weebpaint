@@ -27,6 +27,7 @@ import { checkpointAgeMinutes, humanCheckpointTime } from "./checkpoint-policy.t
 import { els } from "./els.ts";
 import { openInputSheet, openConfirmSheet, openChoiceSheet, lockSyncGate } from "./sheets.ts";
 import { setMenuOpen } from "./settings-menu.ts";
+import { cloudOnline } from "./user-offline.ts";
 import { signIn, isSignedIn } from "./app-store.ts";   // auth 是公共面（cloud-auth-ui 同款直连；v415 红线针对的是 sync store，不含 auth）
 import { hasGallery, galleryOnline } from "./gallery-capability.ts";
 import { galleryAttachment } from "./gallery-attachment-host.ts";
@@ -53,6 +54,12 @@ let input: AppContext["input"], doc: AppContext["doc"], board: AppContext["board
 let layers: AppContext["layers"];
 let setStatus: AppContext["setStatus"], updateSaveStatus: AppContext["updateSaveStatus"], updateZoomLabel: AppContext["updateZoomLabel"];
 let _signInNav = false;   // v0.6.22：登录 redirect 导航中，beforeunload 别挡
+/** 闸门上的「重新登录」：和 smart save 同一个姿势（在点击的同步栈里起跳；有意导航，beforeunload 别挡）。工单 G。 */
+export function beginSignInNav(onFail: (e: unknown) => void): void {
+  void flushPreferences(); void flushAppState();   // #60-C：settings 跳转前落盘
+  _signInNav = true;
+  signIn().catch((e) => { _signInNav = false; onFail(e); });
+}
 let rack: AppContext["rack"];
 
 // （closeSheet 拷贝 2026-09-02 C3 退役：走 ui/sheet）
@@ -87,7 +94,7 @@ function smartSaveAndPush() {
   void session.save({ commitPending: true }).catch(() => {});
   void flushPreferences(); void flushAppState();   // #60-C（2026-09-09）：settings 也在跳转前落盘（redirect 后 pagehide 里的写在 WebKit 上永远 commit 不了）
   // 离线时登录无意义（与旧 menuSignIn「未登录+已配置+在线才显示」同判据）→ 不弹，只提示。
-  if (_cloudSignInPromptDeclined || navigator.onLine === false) {
+  if (_cloudSignInPromptDeclined || !cloudOnline()) {
     setStatus(t("save.savedLocalNotSignedIn"), true);
     updateSaveStatus();
     return;

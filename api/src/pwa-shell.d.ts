@@ -5,7 +5,8 @@ export interface PwaShellDeps {
         onDismiss: () => void;
     }) => void;
     envChip: HTMLElement | null;
-    onBeforeReload: () => Promise<void>;
+    /** false = 人在挽留面上取消了，这次不刷新（F-147 B）。 */
+    onBeforeReload: () => Promise<boolean | void>;
     onForeground: () => void;
 }
 export declare class PwaShell {

@@ -32,7 +32,7 @@ import { mountGallery } from "./gallery/gallery.ts";          // candidate 1 · 
 import { BrushRackController } from "./brush-rack-controller.ts";
 import { PwaShell } from "./pwa-shell.ts";
 import { openInputSheet, openInputSheetEx, openConfirmSheet, openChoiceSheet, lockSyncGate } from "./sheets.ts";   // settleSyncGate→cloud-freshness
-import { setPasswordPrompt, setPassword } from "./crypto-state.ts";   // 加密：密码弹窗注入（ADR-0012）
+import { setPasswordPrompt, setPassword, getPassword, lock as lockPasswords } from "./crypto-state.ts";   // 加密：密码弹窗注入（ADR-0012）
 import { passwordKeeper } from "./encryption.ts";
 import { hasVerifier, checkVerifier } from "./password-verifier.ts";
 import { wireRememberPassword, restoreRemembered, rememberChoice, setRememberChoice, rememberAvailable, rememberSharedBucket } from "./remember-password.ts";   // 2026-10-17 在这台设备上记住密码（≤ 30 天）
@@ -70,15 +70,18 @@ import { initPerspEdit } from "./persp-edit.ts";
 import { initShapeToolbar } from "./shape-toolbar.ts";   // 形状条（ADR-0005；2026-09-18 回滚复活：独立顶栏动词位 + 工厂上下文条；ADR-0013 几何 extension 已删）
 import { updateSaveStatus, updateNewerBanner } from "./save-status.ts";
 import { initErrorBadge, reportError } from "./error-badge.ts";
-import { initDiagLog, note as diagNote } from "./diag-log.ts";   // 黑匣子（2026-08-31）
+import { initDiagLog, note as diagNote, toText as diagText } from "./diag-log.ts";   // 黑匣子（2026-08-31）
 import { initDiagLogSheet } from "./diag-log-sheet.ts";           // dev 页「诊断日志」窗口
+import { createCloudGateHost } from "./cloud-gate-host.ts";
+import { allows } from "./ui/interaction-lock.ts";
+import { cloudOnline, isUserOffline } from "./user-offline.ts";
 import { holdUntilSettled } from "./common/settle-hold.ts";         // 2026-09-05：更新通知/reload 等 auth boot 落地
 import { initTransientPanels, _suppressTransientPanels, _restoreTransientPanels, _bringPanelTop, _commitTransform, _cancelTransform } from "./transient-panels.ts";
 import { initImportImage, importImageAsLayer } from "./import-image.ts";   // importImageAsNewDoc/setAddImportAsNewDoc 仅 gallery-shell/export-menu 用
 import { initExportImportMenu, exportBaseName } from "./export-import-menu.ts";
 import { initGalleryShell, setGalleryOpen, checkQuotaAndWarn, uniqueNameFor } from "./gallery/gallery-shell.ts";
 import { initCloudPickerHost } from "./cloud-picker-host.ts";   // 云盘图片 picker 宿主层（spec 20260820）
-import { initTopbarMenu } from "./topbar-menu.ts";
+import { initTopbarMenu, beginSignInNav } from "./topbar-menu.ts";
 import { initBlenderSync, reconcileBlenderUrlFromPrefs } from "./blender-sync.ts";   // 推/拉贴图到 Blender（BlenderTextureProtocol，插件式隔离子功能）
 import { initPlatformGuards } from "./platform-guards.ts";
 import { initTimelapse } from "./timelapse-session.ts";
@@ -220,7 +223,7 @@ const rack = new BrushRackController({
   editMode: () => editMode,
   setStatus, confirm: openConfirmSheet,
   openExclusive, closeExclusive, registerPanel,
-  isSignedIn, isOnline: () => navigator.onLine !== false,
+  isSignedIn, isOnline: cloudOnline,
 });
 // P3 热插拔接线：换库 → 笔架重挂新 collection（brushRackCollection 是 live binding，事件时刻已指新库）；
 //   收口开画 gate = doc 的家是 gallery 就拒卸（挂载器官未接线时默认保守拒卸）。
@@ -474,7 +477,7 @@ initDevConsole();
 // ===== 图库 = <Gallery> 深模块（src/gallery/gallery.ts）。app 只供画布耦合 host 回调 + 无系统弹窗 UI =====
 const gallery = mountGallery(document.getElementById("galleryMount")!, {
   signedIn: () => galleryOnline(),   // 语义=「云腿可达」（0828 修：folder 库权限即在线；字段名留 host 兼容）
-  online: () => navigator.onLine !== false,
+  online: cloudOnline,
   // gallery 的「活动项」只对 gallery 家有意义（file/transient 家在图库里没有对应卡片）。
   activeName: () => { const h = session.home; return h?.kind === "gallery" ? h.path : null; },
   confirm: (title, m) => openConfirmSheet(title, m),
@@ -540,6 +543,32 @@ if (isAuthConfigured()) {
     reportError(new Error("[auth] init failed: " + String(e)), "log");
   });
 }
+// 掉登录 / 没网闸门（家族工单 G；设计稿 ai-docs/20261103-cloud-gate-design.md）。状态机 cloud-gate.ts，组装 cloud-gate-host.ts，这里只给接点。
+const gateHost = createCloudGateHost({
+  attached: () => { const a = galleryAttachment.state(); return isAuthConfigured() && a.kind === "attached" && a.entry.kind === "onedrive"; },
+  authBoot: authBootP,
+  isSignedIn,
+  retrySilentSignIn: () => retrySilentSignIn(),
+  signIn: () => beginSignInNav((e) => { setStatus(t("cf.signInFailed", { err: String((e as Error)?.message || e) }), true); gateHost.gate.reshowBlocked(); }),
+  check: (g) => session.checkCloudOnce(g),
+  dirtyCount: () => { const be = galleryBackend(); return be.kind === "live" ? be.store.files.dirty.count() : Promise.resolve(0); },
+  openAttentionList: () => { void setGalleryOpen(true).then(() => gallery.setAttentionOnly(true)); },
+  // 从「离线继续」回来：**不自己批量推**（WeebPaint 的推送 = 人按「存」；10-26「列表面」）。排空离线删除队列 + 有没同步好的就提一条「去处理」，和回线同一条路。
+  catchUp: async () => {
+    const be = galleryBackend();
+    if (be.kind === "live") await be.store.files.drainOfflineQueue().catch((e) => reportError(new Error("drainOfflineQueue: " + String(e)), "log"));
+    updateCloudAuthUI();
+    pullSettingsAndState();                                  // 离线期间 online 事件那条路短路了，这里补上
+    void session.refreshOpenDoc();
+    void offerPushLocalOnly();
+  },
+  afterPass: () => {
+    updateCloudAuthUI();
+    const be = galleryBackend();
+    if (be.kind === "live" && isSignedIn()) { be.store.files.drainOfflineQueue().catch((e) => reportError(new Error("drainOfflineQueue: " + String(e)), "log")); void offerPushLocalOnly(); }
+  },
+  note: (m) => diagNote("auth", m),
+});
 // P3 registry 播种（gallery-registry 器官保持纯净、不 import app 面——auth/pref 参数在此喂）。
 // 幂等靠 dedup 不靠标记：冷 boot 时 activeAccount 可能还没从缓存醒来，故 initAuth 后 + 每次 auth 变化都试。
 function _seedGalleryRegistry(): void {
@@ -559,7 +588,7 @@ function _seedGalleryRegistry(): void {
 //   store 2.2.1 起「刷新前改过 + 登录前恢复」那种谱系丢了的脏画推前会先问云端、没人动就直接推成——所以这里数到的多半是真要人选的。
 let askedPushLocalOnly = false;
 async function offerPushLocalOnly(): Promise<void> {
-  if (askedPushLocalOnly || !isSignedIn() || navigator.onLine === false) return;
+  if (askedPushLocalOnly || !isSignedIn() || !cloudOnline() || gateHost.gate.isRunning()) return;   // 闸门罩着：放行时再提（afterPass）
   const be = galleryBackend();
   if (be.kind !== "live") return;
   const n = await be.store.files.dirty.count().catch((e: unknown) => { reportError(new Error("[pushAll] dirty.count failed: " + String(e)), "log"); return 0; });
@@ -583,12 +612,15 @@ window.addEventListener("wp:auth-changed", () => {
   const att = galleryAttachment.state();
   if (att.kind === "attached" && att.entry.kind === "onedrive") galleryAttachment.setOnline(isSignedIn());
   void resumePendingOneDriveConnect();                      // iPad redirect 回程：把跳转前没办完的首次连接续办掉（幂等）
+  if (isSignedIn()) gateHost.gate.onCloudMaybeBack();       // 登录落地：闸开着就重新核；选了离线就收条（工单 G）
   if (!els.galleryFull.classList.contains("hidden")) gallery.refresh();
   if (isSignedIn()) void offerPushLocalOnly();              // 登录回来：只在本机的画问一次（店还没挂上就等 wp:gallery-changed 那一刀）
 });
 // 在线 / 离线变化时刷新云端 UI（标签 / 按钮可见性）。
 // online 时尝试 silent re-auth：boot 离线 → activeAccount 为 null；有网了主动 retry 一次
 window.addEventListener("online", async () => {
+  gateHost.gate.onCloudMaybeBack();
+  if (isUserOffline()) { updateCloudAuthUI(); return; }      // 选了离线继续：网回来走 reconnect（上一行），这里不抢着打网
   if (!isSignedIn()) await retrySilentSignIn();
   pullSettingsAndState();                                    // 回线：拉 4 库 settings/state 对齐
   updateCloudAuthUI();
@@ -617,6 +649,9 @@ const flushSettingsNow = (): void => {
 };
 window.addEventListener("pagehide", (e: PageTransitionEvent) => { if (!e.persisted) flushSettingsNow(); });
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushSettingsNow(); });
+// 醒来（设计稿 §2：visibilitychange + pageshow，不用时钟）：同一套闸门；30 s 内刚核过不罩，已选离线不罩。
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") gateHost.wake("visible"); });
+window.addEventListener("pageshow", (e) => { if (e.persisted) gateHost.wake("pageshow"); });
 
 // 前台新鲜度活动监听 + idle tick 接线已切到 cloud-freshness.ts initCloudFreshness。
 //
@@ -642,15 +677,19 @@ void prefsReady.then(() => {
 //   仍 await prefsReady：只为 legacy→回执条播种（幂等一次）；播种期过后可拆。
 //   排在 fixup 之后（同一个 promise 的 then 按注册顺序跑）→ 开画时 desk/设置已就位。
 // 2026-10-17：这台设备记着密码 → 先和 verifier 比、对了就解锁（要在开上次那幅画之前，不然加密作品先开成锁着的）。没记 = 一次 IDB 读。
+// 工单 G：挂着 OneDrive = 这一段在闸门的罩子底下跑（before），然后续签 + 问云端一次；没挂 = 闸门直接跑 before、不罩。
+const localBoot = (): Promise<void> => restoreRemembered()
+  .then((r) => { if (r === "stale") setStatus(t("enc.rememberedStale"), true); }, (e) => reportError(new Error("[remember] restore failed: " + String(e)), "log"))
+  .then(() => bootRestoreSession(ctx)).catch((e) => reportError(new Error("[boot] restore failed: " + String(e)), "log"));
 void prefsReady
-  .then(() => restoreRemembered().then((r) => { if (r === "stale") setStatus(t("enc.rememberedStale"), true); }, (e) => reportError(new Error("[remember] restore failed: " + String(e)), "log")))
-  .then(() => bootRestoreSession(ctx)).catch((e) => reportError(new Error("[boot] restore failed: " + String(e)), "log"))
+  .then(() => gateHost.gate.run("boot", { before: localBoot }))
+  .then((o) => diagNote("boot", `gate → ${o}`), (e) => reportError(new Error("[boot] gate failed: " + String(e)), "warning"))
   // 2026-11-03 工单 B2：老库 `weebpaint` 的「回到之前」历史搬进带前缀的新库——开完上次那幅画之后、空闲时、一页一次（src/legacy-app-db.ts）。
   .finally(() => { if (!storeAbsent) migrateLegacyAppDbWhenIdle(); });
 // T-crash 恢复横幅（P2 2026-08-26）：扫 crash 库，有崩溃快照 → 非模态浮卡叠画布（不挡 boot、不 await）。
 initCrashBanner(ctx);
 // N3：启动时若在线+已登录，排空上次离线攒下的删除队列（fresh boot 不触发 online 事件，故此处补一刀）。
-{ const be = galleryBackend(); if (be.kind === "live" && navigator.onLine && isSignedIn()) be.store.files.drainOfflineQueue().catch((e: unknown) => reportError(new Error("drainOfflineQueue: " + String(e)), "log")).then(() => offerPushLocalOnly()); }
+{ const be = galleryBackend(); if (be.kind === "live" && cloudOnline() && isSignedIn()) be.store.files.drainOfflineQueue().catch((e: unknown) => reportError(new Error("drainOfflineQueue: " + String(e)), "log")).then(() => offerPushLocalOnly()); }
 
 // 笔架深模块装配：mount sheet/settings 组件 + 注册 panel + 绑 DOM 事件 + 订阅 collection.onChange。
 rack.init({
@@ -693,7 +732,7 @@ els.board.addEventListener("pointerdown", () => {
 //   但没登上」的假离线。根因待 iPad 诊断日志确认；这条是对该窗口的护栏，合规时序下零行为变化（等待≈0）。
 const AUTH_BOOT_HOLD_MS = 8000;
 const authBootSettled = () => holdUntilSettled(authBootP, AUTH_BOOT_HOLD_MS);
-new PwaShell({
+const pwaShell = new PwaShell({
   // 2026-09-02 C7：更新提示走通知栈（ui/notice）——与压感 toast / 错误横幅 / 离线横幅同一条栈、同一样式
   showUpdateNotice: ({ onReload, onDismiss }) => {
     void authBootSettled().then((how) => {
@@ -708,20 +747,21 @@ new PwaShell({
   envChip: document.getElementById("envChip"),
   onBeforeReload: async () => {
     const how = await authBootSettled();
-    diagNote("sw", `reload requested (auth boot ${how}) → apply+save`);
-    editMode.applyPendingTransient();
-    await session.save();   // saveNow 内含 blank/dirty 守卫（es.flushLocal 不脏 no-op）
+    diagNote("sw", `reload requested (auth boot ${how}) → flush`);
+    return session.flushBeforeReload();   // 干净的不碰；改过没传的问人；false = 取消，这次不刷新（F-147 B）
   },
   onForeground: () => {
     pullSettingsAndState();                                   // 前台：拉 4 库
-    if (isSignedIn() && session.home?.kind === "gallery") void session.refreshOpenDoc();   // 当前文件显式快进（P1 2026-08-25）
+    gateHost.retrySilentQuietly("foreground");                // 开机探测没成 / 中途过期之后回前台补一次（设计稿 §1；以前只有回线补）
+    if (isSignedIn() && session.home?.kind === "gallery" && !gateHost.gate.isRunning()) void session.refreshOpenDoc();   // 当前文件显式快进（P1 2026-08-25）
     // 图库开着回前台 → 刷新列表（fire-and-forget，判据同 auth/online 现有姿势）。云端帧只在
     //   watchFolder 订阅时来一次——回前台刷一次让「别的设备的新保存」可见。长驻前台的持续刷新
     //   由下方 A6 轮询承担（app 层定时器，store 保持被动——0821「store 变主动 agent」ADR 顾虑
     //   由此绕开，2026-08-28 user 拍板 a）。
     if (!els.galleryFull.classList.contains("hidden")) gallery.refresh();
   },
-}).init();
+});
+pwaShell.init();
 
 // ── A6 图库长驻轮询（2026-08-28 user 拍板 a：轮询归 app、store 保持被动；只属 gallery store——device 槽无云）──
 //   图库页开着不动时也定期拉云端（此前只有 focus/online/回前台三触发）。条件全满足才 tick：
@@ -735,3 +775,6 @@ setInterval(() => {
   if (!galleryOnline()) return;
   gallery.refresh();
 }, GALLERY_POLL_MS);
+
+// 无头探针钩子（test/probes/probe-cloud-gate.mjs；不是 API）。
+(globalThis as { __wpProbe?: unknown }).__wpProbe = { pwaReload: () => pwaShell._reload(), allows, gateTune: gateHost.tune, session, gate: gateHost.gate, isUserOffline, requireStore, galleryBackend, galleryAttachment, setGalleryOpen, setPassword, getPassword, lockPasswords: () => lockPasswords(), diag: () => diagText() };

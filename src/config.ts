@@ -10,6 +10,8 @@
 //
 // 官网网址（家族规则书 20261103 §1 第 6 条：一个 app 一处常量；「去官网」文案全部插值它，不许散写进 UI / i18n 字符串）。
 //   消费者 = src/site-hint.ts（开局一行）+ src/gallery/gallery-manage-ui.ts（灰入口副标题 / 说明）。added by Claude Opus 5.5 2026-11-03
+/** 点「有新版本」时推云最多等多久（F-147 B；本地那步不设时限）。推不完就走，脏留给库。 */
+export const RELOAD_PUSH_WAIT_MS = 5000;
 export const SITE_URL = "https://weebpaint.com";
 /** SITE_URL 给人看的那段（「weebpaint.com」）。 */
 export const SITE_HOST = SITE_URL.replace(/^https?:\/\//, "").replace(/\/+$/, "");

@@ -1,3 +1,5 @@
+/** 点「有新版本」时推云最多等多久（F-147 B；本地那步不设时限）。推不完就走，脏留给库。 */
+export declare const RELOAD_PUSH_WAIT_MS = 5000;
 export declare const SITE_URL = "https://weebpaint.com";
 /** SITE_URL 给人看的那段（「weebpaint.com」）。 */
 export declare const SITE_HOST: string;

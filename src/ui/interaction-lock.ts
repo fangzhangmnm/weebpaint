@@ -19,7 +19,7 @@
 //         （套索类含变换·填充·删除·选区操作，保守整类禁——选区虽不落 ora，但它是通往写像素的门口）。
 //   ⚠ readonly 的「护栏不写 ora」不在这里——这是 UI 层一片奶酪；持久化层 / workbench 层的护栏另做（park）。
 
-export type LockKind = "busy" | "readonly";
+export type LockKind = "busy" | "readonly" | "gate";
 export type Intent =
   | "pointer:draw"       // 画布上落笔 / 擦 / 填 / 套索 / 滤镜笔——改像素或选区
   | "pointer:navigate"   // 平移 / 缩放 / 旋转视口（hand / space / 双指）
@@ -48,6 +48,13 @@ const POLICY: Record<LockKind, Record<Intent, boolean>> = {
     paste: false, copy: false, "doc:mutate": false, persist: false, "export:read": false,
     menu: false, dialog: false, gate: true, notice: true,
   },
+  // 同步闸门开着（2026-11-03 工单 G）：决策只能在闸门 / 叠在上面的面板里做（口令、冲突）。键盘绑在 window 上，遮罩挡不住，所以要这把锁。
+  gate: {
+    "pointer:draw": false, "pointer:navigate": false, "pointer:pick": false,
+    "key:shortcut": false, "key:modifier": true,
+    paste: false, copy: false, "doc:mutate": false, persist: false, "export:read": false,
+    menu: false, dialog: true, gate: true, notice: true,
+  },
   readonly: {
     "pointer:draw": false, "pointer:navigate": true, "pointer:pick": true,
     "key:shortcut": true /* 再按类，见 policyAllows */, "key:modifier": true,
@@ -67,7 +74,7 @@ export function policyAllows(kind: LockKind, intent: Intent, ctx: IntentCtx = {}
 }
 
 // ---- 运行时：锁计数（同 kind 可嵌套：withBusy 里再 withBusy）----
-const _count: Record<LockKind, number> = { busy: 0, readonly: 0 };
+const _count: Record<LockKind, number> = { busy: 0, readonly: 0, gate: 0 };
 const _listeners = new Set<() => void>();
 function _emit() { for (const f of _listeners) f(); }
 
@@ -84,10 +91,10 @@ export function acquireLock(kind: LockKind): () => void {
   };
 }
 export function isLocked(kind?: LockKind): boolean {
-  return kind ? _count[kind] > 0 : _count.busy > 0 || _count.readonly > 0;
+  return kind ? _count[kind] > 0 : _count.busy > 0 || _count.readonly > 0 || _count.gate > 0;
 }
 export function activeLocks(): LockKind[] {
-  return (["busy", "readonly"] as LockKind[]).filter((k) => _count[k] > 0);
+  return (["busy", "readonly", "gate"] as LockKind[]).filter((k) => _count[k] > 0);
 }
 /** 此刻放不放行：每把在场的锁都得同意。无锁 = 放行。 */
 export function allows(intent: Intent, ctx: IntentCtx = {}): boolean {

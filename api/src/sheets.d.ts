@@ -1,3 +1,4 @@
+import { type GateHandle } from "./gate-stack.ts";
 export declare function openInputSheet(title: string, defaultValue?: string, opts?: {
     placeholder?: string;
     password?: PasswordMode;
@@ -31,6 +32,7 @@ interface SyncGateAction<T = string> {
     label: string;
     value: T;
     primary?: boolean;
+    onPick?: () => void;
 }
 interface SyncGateOpts<T = string> {
     title: string;
@@ -38,8 +40,12 @@ interface SyncGateOpts<T = string> {
     showSpinner?: boolean;
     actions: SyncGateAction<T>[];
     note?: string;
+    quietStart?: boolean;
 }
-export declare function lockSyncGate<T = string>({ title, message, showSpinner, actions, note }: SyncGateOpts<T>): Promise<T>;
+export declare function lockSyncGate<T = string>(opts: SyncGateOpts<T>): Promise<T>;
+/** 要自己收（闸门的罩子、拉取罩子）：拿句柄，别用 settleSyncGate（那个收的是最上面那张，不一定是你的）。 */
+export declare function openSyncGate<T = string>(opts: SyncGateOpts<T>): GateHandle<T>;
+export declare function isSyncGateUp(): boolean;
 export declare function unlockSyncGate(): void;
 export declare function settleSyncGate(value: unknown): void;
 export {};

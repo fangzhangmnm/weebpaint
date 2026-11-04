@@ -8,6 +8,7 @@
 // auth 是公共面：直接 import 自 app-store.js。setStatus / updateSaveStatus / gallery
 // 经 ctx 注册表晚绑（拆分期权宜）。
 
+import { cloudOnline } from "../user-offline.ts";
 import { t, tLatin } from "../i18n/index.ts";
 import { renderGalleryManage } from "./gallery-manage-ui.ts";   // P3：popup = 图库管理面 + 账号（一起刷）
 import type { AppContext } from "../app-context.ts";
@@ -28,7 +29,7 @@ export function updateCloudAuthUI() {
   try { renderGalleryManage(); } catch { /* P3 管理面未 init（boot 极早）；auth 面照常 */ }
   const signed = isSignedIn();
   const configured = isAuthConfigured();
-  const offline = navigator.onLine === false;     // navigator.onLine=undefined 当 true
+  const offline = !cloudOnline();     // 选了「离线继续」也算离线（工单 G）
   if (signed) {
     const acc = getActiveAccount();
     els.cloudIconBtn.innerHTML = ICON_CLOUD_IN;
@@ -64,7 +65,7 @@ export function initCloudAuthUI(ctx: AppContext) {
 
   els.cloudRefreshBtn.addEventListener("click", async () => {
     // 离线 → 在线 后第一次按"刷新"：若未签到但有缓存账号，silent retry 一次
-    if (!isSignedIn() && navigator.onLine !== false) {
+    if (!isSignedIn() && cloudOnline()) {
       await retrySilentSignIn();
       updateCloudAuthUI();
     }

@@ -33,13 +33,18 @@ const STATIC_PRECACHE = [
   // msal / 其它惰性加载的库 SW 不预缓存。用到才下，那时候 fetch 会自动 cache。
 ];
 
-let CACHE_NAME = "weebpaint-boot";   // install 时会被替换为 weebpaint-<bundleHash>；重启后由 currentCacheName() 找回
+let CACHE_NAME = self.location.pathname.includes("/dev/") ? "weebpaint-dev-boot" : "weebpaint-boot";   // install 时会被替换为 weebpaint-<bundleHash>；重启后由 currentCacheName() 找回
 
 // 同一个 SW 文件部署到 /(prod) 和 /dev/ 两处；按**自己的作用域**选策略（owner: docs + src/pwa-shell.ts）：
 //   - prod(scope=/)      → cache-first：秒开 + 离线稳，更新靠 asset-updated toast。
 //   - dev(scope 含 /dev/) → network-first：在线永远先抓网（「改完即见」/强制更新不变），离线才回退缓存
 //     （崩溃后能离线重开——修「/dev/ 按设计无 SW → 闪退离线打不开」的坑，见 ai-docs/20260630-pwa-offline-dev-sw.md）。
 const SCOPE_IS_DEV = self.location.pathname.includes("/dev/");
+// 家族 F-145：prod 和 dev 同一个 origin，缓存是按 origin 算的。两边都用 weebpaint- 前缀时，谁 activate 都把对方的壳删了（离线开不了 / 下次打开全量重下）。
+//   dev 用 weebpaint-dev-，prod 只认「weebpaint- 且不是 dev-」。test/sw-channels.test.mjs 守。
+const SHELL_PREFIX = SCOPE_IS_DEV ? "weebpaint-dev-" : "weebpaint-";
+const isMyShellCache = (k) => k.startsWith(SHELL_PREFIX) && (SCOPE_IS_DEV || !k.startsWith("weebpaint-dev-"));
+const BOOT_CACHE = SHELL_PREFIX + "boot";
 // SW 脚本所在目录 = 本 app 的路径前缀。同源但 scope 外的请求（家族模型包主机 /pwa-models/ 与本站同源 fangzhangmnm.github.io）
 // 一律不接管、不复制进壳缓存（审计 L5，同 WebXiaoHeiWu）。
 const SCOPE_PATH = self.location.pathname.replace(/[^/]*$/, "");
@@ -49,9 +54,9 @@ const SCOPE_PATH = self.location.pathname.replace(/[^/]*$/, "");
 // 只认 weebpaint-（activate 同时清 0.10.0 之前的 webpaint- 旧前缀，重启时不可能还留着它）。
 let cacheNameResolved = null;
 async function currentCacheName() {
-  if (CACHE_NAME !== "weebpaint-boot") return CACHE_NAME;
+  if (CACHE_NAME !== BOOT_CACHE) return CACHE_NAME;
   if (!cacheNameResolved) cacheNameResolved = (async () => {
-    const keys = (await caches.keys()).filter((k) => k.startsWith("weebpaint-") && k !== "weebpaint-boot");
+    const keys = (await caches.keys()).filter((k) => isMyShellCache(k) && k !== BOOT_CACHE);
     if (keys.length) CACHE_NAME = keys[keys.length - 1];
     return CACHE_NAME;
   })().finally(() => { cacheNameResolved = null; });
@@ -77,7 +82,7 @@ self.addEventListener("install", (event) => {
     // 必须跟 line 36 入口 regex 同步认 main-/webpaint-（旧）+ weebpaint-（现）三种名 —— 否则抽不出 hash
     // → fallback "boot" → CACHE_NAME 恒为 weebpaint-boot → cache 永不随 build 失效（离线/更新坏）
     const bundleHash = bundleUrl.match(/(?:main|webpaint|weebpaint)-([a-z0-9-]+)\.mjs/i)?.[1] || "boot";
-    CACHE_NAME = `weebpaint-${bundleHash}`;
+    CACHE_NAME = `${SHELL_PREFIX}${bundleHash}`;
     const cache = await caches.open(CACHE_NAME);
     const urls = [...STATIC_PRECACHE, bundleUrl, bundleUrl + ".map"];
     await Promise.all(urls.map((u) =>
@@ -93,8 +98,9 @@ self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
     await Promise.all(
-      // 改名（0.10.0 webpaint-→weebpaint-）：旧前缀 cache 一并清，免得永久占存储。
-      keys.filter((k) => (k.startsWith("weebpaint-") || k.startsWith("webpaint-")) && k !== CACHE_NAME)
+      // 只清自己这个频道的（F-145）。改名（0.10.0 webpaint-→weebpaint-）：旧前缀 cache 一并清，免得永久占存储。
+      //   dev 频道另清一次老的不带 dev- 的壳？不清：那是 prod 的，分不出来；老 dev 壳由 prod 的 activate 或下次 prod 更新收走。
+      keys.filter((k) => (isMyShellCache(k) || k.startsWith("webpaint-")) && k !== CACHE_NAME)
           .map((k) => caches.delete(k))
     );
     await self.clients.claim();

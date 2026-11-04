@@ -123,3 +123,95 @@
 **§4 检查表在 B2 之后的变化**：第 2 项三个老裸名 ✗ → ✓；第 10 项「没测过 + 报告入口」补上；其余同第 2 节。
 
 **真机项追加**：同时用正式版和 /dev/ 的那台设备上，第一次开 v0.14.51 后「回到之前」的历史还在不在（自动化核过同一段代码；真机攒批，不催）。
+
+## G（家族工单 G：闸门样板 + F-147 B + F-148 + F-145，v0.14.52）
+
+> edited by Claude Opus 5.5 2026-11-03。工单 = 家族根 `ai-docs/20261103-work-orders.md`「工单 G」。收 store 2.2.4（本地 tag，GitHub release 等 user 推）。**prod / itch 没推。**
+
+**测试**：`npm test` 1625 绿；`test/probes/probe-cloud-gate.mjs`（假 MSAL + 假 Graph，真 bundle、真库、真 7z，headless）61 条全过，跑了两遍；`tools/standalone-smoke.mjs` 三形态过。
+
+### §1 续签排查
+
+- `retrySilentSignIn` **有调用，但只有回线一处**（`app.ts` online）。开机探测没成 / 中途过期之后回前台不补 → 加了（`retrySilentQuietly`，最多一分钟一次）。
+- 刷新令牌 24 小时不滑动（09-09 案卷实证），一天一次重新登录躲不掉，闸门是正解。结论 = (a)+(b)。
+- 原因码进黑匣子（`silent renew → failed code=login_required`）。
+
+### 闸门验收（§7）
+
+| # | 结果 |
+|---|---|
+| ① 没挂库零闸 | 过；文件夹图库、无库、itch / 备用版都不闸（`attached` 只认 OneDrive 图库）|
+| ② 登录好 + 云端没动 | 过；罩 112 ms 就走，开头 120 ms 不显形 |
+| ③ 续签失败两个钮；离线继续零请求；回线收条 | 过；含 collection（2.2.4）；离线照常能画 |
+| ④ 没网直接进闸 | 过 |
+| ⑤ 点「先离线用」立刻放行；不点 8 s 进闸 | 过；276 ms / 8087 ms |
+| ⑥ 醒来同一套；已选离线不弹闸 | 过 |
+| ⑦ 离线选择不落盘 | 守卫 |
+| ⑧ 黑匣子有原因码 | 过 |
+| 真分叉 | 过；开机弹库的面（叠在罩子上），人看着时不拿 8 s 打断，选了才放行，没替人推 |
+
+§8 四条守卫 + 另外几条在 `test/cloud-gate.test.mjs`（`navigator.onLine` 全仓只剩 `user-offline.ts`）。
+
+### 和 CatsUp / 设计稿的出入（都是我定的，要改一句话）
+
+1. **从离线回来不 `pushAll`，只排空删除队列 + 有没同步好的提一条「去处理」**。设计稿 §3 写的是补推，CatsUp 也是。但你裁 F-147 时说 WeebPaint 的推送 = 人按存、blur 自动推 = 改消费语义，批量补推是同一个语义；代码里 10-26 也写着「不再自己批量推」。所以条上写「已连上网盘」不写「正在补传」。**要全家一致的话一句话改成 pushAll。**
+2. **开机本地恢复那段也算超时**（`CloudGate.runBefore`）：CatsUp 先恢复后登录，这段零网络；WeebPaint 登录和恢复并行，登录先落地时恢复要问云端。8 s 到了 = 把逃生信号发给库（转读本机）+ 进闸。人在口令面板 / 冲突面上时停表。
+3. **`lockSyncGate` 改成栈**（`gate-stack.ts`）。单槽版第二张一来第一张的 Promise 永远不回，闸门的罩子上会叠面，必须改。
+4. **新交互锁 `gate`**：键盘绑在 window 上，遮罩挡不住。**行为变化：所有同步闸门（冲突面、改名面）开着时快捷键都不进了**，以前能穿透。
+5. **面板叠放规则改了**（`ui/sheet.ts`）：后开的永远在上面。否则开机解锁的口令面板压在罩子底下 = 死锁。两张普通面板的层级不变。
+6. **没有 no-account 这条路**：退出 = 卸库 + 退出登录，所以「挂着 OneDrive」就等于这台有账号；MSAL 缓存空了 = 「登录过期了」。
+7. **同一轮库的面只问一次**：登录和恢复并行时，恢复那步可能已经问过（探针抓到问两遍）。
+8. **「重新登录」在点击的同步栈里起跳**（`onPick`）：WeebPaint 有 iOS 红线注释（loginRedirect 不能在 Promise 续体里）。**CatsUp 和 KudsRocket 的闸门是在 `then` 里起跳的，同一个坑**，见卡门。
+
+### F-147 B（点「有新版本」前）
+
+`session.flushBeforeReload`（`pwa-shell` 收到 false = 这次不刷新）：
+
+- **干净的什么都不做**（原来的 `session.save()` 本来就有脏门，WeebPaint 没有 CatsUp 那个「干净也标脏」的坑；探针核过零写入）。
+- 图库家改过没传 → 问「存好再刷新 / 先不传，刷新」，Esc = 不刷新。存 = 先落本地（不设时限）→ 推，最多 5 s，推不完就走、脏留给库。
+- 先不传 = 只落本地，刷新后「没同步好」如实提醒。
+- file / transient 家 = 现有三键挽留。够不着云（离线 / 没登录）= 只落本地，不问（问了也推不了）。
+- **不做 A**，守卫核 `es.start`：hidden / pagehide 都 `persist(false)`，blur 按 policy，`pushOn: ["exit"]`。
+
+工单说「走现有的挽留」：图库家其实没有现成的这张面（现有的三键只给 file / transient），所以新加了两个按钮的面，文案四语。
+
+### F-148
+
+有坑，但比 CatsUp 轻：
+
+| 地方 | 现象 | 修法 |
+|---|---|---|
+| 解锁着第一次开 | `_refreshEncrypted` 本来就在 open 之后，**标记是对的**；只是没等它 | 等它 |
+| **这台锁着第一次开** | 开之前库说「不是」，不问口令，只报打不开 | open 返回空又认出容器 → 问口令再开（`openItem` / `restore`） |
+| 快进 / 面上选云端 | 别的设备加密或解除后，标记过期 | 再看一次 |
+| **分叉（`_forkAfterEscape`）** | **加密的画「先继续画」= `saveAs` 写新身份 = 明文**。和 F-148 无关的老洞，这轮一起堵了 | 不分叉，放下回图库（`_leaveDocUnsaved`，它还在后台更新） |
+
+留底（打开点快照）用 `getEncryptedBlob` 判，探针核过是密文。图库家没有崩溃影子；文件家的影子工单 B 就是容器。
+
+**还开着的（要 user 定）**：人主动「另存为」一幅加密的画 = 明文，和 CatsUp 的导出同一个问题，Fable 在问 user。
+
+### F-145
+
+开发版缓存名 `weebpaint-dev-<hash>`；两边 activate、重启找回、强制更新（`shell-reset.ts`）都只认自己频道。`test/sw-channels.test.mjs` 把 SW 源码真跑 activate。
+
+**留一点残余**：开发版用户浏览器里的旧壳 `weebpaint-<hash>` 分不清是谁的，开发版不删（删了可能删到正式版的）。user 只用开发版，所以这一份旧壳会留着，几 MB，直到下次开一次正式版。
+
+### 卡门（人话，等 Fable）
+
+1. **从离线回来补不补推？** 见出入第 1 条。现在：不自己推，提一条「去处理」。推的话省一次点击，但等于没按存也传上去了。
+2. **CatsUp、KudsRocket 的「重新登录」要不要也挪进点击的同步栈？** 现在它们在 Promise 的 `then` 里起跳，WeebPaint 的注释说 iOS 上可能静默拦。user 主力 iPad，这条影响真。改动很小（各一个 patch），但那两个仓这轮已经交了，要你派。
+
+### 真机项（攒批，不催）
+
+- iPad Edge：掉登录后闸门上点「重新登录」真的跳走（iOS 红线）。
+- iPad 回前台：罩子闪不闪、第一下落笔有没有被吃。
+- 笔按着时不会弹（页面藏过才会醒），没法无头验。
+- 大画（几百 MB）点「存好再刷新」：本地那步不设时限，遮罩会转多久。
+
+### 新图标需求
+
+没有。
+
+### Fable 要看的 diff
+
+`src/cloud-gate.ts` `runBefore`（CatsUp 没有的那段）· `src/session-state.ts` `flushBeforeReload`、`checkCloudOnce`、`_forkAfterEscape` · `src/sheets.ts` 闸门段 · `src/app.ts` 的 `catchUp`。

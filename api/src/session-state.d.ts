@@ -84,7 +84,21 @@ declare function unloadItem(item: {
 declare function restoreSession(name: string): Promise<boolean>;
 declare function beginLazyBlank(): void;
 declare function saveAs(newName: string): Promise<void>;
-declare function refreshOpenDoc(): Promise<void>;
+export type RefreshStatus = "skipped" | "dirty" | "in-sync" | "fast-forwarded" | "escaped" | "other";
+export interface RefreshGuard {
+    abandoned: () => boolean;
+    onLongWait: () => void;
+}
+declare function refreshOpenDoc(g?: RefreshGuard): Promise<RefreshStatus>;
+/** 闸门问云端这一步（设计稿 §3）：干净 → 快进；有没传的改动 → 库的 open 路（回执丢失自愈，真分叉才弹面）。CatsUp 同形。 */
+declare function checkCloudOnce(g: RefreshGuard): Promise<void>;
+/** 点「有新版本」前（家族 F-147 B；pwa-shell onBeforeReload）。返回 false = 人取消了，这次不刷新。
+ *  WeebPaint 的推送 = 人按「存」，所以这里问人，不替人推；但也不许静默重载丢推送：
+ *  · 干净的什么都不做（别无条件写：干净的也重新编码 = 标脏，刷新后弹「没同步好」，CatsUp 栽过）。
+ *  · file / transient 家：现有的三键挽留。
+ *  · 图库家改过没传：问「存好再刷新 / 先不传，刷新」。存 = 先落本地（不设时限：这步丢了就是丢改动）→ 推，最多等 RELOAD_PUSH_WAIT_MS，推不完就走、脏留给库。
+ *  · 够不着云（离线 / 没登录）：问了也推不了，只落本地，不问。 */
+declare function flushBeforeReload(): Promise<boolean>;
 declare function setName(name: string | null, opts?: {
     persist?: boolean;
 }): void;
@@ -114,6 +128,8 @@ export declare const session: {
     beginTransientBlank: typeof beginTransientBlank;
     newTransientDoc: typeof newTransientDoc;
     refreshOpenDoc: typeof refreshOpenDoc;
+    checkCloudOnce: typeof checkCloudOnce;
+    flushBeforeReload: typeof flushBeforeReload;
     gateFillOnSwitch: typeof _gateFillOnSwitch;
     save: typeof saveNow;
     saveAndPush: typeof saveAndPush;

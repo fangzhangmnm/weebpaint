@@ -1253,6 +1253,26 @@ export const S = {
   "cf.signInFailed": { zh: "登录失败：{err}", en: "Sign-in failed: {err}", ja: "ログイン失敗：{err}", tok: "kama sona li pakala: {err}" }, 
   "cf.checkingCloud": { zh: "检查云端", en: "Checking cloud", ja: "クラウドを確認中", tok: "mi lukin e poki sewi" }, 
   "cf.skipToOffline": { zh: "跳过到离线", en: "Skip to offline", ja: "スキップしてオフライン", tok: "o open kepeken ilo ni taso" }, 
+  // 开机 / 醒来的闸门（家族设计稿 ai-docs/20261103-cloud-gate-design.md §5；不拿「失败 / 错误」当标题、不写指挥句。工单 G，Claude Opus 5.5）
+  "gate.checking": { zh: "正在核对网盘上的版本…", en: "Checking the version on your cloud drive…", ja: "クラウドのバージョンを確認しています…", tok: "mi lukin e sitelen lon poki sewi…" },
+  "gate.escape": { zh: "先离线用", en: "Use offline for now", ja: "ひとまずオフラインで使う", tok: "o kepeken ilo ni taso" },
+  "gate.blockedTitle": { zh: "网盘没连上", en: "Not connected to your cloud drive", ja: "クラウドにつながっていません", tok: "linja tawa poki sewi li lon ala" },
+  "gate.reason.expired": { zh: "登录过期了", en: "Your sign-in has expired", ja: "ログインの期限が切れました", tok: "tenpo pi kama sona li pini" },
+  "gate.reason.noNetwork": { zh: "现在没有网络", en: "There is no network right now", ja: "今はネットワークがありません", tok: "tenpo ni la linja li lon ala" },
+  "gate.reason.noResponse": { zh: "网盘没有回应", en: "Your cloud drive isn't responding", ja: "クラウドから応答がありません", tok: "poki sewi li toki ala" },
+  "gate.signIn": { zh: "重新登录", en: "Sign in again", ja: "もう一度ログイン", tok: "o kama sona sin" },
+  "gate.offline": { zh: "离线继续", en: "Continue offline", ja: "オフラインで続ける", tok: "o awen kepeken ilo ni taso" },
+  "gate.bar": { zh: "离线", en: "Offline", ja: "オフライン", tok: "linja ala" },
+  "gate.barN": { zh: "离线 · 还有 {n} 份没传上去", en: "Offline · {n} not uploaded yet", ja: "オフライン · 未アップロード {n} 件", tok: "linja ala · sitelen {n} li tawa ala poki sewi" },
+  "gate.barReconnecting": { zh: "已连上网盘", en: "Connected to your cloud drive", ja: "クラウドにつながりました", tok: "linja tawa poki sewi li pona" },
+  "gate.barList": { zh: "看列表", en: "See list", ja: "一覧を見る", tok: "o lukin e lipu" },
+  // 点「有新版本」时这幅画改过没存 / 没传（家族 F-147 B）
+  "upd.unsavedTitle": { zh: "「{name}」改过还没传上去", en: "“{name}” has changes that aren't uploaded", ja: "「{name}」に未アップロードの変更があります", tok: "ante pi {name} li tawa ala poki sewi" },
+  "upd.unsavedMsg": { zh: "刷新之后这些改动还在这台设备上。", en: "Your changes stay on this device after reloading.", ja: "再読み込みしても、変更はこの端末に残ります。", tok: "ante li awen lon ilo ni." },
+  "upd.saveAndReload": { zh: "存好再刷新", en: "Save, then reload", ja: "保存してから再読み込み", tok: "o awen. o open sin." },
+  "upd.reloadOnly": { zh: "先不传，刷新", en: "Reload without uploading", ja: "アップロードせず再読み込み", tok: "o tawa ala. o open sin." },
+  // 分叉会写出明文（规则书 §1 第 5 条）：加密的画「先继续画」不分叉，回图库（家族 F-148）
+  "ss.encNoFork": { zh: "「{name}」是加密的，分叉会留下明文，所以先放下了：它还在后台更新，好了到图库里打开", en: "“{name}” is encrypted and a fork would leave an unencrypted copy, so it was set aside. It is still updating; open it from the gallery when it's done.", ja: "「{name}」は暗号化されていて、分岐すると平文が残るため閉じました。更新が終わったらギャラリーから開いてください。", tok: "{name} li len. sitelen sin li len ala la mi pini e ona. o open e ona lon tomo sitelen." },
   "cf.cloudNewerTitle": { zh: "云端有新版本", en: "A newer version exists in the cloud", ja: "クラウドに新しいバージョンがあります", tok: "sitelen sin li lon poki sewi" },
   // 冲突 sheet 文案（2026-08-21 grill 重写）：标题两时机统一；正文一句补事实；按钮写实无行话；留底安心小字。
   "cf.body.push": { zh: "「{name}」在云端和本机各有一版新改动。", en: "“{name}” has new changes both in the cloud and on this device.", ja: "「{name}」はクラウドとこの端末の両方に新しい変更があります。", tok: "sitelen \"{name}\" li jo e ante sin lon poki sewi lon ilo ni kin." },

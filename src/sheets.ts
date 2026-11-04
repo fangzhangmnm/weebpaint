@@ -2,6 +2,8 @@
 // 守红线「不用系统 alert/prompt/confirm」（iPad PWA 全屏体验烂）。纯 DOM，自持元素引用。
 // sync 决策编排（gateCloudSyncOnOpen / checkCloudETag / 闲置锁屏）= store-coupled，留在 app，调本模块的 lockSyncGate。
 
+import { createGateStack, type GateHandle } from "./gate-stack.ts";
+import { acquireLock } from "./ui/interaction-lock.ts";
 import { openSheet as openModalSheet, closeSheet as closeModalSheet } from "./ui/sheet.ts";   // 2026-09-02 C3：backdrop/栈/焦点/busy 互斥归 ui/sheet
 
 // **busy/sheet 互斥护栏（2026-06-12 死锁修复）**：fullscreen-busy 遮罩 z(540) 高于 input/confirm
@@ -155,50 +157,48 @@ export function openChoiceSheet<T>(title: string, message: string, choices: { la
 // ---- Sync gate（锁屏覆盖 + 动作按钮）：纯 DOM 原语。决策编排在 app。----
 // 动作 value 多态：多数是选择字符串（store onConflict / 文件夹名），cloud-freshness 用 { kind:"skip" } 哨兵。
 // → lockSyncGate<T>；外部 settleSyncGate 可用任意值兜底关闭（pending resolve 因此擦成 unknown）。
-interface SyncGateAction<T = string> { label: string; value: T; primary?: boolean; }
-interface SyncGateOpts<T = string> { title: string; message: string; showSpinner?: boolean; actions: SyncGateAction<T>[]; note?: string; }
-const syncGate: {
-  sheet: HTMLElement; title: HTMLElement; message: HTMLElement;
-  spinner: HTMLElement; actions: HTMLElement; note: HTMLElement; _pendingResolve: ((value: unknown) => void) | null;
-} = {
-  sheet: $("syncGateSheet"),
-  title: $("syncGateTitle"),
-  message: $("syncGateMessage"),
-  spinner: $("syncGateSpinner"),
-  actions: $("syncGateActions"),
-  note: $("syncGateNote"),
-  _pendingResolve: null,
+// 2026-11-03 工单 G：改成栈（gate-stack.ts）。开机闸门的「核对中」上面会叠冲突面 / 拉取罩子：单槽版第二张一来第一张的 Promise 就永远不回。
+//   开着 = 交互锁 gate（键盘绑在 window 上，遮罩挡不住）。
+interface SyncGateAction<T = string> { label: string; value: T; primary?: boolean; onPick?: () => void }
+interface SyncGateOpts<T = string> { title: string; message: string; showSpinner?: boolean; actions: SyncGateAction<T>[]; note?: string; quietStart?: boolean }
+const syncGate = {
+  sheet: $("syncGateSheet") as HTMLElement,
+  title: $("syncGateTitle") as HTMLElement,
+  message: $("syncGateMessage") as HTMLElement,
+  spinner: $("syncGateSpinner") as HTMLElement,
+  actions: $("syncGateActions") as HTMLElement,
+  note: $("syncGateNote") as HTMLElement,
 };
-
-export function lockSyncGate<T = string>({ title, message, showSpinner, actions, note }: SyncGateOpts<T>): Promise<T> {
-  syncGate.title.textContent = title;
-  syncGate.message.textContent = message;
-  syncGate.note.textContent = note ?? "";          // 每次 lock 都重置：上一位调用者的小字不残留
-  syncGate.note.classList.toggle("hidden", !note);
-  syncGate.spinner.classList.toggle("hidden", !showSpinner);
-  syncGate.actions.innerHTML = "";
-  return new Promise<T>((resolve) => {
-    for (const a of actions) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.textContent = a.label;
-      if (a.primary) btn.classList.add("primary");
-      btn.addEventListener("click", () => { unlockSyncGate(); resolve(a.value); });
-      syncGate.actions.appendChild(btn);
-    }
-    // gate band + 允许穿透 busy（冲突必 surface；不可 dismiss——决策只能按钮选）
-    openModalSheet(syncGate.sheet, { band: "gate", allowDuringBusy: true, dismissible: false });
-    syncGate._pendingResolve = resolve as (value: unknown) => void;   // 让 fetch 完成时从外部 unlock 并返回
-  });
-}
-export function unlockSyncGate() {
-  closeModalSheet(syncGate.sheet);
-  syncGate._pendingResolve = null;
-}
-export function settleSyncGate(value: unknown) {
-  if (syncGate._pendingResolve) {
-    const r = syncGate._pendingResolve;
-    unlockSyncGate();
-    r(value);
+let _releaseGateLock: (() => void) | null = null;
+const _gate = createGateStack((top) => {
+  if (!top) {
+    closeModalSheet(syncGate.sheet);
+    syncGate.sheet.classList.remove("sync-gate-quiet");
+    _releaseGateLock?.(); _releaseGateLock = null;
+    return;
   }
-}
+  syncGate.title.textContent = top.title;
+  syncGate.message.textContent = top.message ?? "";
+  syncGate.note.textContent = top.note ?? "";          // 每次重画都重置：上一位调用者的小字不残留
+  syncGate.note.classList.toggle("hidden", !top.note);
+  syncGate.spinner.classList.toggle("hidden", !top.showSpinner);
+  syncGate.sheet.classList.toggle("sync-gate-quiet", !!top.quietStart);
+  syncGate.actions.innerHTML = "";
+  top.actions.forEach((a, i) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = a.label;
+    if (a.primary) btn.classList.add("primary");
+    btn.addEventListener("click", () => _gate.pick(i));
+    syncGate.actions.appendChild(btn);
+  });
+  // gate band + 允许穿透 busy（冲突必 surface；不可 dismiss——决策只能按钮选）
+  openModalSheet(syncGate.sheet, { band: "gate", allowDuringBusy: true, dismissible: false });
+  _releaseGateLock ??= acquireLock("gate");
+});
+export function lockSyncGate<T = string>(opts: SyncGateOpts<T>): Promise<T> { return _gate.open<T>(opts).result as Promise<T>; }
+/** 要自己收（闸门的罩子、拉取罩子）：拿句柄，别用 settleSyncGate（那个收的是最上面那张，不一定是你的）。 */
+export function openSyncGate<T = string>(opts: SyncGateOpts<T>): GateHandle<T> { return _gate.open<T>(opts); }
+export function isSyncGateUp(): boolean { return _gate.isUp(); }
+export function unlockSyncGate() { _gate.settleTop(null); }
+export function settleSyncGate(value: unknown) { _gate.settleTop(value); }

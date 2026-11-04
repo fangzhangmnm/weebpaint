@@ -116,8 +116,12 @@ describe("storage-whitelist · 自家前缀（锁 / 频道 / SW）", () => {
     assert(!/serviceWorker\.register\([^)]*scope/.test(ps), "no explicit scope");
     const sw = stripComments(readFileSync("service-worker.js", "utf8"));
     const names = [...sw.matchAll(/CACHE_NAME = (["`])([^"`]*)\1/g)].map((m) => m[2]);
-    assert(names.length >= 2 && names.every((n) => n.startsWith("weebpaint-")), "every CACHE_NAME assignment starts with weebpaint- : " + names.join(", "));
-    for (const m of sw.matchAll(/caches\.keys\(\)\)?\.filter\(\(k\) => ([^\n]+)/g)) assert(/k\.startsWith\("weebpaint-"\)/.test(m[1]), "caches.keys() must be filtered to our own prefix: " + m[1]);
+    // F-145（2026-11-03 工单 G）：名字经 SHELL_PREFIX 分频道，两个频道的前缀都得是 weebpaint- 开头；过滤经 isMyShellCache。
+    assert(/const SHELL_PREFIX = SCOPE_IS_DEV \? "weebpaint-dev-" : "weebpaint-";/.test(sw), "shell prefix per channel, both under weebpaint-");
+    assert(/let CACHE_NAME = [^\n]*\? "weebpaint-dev-boot" : "weebpaint-boot";/.test(sw), "boot name per channel");
+    assert(names.length >= 1 && names.every((n) => n.startsWith("${SHELL_PREFIX}")), "every CACHE_NAME assignment goes through SHELL_PREFIX: " + names.join(", "));
+    assert(/const isMyShellCache = \(k\) => k\.startsWith\(SHELL_PREFIX\)/.test(sw), "own-cache check starts from the channel prefix");
+    for (const m of sw.matchAll(/caches\.keys\(\)\)?\.filter\(\(k\) => ([^\n]+)/g)) assert(/isMyShellCache\(k\)/.test(m[1]), "caches.keys() must be filtered to our own channel: " + m[1]);
   });
 });
 

@@ -214,4 +214,6 @@ if (globalThis.gc) {
   }
   console.log("  [leak-gate] 0 leaks");
 }
+import "./cloud-gate.test.mjs";   // 掉登录 / 没网闸门 + F-147 B + F-148（工单 G，2026-11-03 Opus）
+import "./sw-channels.test.mjs";  // 正式版 / 开发版壳缓存不互删（F-145）
 import "./sw-redirect.test.mjs";   // 2026-10-14 离线壳：跳转响应原样交回（家族周账 F-28）

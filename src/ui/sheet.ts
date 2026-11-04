@@ -70,8 +70,11 @@ function _relayout() {
   const band = top.opts.band ?? "modal";
   b.setAttribute("data-open", "1");
   b.classList.toggle("sync-gate-backdrop", band === "gate");
-  b.style.zIndex = String(_zBase(band));
-  _stack.forEach((en, i) => { en.el.style.zIndex = String(_zBase(en.opts.band ?? "modal") + 1 + i); });
+  // 后开的永远在上面（2026-11-03 工单 G）：闸门罩着时开机解锁要弹口令面板，band 按固定基底算的话口令面板压在罩子底下 = 死锁。
+  let z = 0;
+  _stack.forEach((en, i) => { z = Math.max(z + 1, _zBase(en.opts.band ?? "modal") + 1 + i); en.el.style.zIndex = String(z); });
+  const raised = z > _zBase(band) + _stack.length;   // 顶上那张被顶到了自己 band 之上（罩子上的口令面板）：遮罩跟着上去，盖住罩子；否则还是 band 基底
+  b.style.zIndex = String(raised ? z - 1 : _zBase(band));
 }
 
 export function openSheet(el: HTMLElement, opts: SheetOpts = {}): SheetHandle {

@@ -6,7 +6,8 @@
 import type { StoreUI, StoreTextKey, StoreTextParams } from "@internal/store";
 import { withBusy } from "./fullscreen-busy.ts";
 import { showNotice, type NoticeHandle } from "@internal/workbench-elements";
-import { lockSyncGate, settleSyncGate } from "./sheets.ts";
+import { lockSyncGate, openSyncGate } from "./sheets.ts";
+import { noteRenewFailureLine } from "./cloud-gate.ts";   // 静默续签的原因码进黑匣子（工单 G，设计稿 §1 / §7 ⑧）
 import { t, type Key } from "./i18n/index.ts";
 import { stripSessionExt } from "./config.ts";
 import { reportError } from "./error-badge.ts";
@@ -82,6 +83,14 @@ export function makeResolveRenameOld(gate: typeof lockSyncGate = lockSyncGate) {
   };
 }
 
+/** 闸门的接缝（cloud-gate-host.ts 接线；store-ui 在 app-store 之前求值，不能反过来 import）。 */
+export const storeGate: {
+  escapeProbe: (() => Promise<void> | null) | null;
+  onFace: (() => void) | null;
+  goOffline: (() => void) | null;
+  lastOpenChoice: "keepMine" | "takeCloud" | "cancel" | null;
+} = { escapeProbe: null, onFace: null, goOffline: null, lastOpenChoice: null };
+
 export const storeUI: StoreUI = {
   // 用户态写流：按 key 路由——后台节律走 notice（不遮罩），用户动作走全屏遮罩（可重入 ref-count）。
   busy: (label, fn, key) => (key && QUIET_KEYS.has(key) ? quietBusy(label, fn) : withBusy(label, fn)),
@@ -101,6 +110,7 @@ export const storeUI: StoreUI = {
   //   store 0.18.2 起 ctx 带 cloudState（云端那一侧：有新版 / 没了 / 从没传过 / 没变）：面上换标题和正文，三个词和主按钮不变
   //   （措辞与 gallery 0.7.2 storeUIFor 同一套；「处理…」→ file.resolve() 就靠这几种说法把「云端没了」说清楚）。
   resolveConflict: async ({ name, occasion, cloudState }): Promise<"keepMine" | "takeCloud" | "cancel"> => {
+    storeGate.onFace?.();   // 人在看面：闸门别拿超时打断
     const n = stripSessionExt(name);
     const gone = cloudState === "absent" || cloudState === "never";
     const pushTitle = gone ? t("cf.cloudGoneTitle") : t("cf.cloudNewerTitle");
@@ -129,6 +139,7 @@ export const storeUI: StoreUI = {
             { label: t("common.cancel"), value: "cancel" },
           ],
         });
+    if (occasion === "open") storeGate.lastOpenChoice = choice ?? "cancel";   // session 据此决定要不要整体重开（checkCloudOnce）
     return choice ?? "cancel";
   },
 
@@ -138,6 +149,7 @@ export const storeUI: StoreUI = {
   //   CloudNetworkError（库 2026-08-25 起：provider fetch 网络层 throw 的类型化封装，Safari 原文是裸
   //   `TypeError: Load failed`）→ 用户可见换 i18n 人话（级别不降：保存失败必须显眼），原始错误进 console 供诊断。
   reportError: (err: unknown, level): void => {
+    noteRenewFailureLine((err as { message?: string } | null)?.message ?? "");   // 库把静默续签的原因写进这条 log；闸门要它分「过期了 / 没回应」
     if ((err as { name?: string } | null)?.name === "CloudNetworkError") {
       reportError(err, "log");                                    // 诊断轨：原错（含 Graph 路径/cause）只进 console
       reportError(new Error(t("err.cloudNetwork")), level ?? "error");   // 用户轨：人话 banner，级别照旧
@@ -148,13 +160,17 @@ export const storeUI: StoreUI = {
 
   // 「跳过到离线」逃生闸（对齐旧 cloud-freshness）：引擎 freshness.open 拿 {probe, settle}，probe 与 fetchMeta race，
   //   finally 调 settle。用户点「跳过到离线」→ probe resolve → 读本地（无硬超时，用户即超时）。
+  //   2026-11-03 工单 G：闸门这一轮里用闸门的逃生信号（罩子已经在了，不叠第二张）；闸门外点了 = 离线继续（常驻条，库之后不再打网）。
   offlineEscape: (): { probe: Promise<unknown>; settle: () => void } => {
+    const inGate = storeGate.escapeProbe?.();
+    if (inGate) return { probe: inGate, settle: (): void => {} };
     let onSkip!: () => void;
     const probe = new Promise<unknown>((res) => { onSkip = () => res(undefined); });
-    void lockSyncGate<"skip" | null>({
+    const h = openSyncGate<"skip">({
       title: t("cf.checkingCloud"), message: "", showSpinner: true,
       actions: [{ label: t("cf.skipToOffline"), value: "skip" }],
-    }).then((v) => { if (v === "skip") onSkip(); });
-    return { probe, settle: (): void => settleSyncGate(null) };
+    });
+    void h.result.then((v) => { if (v === "skip") { onSkip(); storeGate.goOffline?.(); } });
+    return { probe, settle: (): void => h.close() };
   },
 };

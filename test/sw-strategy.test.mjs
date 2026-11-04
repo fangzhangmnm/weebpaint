@@ -44,7 +44,7 @@ function loadSW(scopePath, { installedCache = null } = {}) {
     };
   };
   if (installedCache) storeOf(installedCache);
-  const store = storeOf(installedCache ?? "weebpaint-boot");
+  const store = storeOf(installedCache ?? (scopePath.includes("/dev/") ? "weebpaint-dev-boot" : "weebpaint-boot"));   // F-145：开发版缓存名带 dev-
   let fetchImpl = async () => { throw new Error("offline"); };
   const ctxObj = {
     self: {
@@ -196,13 +196,13 @@ describe("service-worker · 重启后找回 cache 名（审计 L4）", () => {
     eqJson(sw.opened, [HASH_CACHE]);
   });
 
-  it("dev：重启（无 install）+ 离线 → network-first 回退到既有 weebpaint-<hash> cache", async () => {
-    const sw = loadSW("/dev/service-worker.js", { installedCache: HASH_CACHE });
+  it("dev：重启（无 install）+ 离线 → network-first 回退到既有 weebpaint-dev-<hash> cache", async () => {
+    const sw = loadSW("/dev/service-worker.js", { installedCache: "weebpaint-dev-0123abcd4567" });   // F-145：开发版只认自己频道的缓存
     sw.seed(`${ORIGIN}/dev/index.html`, new MockResponse("PRECACHED"));
     sw.setFetch(async () => { throw new Error("offline"); });
     const r = await drive(sw.handlers, { url: `${ORIGIN}/dev/index.html` });
     eq(r.body, "PRECACHED", "dev 离线重开也得找回预缓存");
-    eqJson(sw.opened, [HASH_CACHE]);
+    eqJson(sw.opened, ["weebpaint-dev-0123abcd4567"]);
   });
 
   it("并发 fetch 共享同一次解析：两条请求同时进来只查一次 keys、都开 <hash>", async () => {

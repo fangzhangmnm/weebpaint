@@ -27,7 +27,10 @@ import { requireStore, galleryBackend } from "./app-store.ts";
 import { galleryOnline } from "./gallery-capability.ts";   // 库在线 SSoT（0828：isSignedIn 是 MSAL 词，folder 库别问它）
 import { appEncryption } from "./encryption.ts";
 import type { EncryptedBlob } from "./app-store.ts";   // 密文 at-rest 字节（branded）；B2：类型经接缝转口
-import { openInputSheet, openConfirmSheet, openChoiceSheet, lockSyncGate, settleSyncGate } from "./sheets.ts";
+import { openInputSheet, openConfirmSheet, openChoiceSheet, lockSyncGate, openSyncGate } from "./sheets.ts";
+import type { GateHandle } from "./gate-stack.ts";
+import { storeGate } from "./store-ui.ts";
+import { RELOAD_PUSH_WAIT_MS } from "./config.ts";
 import { readHandleFile, writeHandleBlob, handleMtime, hasWeebPaintTraces, supportsSaveFilePicker, pickSaveOraFile, type LocalFileHandle } from "./local-file-session.ts";
 import { claimHomeAuthority, docHome, fileDirty, saveRoute } from "./doc-home.ts";
 import { activeGalleryId } from "@internal/gallery";   // P3：安家铸户口用当前挂载库 id（legacy="default" 零迁移）
@@ -41,6 +44,7 @@ import { serializedToolStatePatch, desk } from "./workbench-state.ts";
 import { getBlenderSyncState, applyBlenderSyncState } from "./blender-sync.ts";
 import { ensureNewPassword, ensureUnlocked, unlockImportedContainer, isFreshPasswordSetup, rollbackFreshPassword } from "./enc-thumbs.ts";
 import { setPassword, getPassword } from "./crypto-state.ts";
+import { note as diagNote } from "./diag-log.ts";
 import { shouldCapture, checkpointKey, planRingEviction, ringBudget, isNewSitting, type CheckpointTrigger, type RingEntryMeta } from "./checkpoint-policy.ts";
 import { getCheckpoint, deleteCheckpoint, ringPut, ringGet, ringAll, ringDelete, ringDeleteByDoc, mintRingId } from "./storage.ts";
 import { els } from "./els.ts";
@@ -775,6 +779,7 @@ async function saveAndPush() {
     //   顺带把当前 desk 捞进 ora（_buildOraMeta → syncRuntimeForSave + Serialize）。
     //   冲突/错误经 store 的 ui bundle surface。
     await es.forceSaveAndPush();
+    await _refreshEncrypted();   // 面上选了「云端覆盖本地」= 整份换了：别的设备可能加密过 / 解除过（F-148）
     // 别无条件报「已同步」：push 失败在 store 内部被 catch 成 banner，这里**不会**抛。
     //   唯一可靠的判据是 es.isPushPending()（v433）——它是 save() 返回的 pushed 一路带上来的。
     setStatus(!galleryOnline() ? t("ss.savedLocalIdb", { name })
@@ -1054,16 +1059,23 @@ async function openItem(item: { name: string }) {   // name = 裸名（gallery.t
 
   try {
     // 加密且未解锁 → 先在 busy 外解锁（file.open 内部 unseal 要密码在内存）。
-    if (await _file(item.name).isEncrypted()) {
+    const encBefore = await _file(item.name).isEncrypted();
+    if (encBefore) {
       if (!(await ensureUnlocked(item.name))) { setStatus(t("ss.notOpenedNeedPasswordCancelled"), true); return; }
     }
     // ★ 返回值**必须**看（v417 修，优先级 1 = OneDrive 不丢画）：false = 字节没装进来
     //   （离线纯云端 / 文件锁定 / 本地副本没了）。旧版把它扔了，于是画布上还是**上一张画**、身份却换成了
     //   新名字、状态栏还报「已打开」——下次 autosave 就把上一张画的像素写进新身份，退出时推上 OneDrive
     //   覆盖掉目标那张画。es.open 现在失败即不改自身 _name，这里也必须不改活动名、留在图库。
-    if (!(await es.open(toFull(item.name)))) { setStatus(t("ss.openFailed", { error: t("mi.lastNotFound", { name: item.name }) }), true); return; }
+    let opened = await es.open(toFull(item.name));
+    // 家族 F-148：库的 isEncrypted 看本地字节。纯云端的加密画、这台锁着：开之前说「不是」，就没问口令；容器拉下来之后才认得出。问了再开一次。
+    if (!opened && !encBefore && await _file(item.name).isEncrypted()) {
+      if (!(await ensureUnlocked(item.name))) { setStatus(t("ss.notOpenedNeedPasswordCancelled"), true); return; }
+      opened = await es.open(toFull(item.name));
+    }
+    if (!opened) { setStatus(t("ss.openFailed", { error: t("mi.lastNotFound", { name: item.name }) }), true); return; }
     _esRebound();
-    _setActive(item.name); _isLazyBlankSession = false; _recomputePhase(); _refreshEncrypted();
+    _setActive(item.name); _isLazyBlankSession = false; _recomputePhase(); await _refreshEncrypted();   // 以 open 之后的字节为准（F-148）；等它：下面的分叉 / 保存要看
     void _captureCheckpoint(item.name, "gallery-open");
     setGalleryOpen(false); setStatus(t("ss.opened", { name: item.name }));
   } catch (err) {
@@ -1129,12 +1141,19 @@ async function _restoreSessionAttempt(name: string): Promise<boolean> {
     //   ③ boot 收到 false 只把**内存**名降回 null，持久的 currentFile 有意保留（防幻影路径 +
     //      取消密码常是瞬态的，清了下次冷启动就再也不自动开这张画）——见 boot.ts。
     //   store 侧的两半已有 node 覆盖（seal.test.ts：无密码写抛 LOCKED 绝不静默存明文；锁定读返 null）。
-    if (await _file(name).isEncrypted()) { if (!(await ensureUnlocked(name))) return false; }
+    const encBefore = await _file(name).isEncrypted();
+    if (encBefore && !(await ensureUnlocked(name))) return false;
     if (_fileHome()) return false;   // 密码框/加密探测悬着期间本地文件落地 → 让位
-    if (!(await es.open(toFull(name)))) return false;   // 文件缺失/锁定 → 未装入。边界转全名。
+    let opened = await es.open(toFull(name));   // 文件缺失/锁定 → 未装入。边界转全名。
+    if (!opened && !encBefore && await _file(name).isEncrypted()) {   // F-148：纯云端的加密画、这台锁着（同 openItem）
+      if (!(await ensureUnlocked(name))) return false;
+      if (_fileHome()) return false;
+      opened = await es.open(toFull(name));
+    }
+    if (!opened) return false;
     if (_fileHome()) return false;   // es.open 期间本地文件落地（adopt 硬闸已挡画布；这里别再抢身份）
     _esRebound();
-    _setActive(name); _isLazyBlankSession = false; _recomputePhase(); _refreshEncrypted();
+    _setActive(name); _isLazyBlankSession = false; _recomputePhase(); await _refreshEncrypted();   // 以 open 之后的字节为准（F-148）
     updateSaveStatus();
     return true;
   } catch (e) { reportError(new Error("[session] restore failed: " + String(e)), "log"); return false; }
@@ -1183,49 +1202,128 @@ async function saveAs(newName: string): Promise<void> {
 //   · escaped → 分叉 consent（2026-08-25 拍板：逃生=显式开新画，不是「回头再弹 412」）：当前画面
 //     saveAs 成新身份（mode:"new" 正门，红线全在）；原名旧字节留作缓存、云端新版仍是正主
 //     （迟到完成的下载 = 原名缓存的静默刷新，画布已属新身份无从被碰）。之后推送全走新身份。
-let _refreshInFlight = false;   // 回线+回前台常成对触发 → 去重
-async function refreshOpenDoc(): Promise<void> {
+// 工单 G：闸门要等它的结果、也要能让迟到的结果作废，所以带状态、带守卫。回线 + 回前台常成对触发 → 在途的那一趟共用（闸门来了加入它、等它，不是看见在途就当没事）。
+export type RefreshStatus = "skipped" | "dirty" | "in-sync" | "fast-forwarded" | "escaped" | "other";
+export interface RefreshGuard { abandoned: () => boolean; onLongWait: () => void }
+let _refreshRun: Promise<RefreshStatus> | null = null;
+let _refreshGuard: RefreshGuard | null = null;
+function refreshOpenDoc(g?: RefreshGuard): Promise<RefreshStatus> {
+  if (_refreshRun) { if (g) _refreshGuard = g; return g ? _refreshRun : Promise.resolve("skipped"); }
   const name = _activeName();   // gallery 家专属（file 家/无家 name=null 即短路——旧 _localFile 闸吸收进联合类型）
-  if (!name || _isLazyBlankSession || _refreshInFlight) return;
-  if (!es || es.isDirty() || es.isPushPending()) return;   // 只干净快进；dirty 的分歧留给保存 412 冲突面（引擎 dirty-skip 双保险）
-  _refreshInFlight = true;
-  let gateUp = false;
+  if (!name || _isLazyBlankSession) return Promise.resolve("skipped");
+  if (!es || es.isDirty() || es.isPushPending()) return Promise.resolve("dirty");   // 只干净快进；dirty 的分歧留给保存 412 冲突面（引擎 dirty-skip 双保险）
+  _refreshGuard = g ?? null;
+  const run = _refreshInner(name).finally(() => { if (_refreshRun === run) _refreshRun = null; });
+  _refreshRun = run;
+  return run;
+}
+async function _refreshInner(name: string): Promise<RefreshStatus> {
+  let cover: GateHandle<"fork"> | null = null;
   let onSkip: () => void = () => {};
   const probe = new Promise<void>((res) => { onSkip = res; });
   try {
     const r = await _file(name).pullIfClean({
+      // 闸门超时 / 点了「先离线用」之后迟到的结果：当脏处理 = 这次不换字节（CatsUp 同形）
+      localDirty: () => es.isDirty() || !!_refreshGuard?.abandoned(),
       // store 0.18.1：回线 / 回前台 = 怀疑自己过期的时刻，不采信 30 s 内的旧清单（0.17.0 fresh-hints），一定问云端——
       //   别的设备恰好在这 30 s 里推过也能快进（WXHW e2e「挂机：别的设备改过、这台干净 → 醒来静默快进」就是这条）。
       trustHints: false,
       onReplaceStart: () => {
-        gateUp = true;
-        void lockSyncGate<"fork" | null>({
+        _refreshGuard?.onLongWait();   // 开始换字节了：这张罩子自己有出口，闸门别拿超时打断
+        cover = openSyncGate<"fork">({
           title: t("cf.cloudNewerTitle"), message: t("cf.body.pulling", { name }), showSpinner: true,
           actions: [{ label: t("cf.act.forkContinue"), value: "fork" }],
-        }).then((v) => { if (v === "fork") onSkip(); });
+        });
+        void cover.result.then((v) => { if (v === "fork") onSkip(); });
       },
       probe,
     });
     if (r?.status === "fast-forwarded") {
-      if (gateUp) { settleSyncGate(null); gateUp = false; }   // 先落遮罩再重载（adoptModel 自带 _loadingDoc 门）
+      (cover as GateHandle<"fork"> | null)?.close(); cover = null;   // 先落遮罩再重载（adoptModel 自带 _loadingDoc 门）
       const ok = await es.open(toFull(name));                 // 同名重开 = openInto 管线（freshness 刚 markSynced → in-sync 快路径 → readLocal → adopt 全量重建）
-      if (!ok) { setStatus(t("ss.refreshReloadFailed", { name }), true); return; }   // 响亮，绝不静默留旧画布
+      if (!ok) { setStatus(t("ss.refreshReloadFailed", { name }), true); return "other"; }   // 响亮，绝不静默留旧画布
+      await _refreshEncrypted();   // 别的设备加密过 / 解除过（F-148）：标记跟着 open 之后的字节走
       void _captureCheckpoint(name, "cloud-refresh");
       setStatus(t("ss.refreshedFromCloud", { name }));
       updateSaveStatus(); gallery.refresh();
-    } else if (r?.status === "escaped") {
-      if (gateUp) { settleSyncGate(null); gateUp = false; }   // fork 按钮自身已关 gate，settle 兜底无害
-      await _forkAfterEscape(name);
+      return "fast-forwarded";
     }
+    if (r?.status === "escaped") {
+      (cover as GateHandle<"fork"> | null)?.close(); cover = null;   // fork 按钮自身已关 gate，close 兜底无害
+      await _forkAfterEscape(name);
+      return "escaped";
+    }
+    if (r?.status === "dirty-skip") return "dirty";
+    return r?.status === "in-sync" ? "in-sync" : "other";
   } catch (e) {
-    if (e instanceof FormatTooNewError) { await _leaveDocUnsaved(); return; }   // 云端那份已是更新 major：拒开（通知条已说）
+    if (e instanceof FormatTooNewError) { await _leaveDocUnsaved(); return "other"; }   // 云端那份已是更新 major：拒开（通知条已说）
     reportError(new Error("[session] refreshOpenDoc failed: " + String(e)), "log");
+    return "other";
   }
-  finally { if (gateUp) settleSyncGate(null); _refreshInFlight = false; }
+  finally { (cover as GateHandle<"fork"> | null)?.close(); }
+}
+/** 闸门问云端这一步（设计稿 §3）：干净 → 快进；有没传的改动 → 库的 open 路（回执丢失自愈，真分叉才弹面）。CatsUp 同形。 */
+async function checkCloudOnce(g: RefreshGuard): Promise<void> {
+  const name = _activeName();
+  if (!name || _isLazyBlankSession) return;
+  if (_enc.encrypted && !getPassword(name)) return;   // 锁着的加密件：不解不比，保存时再裁
+  const st = await refreshOpenDoc(g);
+  diagNote("doc", `gate check: ${st}`);
+  if (st !== "dirty" || g.abandoned() || _activeName() !== name) return;
+  if (es.isDirty()) await saveNow({ implicit: true });   // 没落本机的先落：库比的是本机那份
+  if (g.abandoned()) return;
+  // 这一轮库的面已经问过了（WeebPaint 登录和恢复并行：恢复时 es.open 就可能撞上真分叉）：人答过了，别再问一遍。闸门每轮开始时清（cloud-gate-host）。
+  if (storeGate.lastOpenChoice) return;
+  const blob = await _file(name).open();
+  if (storeGate.lastOpenChoice === "takeCloud" && blob && _activeName() === name) {
+    const ok = await es.open(toFull(name));   // 面上选了云端：整份换世界线（同 takeCloud 收尾）
+    if (!ok) { setStatus(t("ss.refreshReloadFailed", { name }), true); return; }
+    await _refreshEncrypted();
+    setStatus(t("ss.refreshedFromCloud", { name }));
+    updateSaveStatus(); gallery.refresh();
+  }
+}
+
+/** 点「有新版本」前（家族 F-147 B；pwa-shell onBeforeReload）。返回 false = 人取消了，这次不刷新。
+ *  WeebPaint 的推送 = 人按「存」，所以这里问人，不替人推；但也不许静默重载丢推送：
+ *  · 干净的什么都不做（别无条件写：干净的也重新编码 = 标脏，刷新后弹「没同步好」，CatsUp 栽过）。
+ *  · file / transient 家：现有的三键挽留。
+ *  · 图库家改过没传：问「存好再刷新 / 先不传，刷新」。存 = 先落本地（不设时限：这步丢了就是丢改动）→ 推，最多等 RELOAD_PUSH_WAIT_MS，推不完就走、脏留给库。
+ *  · 够不着云（离线 / 没登录）：问了也推不了，只落本地，不问。 */
+async function flushBeforeReload(): Promise<boolean> {
+  if (!(await _gateFillOnSwitch())) return false;   // 挽留门：fill 预览挂着 → 应用/丢弃/取消
+  if (_localHomeKind()) return leaveLocalDoc();
+  const name = _activeName();
+  if (!name || _docIsBlankUnnamed()) return true;
+  const pending = editMode.hasPendingTransient();
+  if (!es.isDirty() && !es.isPushPending() && !pending) return true;
+  if (!galleryOnline()) { _applyPendingForExplicitSave(); await saveNow(); return true; }
+  const choice = await openChoiceSheet<"save" | "local">(t("upd.unsavedTitle", { name }), t("upd.unsavedMsg"), [
+    { label: t("upd.saveAndReload"), value: "save", primary: true },
+    { label: t("upd.reloadOnly"), value: "local" },
+  ]);
+  if (!choice) return false;
+  _applyPendingForExplicitSave();
+  if (!(await _gateNewerOverwrite())) { setStatus(t("ss.saveCancelled")); return false; }   // 第二层：较新 app 写的画，取消 = 不刷新
+  if (choice === "local") { await saveNow(); return true; }
+  await withBusy(t("ss.savingBusy", { name }), async () => {
+    try {
+      await es.flushLocal();
+      await Promise.race([es.flushAndPush(), new Promise((r) => setTimeout(r, RELOAD_PUSH_WAIT_MS))]);
+    } catch (e) { reportError(new Error("[reload] save failed: " + String(e)), "log"); }
+  });
+  return true;
 }
 
 // 逃生分叉：saveAs = 现成深模块（mode:"new" 撞名护栏 + checkpoint + 切身份 + push）。秒级撞名重试一次。
 async function _forkAfterEscape(origName: string): Promise<void> {
+  // 加密的画不分叉：saveAs 写的是新身份 = 明文（规则书 §1 第 5 条；家族 F-148）。放下回图库（拉取只发生在干净文档上，放下不丢东西），它还在后台更新。
+  await _refreshEncrypted();
+  if (_enc.encrypted) {
+    setStatus(t("ss.encNoFork", { name: origName }), true);
+    await _leaveDocUnsaved();
+    return;
+  }
   const d = new Date();
   const p2 = (n: number) => String(n).padStart(2, "0");
   const stamp = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
@@ -1281,6 +1379,8 @@ export const session = {
   beginTransientBlank,   // P2 云关 boot 落点（boot-restore.openBlankCanvas 唯一调用方）：transient 家新画布
   newTransientDoc,       // #22 无库「新建」（gallery-shell newDocConfirm 无库分支）：选尺寸的 transient 画布
   refreshOpenDoc,   // 回线/回前台的显式快进（P1 2026-08-25）——app.ts 事件侧唯一入口，别再裸调 pullIfClean
+  checkCloudOnce,   // 闸门问云端这一步（工单 G）
+  flushBeforeReload,   // 点「有新版本」前（F-147 B）
   // 显式换文档挽留门（fill 预览三选；user 2026-08-21）——给 session 外的换内容入口复用
   //   （import-image 的 .ora 导入为新身份）。session 内的 openItem/newDoc/openLocalFile 已内联。
   gateFillOnSwitch: _gateFillOnSwitch,

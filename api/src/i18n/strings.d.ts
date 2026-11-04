@@ -6660,6 +6660,108 @@ export declare const S: {
         readonly ja: "スキップしてオフライン";
         readonly tok: "o open kepeken ilo ni taso";
     };
+    readonly "gate.checking": {
+        readonly zh: "正在核对网盘上的版本…";
+        readonly en: "Checking the version on your cloud drive…";
+        readonly ja: "クラウドのバージョンを確認しています…";
+        readonly tok: "mi lukin e sitelen lon poki sewi…";
+    };
+    readonly "gate.escape": {
+        readonly zh: "先离线用";
+        readonly en: "Use offline for now";
+        readonly ja: "ひとまずオフラインで使う";
+        readonly tok: "o kepeken ilo ni taso";
+    };
+    readonly "gate.blockedTitle": {
+        readonly zh: "网盘没连上";
+        readonly en: "Not connected to your cloud drive";
+        readonly ja: "クラウドにつながっていません";
+        readonly tok: "linja tawa poki sewi li lon ala";
+    };
+    readonly "gate.reason.expired": {
+        readonly zh: "登录过期了";
+        readonly en: "Your sign-in has expired";
+        readonly ja: "ログインの期限が切れました";
+        readonly tok: "tenpo pi kama sona li pini";
+    };
+    readonly "gate.reason.noNetwork": {
+        readonly zh: "现在没有网络";
+        readonly en: "There is no network right now";
+        readonly ja: "今はネットワークがありません";
+        readonly tok: "tenpo ni la linja li lon ala";
+    };
+    readonly "gate.reason.noResponse": {
+        readonly zh: "网盘没有回应";
+        readonly en: "Your cloud drive isn't responding";
+        readonly ja: "クラウドから応答がありません";
+        readonly tok: "poki sewi li toki ala";
+    };
+    readonly "gate.signIn": {
+        readonly zh: "重新登录";
+        readonly en: "Sign in again";
+        readonly ja: "もう一度ログイン";
+        readonly tok: "o kama sona sin";
+    };
+    readonly "gate.offline": {
+        readonly zh: "离线继续";
+        readonly en: "Continue offline";
+        readonly ja: "オフラインで続ける";
+        readonly tok: "o awen kepeken ilo ni taso";
+    };
+    readonly "gate.bar": {
+        readonly zh: "离线";
+        readonly en: "Offline";
+        readonly ja: "オフライン";
+        readonly tok: "linja ala";
+    };
+    readonly "gate.barN": {
+        readonly zh: "离线 · 还有 {n} 份没传上去";
+        readonly en: "Offline · {n} not uploaded yet";
+        readonly ja: "オフライン · 未アップロード {n} 件";
+        readonly tok: "linja ala · sitelen {n} li tawa ala poki sewi";
+    };
+    readonly "gate.barReconnecting": {
+        readonly zh: "已连上网盘";
+        readonly en: "Connected to your cloud drive";
+        readonly ja: "クラウドにつながりました";
+        readonly tok: "linja tawa poki sewi li pona";
+    };
+    readonly "gate.barList": {
+        readonly zh: "看列表";
+        readonly en: "See list";
+        readonly ja: "一覧を見る";
+        readonly tok: "o lukin e lipu";
+    };
+    readonly "upd.unsavedTitle": {
+        readonly zh: "「{name}」改过还没传上去";
+        readonly en: "“{name}” has changes that aren't uploaded";
+        readonly ja: "「{name}」に未アップロードの変更があります";
+        readonly tok: "ante pi {name} li tawa ala poki sewi";
+    };
+    readonly "upd.unsavedMsg": {
+        readonly zh: "刷新之后这些改动还在这台设备上。";
+        readonly en: "Your changes stay on this device after reloading.";
+        readonly ja: "再読み込みしても、変更はこの端末に残ります。";
+        readonly tok: "ante li awen lon ilo ni.";
+    };
+    readonly "upd.saveAndReload": {
+        readonly zh: "存好再刷新";
+        readonly en: "Save, then reload";
+        readonly ja: "保存してから再読み込み";
+        readonly tok: "o awen. o open sin.";
+    };
+    readonly "upd.reloadOnly": {
+        readonly zh: "先不传，刷新";
+        readonly en: "Reload without uploading";
+        readonly ja: "アップロードせず再読み込み";
+        readonly tok: "o tawa ala. o open sin.";
+    };
+    readonly "ss.encNoFork": {
+        readonly zh: "「{name}」是加密的，分叉会留下明文，所以先放下了：它还在后台更新，好了到图库里打开";
+        readonly en: "“{name}” is encrypted and a fork would leave an unencrypted copy, so it was set aside. It is still updating; open it from the gallery when it's done.";
+        readonly ja: "「{name}」は暗号化されていて、分岐すると平文が残るため閉じました。更新が終わったらギャラリーから開いてください。";
+        readonly tok: "{name} li len. sitelen sin li len ala la mi pini e ona. o open e ona lon tomo sitelen.";
+    };
     readonly "cf.cloudNewerTitle": {
         readonly zh: "云端有新版本";
         readonly en: "A newer version exists in the cloud";

@@ -2018,6 +2018,9 @@ body[data-doc-newer="1"] #statusLabel { color: #dc2626; font-weight: 600; }
 /* Sync gate ——— 锁屏 + 决策 sheet（见 ai-docs/20260528-sync-design.md） */
 .sync-gate-backdrop { z-index: var(--z-gate); background: rgba(0, 0, 0, 0.45); }
 .sync-gate-sheet { z-index: calc(var(--z-gate) + 1); max-width: 320px; }
+/* 闸门的「核对中」：开头 120 ms 不显形（核对很快时看不出闪了一下；输入从第一帧就锁着。工单 G） */
+.sync-gate-quiet[data-open] { animation: sync-gate-quiet-in 0.12s step-end; }
+@keyframes sync-gate-quiet-in { from { opacity: 0; } to { opacity: 1; } }
 .sync-gate-spinner {
   display: flex; align-items: center; gap: 10px;
   padding: 12px 0; color: var(--ink-soft); font-size: 12px;
