@@ -4,6 +4,8 @@ export interface CloudGateHostDeps {
     authBoot: Promise<unknown>;
     isSignedIn(): boolean;
     retrySilentSignIn(): Promise<boolean>;
+    /** 问云端一次（选了离线时用；app-store.cloudReachable）。 */
+    reachable(): Promise<void>;
     /** 交互登录：在点击的同步栈里调（iOS 红线）。 */
     signIn(): void;
     check(g: {
@@ -22,6 +24,7 @@ export declare function createCloudGateHost(d: CloudGateHostDeps): {
     retrySilentQuietly: (why: string) => void;
     paintBar: () => void;
     tune: {
+        offlineRetryMs: number;
         recheckMs: number;
     };
 };

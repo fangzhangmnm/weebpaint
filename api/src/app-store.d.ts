@@ -7,6 +7,8 @@ export declare const storeAbsent: boolean;
 type _Auth = ReturnType<typeof createOneDriveProvider>["auth"];
 export declare const cloudEnabled: boolean;
 export declare const provider: import("@internal/store").CloudProvider | null;
+/** 问云端一次（闸门的「离线继续」期间静默再试用）：真走一趟网，名字不存在 = 云端答了 null，也算通；不通 = 抛。不经 store：选了离线时 store 不出网。 */
+export declare function cloudReachable(): Promise<void>;
 export type AppStorePort = Pick<Store, "file" | "zip" | "files" | "collection" | "identifiers">;
 export type GalleryBackend = {
     kind: "live";

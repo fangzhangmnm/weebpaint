@@ -41,6 +41,7 @@ export function fakeDrive() {
       await route.fulfill({ status: it ? 200 : 404, headers: { "access-control-allow-origin": "*" }, contentType: "application/octet-stream", body: it ? Buffer.from(it.bytes) : "" });
     });
     await ctx.route(/graph\.microsoft\.com\/v1\.0\//, async (route) => {
+      if (d.down) return route.abort("connectionreset");   // 网盘不答（令牌还在）：离线态的定时再试不许把这当成回来了
       const req = route.request();
       if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
       d.requests++;

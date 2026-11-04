@@ -117,6 +117,11 @@ const _asm: { provider: _Prov | null; auth: _Auth | null } = cloudEnabled
   ? _assembleReal()
   : { provider: null, auth: null };
 export const provider = _asm.provider;
+/** 问云端一次（闸门的「离线继续」期间静默再试用）：真走一趟网，名字不存在 = 云端答了 null，也算通；不通 = 抛。不经 store：选了离线时 store 不出网。 */
+export async function cloudReachable(): Promise<void> {
+  if (!provider) throw new Error("no cloud provider");
+  await provider.getItemByPath(".reachable-probe");
+}
 const _auth: _Auth | null = _asm.auth;
 
 // ============ B2 窄接口（C7 裁定落地，2026-08-10；2026-08-27 ambient 退役改造）============

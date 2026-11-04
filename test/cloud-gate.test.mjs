@@ -33,6 +33,7 @@ function rig(over = {}) {
     catchUp: async () => { st.catchUps++; },
     afterPass: () => { st.afterPass++; },
     note: (m) => { log.push(m); },
+    reachable: over.reachable, pageVisible: over.pageVisible, every: over.every,
     hardTimeoutMs: over.hardTimeoutMs ?? 40,
     recheckMs: over.recheckMs ?? 0,
   });
@@ -115,6 +116,52 @@ describe("闸门状态机（设计稿 §7）", () => {
     const p = gate.run("boot");
     await tick(60); eq(st.cover, "checking", "超时停了，没进闸");
     hang.resolve(); eq(await p, "pass");
+  });
+  const clock = () => { const c = { ms: 0, fn: null, stopped: false, every: (m, f) => { c.ms = m; c.fn = f; return () => { c.stopped = true; c.fn = null; }; }, fire: async () => { c.fn?.(); await tick(); await tick(); } }; return c; };
+  const goOff = async (over) => { const c = clock(); const r = rig({ ...over, every: c.every }); void r.gate.run("boot"); await tick(); r.st.goOffline?.(); r.st.escape?.(); await tick(); return { ...r, c }; };
+  const failing = { renew: async () => ({ kind: "failed", code: "timed_out" }) };
+  const st0 = { ok: false };
+  it("离线态（设计稿 §3 硬要求）：每 60 s 静默试一次；通了就清离线、补传、收条，定时器停", async () => {
+    let fail = true, reachCalls = 0;
+    const { gate: _g, st, c } = await goOff({ renew: async () => (fail ? { kind: "failed", code: "timed_out" } : { kind: "ok" }), reachable: async () => { reachCalls++; } });
+    assert(st.offline, "选了离线"); eq(c.ms, 60000, "60 s"); const r0 = st.renews;
+    await c.fire();
+    eq(st.renews, r0 + 1, "到点试了一次"); assert(st.offline, "没通：还是离线"); eq(st.cover, null, "失败不弹闸"); eq(st.bar, "offline", "条还在"); eq(st.catchUps, 0);
+    fail = false;
+    await c.fire();
+    assert(!st.offline, "通了：清离线"); eq(reachCalls, 1, "问了云端"); eq(st.catchUps, 1, "补传"); eq(st.bar, "none", "收条"); assert(c.stopped, "定时器停"); eq(st.cover, null);
+  });
+    it("离线态：令牌还在但云端不答（慢网）= 没回来，不清离线、不弹", async () => {
+    let up = false;
+    const { st, c } = await goOff({ renew: async () => (st0.ok ? { kind: "ok" } : { kind: "failed", code: "x" }), reachable: async () => { if (!up) throw new Error("net"); } });
+    st0.ok = true;
+    await c.fire();
+    assert(st.offline, "还是离线"); eq(st.catchUps, 0, "不补传"); eq(st.cover, null, "不弹"); eq(st.bar, "offline");
+    up = true;
+    await c.fire();
+    assert(!st.offline, "下一拍通了"); eq(st.catchUps, 1);
+    st0.ok = false;
+  });
+    it("离线态：云端一直不答也不挂住（硬超时之后下一拍还能再试）", async () => {
+    const hang = deferred();
+    let calls = 0;
+    const { st, c } = await goOff({ hardTimeoutMs: 10, renew: async () => (st0.ok ? { kind: "ok" } : { kind: "failed", code: "x" }), reachable: async () => { calls++; await hang.promise; } });
+    st0.ok = true;
+    await c.fire(); await tick(30);
+    assert(st.offline, "超时 = 没回来"); eq(calls, 1);
+    await c.fire(); await tick(30);
+    eq(calls, 2, "下一拍再试，没被上一次卡住");
+    hang.resolve(); st0.ok = false;
+  });
+    it("离线态：后台不试、没网不试（回前台 run(wake) 那一下试）", async () => {
+    let visible = false;
+    const { gate, st, c } = await goOff({ ...failing, pageVisible: () => visible });
+    const r0 = st.renews;
+    await c.fire(); eq(st.renews, r0, "后台不试");
+    visible = true; st.online = false;
+    await c.fire(); eq(st.renews, r0, "没网不试");
+    st.online = true;
+    eq(await gate.run("wake"), "offline-kept"); await tick(); eq(st.renews, r0 + 1, "回前台试一次"); eq(st.cover, null, "回前台也不弹");
   });
   it("⑥ 醒来走同一套；已选离线且仍没网 → 不再弹闸（条还在）", async () => {
     const { gate, st } = rig({ online: false });

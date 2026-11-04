@@ -20,6 +20,8 @@ export interface CloudGateHostDeps {
   authBoot: Promise<unknown>;
   isSignedIn(): boolean;
   retrySilentSignIn(): Promise<boolean>;
+  /** 问云端一次（选了离线时用；app-store.cloudReachable）。 */
+  reachable(): Promise<void>;
   /** 交互登录：在点击的同步栈里调（iOS 红线）。 */
   signIn(): void;
   check(g: { abandoned: () => boolean; onLongWait: () => void }): Promise<unknown>;
@@ -70,12 +72,14 @@ export function createCloudGateHost(d: CloudGateHostDeps) {
     closeNotice(OFFLINE_BAR_ID); bar = null;
   }
 
-  const tune = { recheckMs: 30_000 };   // 探针调（__wpProbe.gateTune）；不是偏好
+  const tune = { offlineRetryMs: 60_000, recheckMs: 30_000 };   // 探针调（__wpProbe.gateTune）；不是偏好
   const gate: CloudGate = new CloudGate({
     attached: () => d.attached(),
     browserOnline,
     renew,
     check: async (g) => { await d.check(g); },
+    reachable: () => d.reachable(),
+    pageVisible: () => document.visibilityState !== "hidden",
     signInInteractive: () => d.signIn(),
     ui: {
       showChecking: (onEscape) => {
@@ -114,6 +118,7 @@ export function createCloudGateHost(d: CloudGateHostDeps) {
     afterPass: () => d.afterPass(),
     note: d.note,
     get recheckMs() { return tune.recheckMs; },
+    get offlineRetryMs() { return tune.offlineRetryMs; },
   });
 
   // 库那头的接缝（store-ui.ts）：库的 open 在闸门这一轮里用同一个逃生信号；面弹出来人在看，别拿超时打断；闸门外点「跳过到离线」= 离线继续。

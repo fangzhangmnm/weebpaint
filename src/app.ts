@@ -99,7 +99,7 @@ import { initCrashBanner } from "./crash-banner.ts";            // T-crash 恢�
 //   每个调色器在 src/plugins/ 自成一文件，import 时自注册
 import "./plugins/index.ts";    // 触发 HSB / ColorBalance / Curves / SharpenBlur 自注册
 // candidate 2：导出格式 = 注册表插件（含第一方 ora/psd/png/jpg 自注册）
-import { isAuthConfigured, initAuth, isSignedIn, retrySilentSignIn, getActiveAccount, brushRackCollection, requireStore, galleryBackend, storeAbsent, storeAbsentReason } from "./app-store.ts";   // cut-over：cloud/auth/graph 全走 lib
+import { cloudReachable, isAuthConfigured, initAuth, isSignedIn, retrySilentSignIn, getActiveAccount, brushRackCollection, requireStore, galleryBackend, storeAbsent, storeAbsentReason } from "./app-store.ts";   // cut-over：cloud/auth/graph 全走 lib
 import { galleryOnline } from "./gallery-capability.ts";   // 库在线 SSoT（0828 folder 无云 bug 修）
 import { galleryRegistry, activeGalleryId } from "@internal/gallery";     // P3 名册器官（播种接线在 boot 收尾段）；activeGalleryId = 口令真表单的账号字段
 import { setAttachmentGate, galleryAttachment } from "./gallery-attachment-host.ts";   // P3 挂载器官（收口开画 gate + 笔架重挂接线在 rack 构造后）
@@ -552,6 +552,7 @@ const gateHost = createCloudGateHost({
   authBoot: authBootP,
   isSignedIn,
   retrySilentSignIn: () => retrySilentSignIn(),
+  reachable: () => cloudReachable(),
   signIn: () => beginSignInNav((e) => { setStatus(t("cf.signInFailed", { err: String((e as Error)?.message || e) }), true); gateHost.gate.reshowBlocked(); }),
   check: (g) => session.checkCloudOnce(g),
   dirtyCount: () => { const be = galleryBackend(); return be.kind === "live" ? be.store.files.dirty.count() : Promise.resolve(0); },

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // test/probes/probe-cloud-gate.mjs —— 工单 G 无头验收：闸门（设计稿 §7）+ F-147 B（点「有新版本」前）+ F-148（第二台第一次开纯云端加密画）。created 2026-11-03 by Claude Opus 5.5
 //   真 bundle、真库、真 7z；假的只有两头：MSAL 脚本（静默续签结果可控）和 Graph（内存小网盘，可挂起、可计数）。headless。
-//   用法：bash scripts/build.sh 之后 `node test/probes/probe-cloud-gate.mjs [gate|reload|enc|exit|back]`（不给 = 全跑，≈ 90 s；⑤′ 真等 8 s）。
+//   用法：bash scripts/build.sh 之后 `node test/probes/probe-cloud-gate.mjs [gate|reload|enc|exit|back|retry]`（不给 = 全跑，≈ 90 s；⑤′ 真等 8 s）。
 import { createRequire } from "node:module";
 import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
@@ -361,6 +361,35 @@ const isContainerOn = (d, b) => !b ? Promise.resolve(false) : d.page.evaluate(as
   return globalThis.__wpProbe.isEncryptedBlob(new Blob([u8]));
 }, Buffer.from(b).toString("base64"));
 const dirtyDiag = (d) => d.page.evaluate(() => document.body.innerText.match(/[^\n]*没传上去[^\n]*/)?.[0] ?? "");
+
+// ─────────────────────────────── 离线态定时静默再试（设计稿 §3 硬要求，11-04）───────────────────────────────
+if (only === "all" || only === "retry") {
+  console.log("慢网误判离线：online 事件永不来，定时再试；云端不答不算回来，失败不弹");
+  const drive = fakeDrive();
+  const d = await device(drive);
+  await d.prepare();
+  await d.reload("interaction");
+  await d.page.waitForFunction(() => document.querySelectorAll("#syncGateActions button").length === 2);
+  await d.page.evaluate(() => { globalThis.__wpProbe.gateTune.offlineRetryMs = 800; });
+  await d.gateClick("离线继续"); await d.settled();
+  ok(await d.offline(), "前提：离线继续");
+  // 续签好了（令牌还在），但网盘不答
+  drive.down = true;
+  await d.page.evaluate(() => localStorage.setItem("__fake_msal", "ok"));
+  await sleep(2500);
+  ok(await d.offline(), "云端不答：还是离线");
+  ok(!(await d.gateUp()), "失败不弹闸");
+  ok(/离线/.test(await d.page.evaluate(() => document.body.innerText)), "条还在");
+  drive.down = false;   // 全程没发过 online 事件
+  await d.page.waitForFunction(() => !globalThis.__wpProbe.isUserOffline(), null, { timeout: 6000 });
+  ok(true, "云端答了：离线自己清掉");
+  await sleep(500);
+  ok(!(await d.gateUp()), "清掉时也不弹闸");
+  await sleep(1500);
+  const offLines = await d.page.evaluate(() => document.body.innerText.split("\n").filter((l) => /离线/.test(l)));
+  ok(!offLines.some((l) => /^离线( · |$)/.test(l.trim())), `条收了（还带「离线」的行：${JSON.stringify(offLines)}）`);
+  await d.ctx.close();
+}
 
 // ─────────────────────────────── 出门规则（规则书 §1 第 5 条；工单 G2）───────────────────────────────
 if (only === "all" || only === "exit") {
