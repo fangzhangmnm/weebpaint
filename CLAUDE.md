@@ -79,7 +79,7 @@ Procreate 级绘画 PWA。UI 中文。iPad 是手感的最终裁判。
 
 - **2026-10-26 登录后「问一次 → pushAll」改成「去处理」→ 图库「要处理的」视图（v0.14.49，Claude Fable 5.1；家族周账 F-88 / F-98；user 10-26「列表面」）**：是 / 否框 + 批量推撤了（它对「传过、后来改了没传」说的是半句假话，失败只剩一条没有动作的提示）；现在有没同步好的 → 提一次「去处理」→ 开图库直接进「要处理的」（gallery 0.8.8 顶部横幅 + 每张卡可见的「处理…」，点了当场弹库的三选一面），每一份都由人在面里选；gallery-host 多 `openAttention` / `setAttentionOnly`。真机零。
 
-- **2026-11-05 回来不再把开着的这张算成「没传上去」（v0.14.55，Claude Opus 5.5；家族周账 F-200，user 11-05 报的 MoonSinger，同一段代码）**：`src/cloud-return.ts isOpenDocAutosaveOnly`（库的列表说它 unpushed ∧ 人没按过存；**问库，不问 isPushPending**：第一次改动就为真、字节可能没落盘，减了会把别的画藏掉）；只有它一份 = 不说不传；别的画有 (c) = 通知 +「传上去」（`_pushAllNow`，留在画布上，开着这份也带上 = 说在前面）/「以后再说」；要问 (a) 时不减。规则书第 15 条 (c) 没变。探针 `probe-cloud-gate back`。按存的确认缩成一闪（MoonSinger v0.15.3 做了）等 WeebPaint 的周。
+- **2026-11-05 回来不再把开着的这张算成「没传上去」（v0.14.55 / v0.14.56，Claude Opus 5.5；家族周账 F-200，user 11-05 报的 MoonSinger，同一段代码）**：`src/cloud-return.ts isOpenDocAutosaveOnly` = **库和这一页都说是才算**：库的列表说它 unpushed（只看 isPushPending 不行：第一次改动就为真、字节可能没落盘，减了会把别的画藏掉）∧ 这一页 pushPending ∧ 没按过存（只看库也不行：刷新后这一页不知道，存钮显示干净，通知是唯一的信号 = 家族周账 F-204，老问题）；同一页里只有它一份 = 不说不传；刷新后照说；别的画有 (c) = 通知 +「传上去」（`_pushAllNow`，留在画布上，开着这份也带上 = 说在前面）/「以后再说」；要问 (a) 时不减。规则书第 15 条 (c) 没变。探针 `probe-cloud-gate back`。按存的确认缩成一闪（MoonSinger v0.15.3 做了）等 WeebPaint 的周。
 
 - **2026-11-03 家族工单 G（v0.14.52，Claude Opus 5.5）**：掉登录 / 没网闸门（状态机 `src/cloud-gate.ts`、组装 `src/cloud-gate-host.ts`、离线内存布尔 `src/user-offline.ts`；只有挂着 OneDrive 图库才闸）；`lockSyncGate` 改成栈 + 交互锁 `gate`；点「有新版本」前 `session.flushBeforeReload`；开发版壳缓存 `weebpaint-dev-*`。流程图 `ai-docs/20261103-pipelines.md`（改流程同一个 commit 更新）；探针 `test/probes/probe-cloud-gate.mjs`。
 

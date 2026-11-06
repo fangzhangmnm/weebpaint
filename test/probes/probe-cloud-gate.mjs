@@ -17,6 +17,7 @@ const ok = (c, what) => eq(!!c, true, what);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const only = process.argv[2] ?? "all";
 const PW = "probe-only-password";
+const unsyncedNotice = (d) => d.page.evaluate(() => document.querySelector('[data-notice-id="unsynced"]')?.textContent ?? "");
 
 const browser = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 async function device(drive, msal = "ok") {
@@ -251,7 +252,7 @@ if (only === "all" || only === "reload") {
     await nav; await d.ready(); await sleep(400); await d.settled(); await sleep(1200);
     eq(drive.puts.length, n0, "先不传：没推（WeebPaint 的推送 = 人按存）");
     eq((await d.state()).storeDirty, 1, "先不传：这一笔落在本机，store 记着");
-    ok(/没传上去/.test(await d.page.evaluate(() => document.body.innerText)), "先不传：刷新后如实提醒");
+    ok(/还只在这台设备上/.test(await unsyncedNotice(d)), `先不传：刷新后如实提醒（这一页不知道它没传，存钮显示干净，通知是唯一的信号）：${await unsyncedNotice(d)}`);
     await d.page.evaluate(() => globalThis.__wpProbe.session.saveAndPush()); await d.settled();
   }
   {
@@ -360,7 +361,6 @@ const isContainerOn = (d, b) => !b ? Promise.resolve(false) : d.page.evaluate(as
   const bin = atob(b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
   return globalThis.__wpProbe.isEncryptedBlob(new Blob([u8]));
 }, Buffer.from(b).toString("base64"));
-const unsyncedNotice = (d) => d.page.evaluate(() => document.querySelector('[data-notice-id="unsynced"]')?.textContent ?? "");
 
 // ─────────────────────────────── 离线态定时静默再试（设计稿 §3 硬要求，11-04）───────────────────────────────
 if (only === "all" || only === "retry") {

@@ -16,13 +16,13 @@ describe("planReturn", () => {
   it("开着的从没传过（它是 (a)，不算自动保存）：问", () => { const p = planReturn(1, 1, false); eq(p.kind, "ask"); eq(p.neverUploaded, 1); });
   it("要问 (a) 时不减：现在全传确实会连开着的一起传，面上的数要算它", () => { const p = planReturn(2, 1, true); eq(p.kind, "ask"); eq(p.others, 1); });
 });
-describe("isOpenDocAutosaveOnly：问库，不问 isPushPending", () => {
+describe("isOpenDocAutosaveOnly：库和这一页都说是才算", () => {
   const files = [{ identifier: "a.ora", syncState: "unpushed" }, { identifier: "b.ora", syncState: "synced" }, { identifier: "c.ora", syncState: "conflict" }, { identifier: "d.ora", syncState: "float" }];
-  it("库说它改过没传、人没按过存：是", () => assert(isOpenDocAutosaveOnly(files, "a.ora", false)));
-  it("人按过存（(b)，要么续传成了不在账上、要么真没传成）：不是", () => assert(!isOpenDocAutosaveOnly(files, "a.ora", true)));
-  it("字节还没落盘 = 不在脏账上（库说 synced）：不是——减了就把别的画藏掉了", () => assert(!isOpenDocAutosaveOnly(files, "b.ora", false)));
-  it("分叉（真要人选）/ 从没传过：不是", () => { assert(!isOpenDocAutosaveOnly(files, "c.ora", false)); assert(!isOpenDocAutosaveOnly(files, "d.ora", false)); });
-  it("没开着：不是", () => assert(!isOpenDocAutosaveOnly(files, null, false)));
+  it("库说它改过没传、这一页也知道：是", () => assert(isOpenDocAutosaveOnly(files, "a.ora", true)));
+  it("人按过存（(b)）/ 刷新后这一页不知道（存钮显示干净、离开不传，通知是唯一的信号）：不是", () => assert(!isOpenDocAutosaveOnly(files, "a.ora", false)));
+  it("字节还没落盘 = 不在脏账上（库说 synced）：不是——减了就把别的画藏掉了", () => assert(!isOpenDocAutosaveOnly(files, "b.ora", true)));
+  it("分叉（真要人选）/ 从没传过：不是", () => { assert(!isOpenDocAutosaveOnly(files, "c.ora", true)); assert(!isOpenDocAutosaveOnly(files, "d.ora", true)); });
+  it("没开着：不是", () => assert(!isOpenDocAutosaveOnly(files, null, true)));
 });
 describe("stillLocalIds", () => {
   it("点名传过还没传的，不含开着那份、不含从没传过的、不含干净的", () => {

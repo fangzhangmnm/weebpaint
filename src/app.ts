@@ -606,7 +606,7 @@ async function _offerOnce(): Promise<void> {
   catch (e) { reportError(new Error("list never-uploaded: " + String(e)), "log"); return; }
   const never = neverUploadedIds(items);
   const openId = session.openIdentifier, owed = session.pushOwed;
-  const openAutosaveOnly = isOpenDocAutosaveOnly(items, openId, owed);   // 续传之前算（见函数注释）
+  const openAutosaveOnly = isOpenDocAutosaveOnly(items, openId, session.pushPending && !owed);   // 续传之前算（见函数注释）
   await session.resumeOwedPush(never);
   if (askedPushLocalOnly) return;
   const plan = planReturn(await files.dirty.count().catch(() => dirty), never.size, openAutosaveOnly);
