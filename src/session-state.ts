@@ -1399,6 +1399,8 @@ export const session = {
   /** 回来问一次的「现在传」跑完了：打开着的这份没在失败名单里 = 传上去了，别再显示没上云。 */
   noteAllPushed(failed: readonly string[]) { const a = _activeName(); if (a && !failed.includes(toFull(a))) es?.noteExternallyPushed(); updateSaveStatus(); },
   get pushPending() { return es ? es.isPushPending() : false; },
+  /** 开着的这份在库里的全名（图库家才有；回来时判「开着这份只是自动保存」用，F-200）。 */
+  get openIdentifier() { const a = _activeName(); return a ? toFull(a) : null; },
   get pushOwed() { return es ? es.isPushOwed() : false; },   // 已落本地但没上云（徽章第四态；与 dirty 正交）
   get saving() { return _pushInFlight; },   // v0.5.9：saveAndPush 在飞（app 层过程态，徽章显转圈云）
   openLocalFile, leaveLocalDoc,

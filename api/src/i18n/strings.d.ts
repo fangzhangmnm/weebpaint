@@ -6048,11 +6048,35 @@ export declare const S: {
         readonly ja: "あとで";
         readonly tok: "tenpo kama";
     };
-    readonly "pushAll.inList": {
-        readonly zh: "{n} 份没传上去，在「要处理」列表里";
-        readonly en: "{n} not uploaded; they're in the to-handle list";
-        readonly ja: "未アップロード {n} 件は「対応が必要」の一覧にあります";
-        readonly tok: "sitelen {n} li tawa ala. ona li lon lipu pali";
+    readonly "pushAll.stillLocal": {
+        readonly zh: "{n} 份改过的还只在这台设备上{names}";
+        readonly en: "{n} edited, still only on this device{names}";
+        readonly ja: "変更した {n} 件はまだこの端末にしかありません{names}";
+        readonly tok: "sitelen {n} li lon ilo ni taso{names}";
+    };
+    readonly "pushAll.stillLocalOpenToo": {
+        readonly zh: "；传的话连正在画的这份一起";
+        readonly en: "; uploading also includes the one you're drawing";
+        readonly ja: "。アップロードすると、いま描いているものも一緒に送ります";
+        readonly tok: ". sina pana la sitelen ni kin li tawa";
+    };
+    readonly "pushAll.upload": {
+        readonly zh: "传上去";
+        readonly en: "Upload";
+        readonly ja: "アップロード";
+        readonly tok: "o pana";
+    };
+    readonly "pushAll.notNow": {
+        readonly zh: "以后再说";
+        readonly en: "Not now";
+        readonly ja: "あとで";
+        readonly tok: "tenpo kama";
+    };
+    readonly "pushAll.kept": {
+        readonly zh: "{n} 份留在这台设备上，图库「要处理」里看得见";
+        readonly en: "{n} stay on this device, in the gallery's to-handle list";
+        readonly ja: "{n} 件はこの端末に残ります。ギャラリーの「対応が必要」で確認できます";
+        readonly tok: "sitelen {n} li awen lon ilo ni. ona li lon lipu pali";
     };
     readonly "pushAll.allDone": {
         readonly zh: "{n} 份都传上去了";

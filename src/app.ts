@@ -41,7 +41,7 @@ import { currentPolicy } from "./deployment-policy.ts";   // 家族规则书 §2
 import { sayHintOnce, sayStorageBlockedOnce } from "./site-hint.ts";   // itch / 备用版开局一行「去官网」；浏览器不给存那句
 import { migrateLegacyAppDbWhenIdle } from "./legacy-app-db.ts";   // 2026-11-03 老库搬家（空闲片里跑一次）
 import { sessionFileName, stripSessionExt } from "./config.ts";
-import { planReturn, neverUploadedIds } from "./cloud-return.ts";
+import { planReturn, neverUploadedIds, isOpenDocAutosaveOnly, stillLocalIds } from "./cloud-return.ts";
 import { appEncryption } from "./encryption.ts";
 import { snapshotFolderOnce, walkLibrary } from "@internal/gallery";   // 边界：裸 session 名 → 库全名（薄库身份=X.ora）
 import { ensureUnlocked } from "./enc-thumbs.ts";   // 交互解锁（busy 外）——图库 host.unlock 用
@@ -586,8 +586,8 @@ function _seedGalleryRegistry(): void {
   } catch (e) { reportError(new Error("[gallery-registry] seed failed (soft): " + String(e)), "log"); }
 }
 // ── 回来（开机登录好 / 网回来）时没传的东西（规则书 §1 第 15 条，2026-11-03 夜改写；家族工单 G2；分法见 cloud-return.ts）──
-//   (b) 开着那份按过存没传成 → 续传不问，每次回来都看。(a) 从没传过 → 问一次，点了才传。(c) 只是自动保存 → 不传不问，进「要处理」列表。一页只问一次。
-//   WeebPaint 的传的时机（按「存」或退出）不变。pushAll 这条自动路径只有「现在传」一处（守卫核）；a、c 同时有时面上两样都说，人点了一起传（Fable 11-03 拍）。
+//   (b) 开着那份按过存没传成 → 续传不问，每次回来都看。(a) 从没传过 → 问一次，点了才传。(c) 只是自动保存 → 不自动传，进「要处理」列表；别的画有 (c) = 说一声 +「传上去」，开着的这份不算（F-200）。一页只问一次。
+//   WeebPaint 的传的时机（按「存」或退出）不变。pushAll 这条路只有 _pushAllNow 一处、只由人点的钮调（守卫核）；a、c 同时有时面上两样都说，人点了一起传（Fable 11-03 拍）。
 //   吸取 10-26 的两条（user「弹了一个需要处理然后就什么交互都没了」）：话说真的；传完没传成的带名单、带「去处理」钮。
 let askedPushLocalOnly = false;
 let _offerRun: Promise<void> | null = null;
@@ -600,23 +600,20 @@ async function _offerOnce(): Promise<void> {
   const files = be.store.files;
   const dirty = await files.dirty.count().catch((e) => { reportError(new Error("dirty.count: " + String(e)), "log"); return 0; });
   if (dirty <= 0) return;
-  let never: Set<string>;
-  try {
-    const manifest = await walkLibrary((folder) => snapshotFolderOnce((f, cb) => files.watchFolder(f, cb), folder));
-    never = neverUploadedIds(manifest.files);
-  } catch (e) { reportError(new Error("list never-uploaded: " + String(e)), "log"); return; }
+  const listAll = async () => (await walkLibrary((folder) => snapshotFolderOnce((f, cb) => files.watchFolder(f, cb), folder))).files;
+  let items: Awaited<ReturnType<typeof listAll>>;
+  try { items = await listAll(); }
+  catch (e) { reportError(new Error("list never-uploaded: " + String(e)), "log"); return; }
+  const never = neverUploadedIds(items);
+  const openId = session.openIdentifier, owed = session.pushOwed;
+  const openAutosaveOnly = isOpenDocAutosaveOnly(items, openId, owed);   // 续传之前算（见函数注释）
   await session.resumeOwedPush(never);
   if (askedPushLocalOnly) return;
-  const plan = planReturn(await files.dirty.count().catch(() => dirty), never.size);
-  diagNote("sync", `back with unsynced: ${JSON.stringify(plan)}`);
+  const plan = planReturn(await files.dirty.count().catch(() => dirty), never.size, openAutosaveOnly);
+  diagNote("sync", `back with unsynced: ${JSON.stringify(plan)}${openAutosaveOnly ? " (open doc is autosave-only, not counted)" : ""}`);
   if (plan.kind === "none") return;
   askedPushLocalOnly = true;
-  const openList = (): void => { closeNotice("unsynced"); void setGalleryOpen(true).then(() => gallery.setAttentionOnly(true)); };
-  const showInList = (n: number): void => {
-    if (!els.galleryFull.classList.contains("hidden")) gallery.setAttentionOnly(true);   // 已经在图库里：直接切到「要处理的」
-    showNotice({ id: "unsynced", text: t("pushAll.inList", { n: String(n) }), actions: [{ label: t("pushAll.ok"), primary: true, onClick: openList }] });
-  };
-  if (plan.kind === "list") { showInList(plan.total); return; }
+  if (plan.kind === "list") { showStillLocal(plan.total, stillLocalIds(owed ? await listAll().catch(() => items) : items, openAutosaveOnly ? openId : null), openAutosaveOnly); return; }
   const v = await lockSyncGate<"now" | "later">({
     title: plan.others > 0 ? t("pushAll.askMixed", { a: String(plan.neverUploaded), c: String(plan.others) }) : t("pushAll.askOnly", { a: String(plan.neverUploaded) }),
     message: t("pushAll.askNote"), showSpinner: false,
@@ -625,15 +622,38 @@ async function _offerOnce(): Promise<void> {
   });
   diagNote("sync", `push ask → ${v ?? "closed"}`);
   const total = plan.neverUploaded + plan.others;
-  if (v !== "now") { showInList(total); return; }   // 稍后 = 全部进列表，什么都不推；这一页不再问
+  if (v !== "now") {   // 稍后 = 全部进列表，什么都不推；这一页不再问。回执一句就够（人刚说了稍后，不再追一个钮）
+    if (!els.galleryFull.classList.contains("hidden")) gallery.setAttentionOnly(true);
+    showNotice({ id: "unsynced", text: t("pushAll.kept", { n: String(total) }), autoHideMs: 4000 });
+    return;
+  }
+  await _pushAllNow(total);
+}
+/** (c)：别的画改过、还只在这台设备上（开着这份不算）。人点「传上去」才传，留在画布上；「以后再说」= 图库「要处理」里照旧看得见。
+ *  以前这里是「去处理」→ 进图库 = 人被带离画布（家族周账 F-200）。openToo = 开着这份也会一起传，说在前面，回执的数才对得上。 */
+function showStillLocal(n: number, ids: readonly string[], openToo: boolean): void {
+  if (!els.galleryFull.classList.contains("hidden")) gallery.setAttentionOnly(true);   // 已经在图库里：直接切到「要处理的」
+  const names = ids.length ? `（${ids.slice(0, 3).map((x) => stripSessionExt(x)).join("、")}${n > 3 ? " …" : ""}）` : "";
+  showNotice({ id: "unsynced", text: t("pushAll.stillLocal", { n: String(n), names }) + (openToo ? t("pushAll.stillLocalOpenToo") : ""), tapToDismiss: false, actions: [
+    { label: t("pushAll.upload"), primary: true, onClick: () => { closeNotice("unsynced"); void _pushAllNow(n + (openToo ? 1 : 0)); } },
+    { label: t("pushAll.notNow"), onClick: () => closeNotice("unsynced") },
+  ] });
+}
+/** 人点了传（「现在传」/「传上去」共用这一条）。有没落盘的先落：说了连这份一起，就得是最新的那份。 */
+async function _pushAllNow(total: number): Promise<void> {
+  const be = galleryBackend();
+  if (be.kind !== "live") return;
+  const files = be.store.files;
+  if (session.dirty) await session.save({ implicit: true }).catch((e) => reportError(e instanceof Error ? e : new Error(String(e)), "log"));
   const r = await files.dirty.pushAll().catch((e) => { reportError(e instanceof Error ? e : new Error(String(e)), "warning"); return null; });
   const left = await files.dirty.count().catch(() => total);
-  diagNote("sync", `push ask: pushed=${r?.pushed ?? "-"} failed=${r?.failed.length ?? "-"} left=${left}`);
+  diagNote("sync", `push: pushed=${r?.pushed ?? "-"} failed=${r?.failed.length ?? "-"} left=${left}`);
   if (r) session.noteAllPushed(r.failed);
   if (left === 0) showNotice({ id: "unsynced", text: t("pushAll.allDone", { n: String(r?.pushed ?? total) }), autoHideMs: 4000 });
   else {
     const named = (r?.failed ?? []).slice(0, 3).map((x) => stripSessionExt(x)).join("、");
     if (!els.galleryFull.classList.contains("hidden")) gallery.setAttentionOnly(true);
+    const openList = (): void => { closeNotice("unsynced"); void setGalleryOpen(true).then(() => gallery.setAttentionOnly(true)); };   // 这条的「去处理」留着：真要人选（冲突 / 网络）
     showNotice({ id: "unsynced", level: "warning", text: t("pushAll.partial", { pushed: String(r?.pushed ?? 0), left: String(left), names: named ? `（${named}${left > 3 ? " …" : ""}）` : "" }), tapToDismiss: false, actions: [{ label: t("pushAll.ok"), primary: true, onClick: openList }] });
   }
   if (!els.galleryFull.classList.contains("hidden")) gallery.refresh();

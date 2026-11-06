@@ -121,6 +121,8 @@ export declare const session: {
     /** 回来问一次的「现在传」跑完了：打开着的这份没在失败名单里 = 传上去了，别再显示没上云。 */
     noteAllPushed(failed: readonly string[]): void;
     readonly pushPending: boolean;
+    /** 开着的这份在库里的全名（图库家才有；回来时判「开着这份只是自动保存」用，F-200）。 */
+    readonly openIdentifier: string | null;
     readonly pushOwed: boolean;
     readonly saving: boolean;
     openLocalFile: typeof openLocalFile;

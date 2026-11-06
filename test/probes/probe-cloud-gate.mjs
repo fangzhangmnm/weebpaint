@@ -360,7 +360,7 @@ const isContainerOn = (d, b) => !b ? Promise.resolve(false) : d.page.evaluate(as
   const bin = atob(b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
   return globalThis.__wpProbe.isEncryptedBlob(new Blob([u8]));
 }, Buffer.from(b).toString("base64"));
-const dirtyDiag = (d) => d.page.evaluate(() => document.body.innerText.match(/[^\n]*没传上去[^\n]*/)?.[0] ?? "");
+const unsyncedNotice = (d) => d.page.evaluate(() => document.querySelector('[data-notice-id="unsynced"]')?.textContent ?? "");
 
 // ─────────────────────────────── 离线态定时静默再试（设计稿 §3 硬要求，11-04）───────────────────────────────
 if (only === "all" || only === "retry") {
@@ -456,10 +456,19 @@ if (only === "all" || only === "back") {
     await back();
     eq(drive.puts.length, n0, "(c) 不传");
     ok(!(await d.gateUp()), "(c) 不问");
-    ok(/1 份没传上去/.test(await dirtyDiag(d)), `(c) 进列表：${await dirtyDiag(d)}`);
-    eq((await d.state()).storeDirty, 1, "(c) 还脏着");
+    ok(!(await unsyncedNotice(d)), `(c) 开着的这份：不说「没传上去」（F-200）：${await unsyncedNotice(d)}`);
+    eq((await d.state()).storeDirty, 1, "(c) 还脏着（图库「要处理」里看得见）");
     await d.page.evaluate(() => globalThis.__wpProbe.session.saveAndPush()); await d.settled();
     eq((await d.state()).storeDirty, 0, "(c) 人按存之后传上去");
+  }
+  { // F-200 切 app 回来（不是回线）：开着的这份只是自动保存 = 不说、不传
+    await d.draw(5); await autosave();
+    eq((await d.state()).storeDirty, 1, "F-200 前提：改动落了本机");
+    const n0 = drive.puts.length;
+    await d.hide(); await sleep(200); await d.show(); await sleep(1400);
+    ok(!(await unsyncedNotice(d)), `F-200 回前台：不说：${await unsyncedNotice(d)}`);
+    eq(drive.puts.length, n0, "F-200 回前台：不传");
+    await d.page.evaluate(() => globalThis.__wpProbe.session.saveAndPush()); await d.settled();
   }
   { // (b)
     await off(); await d.draw(6);
@@ -499,6 +508,31 @@ if (only === "all" || only === "back") {
     const st = await d.state();
     eq(st.storeDirty, 0, "(a) 传完不脏"); eq(st.pp, false, "(a) 开着的这份不再显示没上云");
   }
+  { // F-200 别的画也只在这台设备上：说一声；「传上去」两份一起传、留在画布上；回执的数对得上
+    await d.page.evaluate(() => globalThis.__wpProbe.session.newDoc({ name: "第二幅", w: 64, h: 64 })); await d.settled();
+    await d.draw(2); await d.page.evaluate(() => globalThis.__wpProbe.session.saveAndPush()); await d.settled();
+    ok(drive.items.has("第二幅.ora"), "F-200 前提：第二幅在云端");
+    await off();
+    await d.draw(3); await autosave();
+    await d.page.evaluate((x) => globalThis.__wpProbe.session.open({ name: x }), p); await d.settled();
+    await d.draw(4); await autosave();
+    eq((await d.state()).storeDirty, 2, "F-200 前提：两份脏");
+    const n0 = drive.puts.length;
+    await back();
+    const say = await unsyncedNotice(d);
+    ok(/1 份改过的还只在这台设备上/.test(say) && /第二幅/.test(say), `F-200 说别的那 1 份、点名：${say}`);
+    ok(/连正在画的这份一起/.test(say), `F-200 传的时候会带上开着这份：说在前面：${say}`);
+    ok(/传上去/.test(say) && /以后再说/.test(say) && !/去处理/.test(say), `F-200 两个钮：${say}`);
+    ok(!(await d.gateUp()), "F-200 不问");
+    eq(drive.puts.length, n0, "F-200 没点之前一次都没传");
+    const home0 = (await d.state()).home;
+    await d.page.locator('[data-notice-id="unsynced"] button', { hasText: "传上去" }).click();
+    await d.page.waitForFunction(async () => (await globalThis.__wpProbe.galleryBackend().store.files.dirty.count()) === 0); await d.settled(); await sleep(200);
+    eq((await d.state()).home, home0, "F-200 传完还开着这份");
+    ok(await d.page.evaluate(() => document.getElementById("galleryFull").classList.contains("hidden")), "F-200 没进图库（留在画布上）");
+    ok(/2 份都传上去了/.test(await unsyncedNotice(d)), `F-200 回执 2 份：${await unsyncedNotice(d)}`);
+    eq((await d.state()).pp, false, "F-200 开着这份不再显示没上云");
+  }
   { // a + c，稍后
     await d.page.evaluate((x) => globalThis.__wpProbe.session.open({ name: x }), p); await d.settled();
     await off(); await d.draw(4); await autosave();
@@ -512,7 +546,7 @@ if (only === "all" || only === "back") {
     await d.page.keyboard.press("Escape"); await sleep(500);
     ok(!(await d.gateUp()), "Esc = 稍后：面收了");
     eq(drive.puts.length, n0, "稍后：什么都不推");
-    ok(/2 份没传上去/.test(await dirtyDiag(d)), `稍后：都进列表（${await dirtyDiag(d)}）`);
+    ok(/2 份留在这台设备上/.test(await unsyncedNotice(d)) && !/去处理|传上去/.test(await unsyncedNotice(d)), `稍后：都进列表，一句回执不带钮（${await unsyncedNotice(d)}）`);
     await d.page.evaluate(() => window.dispatchEvent(new Event("online"))); await sleep(1500);
     ok(!(await d.gateUp()), "这一页不再问");
     eq(drive.puts.length, n0, "这一页也不自己推");

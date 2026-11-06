@@ -2,7 +2,7 @@
 // created 2026-11-03 by Claude Opus 5.5
 import { describe, it, eq, assert } from "./runner.mjs";
 import { createEditorSession } from "../src/editor-session/index.ts";
-const { planReturn, neverUploadedIds } = await import("../src/cloud-return.ts");
+const { planReturn, neverUploadedIds, isOpenDocAutosaveOnly, stillLocalIds } = await import("../src/cloud-return.ts");
 
 describe("planReturn", () => {
   it("什么都没脏：不问不提", () => eq(planReturn(0, 0).kind, "none"));
@@ -10,6 +10,26 @@ describe("planReturn", () => {
   it("只有从没传过的（a）：问，others = 0", () => { const p = planReturn(2, 2); eq(p.kind, "ask"); eq(p.neverUploaded, 2); eq(p.others, 0); });
   it("两样都有：问，两个数都带上", () => { const p = planReturn(5, 2); eq(p.kind, "ask"); eq(p.neverUploaded, 2); eq(p.others, 3); });
   it("数不齐（列举比脏账多）：others 不为负", () => eq(planReturn(1, 2).others, 0));
+  // F-200（user 11-05 报的 MoonSinger，同一段代码）：开着这份只是自动保存 = 它不是回来发现的事
+  it("只有开着的这份自动保存：什么都不说", () => eq(planReturn(1, 0, true).kind, "none"));
+  it("开着的 + 别的一份：说 1 份", () => { const p = planReturn(2, 0, true); eq(p.kind, "list"); eq(p.total, 1); });
+  it("开着的从没传过（它是 (a)，不算自动保存）：问", () => { const p = planReturn(1, 1, false); eq(p.kind, "ask"); eq(p.neverUploaded, 1); });
+  it("要问 (a) 时不减：现在全传确实会连开着的一起传，面上的数要算它", () => { const p = planReturn(2, 1, true); eq(p.kind, "ask"); eq(p.others, 1); });
+});
+describe("isOpenDocAutosaveOnly：问库，不问 isPushPending", () => {
+  const files = [{ identifier: "a.ora", syncState: "unpushed" }, { identifier: "b.ora", syncState: "synced" }, { identifier: "c.ora", syncState: "conflict" }, { identifier: "d.ora", syncState: "float" }];
+  it("库说它改过没传、人没按过存：是", () => assert(isOpenDocAutosaveOnly(files, "a.ora", false)));
+  it("人按过存（(b)，要么续传成了不在账上、要么真没传成）：不是", () => assert(!isOpenDocAutosaveOnly(files, "a.ora", true)));
+  it("字节还没落盘 = 不在脏账上（库说 synced）：不是——减了就把别的画藏掉了", () => assert(!isOpenDocAutosaveOnly(files, "b.ora", false)));
+  it("分叉（真要人选）/ 从没传过：不是", () => { assert(!isOpenDocAutosaveOnly(files, "c.ora", false)); assert(!isOpenDocAutosaveOnly(files, "d.ora", false)); });
+  it("没开着：不是", () => assert(!isOpenDocAutosaveOnly(files, null, false)));
+});
+describe("stillLocalIds", () => {
+  it("点名传过还没传的，不含开着那份、不含从没传过的、不含干净的", () => {
+    const f = [{ identifier: "a", syncState: "unpushed" }, { identifier: "b", syncState: "unpushed" }, { identifier: "c", syncState: "conflict" }, { identifier: "d", syncState: "float" }, { identifier: "e", syncState: "synced" }];
+    eq(stillLocalIds(f, "a").join(), "b,c");
+    eq(stillLocalIds(f, null).join(), "a,b,c");
+  });
 });
 
 describe("neverUploadedIds", () => {

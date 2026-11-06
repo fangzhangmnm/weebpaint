@@ -345,10 +345,15 @@ describe("守卫（设计稿 §8）", () => {
     eq(sites.sort().join(" "), "src/app.ts:1 src/gallery/gallery-manage-ui.ts:1");
     const ask = app.slice(app.indexOf("async function _offerOnce"), app.indexOf("// auth 可观察 seam"));
     assert(ask.indexOf("lockSyncGate") >= 0 && ask.indexOf("lockSyncGate") < ask.indexOf("dirty.pushAll("), "先问才推");
-    assert(/if \(v !== "now"\) \{[\s\S]*?return;\s*\}[\s\S]*dirty\.pushAll\(/.test(ask), "不是「现在传」就不推");
+    assert(/if \(v !== "now"\) \{[\s\S]*?return;\s*\}\s*await _pushAllNow\(total\);/.test(ask), "不是「现在传」就不推");
     assert(/askedPushLocalOnly = true;[\s\S]*lockSyncGate/.test(ask), "一页只问一次");
     assert(/escValue: "later"/.test(ask), "Esc = 稍后");
-    assert(/plan\.kind === "list"\) \{ showInList\(plan\.total\); return; \}/.test(ask), "没有从没传过的：不问不推，进列表");
+    assert(/plan\.kind === "list"\) \{ showStillLocal\(/.test(ask), "没有从没传过的：不问不推，说一声");
+    eq(strip(app).split("_pushAllNow(").length - 1, 3, "pushAll 只由人点的钮调：定义一处 +「现在传」+「传上去」");
+    const still = app.slice(app.indexOf("function showStillLocal("), app.indexOf("async function _pushAllNow("));
+    assert(/onClick: \(\) => \{ closeNotice\("unsynced"\); void _pushAllNow\(/.test(still), "通知上的传在 onClick 里");
+    assert(!still.includes("setGalleryOpen"), "传上去不离开画布（F-200）");
+    assert(ask.indexOf("isOpenDocAutosaveOnly(") < ask.indexOf("session.resumeOwedPush(never)"), "开着这份算不算在续传之前定：续传之后列表是旧的");
     assert(ask.indexOf("session.resumeOwedPush(never)") < ask.indexOf("planReturn("), "(b) 先续传再数");
     assert(/if \(askedPushLocalOnly\) return;\s*const plan/.test(ask), "已问过的页：只续传，不再问");
   });
