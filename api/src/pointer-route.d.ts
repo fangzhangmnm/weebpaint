@@ -1,5 +1,6 @@
 export declare function effectiveTool(tool: string, altDown: boolean): string;
 export declare function toolToRole(et: string): string;
+export declare function pointerOp(role: string | null, tool: string, floating: boolean): string | undefined;
 export interface PointerDownInput {
     tool: string;
     pointerType: string;

@@ -667,48 +667,49 @@ export function layerRowRender(Vue: any): any {
   const _hoisted_2 = ["title", "innerHTML"]
   const _hoisted_3 = ["title", "innerHTML"]
   const _hoisted_4 = ["value"]
-  const _hoisted_5 = {
+  const _hoisted_5 = ["data-op"]
+  const _hoisted_6 = {
     key: 0,
     class: "layer-group-count"
   }
-  const _hoisted_6 = ["title"]
   const _hoisted_7 = ["title"]
   const _hoisted_8 = ["title"]
   const _hoisted_9 = ["title"]
   const _hoisted_10 = ["title"]
-  const _hoisted_11 = { class: "menu-item-label" }
-  const _hoisted_12 = ["disabled"]
-  const _hoisted_13 = { class: "menu-item-label" }
-  const _hoisted_14 = {
+  const _hoisted_11 = ["title"]
+  const _hoisted_12 = { class: "menu-item-label" }
+  const _hoisted_13 = ["disabled"]
+  const _hoisted_14 = { class: "menu-item-label" }
+  const _hoisted_15 = {
     key: 0,
     class: "menu-sep"
   }
-  const _hoisted_15 = { class: "menu-item-label" }
   const _hoisted_16 = { class: "menu-item-label" }
   const _hoisted_17 = { class: "menu-item-label" }
   const _hoisted_18 = { class: "menu-item-label" }
-  const _hoisted_19 = ["aria-pressed"]
-  const _hoisted_20 = { class: "menu-item-label" }
-  const _hoisted_21 = { class: "menu-item-state" }
-  const _hoisted_22 = ["aria-pressed"]
-  const _hoisted_23 = { class: "menu-item-label" }
-  const _hoisted_24 = { class: "menu-item-state" }
-  const _hoisted_25 = ["aria-pressed"]
-  const _hoisted_26 = { class: "menu-item-label" }
-  const _hoisted_27 = { class: "menu-item-state" }
-  const _hoisted_28 = ["disabled"]
-  const _hoisted_29 = { class: "menu-item-label" }
-  const _hoisted_30 = ["disabled"]
-  const _hoisted_31 = { class: "menu-item-label" }
-  const _hoisted_32 = ["disabled"]
-  const _hoisted_33 = { class: "menu-item-label" }
-  const _hoisted_34 = ["disabled"]
-  const _hoisted_35 = { class: "menu-item-label" }
-  const _hoisted_36 = { class: "layer-slider-row" }
-  const _hoisted_37 = ["title"]
-  const _hoisted_38 = ["value"]
-  const _hoisted_39 = { class: "layer-slider-val" }
-  const _hoisted_40 = { class: "layer-slider-row" }
+  const _hoisted_19 = { class: "menu-item-label" }
+  const _hoisted_20 = ["aria-pressed"]
+  const _hoisted_21 = { class: "menu-item-label" }
+  const _hoisted_22 = { class: "menu-item-state" }
+  const _hoisted_23 = ["aria-pressed"]
+  const _hoisted_24 = { class: "menu-item-label" }
+  const _hoisted_25 = { class: "menu-item-state" }
+  const _hoisted_26 = ["aria-pressed"]
+  const _hoisted_27 = { class: "menu-item-label" }
+  const _hoisted_28 = { class: "menu-item-state" }
+  const _hoisted_29 = ["disabled"]
+  const _hoisted_30 = { class: "menu-item-label" }
+  const _hoisted_31 = ["disabled"]
+  const _hoisted_32 = { class: "menu-item-label" }
+  const _hoisted_33 = ["disabled"]
+  const _hoisted_34 = { class: "menu-item-label" }
+  const _hoisted_35 = ["disabled"]
+  const _hoisted_36 = { class: "menu-item-label" }
+  const _hoisted_37 = { class: "layer-slider-row" }
+  const _hoisted_38 = ["title"]
+  const _hoisted_39 = ["value"]
+  const _hoisted_40 = { class: "layer-slider-val" }
+  const _hoisted_41 = { class: "layer-slider-row" }
   
   return function render(_ctx, _cache) {
     return (_openBlock(), _createElementBlock(_Fragment, null, [
@@ -721,6 +722,7 @@ export function layerRowRender(Vue: any): any {
         _createElementVNode("button", {
           type: "button",
           class: _normalizeClass(["layer-vis", { 'hidden-icon': !_ctx.layer.visible }]),
+          "data-op": "layerVisible",
           title: _ctx.layer.visible ? _ctx.L.visible : _ctx.L.hidden,
           onClick: _cache[0] || (_cache[0] = (...args) => (_ctx.vis && _ctx.vis(...args))),
           innerHTML: _ctx.layer.visible ? _ctx.EYE_OPEN : _ctx.EYE_OFF
@@ -730,6 +732,7 @@ export function layerRowRender(Vue: any): any {
               key: 0,
               type: "button",
               class: "layer-folder",
+              "data-op": "view",
               title: _ctx.collapsed ? _ctx.L.expandGroup : _ctx.L.collapseGroup,
               onClick: _cache[1] || (_cache[1] = (...args) => (_ctx.toggleCollapse && _ctx.toggleCollapse(...args))),
               innerHTML: _ctx.collapsed ? _ctx.FOLDER_CLOSED : _ctx.FOLDER_OPEN
@@ -740,6 +743,7 @@ export function layerRowRender(Vue: any): any {
               key: 1,
               type: "text",
               class: "layer-name-input",
+              "data-op": "content",
               value: _ctx.layer.name,
               onClick: _cache[2] || (_cache[2] = _withModifiers(() => {}, ["stop"])),
               onBlur: _cache[3] || (_cache[3] = (...args) => (_ctx.onRenameCommit && _ctx.onRenameCommit(...args))),
@@ -748,13 +752,14 @@ export function layerRowRender(Vue: any): any {
           : (_openBlock(), _createElementBlock("span", {
               key: 2,
               class: "layer-name",
+              "data-op": _ctx.active ? 'content' : null,
               onClick: _cache[5] || (_cache[5] = (...args) => (_ctx.onNameClick && _ctx.onNameClick(...args)))
             }, [
               _createTextVNode(_toDisplayString(_ctx.layer.name), 1 /* TEXT */),
               (_ctx.isGroup && _ctx.collapsed)
-                ? (_openBlock(), _createElementBlock("span", _hoisted_5, " (" + _toDisplayString(_ctx.childLeafCount) + ")", 1 /* TEXT */))
+                ? (_openBlock(), _createElementBlock("span", _hoisted_6, " (" + _toDisplayString(_ctx.childLeafCount) + ")", 1 /* TEXT */))
                 : _createCommentVNode("v-if", true)
-            ])),
+            ], 8 /* PROPS */, _hoisted_5)),
         (_ctx.layer.clippingMask)
           ? (_openBlock(), _createElementBlock("span", {
               key: 3,
@@ -767,7 +772,7 @@ export function layerRowRender(Vue: any): any {
               }, [
                 _createElementVNode("use", { href: "#clipping-mask" })
               ], -1 /* CACHED */)
-            ]))], 8 /* PROPS */, _hoisted_6))
+            ]))], 8 /* PROPS */, _hoisted_7))
           : _createCommentVNode("v-if", true),
         (!_ctx.isGroup && _ctx.layer.lockAlpha)
           ? (_openBlock(), _createElementBlock("span", {
@@ -783,7 +788,7 @@ export function layerRowRender(Vue: any): any {
               }, [
                 _createElementVNode("use", { href: "#lock-alpha" })
               ], -1 /* CACHED */)
-            ]))], 8 /* PROPS */, _hoisted_7))
+            ]))], 8 /* PROPS */, _hoisted_8))
           : _createCommentVNode("v-if", true),
         (_ctx.isRef)
           ? (_openBlock(), _createElementBlock("span", {
@@ -797,12 +802,13 @@ export function layerRowRender(Vue: any): any {
               }, [
                 _createElementVNode("use", { href: "#reference-layer" })
               ], -1 /* CACHED */)
-            ]))], 8 /* PROPS */, _hoisted_8))
+            ]))], 8 /* PROPS */, _hoisted_9))
           : _createCommentVNode("v-if", true),
         _createElementVNode("button", {
           type: "button",
           ref: "menuBtn",
           class: "layer-tools-btn",
+          "data-op": "content",
           title: _ctx.L.layerMenu,
           onClick: _cache[6] || (_cache[6] = (...args) => (_ctx.toggleMenu && _ctx.toggleMenu(...args)))
         }, [...(_cache[34] || (_cache[34] = [
@@ -812,20 +818,22 @@ export function layerRowRender(Vue: any): any {
           }, [
             _createElementVNode("use", { href: "#more" })
           ], -1 /* CACHED */)
-        ]))], 8 /* PROPS */, _hoisted_9),
+        ]))], 8 /* PROPS */, _hoisted_10),
         _createElementVNode("button", {
           type: "button",
           ref: "badgeBtn",
           class: _normalizeClass(["layer-mode-badge", { active: _ctx.expanded }]),
+          "data-op": "content",
           title: _ctx.badgeTitle,
           onClick: _cache[7] || (_cache[7] = (...args) => (_ctx.toggleBadge && _ctx.toggleBadge(...args)))
-        }, _toDisplayString(_ctx.modeBadge), 11 /* TEXT, CLASS, PROPS */, _hoisted_10),
+        }, _toDisplayString(_ctx.modeBadge), 11 /* TEXT, CLASS, PROPS */, _hoisted_11),
         (_openBlock(), _createBlock(_Teleport, { to: "body" }, [
           (_ctx.menuOpen)
             ? (_openBlock(), _createElementBlock("div", {
                 key: 0,
                 ref: "menuEl",
                 class: "menu-panel layer-tools-popup",
+                "data-op": "content",
                 onClick: _cache[22] || (_cache[22] = _withModifiers(() => {}, ["stop"]))
               }, [
                 _createElementVNode("button", {
@@ -839,7 +847,7 @@ export function layerRowRender(Vue: any): any {
                   }, [
                     _createElementVNode("use", { href: "#rename" })
                   ], -1 /* CACHED */)),
-                  _createElementVNode("span", _hoisted_11, _toDisplayString(_ctx.L.rename), 1 /* TEXT */)
+                  _createElementVNode("span", _hoisted_12, _toDisplayString(_ctx.L.rename), 1 /* TEXT */)
                 ]),
                 _createElementVNode("button", {
                   class: "menu-item menu-item-with-icon",
@@ -853,10 +861,10 @@ export function layerRowRender(Vue: any): any {
                   }, [
                     _createElementVNode("use", { href: "#copy" })
                   ], -1 /* CACHED */)),
-                  _createElementVNode("span", _hoisted_13, _toDisplayString(_ctx.L.duplicate), 1 /* TEXT */)
-                ], 8 /* PROPS */, _hoisted_12),
+                  _createElementVNode("span", _hoisted_14, _toDisplayString(_ctx.L.duplicate), 1 /* TEXT */)
+                ], 8 /* PROPS */, _hoisted_13),
                 (_ctx.isGroup || _ctx.moveTargets.length || _ctx.canMoveOut)
-                  ? (_openBlock(), _createElementBlock("hr", _hoisted_14))
+                  ? (_openBlock(), _createElementBlock("hr", _hoisted_15))
                   : _createCommentVNode("v-if", true),
                 (_ctx.isGroup)
                   ? (_openBlock(), _createElementBlock("button", {
@@ -871,7 +879,7 @@ export function layerRowRender(Vue: any): any {
                       }, [
                         _createElementVNode("use", { href: "#explode-folder" })
                       ], -1 /* CACHED */)),
-                      _createElementVNode("span", _hoisted_15, _toDisplayString(_ctx.L.ungroup), 1 /* TEXT */)
+                      _createElementVNode("span", _hoisted_16, _toDisplayString(_ctx.L.ungroup), 1 /* TEXT */)
                     ]))
                   : _createCommentVNode("v-if", true),
                 (_ctx.isGroup)
@@ -887,7 +895,7 @@ export function layerRowRender(Vue: any): any {
                       }, [
                         _createElementVNode("use", { href: "#merge-layers" })
                       ], -1 /* CACHED */)),
-                      _createElementVNode("span", _hoisted_16, _toDisplayString(_ctx.L.collapseToLayer), 1 /* TEXT */)
+                      _createElementVNode("span", _hoisted_17, _toDisplayString(_ctx.L.collapseToLayer), 1 /* TEXT */)
                     ]))
                   : _createCommentVNode("v-if", true),
                 (_ctx.moveTargets.length)
@@ -902,7 +910,7 @@ export function layerRowRender(Vue: any): any {
                       }, [
                         _createElementVNode("use", { href: "#move-to-folder" })
                       ], -1 /* CACHED */)),
-                      _createElementVNode("span", _hoisted_17, _toDisplayString(_ctx.L.moveIntoGroup), 1 /* TEXT */),
+                      _createElementVNode("span", _hoisted_18, _toDisplayString(_ctx.L.moveIntoGroup), 1 /* TEXT */),
                       _createElementVNode("button", {
                         ref: "moveBtn",
                         type: "button",
@@ -924,7 +932,7 @@ export function layerRowRender(Vue: any): any {
                       }, [
                         _createElementVNode("use", { href: "#move-out-folder" })
                       ], -1 /* CACHED */)),
-                      _createElementVNode("span", _hoisted_18, _toDisplayString(_ctx.L.moveOut), 1 /* TEXT */)
+                      _createElementVNode("span", _hoisted_19, _toDisplayString(_ctx.L.moveOut), 1 /* TEXT */)
                     ]))
                   : _createCommentVNode("v-if", true),
                 _cache[48] || (_cache[48] = _createElementVNode("hr", { class: "menu-sep" }, null, -1 /* CACHED */)),
@@ -943,9 +951,9 @@ export function layerRowRender(Vue: any): any {
                       }, [
                         _createElementVNode("use", { href: "#lock-alpha" })
                       ], -1 /* CACHED */)),
-                      _createElementVNode("span", _hoisted_20, _toDisplayString(_ctx.L.lockAlpha), 1 /* TEXT */),
-                      _createElementVNode("span", _hoisted_21, _toDisplayString(_ctx.layer.lockAlpha ? _ctx.L.on : _ctx.L.off), 1 /* TEXT */)
-                    ], 8 /* PROPS */, _hoisted_19))
+                      _createElementVNode("span", _hoisted_21, _toDisplayString(_ctx.L.lockAlpha), 1 /* TEXT */),
+                      _createElementVNode("span", _hoisted_22, _toDisplayString(_ctx.layer.lockAlpha ? _ctx.L.on : _ctx.L.off), 1 /* TEXT */)
+                    ], 8 /* PROPS */, _hoisted_20))
                   : _createCommentVNode("v-if", true),
                 _createElementVNode("button", {
                   class: "menu-item layer-menu-toggle",
@@ -960,9 +968,9 @@ export function layerRowRender(Vue: any): any {
                   }, [
                     _createElementVNode("use", { href: "#clipping-mask" })
                   ], -1 /* CACHED */)),
-                  _createElementVNode("span", _hoisted_23, _toDisplayString(_ctx.isGroup ? _ctx.L.clipGroup : _ctx.L.clip), 1 /* TEXT */),
-                  _createElementVNode("span", _hoisted_24, _toDisplayString(_ctx.layer.clippingMask ? _ctx.L.on : _ctx.L.off), 1 /* TEXT */)
-                ], 8 /* PROPS */, _hoisted_22),
+                  _createElementVNode("span", _hoisted_24, _toDisplayString(_ctx.isGroup ? _ctx.L.clipGroup : _ctx.L.clip), 1 /* TEXT */),
+                  _createElementVNode("span", _hoisted_25, _toDisplayString(_ctx.layer.clippingMask ? _ctx.L.on : _ctx.L.off), 1 /* TEXT */)
+                ], 8 /* PROPS */, _hoisted_23),
                 (!_ctx.isGroup)
                   ? (_openBlock(), _createElementBlock("button", {
                       key: 6,
@@ -978,9 +986,9 @@ export function layerRowRender(Vue: any): any {
                       }, [
                         _createElementVNode("use", { href: "#reference-layer" })
                       ], -1 /* CACHED */)),
-                      _createElementVNode("span", _hoisted_26, _toDisplayString(_ctx.L.refLayer), 1 /* TEXT */),
-                      _createElementVNode("span", _hoisted_27, _toDisplayString(_ctx.isRef ? _ctx.L.on : _ctx.L.off), 1 /* TEXT */)
-                    ], 8 /* PROPS */, _hoisted_25))
+                      _createElementVNode("span", _hoisted_27, _toDisplayString(_ctx.L.refLayer), 1 /* TEXT */),
+                      _createElementVNode("span", _hoisted_28, _toDisplayString(_ctx.isRef ? _ctx.L.on : _ctx.L.off), 1 /* TEXT */)
+                    ], 8 /* PROPS */, _hoisted_26))
                   : _createCommentVNode("v-if", true),
                 _cache[49] || (_cache[49] = _createElementVNode("hr", { class: "menu-sep" }, null, -1 /* CACHED */)),
                 (!_ctx.isGroup)
@@ -997,8 +1005,8 @@ export function layerRowRender(Vue: any): any {
                       }, [
                         _createElementVNode("use", { href: "#merge-layer-down" })
                       ], -1 /* CACHED */)),
-                      _createElementVNode("span", _hoisted_29, _toDisplayString(_ctx.L.mergeDown), 1 /* TEXT */)
-                    ], 8 /* PROPS */, _hoisted_28))
+                      _createElementVNode("span", _hoisted_30, _toDisplayString(_ctx.L.mergeDown), 1 /* TEXT */)
+                    ], 8 /* PROPS */, _hoisted_29))
                   : _createCommentVNode("v-if", true),
                 (!_ctx.isGroup)
                   ? (_openBlock(), _createElementBlock("button", {
@@ -1014,8 +1022,8 @@ export function layerRowRender(Vue: any): any {
                       }, [
                         _createElementVNode("use", { href: "#separate-colors" })
                       ], -1 /* CACHED */)),
-                      _createElementVNode("span", _hoisted_31, _toDisplayString(_ctx.L.explodeColors), 1 /* TEXT */)
-                    ], 8 /* PROPS */, _hoisted_30))
+                      _createElementVNode("span", _hoisted_32, _toDisplayString(_ctx.L.explodeColors), 1 /* TEXT */)
+                    ], 8 /* PROPS */, _hoisted_31))
                   : _createCommentVNode("v-if", true),
                 (!_ctx.isGroup)
                   ? (_openBlock(), _createElementBlock("button", {
@@ -1031,8 +1039,8 @@ export function layerRowRender(Vue: any): any {
                       }, [
                         _createElementVNode("use", { href: "#clear-document" })
                       ], -1 /* CACHED */)),
-                      _createElementVNode("span", _hoisted_33, _toDisplayString(_ctx.L.clearContent), 1 /* TEXT */)
-                    ], 8 /* PROPS */, _hoisted_32))
+                      _createElementVNode("span", _hoisted_34, _toDisplayString(_ctx.L.clearContent), 1 /* TEXT */)
+                    ], 8 /* PROPS */, _hoisted_33))
                   : _createCommentVNode("v-if", true),
                 _createElementVNode("button", {
                   class: "menu-item menu-danger menu-item-with-icon",
@@ -1046,8 +1054,8 @@ export function layerRowRender(Vue: any): any {
                   }, [
                     _createElementVNode("use", { href: "#trash-can" })
                   ], -1 /* CACHED */)),
-                  _createElementVNode("span", _hoisted_35, _toDisplayString(_ctx.isGroup ? _ctx.L.delGroup : _ctx.L.del), 1 /* TEXT */)
-                ], 8 /* PROPS */, _hoisted_34)
+                  _createElementVNode("span", _hoisted_36, _toDisplayString(_ctx.isGroup ? _ctx.L.delGroup : _ctx.L.del), 1 /* TEXT */)
+                ], 8 /* PROPS */, _hoisted_35)
               ], 512 /* NEED_PATCH */))
             : _createCommentVNode("v-if", true)
         ]))
@@ -1058,9 +1066,10 @@ export function layerRowRender(Vue: any): any {
               key: 0,
               ref: "adjEl",
               class: "menu-panel layer-adjust-popup hidden",
+              "data-op": "content",
               onClick: _cache[30] || (_cache[30] = _withModifiers(() => {}, ["stop"]))
             }, [
-              _createElementVNode("label", _hoisted_36, [
+              _createElementVNode("label", _hoisted_37, [
                 _createElementVNode("span", {
                   class: "layer-slider-icon",
                   title: _ctx.L.opa
@@ -1071,7 +1080,7 @@ export function layerRowRender(Vue: any): any {
                   }, [
                     _createElementVNode("use", { href: "#opacity" })
                   ], -1 /* CACHED */)
-                ]))], 8 /* PROPS */, _hoisted_37),
+                ]))], 8 /* PROPS */, _hoisted_38),
                 _createElementVNode("input", {
                   type: "range",
                   min: "0",
@@ -1082,10 +1091,10 @@ export function layerRowRender(Vue: any): any {
                   onPointerup: _cache[26] || (_cache[26] = (...args) => (_ctx.opaCommit && _ctx.opaCommit(...args))),
                   onPointercancel: _cache[27] || (_cache[27] = (...args) => (_ctx.opaCommit && _ctx.opaCommit(...args))),
                   onClick: _cache[28] || (_cache[28] = _withModifiers(() => {}, ["stop"]))
-                }, null, 40 /* PROPS, NEED_HYDRATION */, _hoisted_38),
-                _createElementVNode("span", _hoisted_39, _toDisplayString(_ctx.opacityPct), 1 /* TEXT */)
+                }, null, 40 /* PROPS, NEED_HYDRATION */, _hoisted_39),
+                _createElementVNode("span", _hoisted_40, _toDisplayString(_ctx.opacityPct), 1 /* TEXT */)
               ]),
-              _createElementVNode("label", _hoisted_40, [
+              _createElementVNode("label", _hoisted_41, [
                 _createElementVNode("span", null, _toDisplayString(_ctx.L.mode), 1 /* TEXT */),
                 _createElementVNode("button", {
                   ref: "modeBtn",

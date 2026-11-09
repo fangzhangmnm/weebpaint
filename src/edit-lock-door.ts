@@ -6,6 +6,7 @@
 import { showNotice, closeNotice } from "@internal/workbench-elements";
 import { t } from "./i18n/index.ts";
 import { isEditLocked, isLocalFileOpen, onEditLockChange, onEditLockFlash, flashEditLock } from "./edit-lock.ts";
+import { controlAllowedWhileLocked } from "./edit-lock-table.ts";
 
 const NOTICE_ID = "edit-lock";
 
@@ -51,22 +52,20 @@ export function initEditLockDoor(d: EditLockDoorDeps): void {
   });
   render(isEditLocked());
 
-  // 界面那一层补齐（user 11-08「图层、滤镜这些界面的那层锁，你修一下呗」）：图层面板 / 调整（滤镜）面板 / 裁切条 / 套索条这些会改画的面板，
-  //   锁着时点不动、门闪一下、看起来淡一档（styles.css）。它们的按钮各有各的处理函数、不经交互锁的意图表——在捕获阶段统一拦，比每个按钮各补一句稳。
-  //   窗口自己的壳（关闭 / 拖动 / 缩放）和「取消」照常。写门（Workpiece.writeGate）仍是后面那一道：这里漏了的入口照样改不了。
-  const SURFACES = "#layersList, .layers-foot, #layerAddPopup, #adjustPanel, #adjustPopup, #cropToolbar, #lassoToolbarStack, #lassoSelOpPopup, #lassoSelEditMenu, #fillSelEditMenu";
-  const CHROME = "#adjustPanelClose, #adjustPanelHead, #adjustPanelResize, #cropToolbarCancel";
+  // 面板按钮这一层（user 11-08「图层、滤镜这些界面的那层锁，你修一下呗」；2026-11-09 改成查表）：
+  //   会改画的控件各有各的处理函数、不经交互锁的意图表——在捕获阶段统一拦，比每个按钮各补一句稳。
+  //   **拦谁不在这里写名单**：控件自己（或它的容器）在 HTML / 模板里标 data-op = 它做的操作，这里只取离被点的元素最近的那个 data-op 去查
+  //   src/edit-lock-table.ts——"view"（不碰画：面板的壳、取消、工具选项）和表里的「看法」（图层的眼睛、选区）放行；
+  //   "content" 和别的词 = 改内容，锁着时点不动、门闪一下、淡一档（styles.css）。没有任何 data-op 的元素不归这一层管。
+  //   写门（Workpiece.writeGate）仍是后面那一道：这里漏标的入口照样改不了，只是没这么干脆。
   const guard = (e: Event): void => {
     if (!isEditLocked()) return;
-    const el = e.target as Element | null;
-    if (!el?.closest || !el.closest(SURFACES) || el.closest(CHROME)) return;
-    // 看法（v0.14.63）：图层的眼睛（可见性）锁着也能点；点图层那一行本身（选中它来看）也放行。行里别的控件（⋯ 菜单、不透明度、改名）照拦。
-    if (el.closest(".layer-vis")) return;
-    if (e.type !== "dblclick" && el.closest("#layersList") && !el.closest("button, input, select, textarea, [role='menu'], .menu-panel")) return;
+    const el = (e.target as Element | null)?.closest?.("[data-op]") as HTMLElement | null;
+    if (!el || controlAllowedWhileLocked(el.dataset.op)) return;
     e.preventDefault(); e.stopPropagation();
     if (e.type === "click") flashEditLock();
   };
   document.addEventListener("pointerdown", guard, true);
   document.addEventListener("click", guard, true);
-  document.addEventListener("dblclick", guard, true);   // 双击图层名 = 改名（内容）：锁着不进
+  document.addEventListener("dblclick", guard, true);
 }

@@ -2,8 +2,10 @@
 //   created 2026-11-08 by Claude Fable 5.1。家规 = 家族 CLAUDE.md「源文件原则上只读：手动解锁才能改」；user「默认的文件你根本不能编辑，一编辑就报错，一保存就报错」。
 //   保存那一片在 editor-session-edit-lock.test.mjs；库那一片在 @internal/store 自己的测试。
 import { describe, it, eq, assert } from "./runner.mjs";
-import { initEditLock, isEditLocked, isIdentifierEditLocked, editWriteGate, refreshEditLock, onEditLockChange, onEditLockFlash, _resetEditLockForTest, unlockLocalFile, keepLocalFileUnlocked, isLocalFileOpen, canLockNow, lockLocalFile, LOOK_LABELS } from "../src/edit-lock.ts";
-import { allows, isLocked, _resetLocksForTest } from "../src/ui/interaction-lock.ts";
+import { initEditLock, isEditLocked, isIdentifierEditLocked, editWriteGate, refreshEditLock, onEditLockChange, onEditLockFlash, _resetEditLockForTest, unlockLocalFile, keepLocalFileUnlocked, isLocalFileOpen, canLockNow, lockLocalFile, takeLookOwed } from "../src/edit-lock.ts";
+import { allows, isLocked, policyAllows, _resetLocksForTest } from "../src/ui/interaction-lock.ts";
+import { LOOK_OPS, isLookOp, lookOpInFile, controlAllowedWhileLocked } from "../src/edit-lock-table.ts";
+import { pointerOp } from "../src/pointer-route.ts";
 import { Workpiece, WriteRefusedError } from "../src/backend/workpiece/workpiece.ts";
 import { History } from "../src/backend/workpiece/history.ts";
 
@@ -132,13 +134,137 @@ describe("edit-lock · 硬盘上的单个文件（不经过库；锁跟着这一
   });
 });
 
-describe("edit-lock · 「看法」类操作（锁着也能动，但对文件零写入）", () => {
-  // user 2026-11-08：「这些看法…你可以修，但只是说…没法保存到文件里」「每个 app 要给自己分类」「锁着的时候关了几层，就是你根本不应该动文件」
-  it("名单是明文的：现在只有图层可见性", () => { eq([...LOOK_LABELS].join(), "layerVisible"); });
-  it("锁着：看法类的写令牌放行、不闪；内容类的照拒", () => {
+describe("edit-lock · 分类表（src/edit-lock-table.ts）——「锁着时什么能动」只此一处", () => {
+  // user 2026-11-08：「这些看法…你可以修，但只是说…没法保存到文件里」「每个 app 要给自己分类，同意，就逼出窄接口」
+  it("名单是明文的：图层可见性（进文件）、选区（不进文件）；别的一律内容", () => {
+    eq(Object.keys(LOOK_OPS).sort().join(), "layerVisible,selection");
+    eq(lookOpInFile("layerVisible"), true); eq(lookOpInFile("selection"), false);
+    for (const content of ["layerProp", "stroke", "addLayer", "fill", "floatTransform", "liftFloat", "clearSelectionPixels", "cutClip", "selection+fill", "toString", "__proto__", "", undefined, null]) {
+      eq(isLookOp(content), false, String(content)); eq(lookOpInFile(content), false, String(content));
+    }
+  });
+  it("面板按钮上的 data-op：view 和看法放行；content、认不出来的词、空的都不放", () => {
+    for (const ok of ["view", "layerVisible", "selection"]) eq(controlAllowedWhileLocked(ok), true, ok);
+    for (const no of ["content", "fill", "liftFloat", "Selection", "", undefined, null]) eq(controlAllowedWhileLocked(no), false, String(no));
+  });
+});
+
+describe("edit-lock · 写门按操作分类（看法放行、内容照拒）", () => {
+  it("锁着：看法类放行、不闪；内容类照拒、闪", () => {
     rig(); let flashes = 0; onEditLockFlash(() => flashes++);
-    eq(editWriteGate("layerVisible"), null); eq(flashes, 0);
-    for (const content of ["layerProp", "stroke", "addLayer", "moveLayer", "fill", "undo", "redo", undefined]) eq(editWriteGate(content), "edit-locked", String(content));
+    eq(editWriteGate("layerVisible"), null); eq(editWriteGate("selection"), null); eq(flashes, 0);
+    const content = ["layerProp", "stroke", "addLayer", "moveLayer", "fill", "liftFloat", "floatTransform", "clearSelectionPixels", "undo", "redo", "selection+fill", undefined];
+    for (const c of content) eq(editWriteGate(c), "edit-locked", String(c));
+    eq(flashes, content.length);
+  });
+  it("锁着时动过要进文件的看法 → 记一笔欠着，解锁之后取走（问一次清一次）；只动过选区 → 什么都不欠", () => {
+    // user 2026-11-08：「切换可见性在编辑模式里面当然是需要保存的…只是说在锁定模式的时候，你 dirty 的时候也没法写」
+    rig(); eq(takeLookOwed(), false);
+    editWriteGate("selection"); eq(takeLookOwed(), false, "选区从不进文件");
+    editWriteGate("layerVisible"); eq(takeLookOwed(), true); eq(takeLookOwed(), false, "取走就清");
+  });
+  it("没锁的时候动看法不记（那时候本来就照常标脏照常存）；装入期间也不记", () => {
+    const st = rig({ unlocked: ["画.ora"] });
+    editWriteGate("layerVisible"); eq(takeLookOwed(), false);
+    st.unlocked.clear(); st.loading = true;
+    editWriteGate("layerVisible"); eq(takeLookOwed(), false);
+  });
+  it("换了一幅画（整份装入）→ 上一幅欠着的作废（没解锁就关掉 = 文件没动过）", () => {
+    rig(); editWriteGate("layerVisible");
+    eq(editWriteGate("load"), null);
+    eq(takeLookOwed(), false);
+  });
+});
+
+describe("edit-lock · 界面那一头也查同一张表（指针 / 快捷键带着 op 来问）", () => {
+  it("只读锁：静态表不放的意图，带上看法类的 op 就放；带内容类的 op 不放；busy / 闸门不看 op", () => {
+    eq(policyAllows("readonly", "pointer:draw"), false);
+    eq(policyAllows("readonly", "pointer:draw", { op: "selection" }), true);
+    eq(policyAllows("readonly", "pointer:draw", { op: "fill" }), false);
+    eq(policyAllows("readonly", "pointer:draw", { op: "floatTransform" }), false);
+    eq(policyAllows("readonly", "key:shortcut", { shortcutCategory: "sc.cat.lasso" }), false);
+    eq(policyAllows("readonly", "key:shortcut", { shortcutCategory: "sc.cat.lasso", op: "selection" }), true);
+    eq(policyAllows("readonly", "key:shortcut", { shortcutCategory: "sc.cat.edit", op: "stroke" }), false, "撤销：要翻的那一步是内容 → 不收");
+    eq(policyAllows("readonly", "key:shortcut", { shortcutCategory: "sc.cat.edit", op: "layerVisible" }), true, "撤销：要翻的那一步是看法 → 收");
+    eq(policyAllows("readonly", "key:shortcut", { shortcutCategory: "sc.cat.edit", op: undefined }), false, "没有可翻的 → 不收");
+    eq(policyAllows("readonly", "copy"), true, "复制是读");
+    for (const k of ["busy", "gate"]) { eq(policyAllows(k, "pointer:draw", { op: "selection" }), false, k); eq(policyAllows(k, "copy"), false, k); }
+  });
+  it("指针要做的操作：套索工具画选区 = selection；油漆桶 = fill；浮着的时候 = floatTransform；别的 role 不细分", () => {
+    eq(pointerOp("lasso", "lasso", false), "selection");
+    eq(pointerOp("lasso", "fill", false), "fill");
+    eq(pointerOp("lasso", "lasso", true), "floatTransform");
+    eq(pointerOp("lasso", "transform", true), "floatTransform");
+    for (const r of ["draw", "erase", "filterBrush", "shapeBrush", "pan", "pick", null]) eq(pointerOp(r, "brush", false), undefined, String(r));
+  });
+  it("接起来：锁着的画上，套索画选区收、油漆桶不收、落笔不收（门闪一下只在被拒的时候）", () => {
+    rig(); let flashes = 0; onEditLockFlash(() => flashes++);
+    eq(allows("pointer:draw", { op: pointerOp("lasso", "lasso", false) }), true); eq(flashes, 0);
+    eq(allows("pointer:draw", { op: pointerOp("lasso", "fill", false) }), false); eq(flashes, 1);
+    eq(allows("pointer:draw", { op: pointerOp("draw", "brush", false) }), false); eq(flashes, 2);
+  });
+});
+
+describe("edit-lock · 写门每一步都问（并进同一步的微步、撤销重做）", () => {
+  class ValComp {
+    constructor(wp, kind) { this._wp = wp; this.kind = kind; this.v = 0; this._origin = null; }
+    set(x) { this._wp._componentWrite(this); if (this._origin === null) this._origin = { v: this.v }; this.v = x; }
+    sealRecord() { const o = this._origin; this._origin = null; return !o || o.v === this.v ? null : o; }
+    swapRecord(d) { const cur = this.v; this.v = d.v; return { v: cur }; }
+    recordBytes() { return 8; } disposeRecord() {}
+  }
+  class TestWp extends Workpiece { constructor(o) { super(o); this.a = new ValComp(this, "a"); this.register(this.a, { undo: "recorded" }); } }
+  const mk = () => { const h = new History({ maxQuotaBytes: 1 << 30, onUnrecoverable: (e) => { throw e; } }); const wp = new TestWp({ undo: h.stack, onTokenLeak: () => {} }); h.attach(wp); wp.writeGate = (l) => editWriteGate(l); return { h, wp }; };
+
+  it("先一个放行的操作留开令牌，后面不放行的不许搭车过门", () => {
+    rig();
+    const { h, wp } = mk();
+    eq(h.withPoint("selection", { checkpoint: false }, () => wp.a.set(1)).ok, true);
+    let threw = false, ran = false;
+    try { h.withPoint("fill", {}, () => { ran = true; wp.a.set(2); }); } catch (e) { threw = e instanceof WriteRefusedError; }
+    eq(threw, true); eq(ran, false); eq(wp.a.v, 1, "被拒的那一步没进去，前面那一步还在");
+    h.sealCheckpoint(); eq(h.stack.peekLabel("undo"), "selection");
+  });
+  it("嵌套：外层放行、里层不放行 → 整步回滚", () => {
+    rig();
+    const { h, wp } = mk();
+    const r = h.withPoint("selection", {}, () => { wp.a.set(1); h.withPoint("addLayer", { checkpoint: false }, () => wp.a.set(2)); });
+    eq(r.ok, false); eq(wp.a.v, 0); eq(h.canUndo(), false);
+  });
+  it("几个不同名字的微步并成的一步，标签 = 名字用 + 连起来（不会被当成开头那个操作）", () => {
+    const st = rig({ unlocked: ["画.ora"] });
+    const { h, wp } = mk();
+    h.withPoint("layerVisible", { checkpoint: false }, () => wp.a.set(1));
+    h.withPoint("layerProp", { checkpoint: false }, () => wp.a.set(2));
+    h.withPoint("layerVisible", {}, () => wp.a.set(3));
+    eq(h.stack.peekLabel("undo"), "layerVisible+layerProp");
+    st.unlocked.clear();                                   // 现在锁上
+    eq(h.undo(), false, "这一步里混着内容：锁着不许翻"); eq(wp.a.v, 3);
+  });
+  it("撤销 / 重做按要翻的那一步的操作算：锁着能翻自己刚动的看法，翻到内容那一步就停", () => {
+    const st = rig({ unlocked: ["画.ora"] });
+    const { h, wp } = mk();
+    h.withPoint("stroke", {}, () => wp.a.set(1));          // 解着的时候画了一笔
+    st.unlocked.clear();                                   // 锁上
+    let flashes = 0; onEditLockFlash(() => flashes++);
+    h.withPoint("selection", {}, () => wp.a.set(2));       // 锁着：框了个选区
+    h.withPoint("layerVisible", {}, () => wp.a.set(3));    // 锁着：关了一层
+    eq(takeLookOwed(), true);
+    eq(h.peekLabel("undo"), "layerVisible");
+    eq(h.undo(), true); eq(wp.a.v, 2); eq(takeLookOwed(), true, "翻回可见性 = 又动了一次要进文件的看法");
+    eq(h.undo(), true); eq(wp.a.v, 1); eq(takeLookOwed(), false, "翻回选区不欠");
+    eq(flashes, 0);
+    eq(h.peekLabel("undo"), "stroke");
+    eq(h.undo(), false, "再往前是画面内容：不动"); eq(wp.a.v, 1); eq(flashes, 1);
+    eq(h.redo(), true); eq(h.redo(), true); eq(wp.a.v, 3);
+    eq(h.redo(), false, "没有可重做的了：不问门、不闪"); eq(flashes, 1);
+  });
+  it("顶上还没封口的那一步：peekLabel 认得到；撤销先补封再按它的标签问", () => {
+    rig();
+    const { h, wp } = mk();
+    h.withPoint("selection", { checkpoint: false }, () => wp.a.set(5));
+    eq(h.peekLabel("undo"), "selection");
+    eq(h.undo(), true); eq(wp.a.v, 0);
   });
 });
 

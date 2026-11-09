@@ -33,9 +33,12 @@ export declare class Workpiece {
     private _onTokenLeak;
     private _fr;
     constructor(opts?: WorkpieceOpts);
-    /** 写门的否决口（2026-11-08，家族「源文件原则上只读」；组合根注入，默认没有）：返回原因 = 此刻不许开新的写令牌（这幅画锁着）。
-     *  装入文档（load）不走令牌，不受它影响；撤销 / 重做在 History 那头问同一个口。 */
+    /** 写门的否决口（2026-11-08，家族「源文件原则上只读」；组合根注入，默认没有）：返回原因 = 此刻不许做这个操作（这幅画锁着）。
+     *  **label = 操作的名字**——门按它分类（app 侧 src/edit-lock-table.ts：列为「看法」的放行，其余拒）。问门的地方有三处，都经 assertWritable：
+     *  开令牌（begin）、并进一个已经开着的令牌的每个微步（History.withPoint）、撤销 / 重做（History 拿要翻的那一步的标签问）。 */
     writeGate: ((label?: string) => string | null) | null;
+    /** 问一次门：不让 → 抛 WriteRefusedError。不开令牌、不改任何状态。 */
+    assertWritable(label?: string): void;
     /** 已有开着的令牌 → throw（泄漏查获点）；泄漏者已被 GC → FR 报警路线 + 此处自愈回滚后继续。 */
     begin(label?: string): WriteToken;
     /** 开着的令牌存在？（substrate 观察者的收集门：LayerTiles 观察 tile 换手时据此判断收不收。） */

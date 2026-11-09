@@ -24,7 +24,7 @@ import { showNotice } from "@internal/workbench-elements";   // 「更新版本�
 import { flattenViewLeaves } from "./backend/workpiece/painting-view.ts";
 import { tLatin } from "./i18n/index.ts";
 import { requireStore, galleryBackend, hasLiveStore } from "./app-store.ts";
-import { initEditLock, isEditLocked, isIdentifierEditLocked, refreshEditLock, flashEditLock, keepLocalFileUnlocked, onEditLockChange } from "./edit-lock.ts";   // 2026-11-08：开着的画锁没锁（家族「源文件原则上只读」）
+import { initEditLock, isEditLocked, isIdentifierEditLocked, refreshEditLock, flashEditLock, keepLocalFileUnlocked, onEditLockChange, takeLookOwed, canLockNow } from "./edit-lock.ts";   // 2026-11-08：开着的画锁没锁（家族「源文件原则上只读」）
 import { galleryOnline } from "./gallery-capability.ts";   // 库在线 SSoT（0828：isSignedIn 是 MSAL 词，folder 库别问它）
 import { appEncryption } from "./encryption.ts";
 import type { EncryptedBlob } from "./app-store.ts";   // 密文 at-rest 字节（branded）；B2：类型经接缝转口
@@ -109,8 +109,6 @@ let _loadedDocIsNewer = false;           // 写这画的 app 版本 > 本版（p
 let _loadedDocWriterVer: string | null = null;
 let _loadedDocNewerConfirmed = false;    // 用户已确认「用本版覆盖」→ 这张画此后照常落盘；换画 / 新建即复位
 let _loadingDoc = false;
-// 锁着时动过「看法」（图层可见性…）：有改动，但锁着期间一个字节都不写。解锁那一刻转成正式的待保存改动（所见即所存）；没解锁就关掉 = 文件没动过。换画时清零。
-let _lookChangedWhileLocked = false;
 
 const AUTOSAVE_IDLE_MS = 30_000;   // v0.4.11 用户拍板：停笔 30 秒即落盘（旧 3min 墙钟 gate 删——dirty 门已足够：存完即净，再编辑本身重置空闲时钟）
 
@@ -570,7 +568,7 @@ function adoptModel(loaded: LoadedDoc) {
     }
     applyEditorStateToUI();   // desk：Unserialize 后把面板/checkboard 回灌 UI（各模块订阅 wp:applyEditorState）
     timelapseAdopt(loaded);   // 录制态从 ora sidecar 回读（per-doc sticky；回读失败自愈=作废+info）
-  } finally { _loadingDoc = false; _lastInputAt = Date.now(); _lookChangedWhileLocked = false; refreshEditLock(); }   // 换 doc = 坐下时钟归零（防跨 doc 误判新坐下）
+  } finally { _loadingDoc = false; _lastInputAt = Date.now(); refreshEditLock(); }   // 换 doc = 坐下时钟归零（防跨 doc 误判新坐下）
 }
 
 // ── adopt 的两个意图，显式拆开（v415）────────────────────────────────────────────────────
@@ -1520,13 +1518,11 @@ export function initSession(ctx: AppContext) {
       onChange: (cb: () => void) => {
         const h = (ev?: Event) => {
           if (_loadingDoc) return;
-          // 锁着（2026-11-08）：参考窗自己发出来的变化（翻页 / 在窗里挪卡、删卡）不标脏、不保存、也不闪——翻页是看，不是改，每翻一页闪一下是噪音。
-          //   从 app 这头加参考图 / 参考视频在入口就被拒了（side-windows.ts 问 editWriteGate，那里会闪）。参考窗里自己的删卡 / 挪卡锁着时还拦不住，
-          //   只是不保存：要真拦得参考窗那个库加一个「让不让改」的口（它的 minor，要 user 批）。
-          //   wp:histchange 不在这里拦：锁着时写门本来就不开令牌，真有一步历史进来 = 上一层漏了，照常标脏 → 保存那一层响亮报。
-          // v0.14.63：锁着时进来的任何变化都只可能是「看法」（图层可见性…；别的写门不放）→ 记一笔，但不标脏、不留崩溃影子、不碰保存 = 对文件零写入。
-          //   user 2026-11-08：「切换可见性在编辑模式里面当然是需要保存的…只是说在锁定模式的时候，你 dirty 的时候也没法写」「锁着的状态的时候，永远没法写，一个字节都没法写」。
-          if (isEditLocked()) { _lookChangedWhileLocked = true; return; }
+          // 锁着：进来的变化一概不标脏、不留崩溃影子、不碰保存 = 对文件零写入（user 2026-11-08：「锁着的状态的时候，永远没法写，一个字节都没法写」）。
+          //   锁着时能进来的只有三种：① 看法（图层可见性、选区——写门按 src/edit-lock-table.ts 放的；要进文件的那几类写门自己记了一笔欠着，
+          //   解锁那一刻下面的 onEditLockChange 取走、转成待保存改动）；② 参考窗翻页（看，不是改；窗里挪卡 / 删卡 / 加卡参考窗自己问 canEdit 拒了）；
+          //   ③ 上一层漏了的内容改动——不在这里兜：保存那一层锁着本来就不写，解锁之后它随下一次真改动一起落盘。
+          if (isEditLocked()) return;
           // P4 坐下判定（§2.7）：输入间隔 ≥ 阈值 → 这是新的一次坐下的首笔，先封「坐下前态」
           //   （fire-and-forget：capture 读 at-rest/磁盘，不碰画布，首笔零延迟）。
           const now = Date.now();
@@ -1558,10 +1554,11 @@ export function initSession(ctx: AppContext) {
     loading: () => _loadingDoc,
     localFile: () => _fileHome()?.handle ?? null,   // 硬盘上的单个文件：锁跟着这一次打开的句柄
   });
-  // 解锁那一刻：锁着时动过的看法转成正式的待保存改动（之后的保存 / 自动保存存的就是眼前的样子）。
+  // 解锁那一刻：锁着时动过的、要进文件的看法（图层可见性…）转成正式的待保存改动（之后的保存 / 自动保存存的就是眼前的样子）。
+  //   只动过不进文件的看法（选区）→ 什么都不欠，解锁后还是干净的。「欠没欠」由写门记（edit-lock.ts），这里只取。
   onEditLockChange((locked) => {
-    if (locked || !_lookChangedWhileLocked) return;
-    _lookChangedWhileLocked = false;
+    if (locked || !canLockNow()) return;   // 「这幅画解开了」才算；回图库 / 换画让锁态变成「这把锁不管」不算（欠的留着，下一次装入作废）
+    if (!takeLookOwed()) return;
     if (_localHomeKind()) _markLocalDirty(); else if (es.currentName()) es.markDirty();
     updateSaveStatus();
   });

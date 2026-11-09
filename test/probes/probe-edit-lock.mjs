@@ -4,6 +4,7 @@
 //   用法：bash scripts/build.sh 之后 `node test/probes/probe-edit-lock.mjs`（≈ 20 s）。
 //   验：新建不锁、存下来带解锁、刷新后还解着；锁上后落笔 / 撤销 / Ctrl+S / 新建图层都改不动，只闪不弹、没有报错横幅；平移缩放照常；
 //       门上「存一版再改」= 多出一版（生来锁着）、**人还在画布上**、这幅解锁能画能存；打开那一版是锁着的；加了星的删不掉。
+//       2026-11-09：锁着也能框选区 / 复制 / 撤销自己刚动的选区；变换、删除、油漆桶不起作用；只动过选区 → 解锁后不欠任何改动。
 import { createRequire } from "node:module";
 import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
@@ -65,6 +66,8 @@ ok((await layerCount()) === n0 && n0 > 0, `新建图层被拒（图层行数 ${n
 ok(!(await dirty()), "还是不脏"); ok((await banners()).length === 0, "没有报错横幅：" + JSON.stringify(await banners()));
 ok(await P(() => getComputedStyle(document.querySelector(".layers-foot")).opacity === "0.5"), "图层面板的钮淡了一档");
 ok(await P(() => { try { globalThis.__wpProbe.wp2begin("probe"); return false; } catch (e) { return e.name === "WriteRefusedError"; } }), "界面层后面那一道还在：直接开写令牌被拒");
+await P(() => document.querySelector("#layersList .layer-row.active .layer-name")?.click()); await sleep(200);
+ok(await P(() => !document.querySelector("#layersList .layer-name-input")), "点当前图层的名字进不了改名框");
 
 console.log("③′ 看法：锁着也能关图层的眼睛；画不变脏、没有任何上传、不闪不报");
 {
@@ -111,6 +114,50 @@ ok(!(await dirty()), "那一笔先存好了"); ok(/接着改/.test((await door()
 await page.locator("#menuButton").click(); await sleep(200);
 ok(await P(() => document.getElementById("menuLockEdit").classList.contains("hidden")), "锁着：菜单里没有「锁上」（解锁在门上）");
 await page.keyboard.press("Escape"); await sleep(100);
+
+console.log("⑤″ 选区是看法：锁着也能框、能复制、能撤销自己刚框的；变换 / 删除 / 油漆桶不起作用；全程对文件零写入");
+{
+  const hasSel = () => P(() => globalThis.__wpProbe.hasSelection());
+  const flashed = () => P(() => !!document.querySelector('[data-notice-id="edit-lock"].edit-lock-flash'));
+  const unflash = () => P(() => document.querySelector('[data-notice-id="edit-lock"]')?.classList.remove("edit-lock-flash"));
+  const puts1 = drive.puts.length;
+  await P(() => { globalThis.__copied = 0; window.addEventListener("wp:copy", () => globalThis.__copied++); navigator.clipboard.write = async () => {}; });   // 无头浏览器没有剪贴板权限：只验「复制这个动作收了」
+  await page.keyboard.press("l"); await sleep(200);
+  ok((await P(() => globalThis.__wpProbe.tool())) === "lasso", "切到套索工具");
+  // 拐一个弯再抬笔：自由套索画直线圈不出面积，矩形 / 椭圆看的是起点和终点——这样哪种子工具都能框出东西
+  const loop = async () => { const box = await page.locator("#board, canvas").first().boundingBox(); const cx = box.x + box.width / 2, cy = box.y + box.height / 2; await page.mouse.move(cx - 60, cy - 40); await page.mouse.down(); await page.mouse.move(cx + 60, cy - 40, { steps: 6 }); await page.mouse.move(cx + 60, cy + 40, { steps: 6 }); await page.mouse.up(); await sleep(250); };
+  await unflash(); await loop();
+  ok(await hasSel(), "框出了选区"); ok(!(await flashed()), "门没闪"); ok(!(await dirty()), "不算有改动要存");
+  await page.keyboard.press("Control+c"); await sleep(300);
+  ok((await P(() => globalThis.__copied)) === 1, "Ctrl+C 收了（复制是读）");
+  await page.keyboard.press("Control+z"); await sleep(200);
+  ok(!(await hasSel()), "Ctrl+Z 撤掉了刚框的选区");
+  await unflash(); await page.keyboard.press("Control+z"); await sleep(200);
+  ok(await flashed(), "再往前是画面内容：不动，门闪一下");
+  await page.keyboard.press("Control+Shift+z"); await sleep(200);
+  ok((await hasSel()) && !(await P(() => globalThis.__wpProbe.canRedo())), "重做把选区带回来，而且只有这一步可重做（上一下没有偷偷撤掉一笔画）");
+  await page.keyboard.press("Control+d"); await sleep(150); ok(!(await hasSel()), "Ctrl+D 去选");
+  await page.keyboard.press("Control+a"); await sleep(150); ok(await hasSel(), "Ctrl+A 全选");
+  await unflash(); await page.keyboard.press("t"); await sleep(200);
+  ok(!(await P(() => globalThis.__wpProbe.floating())) && (await flashed()), "T（变换）不收，门闪一下");
+  await unflash(); await P(() => document.getElementById("lassoTransformBtn")?.click()); await sleep(200);
+  ok(!(await P(() => globalThis.__wpProbe.floating())) && (await flashed()), "点变换钮也不动");
+  await page.keyboard.press("Delete"); await sleep(150);
+  ok((await hasSel()) && !(await P(() => globalThis.__wpProbe.canRedo())), "Delete 不收（没有多出一步）");
+  ok(await P(() => getComputedStyle(document.getElementById("lassoTransformBtn")).opacity === "0.5" && getComputedStyle(document.getElementById("lassoDeselectBtn")).opacity === "1"), "套索条：变换钮淡了，去选钮没淡");
+  await page.keyboard.press("g"); await sleep(250);
+  ok((await P(() => globalThis.__wpProbe.tool())) === "fill" && (await P(() => document.getElementById("lassoFillCommitBtn").classList.contains("hidden"))), "切到油漆桶：不出 ✓（预览不摆出来）");
+  await unflash(); await stroke(10);
+  ok(await flashed(), "油漆桶在画布上点不动，门闪一下");
+  await page.keyboard.press("b"); await sleep(250);
+  ok(await hasSel(), "从油漆桶切到笔：选区还在（没落色、没替人清）");
+  ok(!(await dirty()) && drive.puts.length === puts1 && (await banners()).length === 0, "全程不脏、没有任何上传、没有报错横幅");
+  await page.locator('[data-notice-id="edit-lock"] button', { hasText: "接着改" }).first().click();
+  await page.waitForFunction(() => !globalThis.__wpProbe.editLocked()); await sleep(400); await settled();
+  ok(!(await dirty()), "只动过选区 → 解锁之后什么都不欠（还是干净的）");
+  await page.keyboard.press("Control+d"); await sleep(150);   // 收拾：别把选区带进后面的步骤
+  ok(!(await hasSel()), "解锁后去选");
+}
 
 console.log("⑥ 加星：这幅删不掉");
 ok(await P(async (f) => { const st = globalThis.__wpProbe.requireStore(); await st.files.star(f); try { await st.file(f, { mode: "existing" }).trash(); return false; } catch (e) { return e.name === "StarredError"; } }, full), "加了星的送回收站被库拒");

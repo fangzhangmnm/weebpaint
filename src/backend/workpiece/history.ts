@@ -5,6 +5,10 @@
 //     import 单整点、fill compound 的时序全靠它）；sealCheckpoint = 手势结束封口。
 //     嵌套 withPoint 骑外层令牌（openedHere 才有回滚权——内层失败 throw 给外层统一 cancel）。
 //   - undo/redo 门：顶端未封口 → 补封再翻；swap 抛异常 = 状态不可信 → 不可恢复协议。
+//   - **写门每一步都问**（2026-11-09）：开令牌时 begin 自己问；并进已经开着的令牌的微步（checkpoint:false 留开的 / 嵌套的）在这里补问——
+//     不然「先一个放行的操作留开令牌，后面不放行的搭车过门」。撤销 / 重做拿**要翻的那一步的标签**问：翻一步 = 再做一次那个操作的反面，
+//     让不让翻和让不让做是同一个答案。几个不同名字的微步并成的一步，标签 = 各名字用 + 连起来（「addLayer+liftFloat」）——
+//     它不等于其中任何一个单独的名字，门就不会把一个混着内容的步骤当成它开头那个操作放过去。
 //   - 不可恢复协议（宁丢历史不留半坏）：cancel 自身失败 / swap 中途失败 → 弃整栈 +
 //     onUnrecoverable（app 侧接 integrity 自愈 + 全量重绘 + error banner）。
 // 组件 verb 的记账/回滚本体在各 collector（ADR-0008）；本类只管令牌与栈的编排，不碰 DOM/i18n。
@@ -29,6 +33,7 @@ export class History {
   private _opts: HistoryOpts;
   private _wp: Workpiece | null = null;
   private _open: WriteToken | null = null;
+  private _openLabels: string[] = [];   // 开着的这个令牌并进来过的操作名（去重、按先后）；封口时连成这一步的标签
 
   constructor(opts: HistoryOpts) {
     this._opts = opts;
@@ -50,14 +55,16 @@ export class History {
   withPoint<T>(label: string | undefined, o: { checkpoint?: boolean; hint?: (dir: "undo" | "redo") => void } | undefined, fn: () => T): { ok: boolean; value?: T; msg?: string } {
     const wp = this._req();
     const openedHere = !this._open;
-    if (!this._open) this._open = wp.begin(label);
+    if (!this._open) { this._open = wp.begin(label); this._openLabels = []; }   // begin 自己问门
+    else wp.assertWritable(label);                                             // 并进开着的令牌：照样问（被拒 → 抛，嵌套的由外层回滚）
+    if (label !== undefined && !this._openLabels.includes(label)) this._openLabels.push(label);
     let value: T;
     try {
       value = fn();
     } catch (e) {
       if (openedHere) {
         const tok = this._open;
-        this._open = null;
+        this._open = null; this._openLabels = [];
         try { tok?.cancel(); }
         catch (e2) { this._unrecoverable(e2); }   // 回滚自身失败 → 不可恢复
       } else {
@@ -72,16 +79,19 @@ export class History {
   /** 手势结束：把开着的微步令牌封口。 */
   sealCheckpoint(): void { this._commitOpen(); }
 
-  undo(): boolean {
-    if (this._req().writeGate?.("undo")) return false;   // 这幅画锁着（2026-11-08）：撤销也是改，不动
-    this._commitOpen();                  // 顶端未封口 → 补封
-    try { return this.stack.undo(); }
-    catch (e) { this._unrecoverable(e); return false; }
+  undo(): boolean { return this._flip("undo"); }
+  redo(): boolean { return this._flip("redo"); }
+  /** 下一次撤销 / 重做要翻的是哪个操作（界面那一层预先问门用；没有可翻的 → undefined）。 */
+  peekLabel(dir: "undo" | "redo"): string | undefined {
+    if (dir === "undo" && this._open) return this._openLabel();   // 顶端还没封口的那一步
+    return this.stack.peekLabel(dir);
   }
-  redo(): boolean {
-    if (this._req().writeGate?.("redo")) return false;   // 同上
-    this._commitOpen();
-    try { return this.stack.redo(); }
+  private _flip(dir: "undo" | "redo"): boolean {
+    this._commitOpen();                  // 顶端未封口 → 补封（封口不是写：只是把已经做了的记进栈）
+    if (!(dir === "undo" ? this.stack.canUndo() : this.stack.canRedo())) return false;
+    // 这幅画锁着（2026-11-08）：翻一步也是改——拿要翻的那一步的标签问门（2026-11-09：看法类的步骤锁着也能翻，内容类的不动）。
+    if (this._req().writeGate?.(this.stack.peekLabel(dir))) return false;
+    try { return dir === "undo" ? this.stack.undo() : this.stack.redo(); }
     catch (e) { this._unrecoverable(e); return false; }
   }
 
@@ -92,7 +102,7 @@ export class History {
 
   /** 弃整栈（换文档/不可恢复）。开着的令牌弃置（不回滚——load 流里层可能已换血）。 */
   clear(): void {
-    if (this._open) { const t = this._open; this._open = null; t.abandon(); }
+    if (this._open) { const t = this._open; this._open = null; this._openLabels = []; t.abandon(); }
     this.stack.clear();
   }
 
@@ -103,11 +113,13 @@ export class History {
     return this._wp;
   }
 
+  private _openLabel(): string | undefined { return this._openLabels.length ? this._openLabels.join("+") : undefined; }
+
   private _commitOpen(hint?: (dir: "undo" | "redo") => void): void {
     if (!this._open) return;
-    const t = this._open;
-    this._open = null;
-    t.commit(hint ? { hint } : undefined);
+    const t = this._open, label = this._openLabel();
+    this._open = null; this._openLabels = [];
+    t.commit({ label, hint });
   }
 
   private _translateApplied(step: UndoStep, dir: "undo" | "redo"): void {
@@ -116,7 +128,7 @@ export class History {
   }
 
   private _unrecoverable(e: unknown): void {
-    if (this._open) { const t = this._open; this._open = null; try { t.abandon(); } catch { /* 已不可信 */ } }
+    if (this._open) { const t = this._open; this._open = null; this._openLabels = []; try { t.abandon(); } catch { /* 已不可信 */ } }
     this.stack.clear();
     if (!this._opts.onUnrecoverable) throw e instanceof Error ? e : new Error(String(e));
     this._opts.onUnrecoverable(e);

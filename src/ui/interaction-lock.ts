@@ -16,8 +16,11 @@
 //         连视口导航都不许（遮罩本来就盖着；放行只会制造「遮罩下面还能动」的假象）。修饰键清位永远放行（清位≠动作）。
 //   readonly = 「你只能看」——读操作全放：导航 / 吸色 / 复制 / 导出（png/psd/剪贴板）/ 开菜单面板说明书 / 视图·工具·
 //         窗格·笔粗类快捷键；写操作全禁：落笔 / 粘贴 / 任何改 doc 的命令 / 保存·上传·改名·删除·加密 / 编辑·套索类快捷键
-//         （套索类含变换·填充·删除·选区操作，保守整类禁——选区虽不落 ora，但它是通往写像素的门口）。
+//         （套索类按条分：2026-11-09 起每个动作自带 op，查 src/edit-lock-table.ts——画选区 / 全选 / 反选 / 去选是「看法」放行，
+//          变换 · 填充 · 删除是内容照禁。09-02 那版是「保守整类禁」，理由是选区是通往写像素的门口；现在门口后面每一步各有各的闸。）
 //   ⚠ readonly 的「护栏不写 ora」不在这里——这是 UI 层一片奶酪；持久化层 / workbench 层的护栏另做（park）。
+
+import { isLookOp } from "../edit-lock-table.ts";   // 修改锁的分类表（零依赖的叶子模块）：readonly 这一行的「看法」例外查它
 
 export type LockKind = "busy" | "readonly" | "gate";
 export type Intent =
@@ -36,7 +39,12 @@ export type Intent =
   | "gate"               // sync gate 决策（keep / pull / branch）——设计上必须穿透 busy
   | "notice";            // 通知关闭
 
-export interface IntentCtx { shortcutCategory?: string }
+export interface IntentCtx {
+  shortcutCategory?: string;
+  /** 这个动作要做的操作（= 写令牌的标签；src/edit-lock-table.ts 那张表的键）。只对 readonly 有意义：
+   *  表里列为「看法」的操作，锁着也放行（2026-11-09：选区、图层可见性）。没给 = 按下面的静态表。 */
+  op?: string;
+}
 
 /** readonly 放行的快捷键类（KEYBOARD_SHORTCUTS 的 category i18n key）。 */
 export const READONLY_SHORTCUT_CATEGORIES = new Set(["sc.cat.view", "sc.cat.tools", "sc.cat.panels", "sc.cat.size"]);
@@ -63,8 +71,11 @@ const POLICY: Record<LockKind, Record<Intent, boolean>> = {
   },
 };
 
-/** 纯函数：某把锁对某意图放不放行（可测；readonly 的快捷键按类）。 */
+/** 纯函数：某把锁对某意图放不放行（可测）。
+ *  readonly = 静态表（读的都放）**加上一条**：这个动作要做的操作在分类表里是「看法」→ 放（指针画选区、选区类快捷键…）。
+ *  「看法」只会多放、不会多拦；busy / gate 不看 op（那两把锁在场时什么都不该动）。 */
 export function policyAllows(kind: LockKind, intent: Intent, ctx: IntentCtx = {}): boolean {
+  if (kind === "readonly" && isLookOp(ctx.op)) return true;
   const base = POLICY[kind][intent];
   if (!base) return false;
   if (kind === "readonly" && intent === "key:shortcut" && ctx.shortcutCategory !== undefined) {
@@ -121,7 +132,8 @@ export function assertAllows(intent: Intent, what: string): void {
 }
 export function onLockChange(fn: () => void): () => void { _listeners.add(fn); return () => _listeners.delete(fn); }
 
-/** pointer role（pointer-route.assignRole 的产物）→ intent。ignore/null = 不需要许可。 */
+/** pointer role（pointer-route.assignRole 的产物）→ intent。ignore/null = 不需要许可。
+ *  lasso 这个 role 底下有三种事（画选区 / 拖浮层 / 油漆桶落色），intent 一律是 pointer:draw——细分靠调用方另给的 op（input.ts pointerOp）。 */
 export function intentForPointerRole(role: string | null): Intent | null {
   switch (role) {
     case "draw": case "erase": case "fill": case "filterBrush": case "lasso": return "pointer:draw";

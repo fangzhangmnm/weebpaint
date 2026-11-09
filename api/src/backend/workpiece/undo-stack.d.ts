@@ -53,6 +53,8 @@ export declare class UndoStack {
     redo(): boolean;
     canUndo(): boolean;
     canRedo(): boolean;
+    /** 下一次 undo / redo 要翻的那一步的标签（没有可翻的 / 那一步没带标签 → undefined）。只读，给写门按操作分类用。 */
+    peekLabel(dir: "undo" | "redo"): string | undefined;
     /** 游标位置身份 = stateVersion（栈底 = _baseId，初始 0）。 */
     cursorStepId(): number;
     /** 栈内步数（驱逐观测/调试）。 */

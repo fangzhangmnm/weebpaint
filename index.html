@@ -73,7 +73,7 @@
     <link rel="icon" href="./icon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png" />
-    <link rel="stylesheet" href="./styles.css?v=fe7eb2217f12" />
+    <link rel="stylesheet" href="./styles.css?v=727ab350654b" />
     <!-- @internal/gallery 0.8.5 的皮（vendor/internal-css/gallery.css，收货时 cp 包的 src/gallery.css，别手改）：排在 styles.css 之后，同名规则以包为准 -->
     <link rel="stylesheet" href="./vendor/internal-css/gallery.css" />
     <!-- @internal/workbench-elements 0.1.3 的皮（popup-menu / notice / 菜单面板；收货时 cp 包的 src/workbench-elements.css，别手改） -->
@@ -740,30 +740,30 @@
           <button class="lasso-tool-btn lasso-tool-icon hidden" id="lassoConstrainBtn" type="button" data-i18n-title="la.constrain" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#constrain-ratio"/></svg></button>
           <!-- v0.7.39 上下文互斥双钮共享一个槽位（user：全选只在无选区时显、反选提出 ⋯ 只在有选区时显）
                —— 同槽互斥 → Row1 不加宽（iPad 宽度敏感区）。快捷键 Ctrl+A / Ctrl+Shift+I 点这里。 -->
-          <button class="lasso-tool-btn lasso-tool-icon hidden" id="lassoRow1SelectAllBtn" type="button" data-i18n-title="la.selectAll"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#select-all"/></svg></button>
-          <button class="lasso-tool-btn lasso-tool-icon hidden" id="lassoRow1InvertBtn" type="button" data-i18n-title="la.invert"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#selection-invert"/></svg></button>
+          <button class="lasso-tool-btn lasso-tool-icon hidden" id="lassoRow1SelectAllBtn" data-op="selection" type="button" data-i18n-title="la.selectAll"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#select-all"/></svg></button>
+          <button class="lasso-tool-btn lasso-tool-icon hidden" id="lassoRow1InvertBtn" data-op="selection" type="button" data-i18n-title="la.invert"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#selection-invert"/></svg></button>
           <!-- v0.5.12 行尾动作组：变换（选区工具）/ ⋯（低频操作收纳）/ 去选（高频，=fill 的 cancel）/ ✓（fill） -->
-          <button class="lasso-tool-btn lasso-tool-icon" id="lassoTransformBtn" type="button" title="变换 / 移动" data-i18n-title="la.transformMove"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#free-transform"/></svg></button>
+          <button class="lasso-tool-btn lasso-tool-icon" id="lassoTransformBtn" data-op="content" type="button" title="变换 / 移动" data-i18n-title="la.transformMove"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#free-transform"/></svg></button>
           <!-- v0.6.24：油漆桶 toggle 退役——fill 升顶栏组槽一等工具 -->
           <!-- v0.6.19：清除选区内像素从 ⋯ 提到 Row1（user 重排：…transform, bucket, clear-pixels, ⋯, deselect） -->
-          <button class="lasso-tool-btn lasso-tool-icon hidden" id="lassoClearBtn" type="button" data-i18n-title="la.clearPixels"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#clear-document"/></svg></button>
+          <button class="lasso-tool-btn lasso-tool-icon hidden" id="lassoClearBtn" data-op="content" type="button" data-i18n-title="la.clearPixels"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#clear-document"/></svg></button>
           <!-- v0.9.22 合并复制常驻钮（human 拍板；spec 20260819）：合成图∩选区→剪贴板；
                兼作 Ctrl+Shift+C 被浏览器吞时的兜底。图标=中文「合」stopgap（已登记 SVG Icons/TODO.md 待美工） -->
           <button class="lasso-tool-btn lasso-tool-icon" id="lassoCopyMergedBtn" type="button" data-i18n-title="la.copyMerged"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#copy-picture"/></svg></button>
           <button class="lasso-tool-btn lasso-tool-icon" id="lassoSelEditBtn" type="button" data-i18n-title="la.more" aria-haspopup="true">
             <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#more"/></svg>
           </button>
-          <button class="lasso-tool-btn lasso-tool-icon lasso-tool-cancel" id="lassoDeselectBtn" type="button" data-i18n-title="la.deselect" aria-label="取消选区">
+          <button class="lasso-tool-btn lasso-tool-icon lasso-tool-cancel" id="lassoDeselectBtn" data-op="selection" type="button" data-i18n-title="la.deselect" aria-label="取消选区">
             <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#selection-clear"/></svg>
           </button>
-          <button class="lasso-tool-btn lasso-tool-confirm lasso-tool-icon hidden" id="lassoFillCommitBtn" type="button" data-i18n-title="fm.commit"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#check"/></svg></button>
+          <button class="lasso-tool-btn lasso-tool-confirm lasso-tool-icon hidden" id="lassoFillCommitBtn" data-op="content" type="button" data-i18n-title="fm.commit"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#check"/></svg></button>
         </div>
       </div>
       <!-- Row 2: 选区操作 / 变换控制 -->
       <div class="lasso-toolbar hidden" id="lassoToolbarRow2">
         <!-- v0.5.12：selectionActions 段退役——变换/✓ 进 Row1 行尾，清除/复制/移层收进 ⋯ 菜单，
              row2 只剩浮层变换控制（floating 时显）。选区/填充各自单排。 -->
-        <div class="lasso-section hidden" id="lassoTransformCtrl">
+        <div class="lasso-section hidden" id="lassoTransformCtrl" data-op="content">
           <!-- v0.10.14 user：等比缩放排到自由变换前面（JS 按 data-lasso-mode 绑定，DOM 顺序安全） -->
           <button class="lasso-tool-btn lasso-tool-icon" data-lasso-mode="uniform" type="button" title="等比缩放" data-i18n-title="la.tfUniform"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#scale-uniform"/></svg></button>
           <button class="lasso-tool-btn lasso-tool-icon" data-lasso-mode="free" type="button" title="自由变换" data-i18n-title="la.tfFree"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#scale-free"/></svg></button>
@@ -805,23 +805,23 @@
       <!-- v0.9.22 剪贴板正宫化（spec 20260819）：复制/剪切/粘贴入 ⋯（合并复制在 Row1 常驻钮）。
            不带 needs-sel：无选区时 copy/cut=整层、paste 恒可用。剪切图标=中文「剪」stopgap（已登记待美工） -->
       <button class="lasso-tool-btn" id="lassoCopyClipBtn" data-sel-act="copy" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#copy"/></svg><span data-i18n="la.copyClip">复制到剪贴板</span></button>
-      <button class="lasso-tool-btn" id="lassoCutClipBtn" data-sel-act="cut" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#cut"/></svg><span data-i18n="la.cutClip">剪切到剪贴板</span></button>
-      <button class="lasso-tool-btn" id="lassoPasteClipBtn" data-sel-act="paste" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#clipboard"/></svg><span data-i18n="la.pasteClip">粘贴为新层</span></button>
+      <button class="lasso-tool-btn" id="lassoCutClipBtn" data-op="content" data-sel-act="cut" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#cut"/></svg><span data-i18n="la.cutClip">剪切到剪贴板</span></button>
+      <button class="lasso-tool-btn" id="lassoPasteClipBtn" data-op="content" data-sel-act="paste" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#clipboard"/></svg><span data-i18n="la.pasteClip">粘贴为新层</span></button>
       <!-- v0.7.38 从当前图层 alpha 建选区（替换语义）；不带 needs-sel——要的是活动层不是选区 -->
-      <button class="lasso-tool-btn" id="lassoFromLayerBtn" data-sel-act="fromLayer" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#layers-stack"/></svg><span data-i18n="la.fromLayerShort">从图层建选区</span></button>
-      <button class="lasso-tool-btn lasso-menu-needs-sel" id="lassoSelResizeBtn" data-sel-act="resize" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#selection-expand"/></svg><span data-i18n="la.resizeShort">扩张 / 收缩…</span></button>
-      <button class="lasso-tool-btn lasso-menu-needs-sel" id="lassoDuplicateBtn" data-sel-act="dup" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#copy"/></svg><span data-i18n="la.duplicate">复制选区到新层</span></button>
-      <button class="lasso-tool-btn lasso-menu-needs-sel" id="lassoMoveToLayerBtn" data-sel-act="move" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#move-to-file"/></svg><span data-i18n="la.moveToLayer">选区移动到新层</span></button>
+      <button class="lasso-tool-btn" id="lassoFromLayerBtn" data-op="selection" data-sel-act="fromLayer" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#layers-stack"/></svg><span data-i18n="la.fromLayerShort">从图层建选区</span></button>
+      <button class="lasso-tool-btn lasso-menu-needs-sel" id="lassoSelResizeBtn" data-op="selection" data-sel-act="resize" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#selection-expand"/></svg><span data-i18n="la.resizeShort">扩张 / 收缩…</span></button>
+      <button class="lasso-tool-btn lasso-menu-needs-sel" id="lassoDuplicateBtn" data-op="content" data-sel-act="dup" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#copy"/></svg><span data-i18n="la.duplicate">复制选区到新层</span></button>
+      <button class="lasso-tool-btn lasso-menu-needs-sel" id="lassoMoveToLayerBtn" data-op="content" data-sel-act="move" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#move-to-file"/></svg><span data-i18n="la.moveToLayer">选区移动到新层</span></button>
       <!-- （v0.7.38「送入填色」2026-09-09 退役：ADR-0004 修订 6 起切到油漆桶自动携入选区） -->
       <!-- v0.7.40 蚂蚁线 toggle（selection 侧，管 lassoTool.showAnts；fill 侧那颗管 fillTool——per-tool 分家） -->
       <button class="lasso-tool-btn" id="lassoSelAntsBtn" type="button" role="menuitem" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#select-rectangle"/></svg><span data-i18n="la.antsToggle">蚂蚁线</span></button>
     </div>
     <div class="lasso-icon-menu lasso-icon-list hidden" id="fillSelEditMenu" role="menu" data-i18n-aria="la.editSel">
       <!-- v0.7.38 从当前图层 alpha 建选区（fill 里同样有用：整层填充/换色工作流） -->
-      <button class="lasso-tool-btn" id="fillFromLayerBtn" data-sel-act="fromLayer" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#layers-stack"/></svg><span data-i18n="la.fromLayerShort">从图层建选区</span></button>
-      <button class="lasso-tool-btn lasso-menu-needs-sel" id="fillSelResizeBtn" data-sel-act="resize" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#selection-expand"/></svg><span data-i18n="la.resizeShort">扩张 / 收缩…</span></button>
-      <button class="lasso-tool-btn lasso-menu-needs-sel" id="fillDuplicateBtn" data-sel-act="dup" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#copy"/></svg><span data-i18n="la.duplicate">复制选区到新层</span></button>
-      <button class="lasso-tool-btn lasso-menu-needs-sel" id="fillMoveToLayerBtn" data-sel-act="move" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#move-to-file"/></svg><span data-i18n="la.moveToLayer">选区移动到新层</span></button>
+      <button class="lasso-tool-btn" id="fillFromLayerBtn" data-op="selection" data-sel-act="fromLayer" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#layers-stack"/></svg><span data-i18n="la.fromLayerShort">从图层建选区</span></button>
+      <button class="lasso-tool-btn lasso-menu-needs-sel" id="fillSelResizeBtn" data-op="selection" data-sel-act="resize" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#selection-expand"/></svg><span data-i18n="la.resizeShort">扩张 / 收缩…</span></button>
+      <button class="lasso-tool-btn lasso-menu-needs-sel" id="fillDuplicateBtn" data-op="content" data-sel-act="dup" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#copy"/></svg><span data-i18n="la.duplicate">复制选区到新层</span></button>
+      <button class="lasso-tool-btn lasso-menu-needs-sel" id="fillMoveToLayerBtn" data-op="content" data-sel-act="move" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#move-to-file"/></svg><span data-i18n="la.moveToLayer">选区移动到新层</span></button>
       <!-- 蚂蚁线 toggle：fill 专属（ADR-0004 修订；选区菜单不再出现——v0.6.30 分家） -->
       <button class="lasso-tool-btn" id="lassoAntsBtn" type="button" role="menuitem" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#select-rectangle"/></svg><span data-i18n="la.antsToggle">蚂蚁线</span></button>
     </div>
@@ -907,7 +907,7 @@
     </div>
 
     <!-- v242 选区扩张/收缩 modal：走 adjust 逻辑（transient + 实时预览），数字输入 -->
-    <div class="lasso-popup hidden" id="lassoSelOpPopup" role="dialog" data-i18n-aria="la.expandShrink">
+    <div class="lasso-popup hidden" id="lassoSelOpPopup" data-op="selection" role="dialog" data-i18n-aria="la.expandShrink">
       <div class="lasso-popup-row" style="grid-template-columns: auto auto 1fr auto auto; gap:6px;">
         <button class="lasso-tool-btn lasso-tool-icon" id="lassoSelOpExpandBtn" type="button" data-i18n-title="la.expand"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#selection-expand"/></svg></button>
         <button class="lasso-tool-btn lasso-tool-icon" id="lassoSelOpShrinkBtn" type="button" data-i18n-title="la.shrink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2.5"/><rect x="8" y="8" width="8" height="8" rx="1.5" stroke-dasharray="3 2"/></svg></button>
@@ -1060,7 +1060,7 @@
       <div class="layers-list" id="layersList"><!-- rows rendered by JS --></div>
       <!-- v267 (user) 指令栏：+（弹菜单：新图层 / 导入图片到新层） · 上移 · 下移 · 删除。
            （user 改主意：加号重新弹菜单——本轮明确要求；导入图片收进菜单不再占独立按钮） -->
-      <div class="layers-foot">
+      <div class="layers-foot" data-op="content">
         <button class="layers-foot-btn" id="layerAddBtn" type="button" data-i18n-title="lp.foot.add" aria-label="新建 / 导入" aria-haspopup="true">
           <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#new"/></svg>
         </button>
@@ -1082,7 +1082,7 @@
       <!-- #13 右下角调大小手柄（纯 CSS 斜纹，非图标） -->
       <div class="float-panel-resize" id="layersPanelResize" aria-hidden="true"></div>
       <!-- "+" 弹出菜单：新图层 / 新建图层组(空) / 导入图片到新层（layerImportPhotoBtn 仍由 import-image 接线） -->
-      <div class="menu-panel layer-add-popup hidden" id="layerAddPopup" role="menu">
+      <div class="menu-panel layer-add-popup hidden" id="layerAddPopup" data-op="content" role="menu">
         <button class="menu-item menu-item-with-icon" id="layerAddNewBtn" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#new"/></svg><span class="menu-item-label" data-i18n="sub.newLayer">新图层</span></button>
         <button class="menu-item menu-item-with-icon" id="layerAddGroupBtn" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#create-folder"/></svg><span class="menu-item-label" data-i18n="lp.foot.newGroup">新建图层组</span></button>
         <!-- v0.5.19（user）：导入从主菜单收编——文件/剪贴板两条，落在当前图层上方同级（_insertAtActive） -->
@@ -1116,7 +1116,7 @@
     <!-- Adjustments popup：液化 / 颜色调整。学 Procreate adjustments icon
          v114: 裁切 / 重采样 挪进主菜单「画布」区 (user：「裁切丢到文件目录里，而不是调整目录里」) -->
     <!-- v132 调整 popup 完全 JS 渲染（3 组 hr 分隔）：调色 / 笔刷类 / 艺术滤镜 -->
-    <div class="adjust-popup menu-panel hidden" id="adjustPopup" role="menu">
+    <div class="adjust-popup menu-panel hidden" id="adjustPopup" data-op="content" role="menu">
       <div id="adjustFilterList"><!-- 由 app.js _renderFilterMenu 填 --></div>
     </div>
 
@@ -1207,8 +1207,8 @@
     <!-- v110 颜色调整面板（沿用 .float-panel 拖标题模式）
          v131 (user：「先把调色做了」) refactor → 通用 filter 平台：
          body 改成空容器，JS 按 filter 类型动态填（HSB / 色彩平衡 / Curves / 锐化模糊） -->
-    <div class="float-panel adjust-panel hidden" id="adjustPanel">
-      <div class="float-panel-head" id="adjustPanelHead">
+    <div class="float-panel adjust-panel hidden" id="adjustPanel" data-op="content">
+      <div class="float-panel-head" id="adjustPanelHead" data-op="view">
         <span class="float-panel-title" id="adjustPanelTitle">颜色调整</span>
         <button class="float-panel-close" id="adjustPanelClose" type="button" data-i18n-aria="common.close.aria"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#x"/></svg></button>
       </div>
@@ -1221,12 +1221,12 @@
         </div>
       </div>
       <!-- 2026-09-06 整窗可拖大（user「resize curves window」）：只在声明了 onBodyResize 的滤镜（曲线）露出，见 .adjust-panel.resizable -->
-      <div class="float-panel-resize" id="adjustPanelResize" aria-hidden="true"></div>
+      <div class="float-panel-resize" id="adjustPanelResize" data-op="view" aria-hidden="true"></div>
     </div>
 
     <!-- v110 自由裁切：toolbar (8-handle crop) -->
     <!-- 2026-09-06 U1：裁切条换 .lasso-toolbar-stack 皮（与套索/形状/滤镜笔同位同高），控件 id 不变 -->
-    <div class="lasso-toolbar-stack hidden" id="cropToolbar" role="toolbar">
+    <div class="lasso-toolbar-stack hidden" id="cropToolbar" data-op="content" role="toolbar">
       <div class="lasso-toolbar">
       <button class="lasso-tool-btn lasso-tool-icon" id="cropModeFree" type="button" aria-pressed="true" data-i18n-title="crop.modeFree"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#crop"/></svg></button>
       <button class="lasso-tool-btn lasso-tool-icon" id="cropModeTemplate" type="button" aria-pressed="false" data-i18n-title="crop.modeTemplate"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#crop-fixed-size"/></svg></button>
@@ -1241,7 +1241,7 @@
       <button class="lasso-tool-btn lasso-tool-icon hidden" id="cropResampleToggle" type="button" aria-pressed="false" data-i18n-title="crop.resample"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#resample"/></svg></button>
       <span class="ct-sep" aria-hidden="true">|</span>
       <button class="lasso-tool-btn lasso-tool-icon" id="cropToolbarApply" type="button" data-i18n-title="crop.apply"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#check"/></svg></button>
-      <button class="lasso-tool-btn lasso-tool-icon crop-toolbar-cancel" id="cropToolbarCancel" type="button" data-i18n-title="common.cancel"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#x"/></svg></button>
+      <button class="lasso-tool-btn lasso-tool-icon crop-toolbar-cancel" id="cropToolbarCancel" data-op="view" type="button" data-i18n-title="common.cancel"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#x"/></svg></button>
     </div>
     </div>
 
@@ -1340,16 +1340,16 @@
       </button>
       </div>
       <div class="menu-page hidden" data-menu-page="canvas">
-        <button class="menu-item menu-item-with-icon" id="menuCrop" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#crop"/></svg>
+        <button class="menu-item menu-item-with-icon" id="menuCrop" data-op="content" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#crop"/></svg>
         <span class="menu-item-label" id="menuCropLabel">裁切</span>
       </button>
-        <button class="menu-item menu-item-with-icon" id="menuFlipH" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#flip-horizontal"/></svg>
+        <button class="menu-item menu-item-with-icon" id="menuFlipH" data-op="content" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#flip-horizontal"/></svg>
         <span class="menu-item-label" data-i18n="menu.flipH">水平翻转</span>
       </button>
-        <button class="menu-item menu-item-with-icon" id="menuRotate90" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#rotate-ccw"/></svg>
+        <button class="menu-item menu-item-with-icon" id="menuRotate90" data-op="content" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#rotate-ccw"/></svg>
         <span class="menu-item-label" data-i18n="menu.rotate90">逆时针旋转 90°</span>
       </button>
-        <button class="menu-item menu-item-with-icon" id="menuOffset" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#offset-wrap"/></svg>
+        <button class="menu-item menu-item-with-icon" id="menuOffset" data-op="content" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#offset-wrap"/></svg>
         <span class="menu-item-label" data-i18n="menu.offset">偏移接缝（环绕）…</span>
       </button>
         <button class="menu-item menu-item-with-icon" id="adjustResample" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#scale-uniform"/></svg>
@@ -1555,6 +1555,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-eb3f1991d76b.mjs"></script>
+    <script type="module" src="./dist/weebpaint-f290232fe11c.mjs"></script>
   </body>
 </html>

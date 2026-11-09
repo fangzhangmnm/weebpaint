@@ -3,6 +3,7 @@ import { LassoEngine } from "./lasso.ts";
 import { FilterBrushEngine } from "./filter-brush.ts";
 import { ShapeBrushEngine } from "./shape-brush.ts";
 import { PressureProbe } from "./pressure-probe.ts";
+import { type Intent } from "./ui/interaction-lock.ts";
 import type { GestureViewport, TapRef } from "./common/pointer-gesture.ts";
 import type { PaintingView, ViewLeaf } from "./backend/workpiece/painting-view.ts";
 import type { Board } from "./board.ts";
@@ -85,6 +86,11 @@ interface KeyboardShortcut {
     category: string;
     when?: (i: InputController) => boolean;
     run: (i: InputController) => void;
+    /** 修改锁（2026-11-09）：这条快捷键做的是哪个**操作**（= 写令牌的标签，src/edit-lock-table.ts 的键）。表里列为「看法」的，这幅画锁着也收。
+     *  函数形 = 现算（撤销 / 重做：看要翻的是哪一步）。没写 = 按 category 的老规矩（编辑 / 套索类锁着不收）。 */
+    op?: string | ((i: InputController) => string | undefined);
+    /** 这条快捷键其实是另一种意图（复制 = 读）：按那个意图问交互锁，不按快捷键的类。 */
+    intent?: Intent;
 }
 export declare const KEYBOARD_SHORTCUTS: KeyboardShortcut[];
 export declare class InputController {

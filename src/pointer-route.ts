@@ -26,6 +26,15 @@ export function toolToRole(et: string): string {
   }
 }
 
+// 这一下指针要做的**操作**（修改锁的分类表按它查，src/edit-lock-table.ts；2026-11-09）。
+//   lasso 这个 role 底下其实有三种事：套索工具在画选区（看法，锁着也能做）/ 拖浮着的那块（变换，内容）/ 油漆桶（选区一出来就是待落的色，内容）。
+//   别的 role 不细分：undefined = 按意图的静态表（落笔 / 擦 / 滤镜笔 = 内容；平移 / 吸色 = 读）。返回值是写令牌的标签，和真去写的时候用的是同一个词。
+export function pointerOp(role: string | null, tool: string, floating: boolean): string | undefined {
+  if (role !== "lasso") return undefined;
+  if (floating) return "floatTransform";
+  return effectiveTool(tool, false) === "lasso" ? "selection" : "fill";
+}
+
 export interface PointerDownInput {
   tool: string;
   pointerType: string;       // 'mouse' | 'pen' | 'touch'

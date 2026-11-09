@@ -28,9 +28,9 @@ import { FilterBrushEngine } from "./filter-brush.ts";
 import { ShapeBrushEngine } from "./shape-brush.ts";   // 形状笔引擎（ADR-0005；2026-09-18 回滚复活——ADR-0013 几何 extension 已删）
 import { isPixelStroke, pixelStrokeSpec } from "./engine-registry.ts";
 import { computePinchViewport, snapRotation, isTap, isDoubleTap, gestureTapAction } from "./common/pointer-gesture.ts";
-import { assignRole, effectiveTool, toolToRole, strokeMode, eraserTapOnRelease } from "./pointer-route.ts";
+import { assignRole, effectiveTool, toolToRole, strokeMode, eraserTapOnRelease, pointerOp } from "./pointer-route.ts";
 import { PressureProbe, sampleFromPointerEvent, isWindowsPlatform } from "./pressure-probe.ts";   // 2026-09-02 压感自诊（pen-flat / absolute-mouse）
-import { allows, intentForPointerRole } from "./ui/interaction-lock.ts";   // 2026-09-02 C8：拦什么由交互锁一处回答（busy/只读同一把锁）
+import { allows, intentForPointerRole, type Intent } from "./ui/interaction-lock.ts";   // 2026-09-02 C8：拦什么由交互锁一处回答（busy/只读同一把锁）
 import { inputSmooth } from "./stroke-input-smooth.ts";
 import { t } from "./i18n/index.ts";
 import { SMOOTH } from "./smooth-config.ts";
@@ -129,6 +129,11 @@ interface KeyboardShortcut {
   category: string;
   when?: (i: InputController) => boolean;
   run: (i: InputController) => void;
+  /** 修改锁（2026-11-09）：这条快捷键做的是哪个**操作**（= 写令牌的标签，src/edit-lock-table.ts 的键）。表里列为「看法」的，这幅画锁着也收。
+   *  函数形 = 现算（撤销 / 重做：看要翻的是哪一步）。没写 = 按 category 的老规矩（编辑 / 套索类锁着不收）。 */
+  op?: string | ((i: InputController) => string | undefined);
+  /** 这条快捷键其实是另一种意图（复制 = 读）：按那个意图问交互锁，不按快捷键的类。 */
+  intent?: Intent;
 }
 
 const TAP_MAX_DURATION = 220;
@@ -203,20 +208,22 @@ function _hasSelectionIdle(i: InputController) {
 
 export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   // 编辑（任何时候都该 work，除了 gallery 单 modal）
-  { combo: "Ctrl+Z",           desc: "sc.undo",     category: "sc.cat.edit",
+  //   修改锁：撤销 / 重做翻的是哪个操作就按哪个操作算——锁着时能翻自己刚动的选区、图层可见性，翻到画面内容那一步就停（History 那头是同一个判断）。
+  { combo: "Ctrl+Z",           desc: "sc.undo",     category: "sc.cat.edit", op: (i) => i.history?.peekLabel("undo"),
     when: _editMode, run: (i) => i.ctrlZ() },
-  { combo: "Ctrl+Shift+Z",     desc: "sc.redo",     category: "sc.cat.edit",
+  { combo: "Ctrl+Shift+Z",     desc: "sc.redo",     category: "sc.cat.edit", op: (i) => i.history?.peekLabel("redo"),
     when: _editMode, run: (i) => i.redo() },
-  { combo: "Ctrl+Y",           desc: "sc.redo",     category: "sc.cat.edit",
+  { combo: "Ctrl+Y",           desc: "sc.redo",     category: "sc.cat.edit", op: (i) => i.history?.peekLabel("redo"),
     when: _editMode, run: (i) => i.redo() },
   // v156 剪贴板：逻辑在 selection-ops → run 派发 window 事件。
   //   copy/cut：when=_editMode（不查选区）→ 始终匹配以 preventDefault，挡掉浏览器原生 copy/cut；run 内部再决定。
   // v0.9.22 剪贴板正宫化（spec ai-docs/20260819-clipboard-and-local-file-spec.md）：
   //   合并复制 Ctrl+Shift+C（真机验证项：Google Docs 先例预期标签页可拦；翻车则双击 Ctrl+C 独挑）+
   //   双击 Ctrl+C 升级（selection-ops 判窗）+ Ctrl+X 剪切。
-  { combo: "Ctrl+Shift+C",     desc: "sc.copyMergedClip", category: "sc.cat.edit",
+  //   修改锁：复制是读——按 copy 这个意图问（锁着照常；busy / 闸门开着照旧不收）。
+  { combo: "Ctrl+Shift+C",     desc: "sc.copyMergedClip", category: "sc.cat.edit", intent: "copy",
     when: _editMode, run: () => window.dispatchEvent(new CustomEvent("wp:copyMerged")) },
-  { combo: "Ctrl+C",           desc: "sc.copyClip", category: "sc.cat.edit",
+  { combo: "Ctrl+C",           desc: "sc.copyClip", category: "sc.cat.edit", intent: "copy",
     when: _editMode, run: () => window.dispatchEvent(new CustomEvent("wp:copy")) },
   { combo: "Ctrl+C ×2",        desc: "sc.copyMergedDouble", category: "sc.cat.edit",
     when: () => false, run: () => {} },   // display-only：双击判定在 wp:copy 处理器里
@@ -261,26 +268,27 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     when: _floating, run: (i) => { i.lasso.nudgeFloat(0, -10); i.board.invalidateAll(); } },
   { combo: "Shift+ArrowDown",  desc: "sc.nudgeFloat10", category: "sc.cat.lasso",
     when: _floating, run: (i) => { i.lasso.nudgeFloat(0, 10); i.board.invalidateAll(); } },
-  { combo: "Escape",           desc: "sc.polygonCancel", category: "sc.cat.lasso",
+  //   修改锁：下面六条只动选区（op: "selection" = 看法）——锁着也收。变换 / 浮层那几条没标，锁着照旧不收。
+  { combo: "Escape",           desc: "sc.polygonCancel", category: "sc.cat.lasso", op: "selection",
     when: (i) => i.lasso.polygonSessionActive() && !_floating(i),
     run: (i) => { i.lasso.polygonCancelSession(); i.board.requestRender(); } },
-  { combo: "Enter",            desc: "sc.polygonClose", category: "sc.cat.lasso",
+  { combo: "Enter",            desc: "sc.polygonClose", category: "sc.cat.lasso", op: "selection",
     when: (i) => i.lasso.polygonSessionActive() && !_floating(i),
     run: (i) => i._polygonClose() },
-  { combo: "Escape",           desc: "sc.deselect", category: "sc.cat.lasso",
+  { combo: "Escape",           desc: "sc.deselect", category: "sc.cat.lasso", op: "selection",
     when: _hasSelectionIdle,
     run: (i) => {
       i._pushSelEntry(i.lasso.setSelection(null));
       i.board.invalidateAll();
     },
   },
-  { combo: "Ctrl+A",           desc: "sc.selectAll",     category: "sc.cat.lasso",
+  { combo: "Ctrl+A",           desc: "sc.selectAll",     category: "sc.cat.lasso", op: "selection",
     when: (i) => _editMode(i) && !_floating(i),
     run: () => document.getElementById("lassoRow1SelectAllBtn")?.click() },   // v0.7.39 全选提出 ⋯ 成 Row1 钮
-  { combo: "Ctrl+D",           desc: "sc.deselect", category: "sc.cat.lasso",
+  { combo: "Ctrl+D",           desc: "sc.deselect", category: "sc.cat.lasso", op: "selection",
     when: (i) => _editMode(i) && !_floating(i),
     run: () => document.getElementById("lassoDeselectBtn")?.click() },
-  { combo: "Ctrl+Shift+I",     desc: "sc.invert",     category: "sc.cat.lasso",
+  { combo: "Ctrl+Shift+I",     desc: "sc.invert",     category: "sc.cat.lasso", op: "selection",
     when: (i) => _editMode(i) && !_floating(i),
     run: () => document.getElementById("lassoRow1InvertBtn")?.click() },   // v0.7.39 反选提出 ⋯ 成 Row1 钮
   // v156 变换 / 复制为浮层（都需选区 + 非浮层；run 内部再查选区）
@@ -600,7 +608,8 @@ export class InputController {
       singleFingerDraw: this.getSingleFingerDraw(),
     });
     // 交互锁（2026-09-02 C8）：busy 期遮罩几何上挡 pointer，这里是结构性的第二道（遮罩下面/只读模式都不靠几何）
-    { const intent = intentForPointerRole(role); if (intent && !allows(intent)) { e.preventDefault(); return; } }
+    //   修改锁（2026-11-09）：同一个 lasso role 底下「画选区」是看法、锁着也能做，「拖浮层 / 油漆桶」是内容——把这一下要做的操作一并交给交互锁查表。
+    { const intent = intentForPointerRole(role); if (intent && !allows(intent, { op: pointerOp(role, tool, this.lasso.state() === "floating") })) { e.preventDefault(); return; } }
 
     const now = performance.now();
     const rec: PointerRec = {
@@ -1539,7 +1548,9 @@ export class InputController {
     for (const sc of KEYBOARD_SHORTCUTS) {
       if (sc.when && !sc.when(this)) continue;
       if (!_matchCombo(e, sc.combo)) continue;
-      if (!allows("key:shortcut", { shortcutCategory: sc.category })) { e.preventDefault(); return; }   // 只读：编辑/套索类禁
+      // 只读（修改锁）：编辑 / 套索类不收——除非这一条做的操作是「看法」（op），或者它其实是读（intent: 复制）。
+      const op = typeof sc.op === "function" ? sc.op(this) : sc.op;
+      if (!(sc.intent ? allows(sc.intent) : allows("key:shortcut", { shortcutCategory: sc.category, op }))) { e.preventDefault(); return; }
       try { sc.run(this); } catch (err) { reportError(new Error("[shortcut] " + sc.combo + " " + String(err)), "log"); }
       e.preventDefault();
       return;

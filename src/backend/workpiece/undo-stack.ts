@@ -119,6 +119,11 @@ export class UndoStack {
 
   canUndo(): boolean { return this._cursor >= 0; }
   canRedo(): boolean { return this._cursor < this._steps.length - 1; }
+  /** 下一次 undo / redo 要翻的那一步的标签（没有可翻的 / 那一步没带标签 → undefined）。只读，给写门按操作分类用。 */
+  peekLabel(dir: "undo" | "redo"): string | undefined {
+    const step = dir === "undo" ? this._steps[this._cursor] : this._steps[this._cursor + 1];
+    return step?.label;
+  }
 
   /** 游标位置身份 = stateVersion（栈底 = _baseId，初始 0）。 */
   cursorStepId(): number {

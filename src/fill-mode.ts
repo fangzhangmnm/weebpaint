@@ -29,6 +29,7 @@ import { t } from "./i18n/index.ts";
 import { registerColorTarget, refreshColorDisplay } from "./color-panel.ts";
 import type { AppContext } from "./app-context.ts";
 import type { ViewLeaf } from "./backend/workpiece/painting-view.ts";
+import { isEditLocked, onEditLockChange } from "./edit-lock.ts";   // 修改锁：锁着时油漆桶整个不起作用（见 fillPreviewActive）
 
 let _ctx: AppContext | null = null;
 let _lastPersistentMode = "";
@@ -63,8 +64,11 @@ function _flushColorEntry(force = false): void {
 
 // 预览挂着？= fill 工具 && 有选区 && 非浮层。board 的 overlay 槽断言靠它结构安全
 // （fill canDraw=false → 不可能同时有 brush overlay）。
+//   修改锁（2026-11-09）：这幅画锁着时恒 false——油漆桶整个不起作用：不出预览（预览 = 一块待落的色，落不下去的东西不摆出来骗人）、
+//   ✓ 不出现、换色不进撤销、切走不落色。选区照常（选区是「看法」，锁着也能框、能带进带出）；解锁那一刻预览自己回来（它是 选区 × 颜色 的纯函数）。
 export function fillPreviewActive(): boolean {
   if (!_ctx) return false;
+  if (isEditLocked()) return false;
   return !!(_ctx.editMode.current() === "fill" && _ctx.doc.selection && !_ctx.input.lasso.hasFloating());
 }
 
@@ -144,6 +148,14 @@ function _onModeChange(): void {
     board.requestRender();
     return;
   }
+  if (isEditLocked()) {
+    // 修改锁：锁着时油漆桶没摆出过任何东西 → 切走什么都不落、也不替人清选区（和从套索切到笔一样，选区留着）。只收掉待填色这个导航态。
+    _colorBase = null; clearTimeout(_colorTimer);
+    _ctx!.wp2.pendingFill.clear();
+    refreshColorDisplay();
+    board.requestRender();
+    return;
+  }
   // 真切出 fill 到非选区工具：**先 commit 后清场**（v0.8.29 修——曾先
   //   pendingFill.clear() 再 _doCommit，_fillColor 落回笔刷色：预览是绿、落地成红）。
   //   预览确实挂着才 commit + 清选区（组/隐藏层本就没显示 → 静默跳过，但选区也要清）。
@@ -209,6 +221,7 @@ export function initFillMode(ctx: AppContext): void {
     ctx.board.requestRender();
   });
   window.addEventListener("wp:modechange", _onModeChange);
+  onEditLockChange(() => { ctx.board.requestRender(); });   // 锁上 / 解开：预览跟着收起 / 回来（fillPreviewActive 现算，这里只催一帧）
   // fill 里 tap 出选区但活动层不可填（组/隐藏）：蚂蚁线和 ✓ 照常出现而预览隐形（provider 静默
   // null）——曾经零提示直到按 ✓ 才报。选区一变就用标准 el.* 文案报状态行（v0.9.11）。
   window.addEventListener("wp:lassochange", () => {

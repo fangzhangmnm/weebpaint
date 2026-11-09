@@ -19,6 +19,7 @@ export declare class History {
     private _opts;
     private _wp;
     private _open;
+    private _openLabels;
     constructor(opts: HistoryOpts);
     /** 组合根装配（wp 的 ctor 需要 stack 先在 → late-bind）。 */
     attach(wp: Workpiece): void;
@@ -36,6 +37,9 @@ export declare class History {
     sealCheckpoint(): void;
     undo(): boolean;
     redo(): boolean;
+    /** 下一次撤销 / 重做要翻的是哪个操作（界面那一层预先问门用；没有可翻的 → undefined）。 */
+    peekLabel(dir: "undo" | "redo"): string | undefined;
+    private _flip;
     canUndo(): boolean;
     canRedo(): boolean;
     get depth(): number;
@@ -43,6 +47,7 @@ export declare class History {
     /** 弃整栈（换文档/不可恢复）。开着的令牌弃置（不回滚——load 流里层可能已换血）。 */
     clear(): void;
     private _req;
+    private _openLabel;
     private _commitOpen;
     private _translateApplied;
     private _unrecoverable;

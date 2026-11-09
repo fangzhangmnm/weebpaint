@@ -68,19 +68,21 @@ export const LAYER_ROW_TEMPLATE = `
       :data-layer-id="String(layer.id)"
       @click="onRowClick"
     >
+      <!-- 修改锁（2026-11-09）：行里每个控件标 data-op = 它做的操作，edit-lock-door.ts 按 src/edit-lock-table.ts 查——
+           眼睛 = 看法（layerVisible）、组的折叠 = 只是界面（view），锁着也能点；⋯ 菜单 / 混合模式 / 改名 = 内容。行本身不标 = 点选图层照常。 -->
       <!-- 眼睛**始终第一**（组/叶都是）→ 眼睛列对齐，组不再有误导性缩进。 -->
-      <button type="button" class="layer-vis" :class="{ 'hidden-icon': !layer.visible }"
+      <button type="button" class="layer-vis" data-op="layerVisible" :class="{ 'hidden-icon': !layer.visible }"
         :title="layer.visible ? L.visible : L.hidden"
         @click="vis"
         v-html="layer.visible ? EYE_OPEN : EYE_OFF"></button>
 
       <!-- 组：文件夹图标点击折叠（去三角），排在眼睛之后。叶不显。不缩进，组内层靠 .layer-nested 左竖条标归属。 -->
-      <button v-if="isGroup" type="button" class="layer-folder" :title="collapsed ? L.expandGroup : L.collapseGroup"
+      <button v-if="isGroup" type="button" class="layer-folder" data-op="view" :title="collapsed ? L.expandGroup : L.collapseGroup"
         @click="toggleCollapse" v-html="collapsed ? FOLDER_CLOSED : FOLDER_OPEN"></button>
 
-      <input v-if="renaming" type="text" class="layer-name-input" :value="layer.name"
+      <input v-if="renaming" type="text" class="layer-name-input" data-op="content" :value="layer.name"
         @click.stop @blur="onRenameCommit" @keydown="onRenameKey" />
-      <span v-else class="layer-name" @click="onNameClick">{{ layer.name }}<span v-if="isGroup && collapsed" class="layer-group-count"> ({{ childLeafCount }})</span></span>
+      <span v-else class="layer-name" :data-op="active ? 'content' : null" @click="onNameClick">{{ layer.name }}<span v-if="isGroup && collapsed" class="layer-group-count"> ({{ childLeafCount }})</span></span>
 
       <span v-if="layer.clippingMask" class="layer-clip-chip" :title="L.clippedTip"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#clipping-mask"/></svg></span>
       <!-- v0.5.8：锁α chip 用 #lock-alpha（不透明度锁）而非通用 #lock——与 ⋯ 菜单 toggle 同图形 -->
@@ -90,12 +92,12 @@ export const LAYER_ROW_TEMPLATE = `
       <!-- 参考层 chip：SVG（#reference-layer），不用语言相关的文字图标（家族规则；旧「参/R」已废） -->
       <span v-if="isRef" class="layer-ref-chip" :title="L.refTip"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#reference-layer"/></svg></span>
 
-      <button type="button" ref="menuBtn" class="layer-tools-btn" :title="L.layerMenu" @click="toggleMenu"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#more"/></svg></button>
+      <button type="button" ref="menuBtn" class="layer-tools-btn" data-op="content" :title="L.layerMenu" @click="toggleMenu"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#more"/></svg></button>
 
-      <button type="button" ref="badgeBtn" class="layer-mode-badge" :class="{ active: expanded }"
+      <button type="button" ref="badgeBtn" class="layer-mode-badge" data-op="content" :class="{ active: expanded }"
         :title="badgeTitle" @click="toggleBadge">{{ modeBadge }}</button>
 
-      <Teleport to="body"><div v-if="menuOpen" ref="menuEl" class="menu-panel layer-tools-popup" @click.stop>
+      <Teleport to="body"><div v-if="menuOpen" ref="menuEl" class="menu-panel layer-tools-popup" data-op="content" @click.stop>
         <button class="menu-item menu-item-with-icon" type="button" @click="act('rename')"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#rename"/></svg><span class="menu-item-label">{{ L.rename }}</span></button>
 
         <!-- 复制（叶+组皆可；组=递归深拷，disabled 按叶数预算） -->
@@ -125,7 +127,7 @@ export const LAYER_ROW_TEMPLATE = `
     </div>
 
     <!-- 调整弹层（2026-09-11）：Teleport 到 body（逃出面板 backdrop-filter 包含块，与 ⋯ 菜单同理），popup-menu 收养定位/关闭纪律 -->
-    <Teleport to="body"><div v-if="expanded" ref="adjEl" class="menu-panel layer-adjust-popup hidden" @click.stop>
+    <Teleport to="body"><div v-if="expanded" ref="adjEl" class="menu-panel layer-adjust-popup hidden" data-op="content" @click.stop>
       <label class="layer-slider-row">
         <span class="layer-slider-icon" :title="L.opa"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#opacity"/></svg></span>
         <input type="range" min="0" max="100" :value="opacityPct"

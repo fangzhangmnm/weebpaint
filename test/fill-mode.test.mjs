@@ -3,6 +3,8 @@
 import { test, eq } from "./runner.mjs";
 import { initFillMode, fillPreviewActive, commitFillNow, gateFillOnDocSwitch } from "../src/fill-mode.ts";
 import { currentPanelColor, setColor, setBrushColor } from "../src/color-panel.ts";
+import { initEditLock, _resetEditLockForTest } from "../src/edit-lock.ts";
+import { _resetLocksForTest } from "../src/ui/interaction-lock.ts";
 
 // 最小 fake ctx：fill-mode 只碰这些面。editMode 状态机用字段模拟 + 手动派 wp:modechange。
 function makeCtx() {
@@ -292,4 +294,22 @@ test("[fill-mode] 换文档挽留门：取消（Esc/点背板 → null）= 拦�
   eq(await gateFillOnDocSwitch(async () => null), false, "拦下（调用方中止换文档）");
   eq(calls.commitFill, 0, "没 commit");
   eq(fillPreviewActive(), true, "预览还挂着（留在当前画继续调）");
+});
+
+// 2026-11-09（Claude Fable 5.1）：修改锁——选区是「看法」锁着也能框，但油漆桶是「选区一出来就是待落的色」= 内容。
+test("[fill-mode] 修改锁：这幅画锁着时油漆桶整个不起作用——不出预览、✓ 不落、切走不落色也不替人清选区；解锁后预览自己回来", () => {
+  const { ctx, calls } = makeCtx();
+  initFillMode(ctx);
+  const unlocked = new Set();
+  initEditLock({ store: () => ({ lockByDefault: true, unlockOf: (id) => (unlocked.has(id) ? {} : null), watchUnlocks: () => () => {} }), activeIdentifier: () => "画.ora", createPending: () => false, loading: () => false });
+  try {
+    setMode(ctx, "fill"); ctx.doc.selection = { fake: true };
+    eq(fillPreviewActive(), false, "锁着不出预览"); eq(calls.provider(), null, "预览 provider 不给内容");
+    commitFillNow(); eq(calls.commitFill, 0, "✓ 不落");
+    setMode(ctx, "brush");
+    eq(calls.commitFill, 0, "切走不落色"); eq(calls.setSelectionNull, 0, "也不清选区"); eq(!!ctx.doc.selection, true);
+    eq(ctx.wp2.pendingFill.view(), null, "待填色的导航态收掉了");
+    setMode(ctx, "fill"); unlocked.add("画.ora");
+    eq(fillPreviewActive(), true, "解锁后预览自己回来（选区 × 颜色的纯函数）");
+  } finally { _resetEditLockForTest(); _resetLocksForTest(); }
 });

@@ -20,6 +20,7 @@ import { resampleItems } from "./frontend/resample-modes.ts";
 import { mountSelectField, type SelectField } from "./ui/select-field.ts";   // 2026-09-02 C6 下拉标准件
 import { t, tLatin } from "./i18n/index.ts";
 import { fillPreviewActive, commitFillNow } from "./fill-mode.ts";
+import { onEditLockChange } from "./edit-lock.ts";   // 修改锁：锁态变了套索条要重排一次（✓ 的显隐跟着预览走）
 import { isPopupOpen, openAdoptedPopup, toggleAdoptedPopup, closePopupMenuOf } from "@internal/workbench-elements";
 import { registerContextToolbar, mountContextToolbar, type ContextToolbarHandle } from "./ui/context-toolbar.ts";
 import { attachSubToolSlot, type SubToolSlotHandle } from "./ui/subtool-slot.ts";   // 2026-09-06 U3 动词位长按（修订 ③：长按 = 叫出上下文条）
@@ -674,6 +675,7 @@ export function initToolbar(ctx: AppContext) {
   lassoDeselectBtn = byId("lassoDeselectBtn");
   lassoFillCommitBtn = byId("lassoFillCommitBtn");
   lassoFillCommitBtn.addEventListener("click", () => { commitFillNow(); updateLassoToolbar(); });
+  onEditLockChange(() => updateLassoToolbar());
   // 油漆桶 = 套索的深模式 toggle（row1 变换旁，user v0.5.14）：进=fill 工具（恢复 fill 的记忆子工具），
   //   出=回套索（切出=commit 由 fill-mode 的 modechange 钩子管，这里零填色知识）。
   // v0.6.24：lassoFillModeBtn 退役（fill 升顶栏组槽）
@@ -935,7 +937,7 @@ export function initToolbar(ctx: AppContext) {
     const layer = requireEditableLeaf(doc, setStatus) as LayerLike | null;
     if (!layer || !doc.selection) return;
     // v2（T2）：令牌 + collector 写时扣押（no-op 清除 = 零换手 = 不占 undo 步——v0.6.17 同族）。
-    const token = wp2.begin("clearSel");
+    const token = wp2.begin("clearSelectionPixels");
     (doc.selection as Selection).clearOnLayer(layer as unknown as Parameters<Selection["clearOnLayer"]>[0]);
     token.commit();
     board.invalidateAll();
