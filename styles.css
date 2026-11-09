@@ -2510,4 +2510,4 @@ body[data-mode="gallery"] [data-notice-id="edit-lock"] { display: none !importan
 .edit-lock-flash { animation: edit-lock-flash 420ms ease-out; }
 body[data-edit-locked]:not([data-mode="gallery"]) .left-sidebar { opacity: .5; }
 /* 会改画的面板锁着时淡一档、点不动（src/edit-lock-door.ts 在捕获阶段拦）；窗口的壳照常 */
-body[data-edit-locked]:not([data-mode="gallery"]) :is(#layersList, .layers-foot, #layerAddPopup, #adjustPopup, #cropToolbar, #lassoToolbarStack) { opacity: .5; }
+body[data-edit-locked]:not([data-mode="gallery"]) :is(.layers-foot, #layerAddPopup, #adjustPopup, #cropToolbar, #lassoToolbarStack) { opacity: .5; }   /* v0.14.63：图层列表不再整块变淡——眼睛（可见性）锁着也能点 */

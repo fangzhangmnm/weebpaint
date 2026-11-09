@@ -142,7 +142,8 @@ export class LayersFace {
   /** 层/组属性（rename/visible/opacity/mode/clippingMask/lockAlpha）。
    *  拖动期预览走 view 镜像（不碰 json），提交只在此记一账——旧 initialOld 舞蹈退役。 */
   setLayerProp(id: number, prop: string, value: unknown, o?: RunOpts): OpStatus {
-    const r = this._point("layerProp", o, () => this._tree.setLayerProp(id, prop as LayerPropKey, value));
+    // 标签按「改的是什么」分开（2026-11-08 修改锁）：可见性是「看法」——锁着时也能动（壳的写门按标签放行，见 src/edit-lock.ts LOOK_LABELS），其余属性是作品内容。
+    const r = this._point(prop === "visible" ? "layerVisible" : "layerProp", o, () => this._tree.setLayerProp(id, prop as LayerPropKey, value));
     if (!r.ok) return { ok: false, msg: r.msg };
     return r.value ? { ok: true } : { ok: false, msg: "node gone" };
   }

@@ -66,6 +66,22 @@ ok(!(await dirty()), "还是不脏"); ok((await banners()).length === 0, "没有
 ok(await P(() => getComputedStyle(document.querySelector(".layers-foot")).opacity === "0.5"), "图层面板的钮淡了一档");
 ok(await P(() => { try { globalThis.__wpProbe.wp2begin("probe"); return false; } catch (e) { return e.name === "WriteRefusedError"; } }), "界面层后面那一道还在：直接开写令牌被拒");
 
+console.log("③′ 看法：锁着也能关图层的眼睛；画不变脏、没有任何上传、不闪不报");
+{
+  const puts0 = drive.puts.length;
+  await P(() => document.querySelector('[data-notice-id="edit-lock"]')?.classList.remove("edit-lock-flash"));
+  const hidden0 = await P(() => document.querySelectorAll("#layersList .layer-vis.hidden-icon").length);
+  await P(() => document.querySelector("#layersList .layer-vis")?.click()); await sleep(300);
+  const hidden1 = await P(() => document.querySelectorAll("#layersList .layer-vis.hidden-icon").length);
+  ok(hidden1 === hidden0 + 1, `眼睛关上了（隐藏的图层 ${hidden0} → ${hidden1}）`);
+  ok(!(await dirty()), "不算有改动要存"); ok(drive.puts.length === puts0, "对文件零写入（没有任何上传）");
+  ok(!(await P(() => !!document.querySelector('[data-notice-id="edit-lock"].edit-lock-flash'))) && (await banners()).length === 0, "不闪、不报");
+  await sleep(1200);   // 等过自动落盘的节律
+  ok(!(await dirty()) && drive.puts.length === puts0 && (await banners()).length === 0, "过一会儿也没有去存、没有报错");
+  await P(() => document.querySelector("#layersList .layer-vis")?.click()); await sleep(200);
+  ok((await P(() => document.querySelectorAll("#layersList .layer-vis.hidden-icon").length)) === hidden0, "再点一下开回来");
+}
+
 console.log("④ 平移缩放照常");
 await page.mouse.move(550, 360); await page.mouse.wheel(0, -240); await sleep(200);
 ok(!(await dirty()), "滚轮缩放之后还是不脏");
@@ -75,6 +91,7 @@ const putsBefore = drive.puts.length;
 await page.locator('[data-notice-id="edit-lock"] button', { hasText: "存一版再改" }).first().click();
 await page.waitForFunction(() => !globalThis.__wpProbe.editLocked()); await sleep(600); await settled();
 ok(await onCanvas(), "没有被踢回图库"); ok((await door()) == null, "门收了");
+ok(await dirty(), "锁着时动过看法（③′ 点过眼睛）→ 解锁那一刻转成待保存的改动（所见即所存）");
 const versions = [...drive.items.keys()].filter((k) => k.includes(".backup-"));
 ok(versions.length === 1 && versions[0].startsWith(name + ".backup-"), "云端多了一版：" + versions.join(","));
 ok(!(await P((v) => globalThis.__wpProbe.requireStore().files.unlockOf(v), versions[0] ?? "x")), "那一版生来锁着");

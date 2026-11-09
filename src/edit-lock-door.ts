@@ -60,9 +60,13 @@ export function initEditLockDoor(d: EditLockDoorDeps): void {
     if (!isEditLocked()) return;
     const el = e.target as Element | null;
     if (!el?.closest || !el.closest(SURFACES) || el.closest(CHROME)) return;
+    // 看法（v0.14.63）：图层的眼睛（可见性）锁着也能点；点图层那一行本身（选中它来看）也放行。行里别的控件（⋯ 菜单、不透明度、改名）照拦。
+    if (el.closest(".layer-vis")) return;
+    if (e.type !== "dblclick" && el.closest("#layersList") && !el.closest("button, input, select, textarea, [role='menu'], .menu-panel")) return;
     e.preventDefault(); e.stopPropagation();
     if (e.type === "click") flashEditLock();
   };
   document.addEventListener("pointerdown", guard, true);
   document.addEventListener("click", guard, true);
+  document.addEventListener("dblclick", guard, true);   // 双击图层名 = 改名（内容）：锁着不进
 }

@@ -26,6 +26,12 @@ export declare function canLockNow(): boolean;
 export declare function isLocalFileOpen(): boolean;
 /** 开着的这幅画此刻是不是锁着。 */
 export declare function isEditLocked(): boolean;
+/** **「看法」类操作的明文名单**（家族标准：每个 app 自己列；user 2026-11-08「每个 app 要给自己分类，同意，就逼出窄接口」）。
+ *  看法 = 进去看的时候要折腾的东西：锁着时能动、导出和复制跟着眼前的样子走，但**锁着期间对文件零写入**——
+ *  user：「你可以修，但只是说…没法保存到文件里」「锁着的时候关了几层，就是你根本不应该动文件…有文件读写就报错就违规了」。
+ *  名单里是写令牌的标签（唯一的写入口上每个操作自带的类别）。现在只有图层可见性；选区 / 套索还没放开（要先把套索手势里的每条分支走一遍）。
+ *  不在名单里的 = 作品内容，锁着时不开令牌。 */
+export declare const LOOK_LABELS: ReadonlySet<string>;
 /** 给后端写门用：锁着（且不在装入）→ 让门闪一下并返回原因；否则 null。
  *  label = 写令牌的标签："load" = 整份装入（换画 / 新建 / 还原，替换整个文档，不是改这幅锁着的画）→ 永远放行；装入期间（loading）也放行。 */
 export declare function editWriteGate(label?: string): string | null;

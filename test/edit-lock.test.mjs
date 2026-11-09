@@ -2,7 +2,7 @@
 //   created 2026-11-08 by Claude Fable 5.1。家规 = 家族 CLAUDE.md「源文件原则上只读：手动解锁才能改」；user「默认的文件你根本不能编辑，一编辑就报错，一保存就报错」。
 //   保存那一片在 editor-session-edit-lock.test.mjs；库那一片在 @internal/store 自己的测试。
 import { describe, it, eq, assert } from "./runner.mjs";
-import { initEditLock, isEditLocked, isIdentifierEditLocked, editWriteGate, refreshEditLock, onEditLockChange, onEditLockFlash, _resetEditLockForTest, unlockLocalFile, keepLocalFileUnlocked, isLocalFileOpen, canLockNow, lockLocalFile } from "../src/edit-lock.ts";
+import { initEditLock, isEditLocked, isIdentifierEditLocked, editWriteGate, refreshEditLock, onEditLockChange, onEditLockFlash, _resetEditLockForTest, unlockLocalFile, keepLocalFileUnlocked, isLocalFileOpen, canLockNow, lockLocalFile, LOOK_LABELS } from "../src/edit-lock.ts";
 import { allows, isLocked, _resetLocksForTest } from "../src/ui/interaction-lock.ts";
 import { Workpiece, WriteRefusedError } from "../src/backend/workpiece/workpiece.ts";
 import { History } from "../src/backend/workpiece/history.ts";
@@ -129,6 +129,16 @@ describe("edit-lock · 硬盘上的单个文件（不经过库；锁跟着这一
     _resetLocksForTest(); _resetEditLockForTest();
     initEditLock({ store: () => null, activeIdentifier: () => null, createPending: () => false, loading: () => false, localFile: () => null });
     eq(unlockLocalFile(), false); eq(isLocalFileOpen(), false); eq(isEditLocked(), false, "空白画布 / 没开东西不锁");
+  });
+});
+
+describe("edit-lock · 「看法」类操作（锁着也能动，但对文件零写入）", () => {
+  // user 2026-11-08：「这些看法…你可以修，但只是说…没法保存到文件里」「每个 app 要给自己分类」「锁着的时候关了几层，就是你根本不应该动文件」
+  it("名单是明文的：现在只有图层可见性", () => { eq([...LOOK_LABELS].join(), "layerVisible"); });
+  it("锁着：看法类的写令牌放行、不闪；内容类的照拒", () => {
+    rig(); let flashes = 0; onEditLockFlash(() => flashes++);
+    eq(editWriteGate("layerVisible"), null); eq(flashes, 0);
+    for (const content of ["layerProp", "stroke", "addLayer", "moveLayer", "fill", "undo", "redo", undefined]) eq(editWriteGate(content), "edit-locked", String(content));
   });
 });
 
