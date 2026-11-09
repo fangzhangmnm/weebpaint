@@ -457,9 +457,12 @@ if (only === "all" || only === "back") {
   { // (c)
     await off(); await d.draw(3); await autosave();
     eq((await d.state()).storeDirty, 1, "(c) 前提：改动落了本机");
-    const n0 = drive.puts.length;
+    // 只数画的上传：`.weebpaint/` 下是库自己的同步文件（偏好、星和收起的记号…），它们第一次建出来 / 对一次云端不算「把没传的画传上去」
+    //   （2026-11-08：开了记号之后，记号文件偶尔正好在这个窗口里第一次建出来，四次整跑中一次）。
+    const docPuts = () => drive.puts.filter((x) => !String(x.key).startsWith(".weebpaint/"));
+    const n0 = docPuts().length;
     await back();
-    eq(drive.puts.length, n0, "(c) 不传" + (drive.puts.length !== n0 ? "（多出来的：" + drive.puts.slice(n0).map((x) => x.key).join(", ") + "）" : ""));
+    eq(docPuts().length, n0, "(c) 不传" + (docPuts().length !== n0 ? "（多出来的：" + docPuts().slice(n0).map((x) => x.key).join(", ") + "）" : ""));
     ok(!(await d.gateUp()), "(c) 不问");
     ok(!(await unsyncedNotice(d)), `(c) 开着的这份：不说「没传上去」（F-200）：${await unsyncedNotice(d)}`);
     eq((await d.state()).storeDirty, 1, "(c) 还脏着（图库「要处理」里看得见）");

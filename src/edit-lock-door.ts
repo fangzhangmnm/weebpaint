@@ -5,7 +5,7 @@
 //   非模态：通知栈里一条常驻（不能点掉——锁着是事实，不是提醒）；图库开着时藏起来（styles.css）。
 import { showNotice, closeNotice } from "@internal/workbench-elements";
 import { t } from "./i18n/index.ts";
-import { isEditLocked, onEditLockChange, onEditLockFlash } from "./edit-lock.ts";
+import { isEditLocked, onEditLockChange, onEditLockFlash, flashEditLock } from "./edit-lock.ts";
 
 const NOTICE_ID = "edit-lock";
 
@@ -45,4 +45,19 @@ export function initEditLockDoor(d: EditLockDoorDeps): void {
     el.classList.remove("edit-lock-flash"); void el.offsetWidth; el.classList.add("edit-lock-flash");   // 重新触发一次动画
   });
   render(isEditLocked());
+
+  // 界面那一层补齐（user 11-08「图层、滤镜这些界面的那层锁，你修一下呗」）：图层面板 / 调整（滤镜）面板 / 裁切条 / 套索条这些会改画的面板，
+  //   锁着时点不动、门闪一下、看起来淡一档（styles.css）。它们的按钮各有各的处理函数、不经交互锁的意图表——在捕获阶段统一拦，比每个按钮各补一句稳。
+  //   窗口自己的壳（关闭 / 拖动 / 缩放）和「取消」照常。写门（Workpiece.writeGate）仍是后面那一道：这里漏了的入口照样改不了。
+  const SURFACES = "#layersList, .layers-foot, #layerAddPopup, #adjustPanel, #adjustPopup, #cropToolbar, #lassoToolbarStack, #lassoSelOpPopup, #lassoSelEditMenu, #fillSelEditMenu";
+  const CHROME = "#adjustPanelClose, #adjustPanelHead, #adjustPanelResize, #cropToolbarCancel";
+  const guard = (e: Event): void => {
+    if (!isEditLocked()) return;
+    const el = e.target as Element | null;
+    if (!el?.closest || !el.closest(SURFACES) || el.closest(CHROME)) return;
+    e.preventDefault(); e.stopPropagation();
+    if (e.type === "click") flashEditLock();
+  };
+  document.addEventListener("pointerdown", guard, true);
+  document.addEventListener("click", guard, true);
 }

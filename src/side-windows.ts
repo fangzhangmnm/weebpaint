@@ -13,6 +13,7 @@
 //   清单比库新（DeckManifestTooNewError）→ 目录原样带着、保存时原样写回、状态行如实说；不吞、不猜。
 
 import { t } from "./i18n/index.ts";
+import { editWriteGate } from "./edit-lock.ts";   // 2026-11-08：参考图也是跟着画存的东西，加之前问同一个地方（锁着就不让加）
 import { WpReferenceWindow } from "@internal/reference-window";
 import type { RefLiveSource, RefPanelRect } from "@internal/reference-window";
 import { encodeDeck, decodeDeck, mimeForName, DeckManifestTooNewError, sniffKind } from "@internal/reference-window/deck";
@@ -280,6 +281,7 @@ async function importReferenceFiles(files: File[]): Promise<void> {
 /** 视频参考（参考窗 0.5.0）：走库的导入漏斗，只收视频；默认存法照库（视频 = 只放内存，不存进画里——user 10-21「音视频应该是当此有效」），
  *  不传 defaultRam 覆盖；＋ 菜单「只放内存」能改。逐帧在卡上（上一帧 / 下一帧）。不转码（浏览器能放就能用）。 */
 async function addReferenceVideo(file: File): Promise<void> {
+  if (editWriteGate("reference.add")) return;   // 这幅画锁着：不加（门闪一下）。user 11-08「参考图，我觉得也应该收进吧」
   if (_refuseWhileCarried()) return;
   const r = await referenceWindow.importFiles([file], { kinds: ["video"] });
   if (r.added.length || r.filled.length) { refSetOpen(true); setStatus(t("ref.videoAdded", { name: file.name || t("ref.kindVideo") })); return; }   // filled = 补回了「只放内存」的空位
@@ -292,6 +294,7 @@ async function addReferenceVideo(file: File): Promise<void> {
  *  压大保原）→ 追加为新页并翻到 → desk manifest 同步 + sidecar 标脏 + 状态行（压缩了就报 X→Y）。
  *  file input / 剪贴板 / 云盘 picker / import-image drop 路径全走这里。 */
 export async function addReferenceImage(file: File | Blob): Promise<void> {
+  if (editWriteGate("reference.add")) return;   // 这幅画锁着：不加（门闪一下）。user 11-08「参考图，我觉得也应该收进吧」
   if (_refuseWhileCarried()) return;
   // busy 普查（v0.10.3）：decode + 缩小 + jpeg 编码是秒级重活，且全程无交互段——整包 busy。
   const r = await withBusy(

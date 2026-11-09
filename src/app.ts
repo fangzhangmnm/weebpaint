@@ -846,4 +846,4 @@ setInterval(() => {
 }, GALLERY_POLL_MS);
 
 // 无头探针钩子（test/probes/probe-cloud-gate.mjs；不是 API）。
-(globalThis as { __wpProbe?: unknown }).__wpProbe = { isEncryptedBlob: (b: Blob) => appEncryption.isEncryptedBlob(b), pwaReload: () => pwaShell._reload(), allows, gateTune: gateHost.tune, session, gate: gateHost.gate, isUserOffline, requireStore, galleryBackend, galleryAttachment, setGalleryOpen, setPassword, getPassword, lockPasswords: () => lockPasswords(), diag: () => diagText(), editLocked: () => isEditLocked() };
+(globalThis as { __wpProbe?: unknown }).__wpProbe = { isEncryptedBlob: (b: Blob) => appEncryption.isEncryptedBlob(b), pwaReload: () => pwaShell._reload(), allows, gateTune: gateHost.tune, session, gate: gateHost.gate, isUserOffline, requireStore, galleryBackend, galleryAttachment, setGalleryOpen, setPassword, getPassword, lockPasswords: () => lockPasswords(), diag: () => diagText(), editLocked: () => isEditLocked(), wp2begin: (label: string) => { const tok = wp2.begin(label); tok.cancel(); } };

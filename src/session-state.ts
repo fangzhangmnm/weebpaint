@@ -24,7 +24,7 @@ import { showNotice } from "@internal/workbench-elements";   // 「更新版本�
 import { flattenViewLeaves } from "./backend/workpiece/painting-view.ts";
 import { tLatin } from "./i18n/index.ts";
 import { requireStore, galleryBackend, hasLiveStore } from "./app-store.ts";
-import { initEditLock, isEditLocked, isIdentifierEditLocked, refreshEditLock, flashEditLock } from "./edit-lock.ts";   // 2026-11-08：开着的画锁没锁（家族「源文件原则上只读」）
+import { initEditLock, isEditLocked, isIdentifierEditLocked, refreshEditLock } from "./edit-lock.ts";   // 2026-11-08：开着的画锁没锁（家族「源文件原则上只读」）
 import { galleryOnline } from "./gallery-capability.ts";   // 库在线 SSoT（0828：isSignedIn 是 MSAL 词，folder 库别问它）
 import { appEncryption } from "./encryption.ts";
 import type { EncryptedBlob } from "./app-store.ts";   // 密文 at-rest 字节（branded）；B2：类型经接缝转口
@@ -1513,9 +1513,11 @@ export function initSession(ctx: AppContext) {
       onChange: (cb: () => void) => {
         const h = (ev?: Event) => {
           if (_loadingDoc) return;
-          // 锁着（2026-11-08）：参考图这类「跟着画走但不进撤销」的旁带改动不标脏、不保存，门闪一下告诉人。
+          // 锁着（2026-11-08）：参考窗自己发出来的变化（翻页 / 在窗里挪卡、删卡）不标脏、不保存、也不闪——翻页是看，不是改，每翻一页闪一下是噪音。
+          //   从 app 这头加参考图 / 参考视频在入口就被拒了（side-windows.ts 问 editWriteGate，那里会闪）。参考窗里自己的删卡 / 挪卡锁着时还拦不住，
+          //   只是不保存：要真拦得参考窗那个库加一个「让不让改」的口（它的 minor，要 user 批）。
           //   wp:histchange 不在这里拦：锁着时写门本来就不开令牌，真有一步历史进来 = 上一层漏了，照常标脏 → 保存那一层响亮报。
-          if (ev?.type === "wp:sidecarchange" && isEditLocked()) { flashEditLock(); return; }
+          if (ev?.type === "wp:sidecarchange" && isEditLocked()) return;
           // P4 坐下判定（§2.7）：输入间隔 ≥ 阈值 → 这是新的一次坐下的首笔，先封「坐下前态」
           //   （fire-and-forget：capture 读 at-rest/磁盘，不碰画布，首笔零延迟）。
           const now = Date.now();

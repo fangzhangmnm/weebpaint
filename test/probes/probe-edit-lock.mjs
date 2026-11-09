@@ -60,9 +60,11 @@ ok(await P(() => !!document.querySelector('[data-notice-id="edit-lock"].edit-loc
 await page.keyboard.press("Control+z"); await page.keyboard.press("Control+s"); await sleep(200);
 ok(!(await dirty()) && !(await P(() => globalThis.__wpProbe.session.saving)), "Ctrl+Z / Ctrl+S 没动");
 const n0 = await layerCount();
-await P(() => document.getElementById("layerAddNewBtn")?.click()); await sleep(300);   // 图层面板的钮不经交互锁 → 写门拒
+await P(() => document.getElementById("layerAddNewBtn")?.click()); await sleep(300);   // 图层面板：界面层在捕获阶段拦（v0.14.60）；它后面还有写门
 ok((await layerCount()) === n0 && n0 > 0, `新建图层被拒（图层行数 ${n0} → ${await layerCount()}）`);
 ok(!(await dirty()), "还是不脏"); ok((await banners()).length === 0, "没有报错横幅：" + JSON.stringify(await banners()));
+ok(await P(() => getComputedStyle(document.querySelector(".layers-foot")).opacity === "0.5"), "图层面板的钮淡了一档");
+ok(await P(() => { try { globalThis.__wpProbe.wp2begin("probe"); return false; } catch (e) { return e.name === "WriteRefusedError"; } }), "界面层后面那一道还在：直接开写令牌被拒");
 
 console.log("④ 平移缩放照常");
 await page.mouse.move(550, 360); await page.mouse.wheel(0, -240); await sleep(200);
