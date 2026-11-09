@@ -11,12 +11,25 @@ from fontTools.pens.transformPen import TransformPen
 from fontTools.pens.boundsPen import BoundsPen
 from fontTools.misc.transform import Transform
 
-FONTS = {'cjk': '/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf', 'sans': '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'}
-_fts = {}
+import os
+# 每种字面按顺序找第一个这台机器上有的（路径, ttc 里第几个字面, 出处写进 data-src 的名字）。
+#   2026-11-08（Claude Fable 5.1）：这台 WSL 上没有 DroidSansFallbackFull → 加了思源黑体（Noto Sans CJK SC Bold，SIL OFL 1.1）当第二候选；出处按实际用到的写。
+FONTS = {
+    'cjk': [('/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf', None, 'DroidSansFallbackFull(Apache-2.0)'),
+            ('/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc', 2, 'NotoSansCJK-SC-Bold(OFL-1.1)')],
+    'sans': [('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', None, 'DejaVuSans-Bold(Bitstream-Vera)')],
+}
+_fts = {}; _used = []
 def fontfor(name):
     if name not in _fts:
-        ft = TTFont(FONTS[name], lazy=True)
-        _fts[name] = (ft.getGlyphSet(), ft.getBestCmap())
+        for path, num, src in FONTS[name]:
+            if os.path.exists(path):
+                ft = TTFont(path, lazy=True) if num is None else TTFont(path, fontNumber=num, lazy=True)
+                _fts[name] = (ft.getGlyphSet(), ft.getBestCmap())
+                if src not in _used: _used.append(src)
+                break
+        else:
+            raise SystemExit(f"bake-stopgap-glyphs: no '{name}' font found on this machine (tried {[p for p, _, _ in FONTS[name]]})")
     return _fts[name]
 
 def text_path(text, box, font='cjk'):
@@ -52,16 +65,19 @@ SPECS = [
     # 2026-09-06 收货：chevron-left/right、one-to-one、help、blend/blur/sharpen/liquify 八枚已由图标库「待过目层」（fable 自画，
     #   data-review="pending"）提供 → 全部 stopgap 退役，SPECS 清零。新缺图标照旧在这里烤字顶位 + 登记 ../20260708 SVG Icons/TODO.md。
     # 2026-09-09/10 曾烤 ruler「尺」/ ruler-snap「吸」（ADR-0013 几何 extension）→ 2026-09-18 形状笔回滚，两条随 extension 删，SPECS 再度清零。
+    # 2026-11-08（v0.14.58，Claude Fable 5.1）：图库库 0.9.0 的「加星」——名字前的记号 + ⋯ 菜单「加星 / 撤星」。图标库 TODO 已登记 `star`，真图进库后同名自动让位。
+    ("star", "星", (2, 2, 20, 20), "加星（图库卡片名字前 / ⋯ 菜单；图标库 TODO 已登记 star）"),
 ]
 syms = []
 for sid, text, box, note in SPECS:
     d = text_path(text, box[:4], box[4] if len(box) > 4 else 'cjk')
-    syms.append(f'  <symbol id="{sid}" data-cat="stopgap" data-src="baked:DroidSansFallbackFull(Apache-2.0)/DejaVuSans-Bold(Bitstream-Vera)" data-note="{note}" viewBox="0 0 24 24"><path d="{d}" fill="currentColor" stroke="none"/></symbol>')
+    syms.append(f'  <symbol id="{sid}" data-cat="stopgap" data-src="baked:{"/".join(_used)}" data-note="{note}" viewBox="0 0 24 24"><path d="{d}" fill="currentColor" stroke="none"/></symbol>')
 
 HEADER = '''<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none">
 <!-- WeebPaint 本地 stopgap 补丁 sprite —— 共享库（20260708 SVG Icons）里还没有的图标先用
      【中文字烤成轮廓 path】顶位（旧协议：占地不解决 pictogram，每条都是过渡态待真图形）。
-     字形烤自系统 DroidSansFallbackFull（Apache-2.0），不依赖设备字体，无豆腐块。
+     字形烤自烤制那台机器的系统字体（每个 symbol 的 data-src 写明是哪一款：DroidSansFallbackFull Apache-2.0 / 思源黑体 Noto Sans CJK SIL OFL 1.1），
+     不依赖设备字体，无豆腐块。
 
      机制（自愈）：tools/inline-sprites.py 把本文件与 assets/icons.svg 合并内联；
      assets/icons.svg（上游钉死拷贝）里已有同名 symbol 时，本文件的副本【自动让位】。
@@ -74,12 +90,14 @@ HEADER = '''<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;wid
 open('assets/icons-local.svg', 'w', encoding='utf-8').write(HEADER + '\n'.join(syms) + '\n</svg>\n')
 print("baked", len(syms), "symbols")
 
-# 渲一眼（家规：别盲画）
-import cairosvg
+# 渲一眼（家规：别盲画）。这台机器没装 cairosvg → 预览 svg 照写，换别的办法看（无头浏览器截一张）。
+try: import cairosvg
+except ImportError: cairosvg = None
 prev = '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="120" viewBox="0 0 96 24"><rect width="96" height="24" fill="#fff"/>'
 for i, (sid, text, box, note) in enumerate(SPECS):
     d = text_path(text, box[:4], box[4] if len(box) > 4 else 'cjk')
     prev += f'<g transform="translate({i*24},0)"><rect width="24" height="24" fill="none" stroke="#ccc" stroke-width="0.2"/><path d="{d}" fill="#000"/></g>'
 prev += '</svg>'
-cairosvg.svg2png(bytestring=prev.encode(), write_to='/tmp/glyphs-preview.png', output_width=480)
-print("preview written")
+open('tmp/glyphs-preview.svg', 'w', encoding='utf-8').write(prev)
+if cairosvg: cairosvg.svg2png(bytestring=prev.encode(), write_to='tmp/glyphs-preview.png', output_width=480); print("preview written: tmp/glyphs-preview.png")
+else: print("preview svg written: tmp/glyphs-preview.svg (no cairosvg here — render it another way before shipping)")

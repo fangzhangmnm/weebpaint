@@ -1,7 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none">
 <!-- WeebPaint 本地 stopgap 补丁 sprite —— 共享库（20260708 SVG Icons）里还没有的图标先用
      【中文字烤成轮廓 path】顶位（旧协议：占地不解决 pictogram，每条都是过渡态待真图形）。
-     字形烤自系统 DroidSansFallbackFull（Apache-2.0），不依赖设备字体，无豆腐块。
+     字形烤自烤制那台机器的系统字体（每个 symbol 的 data-src 写明是哪一款：DroidSansFallbackFull Apache-2.0 / 思源黑体 Noto Sans CJK SIL OFL 1.1），
+     不依赖设备字体，无豆腐块。
 
      机制（自愈）：tools/inline-sprites.py 把本文件与 assets/icons.svg 合并内联；
      assets/icons.svg（上游钉死拷贝）里已有同名 symbol 时，本文件的副本【自动让位】。
@@ -10,5 +11,5 @@
      需求登记：全局清单 ../20260708 SVG Icons/TODO.md（美工 agent 的取活处）。
      重新烤制：仓库根跑 python3 tools/bake-stopgap-glyphs.py（SPECS 即声明）。
 -->
-
+  <symbol id="star" data-cat="stopgap" data-src="baked:NotoSansCJK-SC-Bold(OFL-1.1)" data-note="加星（图库卡片名字前 / ⋯ 菜单；图标库 TODO 已登记 star）" viewBox="0 0 24 24"><path d="M7.24 7.35H17.02V8.54H7.24ZM7.24 4.33H17.02V5.48H7.24ZM4.64 2.33V10.55H5.68C4.86 12.26 3.48 13.96 2 15.06C2.64 15.41 3.72 16.23 4.22 16.69C4.89 16.1 5.59 15.33 6.25 14.49H10.94V15.83H5.24V17.9H10.94V19.4H2.51V21.67H22V19.4H13.67V17.9H19.6V15.83H13.67V14.49H20.59V12.29H13.67V10.94H10.94V12.29H7.73C7.97 11.89 8.17 11.47 8.37 11.07L6.54 10.55H19.75V2.33Z" fill="currentColor" stroke="none"/></symbol>
 </svg>

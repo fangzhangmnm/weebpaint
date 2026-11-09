@@ -78,6 +78,10 @@ const _createRealStore = (provider: _Prov, signedIn: () => boolean, databaseId?:
   //   刷新 / iOS 杀页之后再推同一份字节（退出 / 显式保存 / 回线补推）先问 Graph 传到哪、从那里接着传，不从零；续上的会话提交前一律核 eTag。
   //   UI 侧没传完 = 既有的「已存本地，未上云」徽章（save-status），文案加了「回线后接着传」。
   uploads: { resumable: true },
+  // store 2.3.0（家族「源文件原则上只读」迁移，user 2026-11-08「第一个迁移 WeebPaint」）：星 / 收起的记号——记在库自己的一份同步文件里
+  //   （云端 `.weebpaint/store.file-marks.json`，和设置同一套设施）。加了星的画，库拒绝把它送进回收站；收起是纯显示。
+  //   锁（lockByDefault）是另一个开关：要等画布不收输入、保存那条路拒绝并报错都做好之后再开，这一版还没开。
+  fileMarks: true,
   crypt: {
     makePeek: async (blob) => { try { return await zipReadEntry(blob, "Thumbnails/thumbnail.png"); } catch { return null; } },  // ora 内容知识只此一行
     getPassword,
