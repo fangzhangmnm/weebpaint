@@ -872,6 +872,7 @@ export const S = {
   "el.continue": { zh: "接着改", en: "Keep editing", ja: "編集を続ける", tok: "o ante" },
   "el.versionThenEdit": { zh: "存一版再改", en: "Save a version first", ja: "先に版を保存", tok: "o awen e sin, o ante" },
   "el.refused": { zh: "这幅画锁着，没有改动（先解锁）", en: "This artwork is locked — nothing was changed (unlock first)", ja: "ロック中のため変更していません（先にロック解除）", tok: "sitelen li awen. ala li ante. o open e ona" },
+  "el.localSaveBlocked": { zh: "这个文件锁着，没有写回去。先点「接着改」解锁；导出和另存为照常能用。", en: "This file is locked — nothing was written back. Tap “Keep editing” to unlock; Export and Save As still work.", ja: "このファイルはロック中のため書き戻していません。「編集を続ける」で解除できます。書き出し・別名保存は使えます。", tok: "lipu ni li awen. mi sitelen ala lon ona. o open e ona. sina ken pana e sin" },
   "el.saveBlocked": { zh: "这幅画锁着，刚才的改动没有保存。解锁之后再存——改动还在。", en: "This artwork is locked: your recent changes were NOT saved. Unlock it, then save — the changes are still here.", ja: "ロック中のため、変更は保存されていません。ロックを解除してから保存してください（変更は残っています）。", tok: "sitelen li awen: ante sina li awen ala lon lipu. o open e ona, o awen. ante li lon" },
   "cb.recover": { zh: "恢复", en: "Recover", ja: "復元", tok: "kama sin" },
   "cb.discard": { zh: "丢弃", en: "Discard", ja: "破棄", tok: "weka" },

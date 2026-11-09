@@ -5,7 +5,7 @@
 //   非模态：通知栈里一条常驻（不能点掉——锁着是事实，不是提醒）；图库开着时藏起来（styles.css）。
 import { showNotice, closeNotice } from "@internal/workbench-elements";
 import { t } from "./i18n/index.ts";
-import { isEditLocked, onEditLockChange, onEditLockFlash, flashEditLock } from "./edit-lock.ts";
+import { isEditLocked, isLocalFileOpen, onEditLockChange, onEditLockFlash, flashEditLock } from "./edit-lock.ts";
 
 const NOTICE_ID = "edit-lock";
 
@@ -16,6 +16,8 @@ export interface EditLockDoorDeps {
   unlock(identifier: string): Promise<boolean>;
   /** 「存一版再改」：先存一版，成了才解锁。 */
   saveVersionThenUnlock(identifier: string): Promise<boolean>;
+  /** 开着的是硬盘上的单个文件时的「接着改」（解到关掉这个文件为止）。 */
+  unlockLocal(): boolean;
 }
 
 export function initEditLockDoor(d: EditLockDoorDeps): void {
@@ -32,10 +34,13 @@ export function initEditLockDoor(d: EditLockDoorDeps): void {
     showNotice({
       id: NOTICE_ID, level: "info", dismissible: false, tapToDismiss: false,
       text: t("el.lockedText"),
-      actions: [
-        { label: t("el.continue"), primary: true, onClick: act((id) => d.unlock(id)) },
-        { label: t("el.versionThenEdit"), onClick: act((id) => d.saveVersionThenUnlock(id)) },
-      ],
+      // 硬盘上的单个文件：只有「接着改」（它旁边没有图库可以放一版；要留底用导出 / 另存为）。图库里的画：两个钮。
+      actions: isLocalFileOpen()
+        ? [{ label: t("el.continue"), primary: true, onClick: () => { d.unlockLocal(); } }]
+        : [
+          { label: t("el.continue"), primary: true, onClick: act((id) => d.unlock(id)) },
+          { label: t("el.versionThenEdit"), onClick: act((id) => d.saveVersionThenUnlock(id)) },
+        ],
     });
   };
   onEditLockChange(render);

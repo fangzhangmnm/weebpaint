@@ -2,7 +2,7 @@
 //   created 2026-11-08 by Claude Fable 5.1。家规 = 家族 CLAUDE.md「源文件原则上只读：手动解锁才能改」；user「默认的文件你根本不能编辑，一编辑就报错，一保存就报错」。
 //   保存那一片在 editor-session-edit-lock.test.mjs；库那一片在 @internal/store 自己的测试。
 import { describe, it, eq, assert } from "./runner.mjs";
-import { initEditLock, isEditLocked, isIdentifierEditLocked, editWriteGate, refreshEditLock, onEditLockChange, onEditLockFlash, _resetEditLockForTest } from "../src/edit-lock.ts";
+import { initEditLock, isEditLocked, isIdentifierEditLocked, editWriteGate, refreshEditLock, onEditLockChange, onEditLockFlash, _resetEditLockForTest, unlockLocalFile, keepLocalFileUnlocked, isLocalFileOpen } from "../src/edit-lock.ts";
 import { allows, isLocked, _resetLocksForTest } from "../src/ui/interaction-lock.ts";
 import { Workpiece, WriteRefusedError } from "../src/backend/workpiece/workpiece.ts";
 import { History } from "../src/backend/workpiece/history.ts";
@@ -92,6 +92,43 @@ describe("edit-lock · 写门（图层面板 / 滤镜 / 撤销这些不经交互
     let threw = false; let ran = false;
     try { h.withPoint("x", {}, () => { ran = true; }); } catch (e) { threw = e instanceof WriteRefusedError; }
     eq(threw, true); eq(ran, false);
+  });
+});
+
+describe("edit-lock · 硬盘上的单个文件（不经过库；锁跟着这一次打开的这个文件）", () => {
+  // user 2026-11-08：「硬盘上的一个文件，如果能实现这个功能的话，我觉得也可以」「就取决于这个锁跟着是谁」
+  function rigLocal() {
+    _resetLocksForTest(); _resetEditLockForTest();
+    const st = { handle: { name: "猫.ora" } };
+    initEditLock({ store: () => null, activeIdentifier: () => null, createPending: () => false, loading: () => false, localFile: () => st.handle });
+    return st;
+  }
+  it("打开一个硬盘文件：默认锁着（不需要库、不看库的开关）；界面那一片和写门照样拦", () => {
+    rigLocal();
+    eq(isLocalFileOpen(), true); eq(isEditLocked(), true);
+    eq(allows("pointer:draw"), false); eq(allows("pointer:navigate"), true); eq(allows("export:read"), true, "导出照常 = 逃生口");
+    eq(editWriteGate("layer.add"), "edit-locked");
+  });
+  it("人点「接着改」→ 解锁，管到这个文件关掉；换开另一个文件 / 重新打开同一个 → 又锁着", () => {
+    const st = rigLocal(); const seen = []; onEditLockChange((l) => seen.push(l));
+    eq(unlockLocalFile(), true); eq(isEditLocked(), false); eq(allows("pointer:draw"), true);
+    st.handle = { name: "狗.ora" }; refreshEditLock();          // 换开另一个文件
+    eq(isEditLocked(), true);
+    st.handle = { name: "猫.ora" }; refreshEditLock();          // 同名文件重新打开 = 新的一次打开（新句柄）
+    eq(isEditLocked(), true, "同名不等于同一次打开");
+    eq(seen.join(), "false,true");
+  });
+  it("新画刚存成的文件不锁；解着锁时文件换了句柄（加密另写）状态带过去", () => {
+    const st = rigLocal();
+    const created = { name: "新画.ora" }; st.handle = created; keepLocalFileUnlocked(created);
+    eq(isEditLocked(), false);
+    const sealed = { name: "新画.ora" }; st.handle = sealed; keepLocalFileUnlocked(sealed);
+    eq(isEditLocked(), false);
+  });
+  it("开着的不是硬盘文件：unlockLocalFile 什么都不做", () => {
+    _resetLocksForTest(); _resetEditLockForTest();
+    initEditLock({ store: () => null, activeIdentifier: () => null, createPending: () => false, loading: () => false, localFile: () => null });
+    eq(unlockLocalFile(), false); eq(isLocalFileOpen(), false); eq(isEditLocked(), false, "空白画布 / 没开东西不锁");
   });
 });
 

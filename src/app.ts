@@ -73,7 +73,7 @@ import { initPerspEdit } from "./persp-edit.ts";
 import { initShapeToolbar } from "./shape-toolbar.ts";   // 形状条（ADR-0005；2026-09-18 回滚复活：独立顶栏动词位 + 工厂上下文条；ADR-0013 几何 extension 已删）
 import { updateSaveStatus, updateNewerBanner } from "./save-status.ts";
 import { initErrorBadge, reportError } from "./error-badge.ts";
-import { editWriteGate, refreshEditLock, isEditLocked } from "./edit-lock.ts";
+import { editWriteGate, refreshEditLock, isEditLocked, unlockLocalFile } from "./edit-lock.ts";
 import { initEditLockDoor } from "./edit-lock-door.ts";
 import { initDiagLog, note as diagNote, toText as diagText } from "./diag-log.ts";   // 黑匣子（2026-08-31）
 import { initDiagLogSheet } from "./diag-log-sheet.ts";           // dev 页「诊断日志」窗口
@@ -506,6 +506,7 @@ initEditLockDoor({
   activeIdentifier: () => { const h = session.home; return h?.kind === "gallery" ? sessionFileName(h.path) : null; },
   unlock: (id) => gallery.unlockEdit(id),
   saveVersionThenUnlock: (id) => gallery.saveVersionThenUnlock(id),
+  unlockLocal: () => unlockLocalFile(),
 });
 window.addEventListener("wp:gallery-changed", () => refreshEditLock());   // 换库 → 重订解锁的订阅
 

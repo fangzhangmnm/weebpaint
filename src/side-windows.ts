@@ -13,7 +13,7 @@
 //   清单比库新（DeckManifestTooNewError）→ 目录原样带着、保存时原样写回、状态行如实说；不吞、不猜。
 
 import { t } from "./i18n/index.ts";
-import { editWriteGate } from "./edit-lock.ts";   // 2026-11-08：参考图也是跟着画存的东西，加之前问同一个地方（锁着就不让加）
+import { editWriteGate, isEditLocked, flashEditLock } from "./edit-lock.ts";   // 2026-11-08：参考图也是跟着画存的东西，加之前问同一个地方（锁着就不让加）
 import { WpReferenceWindow } from "@internal/reference-window";
 import type { RefLiveSource, RefPanelRect } from "@internal/reference-window";
 import { encodeDeck, decodeDeck, mimeForName, DeckManifestTooNewError, sniffKind } from "@internal/reference-window/deck";
@@ -148,6 +148,9 @@ export function initSideWindows(ctx: AppContext) {
   ref.liveProvider = composeLiveFrame;
   // ＋ 菜单端口（2026-09-02）：菜单挂 body 走 popup-menu 深模块（overflow:hidden 裁不到、z 在 menu band）；组件只描述项。
   ref.menuPort = (o) => togglePopupMenu(o);
+  // reference-window 0.6.0：在窗里挪卡 / 删卡 / 加一张画布镜像之前问同一个地方；被拒 → 门闪一下。翻页、跳转、缩放不问（那是看）。
+  ref.canEdit = () => !isEditLocked();
+  ref.addEventListener("editrefused", () => flashEditLock());
 
   // ---- 组件事件 → desk 持久化（宿主 store 解耦：组件不认识 desk）----
   // 视口变化住在牌组里，保存时随手带走（不标脏）。

@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { describe, it, assert, eq } from "./runner.mjs";
 
 function* walk(d) { for (const f of readdirSync(d)) { const p = join(d, f); if (statSync(p).isDirectory()) yield* walk(p); else if (/\.(ts|mjs|js)$/.test(f)) yield p.replace(/\\/g, "/"); } }
-const UNLOCK = [/\bfiles\s*\.\s*unlock\s*\(/, /\bunlockEdit\s*\(/, /\bsaveVersionThenUnlock\s*\(/];
+const UNLOCK = [/\bfiles\s*\.\s*unlock\s*\(/, /\bunlockEdit\s*\(/, /\bsaveVersionThenUnlock\s*\(/, /(?<!function )\bunlockLocalFile\s*\(/, /\bd\.unlockLocal\s*\(/];   // 最后两个 = 硬盘上单个文件的「接着改」
 const ALLOWED = new Set(["src/app.ts", "src/edit-lock-door.ts"]);   // 接线点（把图库库的两个动词递给那扇门）+ 那扇门自己（两个钮；下面单独钉它只经注入的函数解）
 
 describe("守卫 · 解锁只在人的手势里", () => {
@@ -30,6 +30,15 @@ describe("守卫 · 解锁只在人的手势里", () => {
     const code = (s) => s.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).map((l) => l.replace(/\/\/.*$/, "")).join("\n");   // 不看注释
     assert(!/requireStore|@internal\/store|\.unlock\s*\(/.test(code(lock)), "edit-lock.ts must not reach the store or unlock anything");
     assert(!/requireStore|@internal\/store|files\s*\.\s*unlock/.test(code(door)), "edit-lock-door.ts must only use the injected unlock functions");
-    eq((door.match(/d\.unlock\(|d\.saveVersionThenUnlock\(/g) ?? []).length, 2, "exactly the two buttons");
+    eq((door.match(/d\.unlock\(|d\.saveVersionThenUnlock\(|d\.unlockLocal\(/g) ?? []).length, 3, "exactly the three buttons (gallery: two; local file: one)");
+  });
+  it("硬盘文件「算解着」的口（keepLocalFileUnlocked）只在两处：新画存成文件、解着锁时加密换了句柄", () => {
+    const hits = [];
+    for (const p of walk("src")) {
+      if (p === "src/edit-lock.ts") continue;
+      readFileSync(p, "utf8").split("\n").forEach((l, i) => { if (/^\s*(\/\/|\*|\/\*)/.test(l) || /^import /.test(l)) return; if (/\bkeepLocalFileUnlocked\s*\(/.test(l.replace(/\/\/.*$/, ""))) hits.push(`${p}:${i + 1}`); });
+    }
+    eq(hits.length, 2, "keepLocalFileUnlocked call sites: " + hits.join(", "));
+    assert(hits.every((h) => h.startsWith("src/session-state.ts:")), hits.join(", "));
   });
 });

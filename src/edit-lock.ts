@@ -19,6 +19,8 @@ export interface EditLockDeps {
   createPending(): boolean;
   /** 正在装入文档（装入不算改）。 */
   loading(): boolean;
+  /** 开着的是硬盘上的单个文件（不经过库）→ 这一次打开的句柄（每次打开是新的一个）；不是 → null。 */
+  localFile?(): object | null;
 }
 
 let _deps: EditLockDeps | null = null;
@@ -27,9 +29,27 @@ let _last = false;
 const _changeListeners = new Set<(locked: boolean) => void>();
 const _flashListeners = new Set<() => void>();
 
+// 硬盘上的单个文件（user 2026-11-08：「硬盘上的一个文件，如果能实现这个功能的话，我觉得也可以」「就取决于这个锁跟着是谁」）：
+//   它不经过库，库那一片奶酪没有；锁跟着**这一次打开的这个文件**（按句柄认）——打开默认锁着，人点「接着改」解锁，管到关掉 / 换开别的为止，不往任何地方记
+//   （单个文件没有可靠的身份，只有文件名；按名字记一天会认错文件）。新画存成的文件不锁（那一下就是人在建它）。导出、另存为不归锁管 = 逃生口。
+let _localUnlocked: object | null = null;
+/** 「接着改」：解锁现在开着的这个硬盘文件。**只在人点钮时调**（edit-lock-door.ts）。开着的不是硬盘文件 → false。 */
+export function unlockLocalFile(): boolean {
+  const lf = _deps?.localFile?.() ?? null;
+  if (!lf) return false;
+  _localUnlocked = lf; refreshEditLock();
+  return true;
+}
+/** 这个句柄算解着：新画刚存成的文件（人自己那一下保存建出来的），或者解着锁时文件换了句柄（给它加密另写了一份）。不是解锁的口：只许在这两处调。 */
+export function keepLocalFileUnlocked(handle: object): void { _localUnlocked = handle; refreshEditLock(); }
+/** 现在开着的是不是硬盘上的单个文件（门据此只给一个钮）。 */
+export function isLocalFileOpen(): boolean { return !!_deps?.localFile?.(); }
+
 /** 开着的这幅画此刻是不是锁着。 */
 export function isEditLocked(): boolean {
   const d = _deps; if (!d) return false;
+  const lf = d.localFile?.() ?? null;
+  if (lf) return _localUnlocked !== lf;   // 硬盘上的单个文件：只看这一次打开解没解
   const st = d.store(); if (!st || !st.lockByDefault) return false;
   const id = d.activeIdentifier(); if (!id) return false;
   if (d.createPending()) return false;
@@ -71,7 +91,7 @@ export function refreshEditLock(): void {
 
 let _unDenied: (() => void) | null = null;
 /** 测试收尾用：拆掉接线（模块是单例，不拆会带进后面的测试）。 */
-export function _resetEditLockForTest(): void { _unwatch?.(); _unwatch = null; _watched = null; _deps = null; _last = false; _unDenied?.(); _unDenied = null; setDynamicLock("readonly", null); _changeListeners.clear(); _flashListeners.clear(); }
+export function _resetEditLockForTest(): void { _localUnlocked = null; _unwatch?.(); _unwatch = null; _watched = null; _deps = null; _last = false; _unDenied?.(); _unDenied = null; setDynamicLock("readonly", null); _changeListeners.clear(); _flashListeners.clear(); }
 export function initEditLock(deps: EditLockDeps): void {
   _deps = deps;
   _unwatch?.(); _unwatch = null; _watched = null; _last = false;   // 重新接线（测试会接好几次）：从头订

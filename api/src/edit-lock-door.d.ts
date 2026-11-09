@@ -5,5 +5,7 @@ export interface EditLockDoorDeps {
     unlock(identifier: string): Promise<boolean>;
     /** 「存一版再改」：先存一版，成了才解锁。 */
     saveVersionThenUnlock(identifier: string): Promise<boolean>;
+    /** 开着的是硬盘上的单个文件时的「接着改」（解到关掉这个文件为止）。 */
+    unlockLocal(): boolean;
 }
 export declare function initEditLockDoor(d: EditLockDoorDeps): void;

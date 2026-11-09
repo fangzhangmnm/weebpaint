@@ -24,7 +24,7 @@ import { showNotice } from "@internal/workbench-elements";   // 「更新版本�
 import { flattenViewLeaves } from "./backend/workpiece/painting-view.ts";
 import { tLatin } from "./i18n/index.ts";
 import { requireStore, galleryBackend, hasLiveStore } from "./app-store.ts";
-import { initEditLock, isEditLocked, isIdentifierEditLocked, refreshEditLock } from "./edit-lock.ts";   // 2026-11-08：开着的画锁没锁（家族「源文件原则上只读」）
+import { initEditLock, isEditLocked, isIdentifierEditLocked, refreshEditLock, flashEditLock, keepLocalFileUnlocked } from "./edit-lock.ts";   // 2026-11-08：开着的画锁没锁（家族「源文件原则上只读」）
 import { galleryOnline } from "./gallery-capability.ts";   // 库在线 SSoT（0828：isSignedIn 是 MSAL 词，folder 库别问它）
 import { appEncryption } from "./encryption.ts";
 import type { EncryptedBlob } from "./app-store.ts";   // 密文 at-rest 字节（branded）；B2：类型经接缝转口
@@ -246,6 +246,7 @@ async function settleToFile(): Promise<boolean> {
       const { bytes } = await _encodeCurrentOraWithPeek();
       await writeHandleBlob(h, bytes);
       _homeAuth.setHome({ kind: "file", handle: h, fileName: h.name, lastSeenMtime: (await handleMtime(h)) ?? Date.now() });
+      keepLocalFileUnlocked(h);   // 新画刚存成的文件：不锁（这一下保存就是人在建它）
       _transientName = null;
       if (_luggageTag) { crashStore.dropOnCleanClose(_luggageTag).catch(() => {}); _snapSerial = _editSerial; }
       else { _luggageTag = mintLuggageTag(); _snapSerial = _editSerial; }
@@ -331,6 +332,8 @@ async function _packFileHomeContainer(bytes: Blob, peek: Blob | null, fileName: 
 async function saveLocalFileNow(): Promise<boolean> {
   const fh = _fileHome();
   if (!fh) return false;
+  // 锁着（2026-11-08）：不写回这个文件——说清楚、门闪一下。导出 / 另存为不经过这里，照常（逃生口）。
+  if (isEditLocked()) { flashEditLock(); setStatus(t("el.localSaveBlocked"), true); return false; }
   _applyPendingForExplicitSave();   // 无地保存全部来自显式动作（implicit 在 saveNow 就 no-op 了）
   if (!(await _gateNewerOverwrite())) { setStatus(t("ss.saveCancelled")); return false; }   // 第二层：较新 app 写的画，覆盖前确认
   try {
@@ -839,7 +842,9 @@ async function _encryptFileHome(): Promise<void> {
     });
     ok = true;
     _enc.encrypted = true;
+    const wasUnlocked = !isEditLocked();   // 加密不归锁管：解着的还解着、锁着的还锁着（句柄换了，把解着的状态带过去）
     _homeAuth.setHome({ kind: "file", handle: h, fileName: h.name, lastSeenMtime: (await handleMtime(h)) ?? Date.now() });
+    if (wasUnlocked) keepLocalFileUnlocked(h);
     if (_luggageTag) { crashStore.dropOnCleanClose(_luggageTag).catch(() => {}); _snapSerial = _editSerial; }   // 旧（明文）快照作废：磁盘容器已是最新
     updateSaveStatus();
     setStatus(t("lf.encSavedAs", { name: h.name }), true);
@@ -1547,6 +1552,7 @@ export function initSession(ctx: AppContext) {
     activeIdentifier: () => { const a = _activeName(); return a ? toFull(a) : null; },
     createPending: () => _isLazyBlankSession || es.isCreatePending(),
     loading: () => _loadingDoc,
+    localFile: () => _fileHome()?.handle ?? null,   // 硬盘上的单个文件：锁跟着这一次打开的句柄
   });
   // S8/v0.4.11：autosave 挂 background-sync-jobs（minIdleMs=30s：停笔 30 秒才落盘，输入插队自动让路，
   //   不在描边中途 encode）。dirty 门足够防重复（flushLocal 后即净；encode 中的重入由 es._saving 挡）。
