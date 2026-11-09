@@ -188,6 +188,9 @@ describe("edit-lock · 界面那一头也查同一张表（指针 / 快捷键带
     eq(policyAllows("readonly", "key:shortcut", { shortcutCategory: "sc.cat.edit", op: "layerVisible" }), true, "撤销：要翻的那一步是看法 → 收");
     eq(policyAllows("readonly", "key:shortcut", { shortcutCategory: "sc.cat.edit", op: undefined }), false, "没有可翻的 → 不收");
     eq(policyAllows("readonly", "copy"), true, "复制是读");
+    eq(policyAllows("readonly", "key:shortcut", { shortcutCategory: "sc.cat.edit", op: "view" }), true, "Ctrl+Z 取消一个还没应用的小窗：不碰画 → 收");
+    eq(policyAllows("readonly", "key:shortcut", { shortcutCategory: "sc.cat.edit", op: "content" }), false);
+    eq(policyAllows("busy", "key:shortcut", { op: "view" }), false);
     for (const k of ["busy", "gate"]) { eq(policyAllows(k, "pointer:draw", { op: "selection" }), false, k); eq(policyAllows(k, "copy"), false, k); }
   });
   it("指针要做的操作：套索工具画选区 = selection；油漆桶 = fill；浮着的时候 = floatTransform；别的 role 不细分", () => {

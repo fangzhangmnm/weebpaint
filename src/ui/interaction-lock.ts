@@ -20,7 +20,7 @@
 //          变换 · 填充 · 删除是内容照禁。09-02 那版是「保守整类禁」，理由是选区是通往写像素的门口；现在门口后面每一步各有各的闸。）
 //   ⚠ readonly 的「护栏不写 ora」不在这里——这是 UI 层一片奶酪；持久化层 / workbench 层的护栏另做（park）。
 
-import { isLookOp } from "../edit-lock-table.ts";   // 修改锁的分类表（零依赖的叶子模块）：readonly 这一行的「看法」例外查它
+import { controlAllowedWhileLocked } from "../edit-lock-table.ts";   // 修改锁的分类表（零依赖的叶子模块）：readonly 这一行的例外查它
 
 export type LockKind = "busy" | "readonly" | "gate";
 export type Intent =
@@ -42,7 +42,7 @@ export type Intent =
 export interface IntentCtx {
   shortcutCategory?: string;
   /** 这个动作要做的操作（= 写令牌的标签；src/edit-lock-table.ts 那张表的键）。只对 readonly 有意义：
-   *  表里列为「看法」的操作，锁着也放行（2026-11-09：选区、图层可见性）。没给 = 按下面的静态表。 */
+   *  表里列为「看法」的操作（2026-11-09：选区、图层可见性），和明说不碰画的 "view"（取消一个还没应用的小窗），锁着也放行。没给 = 按下面的静态表。 */
   op?: string;
 }
 
@@ -72,10 +72,11 @@ const POLICY: Record<LockKind, Record<Intent, boolean>> = {
 };
 
 /** 纯函数：某把锁对某意图放不放行（可测）。
- *  readonly = 静态表（读的都放）**加上一条**：这个动作要做的操作在分类表里是「看法」→ 放（指针画选区、选区类快捷键…）。
- *  「看法」只会多放、不会多拦；busy / gate 不看 op（那两把锁在场时什么都不该动）。 */
+ *  readonly = 静态表（读的都放）**加上一条**：这个动作要做的操作在分类表里是「看法」，或者明说不碰画（"view"）→ 放
+ *  （指针画选区、选区类快捷键、Ctrl+Z 取消一个还没应用的小窗…）。和面板按钮用的是同一个判断（controlAllowedWhileLocked）。
+ *  op 只会多放、不会多拦；busy / gate 不看 op（那两把锁在场时什么都不该动）。 */
 export function policyAllows(kind: LockKind, intent: Intent, ctx: IntentCtx = {}): boolean {
-  if (kind === "readonly" && isLookOp(ctx.op)) return true;
+  if (kind === "readonly" && controlAllowedWhileLocked(ctx.op)) return true;
   const base = POLICY[kind][intent];
   if (!base) return false;
   if (kind === "readonly" && intent === "key:shortcut" && ctx.shortcutCategory !== undefined) {

@@ -181,6 +181,8 @@ export declare class InputController {
     _keyup(e: KeyboardEvent): void;
     _emitTool(tool: string): void;
     _adjustSize(delta: number): void;
+    /** Ctrl+Z 这一下要做的操作（修改锁按它查表）：开着一个还没应用的小窗 / 裁切 / 调整 → 取消它，不碰画（"view"，锁着也收）；否则 = 要撤的那一步。 */
+    _ctrlZOp(): string | undefined;
     canUndo(): boolean;
     canRedo(): boolean;
     ctrlZ(): void;

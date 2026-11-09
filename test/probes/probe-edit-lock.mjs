@@ -104,6 +104,9 @@ await P(() => globalThis.__wpProbe.session.saveAndPush()); await settled();
 ok(!(await dirty()) && drive.puts.length > putsBefore, "存上去了");
 
 console.log("⑤′ 画布文件菜单里的「锁上（先不改了）」：解着才出现；点了先存好再锁");
+await page.keyboard.press("l"); await sleep(200);   // 先框一个选区再画一笔：锁上之后「有选区 ∧ 最上面一步是画面内容」，给 ⑤″ 第一条用
+{ const box = await page.locator("#board, canvas").first().boundingBox(); const cx = box.x + box.width / 2, cy = box.y + box.height / 2; await page.mouse.move(cx - 60, cy - 40); await page.mouse.down(); await page.mouse.move(cx + 60, cy - 40, { steps: 6 }); await page.mouse.move(cx + 60, cy + 40, { steps: 6 }); await page.mouse.up(); await sleep(250); }
+await page.keyboard.press("b"); await sleep(200);
 await stroke(55);
 ok(await dirty(), "先留一笔没存的");
 await page.locator("#menuButton").click(); await sleep(200);
@@ -113,7 +116,7 @@ await page.waitForFunction(() => globalThis.__wpProbe.editLocked()); await sleep
 ok(!(await dirty()), "那一笔先存好了"); ok(/接着改/.test((await door()) ?? ""), "锁上了，门回来了");
 await page.locator("#menuButton").click(); await sleep(200);
 ok(await P(() => document.getElementById("menuLockEdit").classList.contains("hidden")), "锁着：菜单里没有「锁上」（解锁在门上）");
-await page.keyboard.press("Escape"); await sleep(100);
+await page.locator("#menuButton").click(); await sleep(150);   // 再点一下收菜单。不按 Esc：有选区时 Esc = 去选（锁着也收，选区是看法），会把给 ⑤″ 留的选区清掉
 
 console.log("⑤″ 选区是看法：锁着也能框、能复制、能撤销自己刚框的；变换 / 删除 / 油漆桶不起作用；全程对文件零写入");
 {
@@ -124,6 +127,17 @@ console.log("⑤″ 选区是看法：锁着也能框、能复制、能撤销自
   await P(() => { globalThis.__copied = 0; window.addEventListener("wp:copy", () => globalThis.__copied++); navigator.clipboard.write = async () => {}; });   // 无头浏览器没有剪贴板权限：只验「复制这个动作收了」
   await page.keyboard.press("l"); await sleep(200);
   ok((await P(() => globalThis.__wpProbe.tool())) === "lasso", "切到套索工具");
+  // 选区扩张 / 收缩的小窗：开着时 Ctrl+Z = 取消它（不碰画）。此刻最上面一步是画面内容，照「要撤的那一步」算是不收的——取消小窗这一下要收。
+  ok(await hasSel(), "锁上之前框的选区还在");
+  await unflash(); await P(() => document.getElementById("lassoSelResizeBtn")?.click()); await sleep(250);
+  ok(await P(() => !document.getElementById("lassoSelOpPopup").classList.contains("hidden")), "扩张 / 收缩的小窗开了");
+  await page.keyboard.press("Control+z"); await sleep(250);
+  ok(await P(() => document.getElementById("lassoSelOpPopup").classList.contains("hidden")), "Ctrl+Z 取消了小窗");
+  ok((await hasSel()) && !(await flashed()) && !(await P(() => globalThis.__wpProbe.canRedo())), "选区还在、门没闪、没有撤掉任何一步");
+  await page.keyboard.press("Control+z"); await sleep(200);
+  ok((await flashed()) && (await hasSel()) && !(await P(() => globalThis.__wpProbe.canRedo())), "小窗关了之后再按 Ctrl+Z：最上面一步是画面内容，不动，门闪一下");
+  await page.keyboard.press("Control+d"); await sleep(150);
+  ok(!(await hasSel()), "Ctrl+D 去选");
   // 拐一个弯再抬笔：自由套索画直线圈不出面积，矩形 / 椭圆看的是起点和终点——这样哪种子工具都能框出东西
   const loop = async () => { const box = await page.locator("#board, canvas").first().boundingBox(); const cx = box.x + box.width / 2, cy = box.y + box.height / 2; await page.mouse.move(cx - 60, cy - 40); await page.mouse.down(); await page.mouse.move(cx + 60, cy - 40, { steps: 6 }); await page.mouse.move(cx + 60, cy + 40, { steps: 6 }); await page.mouse.up(); await sleep(250); };
   await unflash(); await loop();
@@ -132,10 +146,8 @@ console.log("⑤″ 选区是看法：锁着也能框、能复制、能撤销自
   ok((await P(() => globalThis.__copied)) === 1, "Ctrl+C 收了（复制是读）");
   await page.keyboard.press("Control+z"); await sleep(200);
   ok(!(await hasSel()), "Ctrl+Z 撤掉了刚框的选区");
-  await unflash(); await page.keyboard.press("Control+z"); await sleep(200);
-  ok(await flashed(), "再往前是画面内容：不动，门闪一下");
   await page.keyboard.press("Control+Shift+z"); await sleep(200);
-  ok((await hasSel()) && !(await P(() => globalThis.__wpProbe.canRedo())), "重做把选区带回来，而且只有这一步可重做（上一下没有偷偷撤掉一笔画）");
+  ok((await hasSel()) && !(await P(() => globalThis.__wpProbe.canRedo())), "重做把选区带回来");
   await page.keyboard.press("Control+d"); await sleep(150); ok(!(await hasSel()), "Ctrl+D 去选");
   await page.keyboard.press("Control+a"); await sleep(150); ok(await hasSel(), "Ctrl+A 全选");
   await unflash(); await page.keyboard.press("t"); await sleep(200);

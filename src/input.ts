@@ -30,7 +30,8 @@ import { isPixelStroke, pixelStrokeSpec } from "./engine-registry.ts";
 import { computePinchViewport, snapRotation, isTap, isDoubleTap, gestureTapAction } from "./common/pointer-gesture.ts";
 import { assignRole, effectiveTool, toolToRole, strokeMode, eraserTapOnRelease, pointerOp } from "./pointer-route.ts";
 import { PressureProbe, sampleFromPointerEvent, isWindowsPlatform } from "./pressure-probe.ts";   // 2026-09-02 压感自诊（pen-flat / absolute-mouse）
-import { allows, intentForPointerRole, type Intent } from "./ui/interaction-lock.ts";   // 2026-09-02 C8：拦什么由交互锁一处回答（busy/只读同一把锁）
+import { allows, intentForPointerRole, type Intent } from "./ui/interaction-lock.ts";
+import { OP_VIEW } from "./edit-lock-table.ts";   // 2026-09-02 C8：拦什么由交互锁一处回答（busy/只读同一把锁）
 import { inputSmooth } from "./stroke-input-smooth.ts";
 import { t } from "./i18n/index.ts";
 import { SMOOTH } from "./smooth-config.ts";
@@ -209,7 +210,7 @@ function _hasSelectionIdle(i: InputController) {
 export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   // 编辑（任何时候都该 work，除了 gallery 单 modal）
   //   修改锁：撤销 / 重做翻的是哪个操作就按哪个操作算——锁着时能翻自己刚动的选区、图层可见性，翻到画面内容那一步就停（History 那头是同一个判断）。
-  { combo: "Ctrl+Z",           desc: "sc.undo",     category: "sc.cat.edit", op: (i) => i.history?.peekLabel("undo"),
+  { combo: "Ctrl+Z",           desc: "sc.undo",     category: "sc.cat.edit", op: (i) => i._ctrlZOp(),
     when: _editMode, run: (i) => i.ctrlZ() },
   { combo: "Ctrl+Shift+Z",     desc: "sc.redo",     category: "sc.cat.edit", op: (i) => i.history?.peekLabel("redo"),
     when: _editMode, run: (i) => i.redo() },
@@ -1585,6 +1586,11 @@ export class InputController {
   // 留这几个 wrapper 给绑了快捷键 / 老 listener 用，**不**自己保存状态。
   // v0.4.7（S6）：transform transient 的 ctrl-z 语义从「取消」改「history」（spec:214——lift/拖动/
   //   stamp 都在栈上，undo 逐整点回退；undo 过 lift 自然退出浮层）。crop/adjust 仍 abort-transient。
+  /** Ctrl+Z 这一下要做的操作（修改锁按它查表）：开着一个还没应用的小窗 / 裁切 / 调整 → 取消它，不碰画（"view"，锁着也收）；否则 = 要撤的那一步。 */
+  _ctrlZOp(): string | undefined {
+    if (this.editMode && this.editMode.isTransient() && this.editMode.ctrlZMeans() === "abort-transient") return OP_VIEW;
+    return this.history?.peekLabel("undo");
+  }
   canUndo() {
     if (this.editMode && this.editMode.isTransient() && this.editMode.ctrlZMeans() === "abort-transient") return true;   // crop/adjust：ctrl-z = 取消
     return !!this.history && this.history.canUndo();
