@@ -50,6 +50,8 @@ export function mountGallery(el: HTMLElement, host: GalleryHost): GalleryHandle 
     push: async (item: GItem) => { throw new Error(`[gallery] push(${item.identifier}) is not a sync verb (vocabulary = resolve / 三选一 in the sheet); gallery >= 0.8.1 must not call it`); },
     unload: (item: GItem) => session.unload({ name: bare(item.identifier) }),
     exit: () => session.exit(),
+    // gallery 0.9.1：「存一版」之前把开着的这幅落到本机——只落盘，不关画、不推云（exit 会把人从画布踢回图库）。锁着的画没有改动，本来就是 no-op。
+    flush: async () => { if (session.dirty) await session.save({ implicit: true }); },
     dropCheckpoint: (id) => { void session.dropCheckpoint(bare(id)); },
     importImageAsDoc: (file, o) => importImageAsNewDoc(file, o),
   };

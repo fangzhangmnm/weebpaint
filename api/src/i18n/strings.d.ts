@@ -4470,6 +4470,36 @@ export declare const S: {
         readonly ja: "前回異常終了した際の未保存の作品があります：{name}";
         readonly tok: "ilo li moli la sitelen {name} li awen ala. ";
     };
+    readonly "el.lockedText": {
+        readonly zh: "这幅画锁着，现在只能看。要改先解锁：";
+        readonly en: "This artwork is locked — view only. Unlock to edit:";
+        readonly ja: "この作品はロック中です（閲覧のみ）。編集するにはロックを解除：";
+        readonly tok: "sitelen ni li awen. sina ken lukin taso. o open e ona tawa ante:";
+    };
+    readonly "el.continue": {
+        readonly zh: "接着改";
+        readonly en: "Keep editing";
+        readonly ja: "編集を続ける";
+        readonly tok: "o ante";
+    };
+    readonly "el.versionThenEdit": {
+        readonly zh: "存一版再改";
+        readonly en: "Save a version first";
+        readonly ja: "先に版を保存";
+        readonly tok: "o awen e sin, o ante";
+    };
+    readonly "el.refused": {
+        readonly zh: "这幅画锁着，没有改动（先解锁）";
+        readonly en: "This artwork is locked — nothing was changed (unlock first)";
+        readonly ja: "ロック中のため変更していません（先にロック解除）";
+        readonly tok: "sitelen li awen. ala li ante. o open e ona";
+    };
+    readonly "el.saveBlocked": {
+        readonly zh: "这幅画锁着，刚才的改动没有保存。解锁之后再存——改动还在。";
+        readonly en: "This artwork is locked: your recent changes were NOT saved. Unlock it, then save — the changes are still here.";
+        readonly ja: "ロック中のため、変更は保存されていません。ロックを解除してから保存してください（変更は残っています）。";
+        readonly tok: "sitelen li awen: ante sina li awen ala lon lipu. o open e ona, o awen. ante li lon";
+    };
     readonly "cb.recover": {
         readonly zh: "恢复";
         readonly en: "Recover";

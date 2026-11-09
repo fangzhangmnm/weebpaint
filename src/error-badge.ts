@@ -24,6 +24,14 @@ export function initErrorBadge(deps: { status: (text: string, persist?: boolean)
     diagRecord("error", "[window] " + text);
     showBanner(text, "error");
   };
+  // 锁着的画（2026-11-08）：没人接的拒绝（锁着时点了图层 / 滤镜这类不经交互锁的按钮 → 写门抛 WriteRefusedError；自动保存撞上锁 → EditLockedError）
+  //   会走到 theme-guard.js 的全局兜底、糊一张红卡。那不是脚本错误：挂筛子接走，同 reportError 的两条规矩（按错误名认；名字没有就看消息里的字）。
+  (window as unknown as { __wp_fatalFilter?: (text: string, name?: string) => boolean }).__wp_fatalFilter = (text, name) => {
+    const is = (n: string) => name === n || new RegExp("\\b" + n + "\\b").test(text);
+    if (is("WriteRefusedError") || /write refused \(edit-locked\)/.test(text)) { diagRecord("log", "[window] " + text); flashEditLock(); statusSink?.(t("el.refused")); return true; }
+    if (is("EditLockedError") || is("LockedError") || /is locked for editing/.test(text)) { diagRecord("warning", "[window] " + text); flashEditLock(); showBanner(t("el.saveBlocked"), "warning"); return true; }
+    return false;
+  };
 }
 
 function errToText(err: unknown): string {

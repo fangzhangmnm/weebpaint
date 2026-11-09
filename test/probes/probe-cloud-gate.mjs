@@ -63,6 +63,11 @@ async function device(drive, msal = "ok") {
       return { home: p.session.home?.path ?? p.session.home?.kind ?? null, dirty: p.session.dirty, pp: p.session.pushPending, enc: p.session.enc.encrypted, storeDirty, att: p.galleryAttachment.state().kind };
     }),
     draw: async (dx = 0) => {
+      // 家族「源文件原则上只读」（2026-11-08，v0.14.59）：开着的画锁着就先像人一样点门上的「接着改」——探针不替人直接调解锁，走那扇门。
+      if (await P(() => globalThis.__wpProbe.editLocked())) {
+        await page.locator('[data-notice-id="edit-lock"] button', { hasText: "接着改" }).first().click();
+        await page.waitForFunction(() => !globalThis.__wpProbe.editLocked());
+      }
       const box = await page.locator("#board, canvas").first().boundingBox();
       const cx = box.x + box.width / 2 + dx, cy = box.y + box.height / 2;
       await page.mouse.move(cx - 60, cy - 30); await page.mouse.down(); await page.mouse.move(cx + 60, cy + 30, { steps: 8 }); await page.mouse.up();
@@ -454,7 +459,7 @@ if (only === "all" || only === "back") {
     eq((await d.state()).storeDirty, 1, "(c) 前提：改动落了本机");
     const n0 = drive.puts.length;
     await back();
-    eq(drive.puts.length, n0, "(c) 不传");
+    eq(drive.puts.length, n0, "(c) 不传" + (drive.puts.length !== n0 ? "（多出来的：" + drive.puts.slice(n0).map((x) => x.key).join(", ") + "）" : ""));
     ok(!(await d.gateUp()), "(c) 不问");
     ok(!(await unsyncedNotice(d)), `(c) 开着的这份：不说「没传上去」（F-200）：${await unsyncedNotice(d)}`);
     eq((await d.state()).storeDirty, 1, "(c) 还脏着（图库「要处理」里看得见）");

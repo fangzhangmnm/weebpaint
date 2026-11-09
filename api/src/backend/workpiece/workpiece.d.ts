@@ -15,6 +15,11 @@ export interface WorkpieceChangeEvent {
     kind: string;
     recorded: boolean;
 }
+/** 写门拒绝了（见 Workpiece.writeGate）：这幅画此刻不许改。不是失败，是契约——壳把它翻成「锁闪一下」，不当成报错横幅。 */
+export declare class WriteRefusedError extends Error {
+    reason: string;
+    constructor(reason: string, label?: string);
+}
 export declare class Workpiece {
     private _undo;
     private _registry;
@@ -28,6 +33,9 @@ export declare class Workpiece {
     private _onTokenLeak;
     private _fr;
     constructor(opts?: WorkpieceOpts);
+    /** 写门的否决口（2026-11-08，家族「源文件原则上只读」；组合根注入，默认没有）：返回原因 = 此刻不许开新的写令牌（这幅画锁着）。
+     *  装入文档（load）不走令牌，不受它影响；撤销 / 重做在 History 那头问同一个口。 */
+    writeGate: ((label?: string) => string | null) | null;
     /** 已有开着的令牌 → throw（泄漏查获点）；泄漏者已被 GC → FR 报警路线 + 此处自愈回滚后继续。 */
     begin(label?: string): WriteToken;
     /** 开着的令牌存在？（substrate 观察者的收集门：LayerTiles 观察 tile 换手时据此判断收不收。） */

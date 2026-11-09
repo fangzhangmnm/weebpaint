@@ -73,7 +73,7 @@ import { initPerspEdit } from "./persp-edit.ts";
 import { initShapeToolbar } from "./shape-toolbar.ts";   // 形状条（ADR-0005；2026-09-18 回滚复活：独立顶栏动词位 + 工厂上下文条；ADR-0013 几何 extension 已删）
 import { updateSaveStatus, updateNewerBanner } from "./save-status.ts";
 import { initErrorBadge, reportError } from "./error-badge.ts";
-import { editWriteGate, refreshEditLock } from "./edit-lock.ts";
+import { editWriteGate, refreshEditLock, isEditLocked } from "./edit-lock.ts";
 import { initEditLockDoor } from "./edit-lock-door.ts";
 import { initDiagLog, note as diagNote, toText as diagText } from "./diag-log.ts";   // 黑匣子（2026-08-31）
 import { initDiagLogSheet } from "./diag-log-sheet.ts";           // dev 页「诊断日志」窗口
@@ -846,4 +846,4 @@ setInterval(() => {
 }, GALLERY_POLL_MS);
 
 // 无头探针钩子（test/probes/probe-cloud-gate.mjs；不是 API）。
-(globalThis as { __wpProbe?: unknown }).__wpProbe = { isEncryptedBlob: (b: Blob) => appEncryption.isEncryptedBlob(b), pwaReload: () => pwaShell._reload(), allows, gateTune: gateHost.tune, session, gate: gateHost.gate, isUserOffline, requireStore, galleryBackend, galleryAttachment, setGalleryOpen, setPassword, getPassword, lockPasswords: () => lockPasswords(), diag: () => diagText() };
+(globalThis as { __wpProbe?: unknown }).__wpProbe = { isEncryptedBlob: (b: Blob) => appEncryption.isEncryptedBlob(b), pwaReload: () => pwaShell._reload(), allows, gateTune: gateHost.tune, session, gate: gateHost.gate, isUserOffline, requireStore, galleryBackend, galleryAttachment, setGalleryOpen, setPassword, getPassword, lockPasswords: () => lockPasswords(), diag: () => diagText(), editLocked: () => isEditLocked() };

@@ -80,8 +80,11 @@ const _createRealStore = (provider: _Prov, signedIn: () => boolean, databaseId?:
   uploads: { resumable: true },
   // store 2.3.0（家族「源文件原则上只读」迁移，user 2026-11-08「第一个迁移 WeebPaint」）：星 / 收起的记号——记在库自己的一份同步文件里
   //   （云端 `.weebpaint/store.file-marks.json`，和设置同一套设施）。加了星的画，库拒绝把它送进回收站；收起是纯显示。
-  //   锁（lockByDefault）是另一个开关：要等画布不收输入、保存那条路拒绝并报错都做好之后再开，这一版还没开。
   fileMarks: true,
+  // 锁：图库里的画默认只读，手动解锁（那扇门的两个钮 / 图库菜单）才能改；逐件、跟设备、放凉一天过期、还在画就一直往后推。
+  //   app 这一侧的三片奶酪 = src/edit-lock.ts（界面只读锁 + 写门）+ editor-session 的 editLocked（保存）；库这一片 = 这个开关（save 抛 LockedError）。
+  //   新建的画存下来那一下库会发一枚解锁；本地文件 / 空白画布不归这把锁管。
+  lockByDefault: true,
   crypt: {
     makePeek: async (blob) => { try { return await zipReadEntry(blob, "Thumbnails/thumbnail.png"); } catch { return null; } },  // ora 内容知识只此一行
     getPassword,

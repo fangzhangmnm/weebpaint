@@ -30,13 +30,20 @@
     bar.textContent = text + "  (点击关闭)";
   }
   window.__wp_showFatal = show;
+  // 2026-11-08：app 起来之后可以挂一个筛子 window.__wp_fatalFilter(text, name)——返回 true = 这条 app 自己接了（现在只有一种：
+  //   锁着的画被拒绝改动，「锁着所以没做」不是脚本错误，走门闪一下，不糊红卡；src/error-badge.ts）。没挂 / 返回 false / 筛子自己抛了 = 照旧糊红卡。
+  function route(text, name) {
+    var f = window.__wp_fatalFilter;
+    if (f) { try { if (f(text, name)) return; } catch (_) {} }
+    show(text);
+  }
   window.addEventListener("error", function (e) {
     var m = (e && e.message) || (e && e.error && (e.error.message || String(e.error))) || "脚本错误";
     var src = e && e.filename ? " (" + e.filename.split("/").pop() + ":" + e.lineno + ")" : "";
-    show(m + src);
+    route(m + src, e && e.error && e.error.name);
   });
   window.addEventListener("unhandledrejection", function (e) {
     var r = e && e.reason;
-    show((r && r.message) || String(r || "promise rejection"));
+    route((r && r.message) || String(r || "promise rejection"), r && r.name);
   });
 })();

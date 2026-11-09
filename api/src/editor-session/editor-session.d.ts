@@ -8,6 +8,12 @@ export interface EditorAdapter {
     }>;
     onSaved?(name: string): void;
     mayWrite?(): boolean;
+    editLocked?(name: string): boolean;
+}
+/** 锁着的文档被要求保存（见 EditorAdapter.editLocked）。app 层响亮报出来；人解锁之后再存，内存里的改动还在。 */
+export declare class EditLockedError extends Error {
+    identifier: string;
+    constructor(identifier: string);
 }
 /** editor-session 消费的 store 最小面（结构类型；真 sync-store 天然满足，测试可 mock）。 */
 export type TryMoveResult = {
@@ -69,6 +75,8 @@ export interface EditorSession {
     isPushPending(): boolean;
     /** 人按过存、当时没推成、之后没再改。回来时可以自动续传（完成已有的同意，ADR-0018）；只是编辑过、自动保存过的不算。 */
     isPushOwed(): boolean;
+    /** 当前这份是刚新建、还没首存的（首存走 mode:"new"）。它还不存在于库里，谈不上锁着。 */
+    isCreatePending(): boolean;
     /** 库替这份推上去了（回来问一次 → dirty.pushAll）：别再记着欠一推。内存还脏就不算。 */
     noteExternallyPushed(): void;
     start(): void;

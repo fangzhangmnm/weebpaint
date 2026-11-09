@@ -7,6 +7,9 @@ export interface IntentCtx {
 export declare const READONLY_SHORTCUT_CATEGORIES: Set<string>;
 /** 纯函数：某把锁对某意图放不放行（可测；readonly 的快捷键按类）。 */
 export declare function policyAllows(kind: LockKind, intent: Intent, ctx?: IntentCtx): boolean;
+export declare function setDynamicLock(kind: LockKind, held: (() => boolean) | null): void;
+export declare function notifyLockChange(): void;
+export declare function onReadonlyDenied(fn: (intent: Intent) => void): () => void;
 /** 拉锁；返回放锁函数（幂等）。 */
 export declare function acquireLock(kind: LockKind): () => void;
 export declare function isLocked(kind?: LockKind): boolean;

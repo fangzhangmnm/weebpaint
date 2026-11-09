@@ -21,6 +21,8 @@ export interface BackendShellHooks {
     onUnrecoverable?: (e: unknown) => void;
     /** LayersFace statuses hint（undo/redo 状态栏文案；非权威附注）。 */
     status?: (msg: string) => void;
+    /** 写门的否决口（2026-11-08）：返回原因 = 此刻不许改这幅画（锁着）。壳接 edit-lock；headless / MCP 不传 = 不拦。 */
+    writeGate?: (label?: string) => string | null;
 }
 export interface BackendInject {
     appVersion?: string;
