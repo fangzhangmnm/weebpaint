@@ -1328,6 +1328,11 @@
         <button class="menu-item menu-item-with-icon" id="menuEncrypt" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#lock"/></svg>
         <span class="menu-item-label" id="menuEncryptLabel">加密保护…</span>
       </button>
+        <!-- 修改锁（2026-11-08，user「画布的文件菜单里也加一个，就是说上锁」）：这幅画解着的时候才出现；点了先存好再锁上。
+             解锁不在这里——锁着时画布顶上那一条就是解锁的地方。和上面的加密是两把不同的锁。 -->
+        <button class="menu-item menu-item-with-icon hidden" id="menuLockEdit" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#lock"/></svg>
+        <span class="menu-item-label" data-i18n="menu.lockEdit">锁上（先不改了）</span>
+      </button>
         <!-- v133 revert；2026-08-21 接活出栏（handler 早就在 topbar-menu，按钮一直 hidden——user：「居然没接」）。
              常显：无快照时点击走「没找到快照」status 兜底 -->
         <button class="menu-item menu-item-with-icon" id="menuRevertToOpen" type="button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow-undo"/></svg>
@@ -1550,6 +1555,6 @@
     <!-- v121：esbuild 打成单 bundle，文件名带 content-hash。
          hash 变 = URL 变 = 浏览器自动拿新版，不可能撞 stale cache。
          build.sh 会 sed 改下面这行的文件名。 -->
-    <script type="module" src="./dist/weebpaint-9bfbe1998b02.mjs"></script>
+    <script type="module" src="./dist/weebpaint-ec3506eb7d02.mjs"></script>
   </body>
 </html>
