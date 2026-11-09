@@ -2502,3 +2502,10 @@ body[data-no-gallery] svg.menu-scope-badge[data-i18n-title="menu.scopeGalleryTip
   background: rgba(127, 127, 127, 0.12);
   -webkit-user-select: text; user-select: text;
 }
+
+/* ── 那扇门（2026-11-08，家族「源文件原则上只读」；src/edit-lock-door.ts）──
+   开着的画锁着：画布顶上常驻一条（通知栈里的 edit-lock）；图库开着时藏起来；蹭到了闪一下；工具栏淡一档（画本身不动）。 */
+body[data-mode="gallery"] [data-notice-id="edit-lock"] { display: none !important; }
+@keyframes edit-lock-flash { 0% { transform: scale(1); filter: none; } 30% { transform: scale(1.04); filter: brightness(1.35); } 100% { transform: scale(1); filter: none; } }
+.edit-lock-flash { animation: edit-lock-flash 420ms ease-out; }
+body[data-edit-locked]:not([data-mode="gallery"]) .left-sidebar { opacity: .5; }

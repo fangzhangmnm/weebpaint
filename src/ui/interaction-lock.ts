@@ -77,6 +77,16 @@ export function policyAllows(kind: LockKind, intent: Intent, ctx: IntentCtx = {}
 const _count: Record<LockKind, number> = { busy: 0, readonly: 0, gate: 0 };
 const _listeners = new Set<() => void>();
 function _emit() { for (const f of _listeners) f(); }
+// 动态锁（2026-11-08，readonly 的入口接上了 = 家族「源文件原则上只读」，src/edit-lock.ts）：这把锁在不在场不靠「拉 / 放」记数，而是**每次问都现算**——
+//   「开着的这幅画此刻有没有活着的解锁」会因为过期、别的标签页、换画而变，靠事件拉放一旦漏一次就是「界面说能画、其实锁着」或者反过来。
+//   现算就没有失步这回事；状态变化的通知（重画界面）由拥有方调 notifyLockChange。
+const _dynamic: Partial<Record<LockKind, () => boolean>> = {};
+export function setDynamicLock(kind: LockKind, held: (() => boolean) | null): void { if (held) _dynamic[kind] = held; else delete _dynamic[kind]; _emit(); }
+export function notifyLockChange(): void { _emit(); }
+const _held = (k: LockKind): boolean => _count[k] > 0 || !!_dynamic[k]?.();
+// 被只读锁拦下的动作（落笔 / 粘贴 / 改 doc / 保存…）→ 通知一声（门闪一下）。busy / gate 在场时不报：那时候人本来就什么都做不了。
+const _deniedListeners = new Set<(intent: Intent) => void>();
+export function onReadonlyDenied(fn: (intent: Intent) => void): () => void { _deniedListeners.add(fn); return () => _deniedListeners.delete(fn); }
 
 /** 拉锁；返回放锁函数（幂等）。 */
 export function acquireLock(kind: LockKind): () => void {
@@ -91,15 +101,18 @@ export function acquireLock(kind: LockKind): () => void {
   };
 }
 export function isLocked(kind?: LockKind): boolean {
-  return kind ? _count[kind] > 0 : _count.busy > 0 || _count.readonly > 0 || _count.gate > 0;
+  return kind ? _held(kind) : _held("busy") || _held("readonly") || _held("gate");
 }
 export function activeLocks(): LockKind[] {
-  return (["busy", "readonly", "gate"] as LockKind[]).filter((k) => _count[k] > 0);
+  return (["busy", "readonly", "gate"] as LockKind[]).filter(_held);
 }
 /** 此刻放不放行：每把在场的锁都得同意。无锁 = 放行。 */
 export function allows(intent: Intent, ctx: IntentCtx = {}): boolean {
-  for (const k of activeLocks()) if (!policyAllows(k, intent, ctx)) return false;
-  return true;
+  const locks = activeLocks();
+  const denying = locks.filter((k) => !policyAllows(k, intent, ctx));
+  if (!denying.length) return true;
+  if (denying.length === 1 && denying[0] === "readonly" && locks.length === 1) for (const f of _deniedListeners) { try { f(intent); } catch { /* 通知不许影响判定 */ } }
+  return false;
 }
 /** 编程错误式断言（如 busy 期开模态 = 自相矛盾 → 响亮 throw，别静默转圈）。 */
 export function assertAllows(intent: Intent, what: string): void {
@@ -118,4 +131,4 @@ export function intentForPointerRole(role: string | null): Intent | null {
   }
 }
 /** 测试用：清零所有锁。 */
-export function _resetLocksForTest(): void { _count.busy = 0; _count.readonly = 0; _emit(); }
+export function _resetLocksForTest(): void { _count.busy = 0; _count.readonly = 0; _count.gate = 0; for (const k of Object.keys(_dynamic) as LockKind[]) delete _dynamic[k]; _deniedListeners.clear(); _emit(); }

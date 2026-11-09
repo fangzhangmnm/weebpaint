@@ -55,6 +55,8 @@ export interface BackendShellHooks {
   onUnrecoverable?: (e: unknown) => void;
   /** LayersFace statuses hint（undo/redo 状态栏文案；非权威附注）。 */
   status?: (msg: string) => void;
+  /** 写门的否决口（2026-11-08）：返回原因 = 此刻不许改这幅画（锁着）。壳接 edit-lock；headless / MCP 不传 = 不拦。 */
+  writeGate?: (label?: string) => string | null;
 }
 
 export interface BackendInject {
@@ -164,6 +166,7 @@ export class WeebPaintBackend implements WeebPaintBackendInterface {
       tree: { width: 1, height: 1, maxLeaves: (): number => this._view.maxLayers },
       persp: inject.persp,
     });
+    if (hooks?.writeGate) this._wp2.writeGate = (label) => hooks.writeGate!(label);   // 2026-11-08：锁着的画不开写令牌（壳注入）
     this._view = new PaintingView(this._wp2);
     this._history.attach(this._wp2);
     this._layers = new LayersFace({ history: this._history, tree: this._wp2.layerTree!, tiles: this._wp2.layerTiles, port: this._view, status: hooks?.status, compositorBytes: inject.compositorBytes });

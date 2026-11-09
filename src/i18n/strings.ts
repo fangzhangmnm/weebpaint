@@ -867,6 +867,12 @@ export const S = {
   "ss.settleDownloaded": { zh: "已开始下载 {name}（此浏览器不支持文件写回；下载文件由你保管，画布上的画仍未关联文件）", en: "Download of {name} started (this browser can't write back to files; the download is in your hands — the canvas is still not linked to a file)", ja: "{name} のダウンロードを開始しました（このブラウザはファイルへの書き戻しに未対応です。ダウンロードはお手元で管理してください。キャンバスはまだファイルに関連付けられていません）", tok: "ilo li pana e {name} tawa sina. ilo ni li ken ala awen tawa lipu. o awen e ona." },
   // T-crash 恢复横幅（P2 2026-08-26，crash-banner.ts）
   "cb.crashFound": { zh: "上次异常退出，有未保存的画：{name}", en: "Unsaved artwork from an abnormal exit: {name}", ja: "前回異常終了した際の未保存の作品があります：{name}", tok: "ilo li moli la sitelen {name} li awen ala. ", },
+  // 2026-11-08 那扇门（家族「源文件原则上只读」；src/edit-lock-door.ts / error-badge.ts）
+  "el.lockedText": { zh: "这幅画锁着，现在只能看。要改先解锁：", en: "This artwork is locked — view only. Unlock to edit:", ja: "この作品はロック中です（閲覧のみ）。編集するにはロックを解除：", tok: "sitelen ni li awen. sina ken lukin taso. o open e ona tawa ante:" },
+  "el.continue": { zh: "接着改", en: "Keep editing", ja: "編集を続ける", tok: "o ante" },
+  "el.versionThenEdit": { zh: "存一版再改", en: "Save a version first", ja: "先に版を保存", tok: "o awen e sin, o ante" },
+  "el.refused": { zh: "这幅画锁着，没有改动（先解锁）", en: "This artwork is locked — nothing was changed (unlock first)", ja: "ロック中のため変更していません（先にロック解除）", tok: "sitelen li awen. ala li ante. o open e ona" },
+  "el.saveBlocked": { zh: "这幅画锁着，刚才的改动没有保存。解锁之后再存——改动还在。", en: "This artwork is locked: your recent changes were NOT saved. Unlock it, then save — the changes are still here.", ja: "ロック中のため、変更は保存されていません。ロックを解除してから保存してください（変更は残っています）。", tok: "sitelen li awen: ante sina li awen ala lon lipu. o open e ona, o awen. ante li lon" },
   "cb.recover": { zh: "恢复", en: "Recover", ja: "復元", tok: "kama sin" },
   "cb.discard": { zh: "丢弃", en: "Discard", ja: "破棄", tok: "weka" },
   "cb.discarded": { zh: "已丢弃崩溃快照", en: "Crash snapshot discarded", ja: "クラッシュスナップショットを破棄しました", tok: "mi weka e ona" },

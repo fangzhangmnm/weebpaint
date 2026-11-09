@@ -73,6 +73,8 @@ import { initPerspEdit } from "./persp-edit.ts";
 import { initShapeToolbar } from "./shape-toolbar.ts";   // 形状条（ADR-0005；2026-09-18 回滚复活：独立顶栏动词位 + 工厂上下文条；ADR-0013 几何 extension 已删）
 import { updateSaveStatus, updateNewerBanner } from "./save-status.ts";
 import { initErrorBadge, reportError } from "./error-badge.ts";
+import { editWriteGate, refreshEditLock } from "./edit-lock.ts";
+import { initEditLockDoor } from "./edit-lock-door.ts";
 import { initDiagLog, note as diagNote, toText as diagText } from "./diag-log.ts";   // 黑匣子（2026-08-31）
 import { initDiagLogSheet } from "./diag-log-sheet.ts";           // dev 页「诊断日志」窗口
 import { createCloudGateHost } from "./cloud-gate-host.ts";
@@ -194,6 +196,8 @@ const backend = WeebPaintBackend.blank({ width: 1024, height: 1024 }, {
     // 状态栏文案走 step.hint（o.statuses），不再经 onApplied）。
     onApplied: () => { renderLayersPanel(); board.invalidateAll(); board.requestRender(); },
     status: (m) => setStatus(m),
+    // 写门（2026-11-08，家族「源文件原则上只读」）：开着的画锁着 → 不开写令牌、撤销重做不动（图层面板 / 滤镜 / 变换这些不经交互锁的按钮在这里被拒）。
+    writeGate: (label) => editWriteGate(label),
   },
 });
 const history = backend.history;
@@ -497,6 +501,14 @@ const gallery = mountGallery(document.getElementById("galleryMount")!, {
   unlock: (name) => ensureUnlocked(name),
   // 画布耦合操作（open/push/unload/rename/exit/setName）gallery.ts 直调 session.*，不再经 host。
 });
+// 那扇门（家族「源文件原则上只读」）：开着的画锁着 → 画布顶上一条「锁着：接着改 / 存一版再改」；蹭到只闪不弹。解锁只在人点这两个钮（或图库菜单）时发生。
+initEditLockDoor({
+  activeIdentifier: () => { const h = session.home; return h?.kind === "gallery" ? sessionFileName(h.path) : null; },
+  unlock: (id) => gallery.unlockEdit(id),
+  saveVersionThenUnlock: (id) => gallery.saveVersionThenUnlock(id),
+});
+window.addEventListener("wp:gallery-changed", () => refreshEditLock());   // 换库 → 重订解锁的订阅
+
 
 // gallery 现由 ctx 的 getter 透传（不再 ctx.gallery= / Object.assign 二次突变——ctx 已冻结、一次构造）。
 // 晚 init 在此之后跑，故各模块 init 体里的 `x = ctx.gallery` 读到真值。

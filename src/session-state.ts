@@ -23,7 +23,8 @@ import { configureFormatNotice, beginFormatNotice, noteNewerMinor, noteTooNewPar
 import { showNotice } from "@internal/workbench-elements";   // 「更新版本写的」走通知条
 import { flattenViewLeaves } from "./backend/workpiece/painting-view.ts";
 import { tLatin } from "./i18n/index.ts";
-import { requireStore, galleryBackend } from "./app-store.ts";
+import { requireStore, galleryBackend, hasLiveStore } from "./app-store.ts";
+import { initEditLock, isEditLocked, isIdentifierEditLocked, refreshEditLock, flashEditLock } from "./edit-lock.ts";   // 2026-11-08：开着的画锁没锁（家族「源文件原则上只读」）
 import { galleryOnline } from "./gallery-capability.ts";   // 库在线 SSoT（0828：isSignedIn 是 MSAL 词，folder 库别问它）
 import { appEncryption } from "./encryption.ts";
 import type { EncryptedBlob } from "./app-store.ts";   // 密文 at-rest 字节（branded）；B2：类型经接缝转口
@@ -112,7 +113,7 @@ let _loadingDoc = false;
 const AUTOSAVE_IDLE_MS = 30_000;   // v0.4.11 用户拍板：停笔 30 秒即落盘（旧 3min 墙钟 gate 删——dirty 门已足够：存完即净，再编辑本身重置空闲时钟）
 
 const _phase = reactive<{ current: "gallery" | "editing" | "lazyblank" }>({ current: "gallery" });
-function _recomputePhase() { _phase.current = !_activeName() ? "gallery" : _isLazyBlankSession ? "lazyblank" : "editing"; }
+function _recomputePhase() { _phase.current = !_activeName() ? "gallery" : _isLazyBlankSession ? "lazyblank" : "editing"; refreshEditLock(); }   // 换画 / 安家 / 回图库都过这里 → 顺手对一下锁（多调无害）
 
 const _enc = reactive<{ encrypted: boolean }>({ encrypted: false });
 // 边界（薄库身份=全名）：app 内部 _activeName() 是**裸** session 名；跨到库/editor-session 前统一 sessionFileName
@@ -564,7 +565,7 @@ function adoptModel(loaded: LoadedDoc) {
     }
     applyEditorStateToUI();   // desk：Unserialize 后把面板/checkboard 回灌 UI（各模块订阅 wp:applyEditorState）
     timelapseAdopt(loaded);   // 录制态从 ora sidecar 回读（per-doc sticky；回读失败自愈=作废+info）
-  } finally { _loadingDoc = false; _lastInputAt = Date.now(); }   // 换 doc = 坐下时钟归零（防跨 doc 误判新坐下）
+  } finally { _loadingDoc = false; _lastInputAt = Date.now(); refreshEditLock(); }   // 换 doc = 坐下时钟归零（防跨 doc 误判新坐下）
 }
 
 // ── adopt 的两个意图，显式拆开（v415）────────────────────────────────────────────────────
@@ -1499,17 +1500,22 @@ export function initSession(ctx: AppContext) {
         adoptModel(loaded);
       },
       encode: async () => await _encodeCurrentOraWithPeek(),
+      // 保存这一层的锁（2026-11-08）：这个身份没有活着的解锁 → es.persist 响亮抛（有改动 / 人按了存）或不走保存（只欠一推）。新建未首存的 es 自己不问。
+      editLocked: (fullName: string) => isIdentifierEditLocked(fullName),
       mayWrite: () => !(_loadedDocIsNewer && !_loadedDocNewerConfirmed),   // 第二层的闸：较新 app 写的画，确认前 autosave / 失焦 / 关页 / 退出推云都不写
       // 字节落盘成功 → 作废该画的缩略图缓存 + 广播（gallery 在世 tile 原地重取，getPeek 本地优先
       //   = 刚写的字节）。覆盖显式保存/autosave/退出 flush 全路径（v0.10.2 缩略图冻结根修）。
-      onSaved: (fullName: string) => { void invalidateCachedThumb(fullName); },   // 缩略图缓存 2026-10-21 起按身份（全名）键，和包一致
+      onSaved: (fullName: string) => { void invalidateCachedThumb(fullName); refreshEditLock(); },   // 首存成了 = 库发了一枚解锁，对一下锁   // 缩略图缓存 2026-10-21 起按身份（全名）键，和包一致
       // v0.8.5（S5）：sidecar 变更（参考图等「跟 ora 走 ∧ 不进 undo」态）与内容变更走同一内容脏门
       //   ——都要落盘/推云；差别只在不进 undo 栈（wp:sidecarchange 不碰 undo 按钮态）。
       // ⚠ wp:histchange 在 **window** 上 dispatch（history.ts）——绑 document 收不到 → 打开的文档编辑永不标脏、
       //   保存静默 no-op、编辑丢失（2026-07-12 真机抓到的数据丢失根因；其余监听者都用 window）。
       onChange: (cb: () => void) => {
-        const h = () => {
+        const h = (ev?: Event) => {
           if (_loadingDoc) return;
+          // 锁着（2026-11-08）：参考图这类「跟着画走但不进撤销」的旁带改动不标脏、不保存，门闪一下告诉人。
+          //   wp:histchange 不在这里拦：锁着时写门本来就不开令牌，真有一步历史进来 = 上一层漏了，照常标脏 → 保存那一层响亮报。
+          if (ev?.type === "wp:sidecarchange" && isEditLocked()) { flashEditLock(); return; }
           // P4 坐下判定（§2.7）：输入间隔 ≥ 阈值 → 这是新的一次坐下的首笔，先封「坐下前态」
           //   （fire-and-forget：capture 读 at-rest/磁盘，不碰画布，首笔零延迟）。
           const now = Date.now();
@@ -1533,6 +1539,13 @@ export function initSession(ctx: AppContext) {
     policy: { autosaveMs: 0, pushOn: ["exit"] },   // S8：interval autosave 退役，改挂 bg-jobs（下方）
   });
   es.start();   // visibility/pagehide/blur 抢救 flush（崩溃安全直调，不受空闲节流）
+  // 开着的画锁没锁（家族「源文件原则上只读」）：锁着 = 库开了 lockByDefault ∧ 住在图库里 ∧ 不是空白 / 刚新建没首存的 ∧ 没有活着的解锁。
+  initEditLock({
+    store: () => (hasLiveStore() ? requireStore().files : null),
+    activeIdentifier: () => { const a = _activeName(); return a ? toFull(a) : null; },
+    createPending: () => _isLazyBlankSession || es.isCreatePending(),
+    loading: () => _loadingDoc,
+  });
   // S8/v0.4.11：autosave 挂 background-sync-jobs（minIdleMs=30s：停笔 30 秒才落盘，输入插队自动让路，
   //   不在描边中途 encode）。dirty 门足够防重复（flushLocal 后即净；encode 中的重入由 es._saving 挡）。
   //   encode 内部有冻结快照 → 即使 flushLocal 的 await 期间用户开画，存档也一致。

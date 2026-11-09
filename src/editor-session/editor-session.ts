@@ -30,6 +30,17 @@ export interface EditorAdapter {
   //   用途（2026-10-21 审计）：「较新 app 写的画 → 覆盖前确认」那一层以前只拦 app 层的保存入口，本模块的 autosave / 失焦 /
   //   关页 / 退出推云绕过了它——没确认就把旧格式写回去。闸放在 persist 咽喉，哪条触发都过它。
   mayWrite?(): boolean;
+  // 可选（2026-11-08，家族「源文件原则上只读」）：这个身份此刻是不是锁着（没有活着的解锁）。锁着的文档不该有改动——界面那层不收输入；
+  //   这里是保存这一层的拦：锁着 ∧（内存脏 ∨ 人按了存）→ persist 抛 EditLockedError、脏原样保住（不许吞：走到这里说明上一层漏了）；
+  //   锁着 ∧ 只欠一推 → 什么都不做（字节早就在本机了，补推归库的 dirty.pushAll / 「处理…」，不走保存）。
+  //   新建还没首存的那份不问（它还不存在，谈不上锁）。缺 = 恒不锁。
+  editLocked?(name: string): boolean;
+}
+
+/** 锁着的文档被要求保存（见 EditorAdapter.editLocked）。app 层响亮报出来；人解锁之后再存，内存里的改动还在。 */
+export class EditLockedError extends Error {
+  identifier: string;
+  constructor(identifier: string) { super(`[editor-session] "${identifier}" is locked for editing: unlock it before saving (in-memory changes are kept)`); this.name = "EditLockedError"; this.identifier = identifier; }
 }
 
 /** editor-session 消费的 store 最小面（结构类型；真 sync-store 天然满足，测试可 mock）。 */
@@ -85,6 +96,8 @@ export interface EditorSession {
   isPushPending(): boolean;
   /** 人按过存、当时没推成、之后没再改。回来时可以自动续传（完成已有的同意，ADR-0018）；只是编辑过、自动保存过的不算。 */
   isPushOwed(): boolean;
+  /** 当前这份是刚新建、还没首存的（首存走 mode:"new"）。它还不存在于库里，谈不上锁着。 */
+  isCreatePending(): boolean;
   /** 库替这份推上去了（回来问一次 → dirty.pushAll）：别再记着欠一推。内存还脏就不算。 */
   noteExternallyPushed(): void;
   start(): void;                                  // 挂 autosave timer + 失焦/pagehide 监听（按 policy）；DOM 无则 no-op
@@ -136,6 +149,11 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
     const need = force || (tryPush ? (_dirty || _pushPending) : _dirty);
     if (!_name || !need || _saving) return;
     if (editor.mayWrite && !editor.mayWrite()) return;   // 闸：app 层说这张画此刻不准写（较新 app 写的、还没确认覆盖）→ 什么都不动，脏保住
+    // 锁（2026-11-08）：新建还没首存的不问。锁着 ∧ 有改动 / 人按了存 → 响亮抛、脏保住；锁着 ∧ 只欠一推 → 不走保存（补推归库）。
+    if (_createFor !== _name && editor.editLocked?.(_name)) {
+      if (_dirty || force) throw new EditLockedError(_name);
+      return;
+    }
     _saving = true;
     let takeCloudReload = false;   // save 途中用户选了「云端覆盖本地」→ 收尾必须整体重载（见 finally 之后）
     // ★ 失败回滚用（v417）：下面会**先**乐观清脏、**再** await save()。save() 抛异常时若不还原，
@@ -225,6 +243,7 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
     isDirty: () => _dirty,
     isPushPending: () => _pushPending,
     isPushOwed: () => _pushOwed,
+    isCreatePending: () => _name != null && _createFor === _name,
     noteExternallyPushed(): void { if (!_dirty) { _pushPending = false; _pushOwed = false; } },
 
     async open(name: string): Promise<boolean> {

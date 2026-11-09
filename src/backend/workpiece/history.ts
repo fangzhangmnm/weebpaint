@@ -73,11 +73,13 @@ export class History {
   sealCheckpoint(): void { this._commitOpen(); }
 
   undo(): boolean {
+    if (this._req().writeGate?.("undo")) return false;   // 这幅画锁着（2026-11-08）：撤销也是改，不动
     this._commitOpen();                  // 顶端未封口 → 补封
     try { return this.stack.undo(); }
     catch (e) { this._unrecoverable(e); return false; }
   }
   redo(): boolean {
+    if (this._req().writeGate?.("redo")) return false;   // 同上
     this._commitOpen();
     try { return this.stack.redo(); }
     catch (e) { this._unrecoverable(e); return false; }

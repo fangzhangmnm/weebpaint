@@ -36,6 +36,12 @@ export interface WorkpieceOpts {
 
 export interface WorkpieceChangeEvent { kind: string; recorded: boolean }
 
+/** 写门拒绝了（见 Workpiece.writeGate）：这幅画此刻不许改。不是失败，是契约——壳把它翻成「锁闪一下」，不当成报错横幅。 */
+export class WriteRefusedError extends Error {
+  reason: string;
+  constructor(reason: string, label?: string) { super(`Workpiece: write refused (${reason}) label=${label ?? "?"}`); this.name = "WriteRefusedError"; this.reason = reason; }
+}
+
 export class Workpiece {
   private _undo: UndoStack | null;
   private _registry: { c: CollectorComponent; policy: UndoPolicy }[] = [];
@@ -67,8 +73,14 @@ export class Workpiece {
 
   // ── 令牌（唯一写门）──
 
+  /** 写门的否决口（2026-11-08，家族「源文件原则上只读」；组合根注入，默认没有）：返回原因 = 此刻不许开新的写令牌（这幅画锁着）。
+   *  装入文档（load）不走令牌，不受它影响；撤销 / 重做在 History 那头问同一个口。 */
+  writeGate: ((label?: string) => string | null) | null = null;
+
   /** 已有开着的令牌 → throw（泄漏查获点）；泄漏者已被 GC → FR 报警路线 + 此处自愈回滚后继续。 */
   begin(label?: string): WriteToken {
+    const refused = this.writeGate?.(label);
+    if (refused) throw new WriteRefusedError(refused, label);
     if (this._tokenOpen) {
       if (this._tokenRef?.deref()) {
         throw new Error(`Workpiece: a token is already open (only one at a time; label=${label ?? "?"})`);

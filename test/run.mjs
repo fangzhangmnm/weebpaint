@@ -69,6 +69,9 @@ import "./format-samples.test.mjs";       // 2026-09-29 持久化立宪：冻结
 import "./format-migrate.test.mjs";       // 2026-10-21 格式版本纪律 F-69：拍子表 / 判决 / 迁移链 / desk·录像直通袋 / 笔架咽喉
 import "./format-stack-xml-unknown.test.mjs";   // 2026-10-21 审计第 1 条：stack.xml 未知属性 / 子元素读写会丢（钉住；靠 app 版本号那层兜）
 import "./editor-session-write-gate.test.mjs";
+import "./editor-session-edit-lock.test.mjs";   // 2026-11-08：保存这一层的锁（家族「源文件原则上只读」）
+import "./edit-lock.test.mjs";   // 2026-11-08：开着的画锁没锁 + 界面的只读锁 + 写门
+import "./edit-lock-guard.test.mjs";   // 2026-11-08：解锁只在人的手势里（结构守卫）
 import "./app-version.test.mjs";                 // parseAppVersion 全序（较新 app 写的画那一层的判据；2026-10-21 审计恢复）  // 2026-10-21 审计第 6 条：覆盖前确认的最后一道 = editor-session persist 的 mayWrite 闸
 import "./reference-transcode.test.mjs";  // 0830 参考图压缩政策纯函数（1024² 面积/豁免/拍平白底）
 import "./reference-icons.test.mjs";      // 0830 参考窗图标 SSoT：id 全在 sprite（零自绘几何那条 2026-09-29 随组件搬进库仓）

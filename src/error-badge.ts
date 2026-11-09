@@ -9,6 +9,7 @@
 
 import { t } from "./i18n/index.ts";
 import { record as diagRecord } from "./diag-log.ts";
+import { flashEditLock } from "./edit-lock.ts";
 import { showNotice } from "@internal/workbench-elements";   // 2026-09-02 C7 通知栈   // 黑匣子（2026-08-31）：全部级别都记，dev 页可看/复制
 export type ErrorLevel = "error" | "warning" | "info" | "log";
 
@@ -58,6 +59,12 @@ function stackHint(err: unknown): string {
 }
 
 export function reportError(err: unknown, level: ErrorLevel = "error"): void {
+  // 锁着的画（2026-11-08，家族「源文件原则上只读」）：
+  //   · 写门拒了（WriteRefusedError：锁着时点了图层 / 滤镜这类按钮）= 契约，不是故障 → 门闪一下、状态行一句，不出横幅；
+  //   · 保存被拒（EditLockedError / 库的 LockedError：锁着还有改动要存）= 上一层漏了 → 响亮（warning 横幅）+ 门闪，话说清「改动还在」。
+  const lockName = (err as { name?: unknown } | null)?.name;
+  if (lockName === "WriteRefusedError") { diagRecord("log", errToText(err)); flashEditLock(); statusSink?.(t("el.refused")); return; }
+  if (lockName === "EditLockedError" || lockName === "LockedError") { diagRecord("warning", errToText(err) + stackHint(err)); console.warn("[wp]", err); flashEditLock(); showBanner(t("el.saveBlocked"), "warning"); return; }
   const msg = errToText(err);
   diagRecord(level, msg + stackHint(err));
   // 最终消费者 log（层层上报只此一处 log）
