@@ -116,7 +116,25 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
                                                    //   乐观清脏吞掉（QA 2026-08-21：busy 期键盘 undo 曾被静默宣布已落盘）。
   let _pushOwed = false;                           // 人按过存、当时没推成、之后没再改（规则书第 15 条 (b)：回来自动续传的依据；_pushPending 每次编辑都置 true，分不出这个）
   let _pushPending = false;                        // 推-pending：自上次成功推后编辑过（驱动退出推；≠内存脏，flushLocal 清内存脏但留 push-pending）
-  let _saving = false;                             // 落盘中（防重入/竞态）
+  // ── 串行 + 钉身份（2026-11-09，Claude Fable 5.1；家族周账 F-187；复现和推理 = 家族根 ai-docs/20261109-editor-session-serialize.md）──
+  //   以前这里是 `_saving` 单飞锁：有一轮在存，后来的调用**直接返回**——等于把「别人在存」当成「我存完了」。原样复现出两个后果：
+  //     · 人按存撞上在飞的自动保存：什么都没做就返回、界面照常说「已保存」；自动保存取快照之后的那一笔既没存也没推。
+  //     · 自动保存编码到一半时换开另一份：open() 的「先存旧的」直接返回 → 身份换成新的 → 旧文档的编码这时才完成，那一行
+  //       `store.file(_name)` 读到的已经是新身份 → **旧文档的内容写进了新文档的文件**，旧文档最后那几笔反而没存进它自己。
+  //   两处一起修，缺一不可：
+  //     ① 串行：所有会写盘 / 会换身份的异步入口排成一队，前一个落地了（成败都算）下一个才开始，开始时按那一刻的状态重新判断要不要做。
+  //        不变量：flushLocal / flushAndPush / forceSaveAndPush / open / rename / delete 的 Promise 落地 = 它承诺的事真的做完了，或者抛了。
+  //     ② 钉身份：一轮保存在起跑那一刻钉住「存给谁」（名字 + 身份代数）。字节只落到那个名字下；收尾改旗标之前先对代数，
+  //        不是同一场了就不碰（adopted / release 是同步的，排不进队，会在一轮保存的 await 窗口里把身份换掉）。
+  //   ⚠ adapter 的回调（encode / adopt / onSaved / mayWrite…）里不许 await 本模块的任何异步入口：那是队里的自己等队尾的自己。
+  //   推挂死会不会把队卡死：和以前 `_saving` 永远放不开是同一个前提——库的 Graph 传输层带超时（app-store.ts GRAPH_TRANSPORT），到点就抛。
+  let _tail: Promise<void> = Promise.resolve();
+  function serial<T>(op: () => Promise<T>): Promise<T> {
+    const run = _tail.then(op, op);                // 前一个成也好败也好，都接着跑这一个
+    _tail = run.then(() => {}, () => {});          // 队尾永不 reject：每个入口的失败只报给它自己的调用方
+    return run;
+  }
+  let _gen = 0;                                    // 身份代数：「开着的是谁」每换一次 +1（open 成 / adopted / delete）
   let _timer: ReturnType<typeof setInterval> | null = null;
   let _idleTimer: ReturnType<typeof setTimeout> | null = null;
   let _onChangeWired = false;
@@ -145,16 +163,19 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
   // force=true（forceSaveAndPush/**用户显式按 save**）：跳过 need 门，不脏也 encode+推（v409：时间戳必须走字，
   //   否则用户点了 save 看到时间戳没动会以为坏了）。desk 改动**不进** need —— 只在顺路落盘时被 encode 顺手捞走
   //   （v409 决策：退出只有 contentDirty 才推，desk 可抛；详 editor-state.ts 的 ⚠ 段）。
-  async function persist(tryPush: boolean, force = false): Promise<void> {
-    const need = force || (tryPush ? (_dirty || _pushPending) : _dirty);
-    if (!_name || !need || _saving) return;
+  //   persist = 排队的那个（所有外面的入口、定时器、失焦 / 隐藏的监听都走它）；persistNow = 队里真正干活的那个（只许在队里调）。
+  const persist = (tryPush: boolean, force = false): Promise<void> => serial(() => persistNow(tryPush, force));
+  async function persistNow(tryPush: boolean, force = false): Promise<void> {
+    const need = force || (tryPush ? (_dirty || _pushPending) : _dirty);   // 轮到自己时才判断：前面那一轮可能已经把该存的存了
+    if (!_name || !need) return;
     if (editor.mayWrite && !editor.mayWrite()) return;   // 闸：app 层说这张画此刻不准写（较新 app 写的、还没确认覆盖）→ 什么都不动，脏保住
+    const name = _name, gen = _gen;                     // 钉住：这一轮存的是谁（见上「钉身份」）
+    const mine = (): boolean => gen === _gen;           // 还是起跑时那一场吗
     // 锁（2026-11-08）：新建还没首存的不问。锁着 ∧ 有改动 / 人按了存 → 响亮抛、脏保住；锁着 ∧ 只欠一推 → 不走保存（补推归库）。
-    if (_createFor !== _name && editor.editLocked?.(_name)) {
-      if (_dirty || force) throw new EditLockedError(_name);
+    if (_createFor !== name && editor.editLocked?.(name)) {
+      if (_dirty || force) throw new EditLockedError(name);
       return;
     }
-    _saving = true;
     let takeCloudReload = false;   // save 途中用户选了「云端覆盖本地」→ 收尾必须整体重载（见 finally 之后）
     // ★ 失败回滚用（v417）：下面会**先**乐观清脏、**再** await save()。save() 抛异常时若不还原，
     //   本次编辑就在内存里被宣布"已落盘"而实际一个字节都没写 —— badge 画干净、autosave 看 need=false
@@ -167,10 +188,10 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
     const epochAtFreeze = _editEpoch;
     try {
       const { bytes, peek } = await editor.encode();
-      if (_editEpoch === epochAtFreeze) _dirty = false;   // 清内存脏：encode 已取快照；快照**之后**的编辑保住脏（下轮 autosave 收）
+      if (mine() && _editEpoch === epochAtFreeze) _dirty = false;   // 清内存脏：encode 已取快照；快照**之后**的编辑保住脏（下轮 autosave 收）
       // 新建画布/import 首存 → mode:"new"（撞名不静默覆盖，抛 CloudNameCollisionError；saveNow 已 try/catch surface）；成功即转 existing（后续 autosave = 编辑）。
-      const mode = _createFor === _name ? "new" : "existing";
-      const res = await store.file(_name, { mode }).save(bytes, { tryPush, hint: peek != null ? { peek } : undefined });
+      const mode = _createFor === name ? "new" : "existing";
+      const res = await store.file(name, { mode }).save(bytes, { tryPush, hint: peek != null ? { peek } : undefined });   // ★ name 不是 _name：字节只落到起跑时那个名字下
       // push-pending 按**实际结果**清，不再乐观清（v432）。旧版在 save 之前就 `_pushPending = false`，
       //   而 store 内部把 push 失败 catch 成 banner 后 save() 照常 resolve → 这里永远看不到失败 →
       //   badge 画干净、退出不再重推、下次 autosave 也不补 → 云端始终停在旧版而 UI 从没说过失败。
@@ -178,22 +199,22 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
       //    那个队列永不 drain。）
       //   `res?.pushed !== true` 而非 `!res.pushed`：store 没报告结果（旧适配器/mock）时**假定没推上去**，
       //   保住 push-pending 下次重试。宁可多推一次，也不要静默清干净（优先级②）。
-      if (tryPush) { _pushPending = res?.pushed !== true || _editEpoch !== epochAtFreeze; if (!_pushPending) _pushOwed = false; }   // 推上去的是 freeze 快照——之后的编辑还欠一推
-      takeCloudReload = res?.resolution === "takeCloud";   // 换世界线标记（重载在 finally 之后做，_saving 已放开）
-      if (_createFor === _name) _createFor = null;   // 首存成功 → 这个身份已建，后续都是编辑
+      if (mine() && tryPush) { _pushPending = res?.pushed !== true || _editEpoch !== epochAtFreeze; if (!_pushPending) _pushOwed = false; }   // 推上去的是 freeze 快照——之后的编辑还欠一推
+      takeCloudReload = mine() && res?.resolution === "takeCloud";   // 换世界线标记（重载在下面做）；已经不是这一场了 = 画布上早换了别的，不重载
+      if (_createFor === name) _createFor = null;   // 首存成功 → 这个身份已建，后续都是编辑
       // 落盘成功 → 通知 app 域字节变了（缩略图等派生缓存作废）。save() 能 resolve = 本地已写成
       //   （push 失败被 store 内部 catch 成 banner，不影响「字节已变」这个事实）。
-      if (_name != null) editor.onSaved?.(_name);
+      editor.onSaved?.(name);
     } catch (e) {
       // 还原**入场时的真实状态**（不是无脑置脏）：本来脏就继续脏（工作没丢、重试武装着）；
       //   本来干净（force save 一个未改动的 doc）就保持干净，别造一个假的脏 badge。
       //   store.save() 内部已吞掉 push 失败（只 reportError），所以能抛到这里的基本都是"本地也没写成"。
       //   入场后（await 窗口里）又编辑过 → 无论入场时多干净，现在必须是脏的（epoch 兜底）。
-      _dirty = wasDirty || _editEpoch !== epochAtFreeze;
-      _pushPending = wasPushPending || _editEpoch !== epochAtFreeze;
+      if (mine()) {   // 不是同一场了：这些旗标已经是下一份文档的，不碰
+        _dirty = wasDirty || _editEpoch !== epochAtFreeze;
+        _pushPending = wasPushPending || _editEpoch !== epochAtFreeze;
+      }
       throw e;
-    } finally {
-      _saving = false;
     }
     // ── takeCloud 收尾：换世界线（2026-08-25 案卷 20260825-cloud-override-adopt-noop-case.md §1）──
     // takeCloud 不是作用在 workspace 上的操作，是**文件版本模型的换世界线**（user 2026-08-25 拍板取 B 形状：
@@ -202,8 +223,8 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
     //   的事故根因。openInto = 与 open() 同一条 vetted 管线（store.open → editor.adopt 全量重建）；
     //   adopt 替换即新 session，undo 栈自然从零起（旧世界线的 undo 历史跨版本无效，被换掉的字节已在 .backup）。
     //   freeze 快照之后、sheet 期间穿进来的编辑（键盘 undo 等）属于被丢弃的旧世界线，随重载一并让位。
-    if (takeCloudReload && _name) {
-      const ok = await openInto(_name);
+    if (takeCloudReload) {
+      const ok = await openInto(name);
       // 重载失败（几乎不可能：字节刚写进本地、刚过 validateAdopt）→ 必须响亮：画布仍是旧世界线，
       //   静默留着就是原事故的失败路径复活。抛给调用方 surface；flags 此刻 pushed=true → 无待推，
       //   不会因此把陈旧画布再推上云。
@@ -226,7 +247,7 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
     const blob = await fileOf(name).open();      // open 内含 freshness / 冲突 surface（store 的 ui）/ 崩溃恢复
     if (!blob) return false;                     // false = 文件缺失/锁定，doc 未装入（caller 据此回图库、别改活动名）
     await editor.adopt(blob);
-    _name = name;
+    _name = name; _gen++;
     _dirty = false; _pushPending = false; _pushOwed = false;        // 刚 adopt = 干净（本会话未编辑；desk 由 Unserialize 载入）
     if (_createFor === name) _createFor = null;  // 这个名字已能从 store 打开 → 身份已建，不该再走 mode:"new"
     return true;
@@ -246,15 +267,15 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
     isCreatePending: () => _name != null && _createFor === _name,
     noteExternallyPushed(): void { if (!_dirty) { _pushPending = false; _pushOwed = false; } },
 
-    async open(name: string): Promise<boolean> {
-      if (_name && _name !== name) await persist(pushOn.has("exit"));   // 切 doc 前先存旧的（退出语义）
+    open: (name: string): Promise<boolean> => serial(async () => {   // 排队：在飞的那一轮保存落地之后才换身份（同名重开也等——不然装进来的是旧字节，随后被在飞的那一轮盖成新的，画布和盘对不上）
+      if (_name && _name !== name) await persistNow(pushOn.has("exit"));   // 切 doc 前先存旧的（退出语义）
       wireOnChange();
       return openInto(name);                       // 装入段抽成 openInto（与 takeCloud 重载共用；事务性保证见其注释）
-    },
+    }),
 
     adopted(name: string, opts?: { create?: boolean }): void {   // new-doc/import：编辑器内容由 app 装入（非 store.open）→ 当前 + 脏
       wireOnChange();
-      _name = name;
+      _name = name; _gen++;                          // 同步换身份（排不进队）：在飞的那一轮靠起跑时钉住的名字 / 代数，不会把字节写到这份名下、也不会来动这份的旗标
       _dirty = true; _pushPending = true; _pushOwed = false;          // 新内容未落盘/未推；desk=默认（reset 过）
       _createFor = opts?.create ? name : null;     // 新建画布/import → **该身份**首存 mode:"new"（撞名不覆盖）；纯 adopt(revert/切名) 不设 = existing
     },
@@ -263,22 +284,24 @@ export function createEditorSession(config: EditorSessionConfig): EditorSession 
 
     flushLocal: () => persist(false),
     flushAndPush: () => persist(true),
-    forceSaveAndPush: async () => { await persist(true, true); _pushOwed = _name != null && _pushPending && !_dirty; },   // 用户显式按 save：无条件 encode+推（v409）；没推成且期间没再改 = 记下欠的这一推
+    forceSaveAndPush: async () => { const gen = _gen; await persist(true, true); if (gen === _gen) _pushOwed = _name != null && _pushPending && !_dirty; },   // 用户显式按 save：无条件 encode+推（v409）；没推成且期间没再改 = 记下欠的这一推
 
-    async rename(newName: string): Promise<TryMoveResult> {
+    rename: (newName: string): Promise<TryMoveResult> => serial(async () => {   // 排队：改名期间不许有保存往旧名字上写
       if (!_name) return { ok: true };
-      await persist(false);                        // 先把内存落到旧名
-      const r = await fileOf(_name).tryMove(newName);   // 唯一入口（含占用检查，挂在 file 上）；占用→不改 _name
-      if (r.ok) _name = newName;
+      await persistNow(false);                     // 先把内存落到旧名
+      const from = _name;
+      if (!from) return { ok: true };
+      const r = await fileOf(from).tryMove(newName);   // 唯一入口（含占用检查，挂在 file 上）；占用→不改 _name
+      if (r.ok && _name === from) _name = newName;     // 同一份文档换了名字（不是换了一份：代数不动、旗标不动）
       return r;
-    },
+    }),
 
-    async delete(): Promise<void> {
+    delete: (): Promise<void> => serial(async () => {   // 排队：在飞的那一轮保存先落地，再进回收站（反过来 = 刚删掉又被存回来）
       if (!_name) return;
       const n = _name;
-      _name = null; _dirty = false; _pushPending = false; _pushOwed = false;
+      _name = null; _gen++; _dirty = false; _pushPending = false; _pushOwed = false;
       await fileOf(n).trash();
-    },
+    }),
 
     start(): void {
       wireOnChange();

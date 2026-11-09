@@ -35,7 +35,7 @@ export const storeAbsent = storeAbsentReason != null;
 
 // Graph 传输层三个显式开关（store 0.17.2 默认全关 = 行为变更默认关；user 2026-10-21「没问题」开；取舍 = ai-docs/20261021-store-2x-gallery-08x-migration.md §3）：
 //   timeouts：每个 Graph 请求带超时（meta 30 s / 一块 5 MiB 120 s / byte-range 60 s / 整文件 15 min）。iPad 锁屏后在途 fetch 常常永远挂着，
-//     editor-session.persist() 的 _saving 单飞锁等的就是这一个 await → 推挂死 = 之后的 autosave 全停、编辑只在内存里。到点 → CloudNetworkError
+//     editor-session 的保存是排队的（2026-11-09 起；之前是 _saving 单飞锁），队里等的就是这一个 await → 推挂死 = 之后的 autosave 全停、编辑只在内存里。到点 → CloudNetworkError
 //     = 和断网同一类：save 返 pushed:false、文件留脏、下次补推。
 //   chunkResume：> 4 MB 的 .ora 走分块上传；单块失败不再整份从头来，问会话传到哪了接着传（退避 1/2/4/8/16 s，5 次）。
 //   verifyChunkedCommit：分块上传只在开会话时核 If-Match，最后一块落地无条件 → 两台设备同时覆盖同一文件有「传那几十秒」的窗口；
