@@ -83,6 +83,18 @@ ok(await dirty(), "解了锁：落笔进去了");
 await P(() => globalThis.__wpProbe.session.saveAndPush()); await settled();
 ok(!(await dirty()) && drive.puts.length > putsBefore, "存上去了");
 
+console.log("⑤′ 画布文件菜单里的「锁上（先不改了）」：解着才出现；点了先存好再锁");
+await stroke(55);
+ok(await dirty(), "先留一笔没存的");
+await page.locator("#menuButton").click(); await sleep(200);
+ok(await P(() => !document.getElementById("menuLockEdit").classList.contains("hidden")), "解着：菜单里有「锁上」");
+await P(() => document.getElementById("menuLockEdit").click());
+await page.waitForFunction(() => globalThis.__wpProbe.editLocked()); await sleep(300); await settled();
+ok(!(await dirty()), "那一笔先存好了"); ok(/接着改/.test((await door()) ?? ""), "锁上了，门回来了");
+await page.locator("#menuButton").click(); await sleep(200);
+ok(await P(() => document.getElementById("menuLockEdit").classList.contains("hidden")), "锁着：菜单里没有「锁上」（解锁在门上）");
+await page.keyboard.press("Escape"); await sleep(100);
+
 console.log("⑥ 加星：这幅删不掉");
 ok(await P(async (f) => { const st = globalThis.__wpProbe.requireStore(); await st.files.star(f); try { await st.file(f, { mode: "existing" }).trash(); return false; } catch (e) { return e.name === "StarredError"; } }, full), "加了星的送回收站被库拒");
 

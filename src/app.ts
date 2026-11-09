@@ -73,7 +73,8 @@ import { initPerspEdit } from "./persp-edit.ts";
 import { initShapeToolbar } from "./shape-toolbar.ts";   // 形状条（ADR-0005；2026-09-18 回滚复活：独立顶栏动词位 + 工厂上下文条；ADR-0013 几何 extension 已删）
 import { updateSaveStatus, updateNewerBanner } from "./save-status.ts";
 import { initErrorBadge, reportError } from "./error-badge.ts";
-import { editWriteGate, refreshEditLock, isEditLocked, unlockLocalFile } from "./edit-lock.ts";
+import { editWriteGate, refreshEditLock, isEditLocked, unlockLocalFile, canLockNow, lockLocalFile, onEditLockChange } from "./edit-lock.ts";
+import { setMenuOpen } from "./settings-menu.ts";
 import { initEditLockDoor } from "./edit-lock-door.ts";
 import { initDiagLog, note as diagNote, toText as diagText } from "./diag-log.ts";   // 黑匣子（2026-08-31）
 import { initDiagLogSheet } from "./diag-log-sheet.ts";           // dev 页「诊断日志」窗口
@@ -509,6 +510,22 @@ initEditLockDoor({
   unlockLocal: () => unlockLocalFile(),
 });
 window.addEventListener("wp:gallery-changed", () => refreshEditLock());   // 换库 → 重订解锁的订阅
+// 画布文件菜单里的「锁上（先不改了）」（修改锁，user 2026-11-08）：这幅画解着的时候才出现。点了 = 先把改动存好（和按存一样），存成了才锁；
+//   没存成不锁——锁了就存不了了，改动会卡在内存里。解锁不在菜单里：锁着时画布顶上那一条就是。
+const _syncLockMenuItem = () => els.menuLockEdit?.classList.toggle("hidden", !canLockNow());
+onEditLockChange(_syncLockMenuItem);
+els.menuBtn?.addEventListener("click", _syncLockMenuItem, true);   // 开菜单那一下再对一次（新画存下来之后才变成「可以锁」，那一刻没有锁态变化的通知）
+els.menuLockEdit?.addEventListener("click", async () => {
+  setMenuOpen(false);
+  if (!canLockNow()) return;
+  const h = session.home;
+  try {
+    if (session.dirty) await session.saveAndPush();
+    if (session.dirty) { setStatus(t("el.lockNotSaved"), true); return; }
+    if (h?.kind === "gallery") await gallery.lockEdit(sessionFileName(h.path));   // 图库库自己说「已锁上」
+    else if (h?.kind === "file") { lockLocalFile(); setStatus(t("el.lockedNow", { name: h.fileName })); }
+  } catch (e) { reportError(e instanceof Error ? e : new Error(String(e)), "warning"); }
+});
 
 
 // gallery 现由 ctx 的 getter 透传（不再 ctx.gallery= / Object.assign 二次突变——ctx 已冻结、一次构造）。

@@ -2,7 +2,7 @@
 //   created 2026-11-08 by Claude Fable 5.1。家规 = 家族 CLAUDE.md「源文件原则上只读：手动解锁才能改」；user「默认的文件你根本不能编辑，一编辑就报错，一保存就报错」。
 //   保存那一片在 editor-session-edit-lock.test.mjs；库那一片在 @internal/store 自己的测试。
 import { describe, it, eq, assert } from "./runner.mjs";
-import { initEditLock, isEditLocked, isIdentifierEditLocked, editWriteGate, refreshEditLock, onEditLockChange, onEditLockFlash, _resetEditLockForTest, unlockLocalFile, keepLocalFileUnlocked, isLocalFileOpen } from "../src/edit-lock.ts";
+import { initEditLock, isEditLocked, isIdentifierEditLocked, editWriteGate, refreshEditLock, onEditLockChange, onEditLockFlash, _resetEditLockForTest, unlockLocalFile, keepLocalFileUnlocked, isLocalFileOpen, canLockNow, lockLocalFile } from "../src/edit-lock.ts";
 import { allows, isLocked, _resetLocksForTest } from "../src/ui/interaction-lock.ts";
 import { Workpiece, WriteRefusedError } from "../src/backend/workpiece/workpiece.ts";
 import { History } from "../src/backend/workpiece/history.ts";
@@ -129,6 +129,23 @@ describe("edit-lock · 硬盘上的单个文件（不经过库；锁跟着这一
     _resetLocksForTest(); _resetEditLockForTest();
     initEditLock({ store: () => null, activeIdentifier: () => null, createPending: () => false, loading: () => false, localFile: () => null });
     eq(unlockLocalFile(), false); eq(isLocalFileOpen(), false); eq(isEditLocked(), false, "空白画布 / 没开东西不锁");
+  });
+});
+
+describe("edit-lock · 什么时候可以「锁上」（画布文件菜单那一项出不出现）", () => {
+  it("图库里的画：解着才可以锁；锁着 / 空白 / 刚新建没存的 / 库没开开关 → 不出现", () => {
+    rig({ unlocked: ["画.ora"] }); eq(canLockNow(), true);
+    rig(); eq(canLockNow(), false, "已经锁着");
+    rig({ createPending: true }); eq(canLockNow(), false, "刚新建还没存");
+    rig({ active: null }); eq(canLockNow(), false, "没开着画");
+    rig({ lockOn: false, unlocked: ["画.ora"] }); eq(canLockNow(), false, "库没开修改锁");
+  });
+  it("硬盘文件：解着才可以锁；lockLocalFile 之后又锁着", () => {
+    _resetLocksForTest(); _resetEditLockForTest();
+    const h = { name: "猫.ora" };
+    initEditLock({ store: () => null, activeIdentifier: () => null, createPending: () => false, loading: () => false, localFile: () => h });
+    eq(canLockNow(), false); unlockLocalFile(); eq(canLockNow(), true);
+    lockLocalFile(); eq(isEditLocked(), true); eq(canLockNow(), false);
   });
 });
 

@@ -4494,6 +4494,24 @@ export declare const S: {
         readonly ja: "ロック中のため変更していません（先にロック解除）";
         readonly tok: "sitelen li awen. ala li ante. o open e ona";
     };
+    readonly "menu.lockEdit": {
+        readonly zh: "锁上（先不改了）";
+        readonly en: "Lock (done editing for now)";
+        readonly ja: "ロックする（編集を終える）";
+        readonly tok: "o awen e sitelen (mi ante ala lon tenpo ni)";
+    };
+    readonly "el.lockedNow": {
+        readonly zh: "已锁上：{name}";
+        readonly en: "Locked: {name}";
+        readonly ja: "ロックしました：{name}";
+        readonly tok: "sitelen li awen: {name}";
+    };
+    readonly "el.lockNotSaved": {
+        readonly zh: "改动没存成，所以先没锁（锁上之后就存不了了）。存好再锁。";
+        readonly en: "Your changes could not be saved, so the artwork was NOT locked (it cannot be saved while locked). Save first, then lock.";
+        readonly ja: "変更を保存できなかったため、ロックしていません（ロック中は保存できません）。保存してからロックしてください。";
+        readonly tok: "ante sina li awen ala. mi awen ala e sitelen. o awen e ante, o awen e sitelen";
+    };
     readonly "el.localSaveBlocked": {
         readonly zh: "这个文件锁着，没有写回去。先点「接着改」解锁；导出和另存为照常能用。";
         readonly en: "This file is locked — nothing was written back. Tap “Keep editing” to unlock; Export and Save As still work.";

@@ -18,6 +18,10 @@ export interface EditLockDeps {
 export declare function unlockLocalFile(): boolean;
 /** 这个句柄算解着：新画刚存成的文件（人自己那一下保存建出来的），或者解着锁时文件换了句柄（给它加密另写了一份）。不是解锁的口：只许在这两处调。 */
 export declare function keepLocalFileUnlocked(handle: object): void;
+/** 「锁上」现在开着的这个硬盘文件（画布文件菜单里那一项；调之前调用方已经把改动写回去了）。 */
+export declare function lockLocalFile(): void;
+/** 现在有没有东西可以「锁上」：开着一幅已经存在的画（图库里的 / 硬盘文件），而且它此刻解着。空白画布、刚新建还没存的、已经锁着的 → false。 */
+export declare function canLockNow(): boolean;
 /** 现在开着的是不是硬盘上的单个文件（门据此只给一个钮）。 */
 export declare function isLocalFileOpen(): boolean;
 /** 开着的这幅画此刻是不是锁着。 */

@@ -104,6 +104,7 @@ export declare const els: {
     menuRevertToOpen: HTMLElement;
     menuEncrypt: HTMLElement;
     menuEncryptLabel: HTMLElement;
+    menuLockEdit: HTMLElement;
     topEncLock: HTMLElement;
     menuCheckerboard: HTMLElement;
     menuPixelGrid: HTMLElement;

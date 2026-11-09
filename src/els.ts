@@ -124,6 +124,7 @@ export const els = {
   menuRevertToOpen: byId("menuRevertToOpen"),
   menuEncrypt: byId("menuEncrypt"),
   menuEncryptLabel: byId("menuEncryptLabel"),
+  menuLockEdit: byId("menuLockEdit"),
   topEncLock: byId("topEncLock"),
   menuCheckerboard: byId("menuCheckerboard"),
   menuPixelGrid: byId("menuPixelGrid"),
