@@ -225,6 +225,8 @@ export class BrowserGl2Port implements Gl2Port {
    * UNPACK_FLIP_Y（three 给贴图上传时按 texture.flipY 设、不复原）——WebGL2 里 texImage3D / texSubImage3D 收 typed array 时它必须是 false，否则 INVALID_OPERATION；
    * 其余 pixelStore（对齐、按行跳过、行长）和 PIXEL_PACK / UNPACK_BUFFER 绑定（three 的异步读回用 PBO）——上传 / 读回按默认值解释字节。
    * 本模块自己会设并复原的（目标、视口、裁剪框、混合、program、VAO、贴图单元）不在这里。
+   * 本文件只上传字节数组（typed array / null），**不从页面元素（图片 / 画布 / 视频 / ImageBitmap）上传**，所以 UNPACK_COLORSPACE_CONVERSION_WEBGL
+   * 不在单子里；哪天加了那种上传，这里要补它（守卫 test/gl-port-shared-guard.test.mjs：没有页面元素上传 + 碰 GL 的方法先归位）。
    */
   private _ensureBase(): void {
     if (!this.shared) return;
@@ -505,6 +507,8 @@ export class BrowserGl2Port implements Gl2Port {
 
     // 目标 + viewport
     if (spec.target === "screen") {
+      // 共用画面时默认画面归宿主（three 的，带深度 / 模板，没验过）：拒绝，画进借来的 FBO 再把它的贴图交给宿主（0-4）
+      if (this.shared) throw new Error("SHARED_CONTEXT_SCREEN_DRAW (the host owns the default framebuffer; draw into a borrowed FBO and hand its texture over)");
       if (!spec.viewport) throw new Error("SCREEN_DRAW_NEEDS_VIEWPORT");
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(...spec.viewport);
@@ -619,6 +623,7 @@ export class BrowserGl2Port implements Gl2Port {
 
   private _placeholder2d(): WebGLTexture {
     if (this._ph2d) return this._ph2d;
+    this._ensureBase();
     const gl = this.gl;
     const tex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -632,6 +637,7 @@ export class BrowserGl2Port implements Gl2Port {
 
   private _placeholderArr(): WebGLTexture {
     if (this._phArr) return this._phArr;
+    this._ensureBase();
     const gl = this.gl;
     const tex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex);

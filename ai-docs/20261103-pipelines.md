@@ -99,6 +99,19 @@
 - **加一类看法怎么加**：表里加一行 → 给它的写入口一个专属标签 → 它的按钮标 `data-op`、快捷键标 `op` → `styles.css` 那条规则的例外名单加一个词。漏了哪一步 `test/edit-lock-guard.test.mjs` 会红（表里的词必须真有写入口在用、界面上的词必须在表里、样式的例外名单必须和表一样、门里不许手写面板名单）。
 - 验收：`node test/probes/probe-edit-lock.mjs`（真 bundle + 真库 + 假网盘，无头，≈ 25 s；⑤″ = 选区那一段 20 条）。
 
+## 显卡那一层的两种建法（`src/shell/browser-gl2-port.ts`；v0.14.70，Claude Opus 5.5，CatsUp 贴图主线 0-4）
+
+```
+画画软件：new BrowserGl2Port(canvas) ──► 自己的画面（alpha:false / preserveDrawingBuffer）──► 合成 → 贴到画板（target "screen"）
+CatsUp：  BrowserGl2Port.fromContext(three 的 gl) ──► 共用画面
+            每个碰 GL 的入口先 _ensureBase()（把宿主留下的状态设回默认）
+            合成进借来的 FBO ──► glTextureOf(fbo) ──► three 的 ExternalTexture 直接采样（不读回）
+            画到 "screen" = 抛；内核做完一批，宿主 renderer.resetState()
+```
+
+- 自己的画面：`_ensureBase` 什么都不做（零开销）。共用：每个入口多二十来个设状态的调用（CatsUp 探路量过：一次 three 的 resetState 约 0.04 ms，CPU 时间）。
+- 归位单子和来历在 `_ensureBase` 的注释里；守卫 `test/gl-port-shared-guard.test.mjs`；显卡冒烟测试的「共用画面」那一轮。为什么 = ADR-0009 追加注。
+
 ## 还随整张画涨的点
 
 恢复（第 2 步）和快进下载随画大小涨；「存好再刷新」的本地那步不设时限，大画遮罩会转得久。

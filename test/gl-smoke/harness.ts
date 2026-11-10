@@ -1655,104 +1655,191 @@ async function regionParity(glctx: BrowserGl2Port, add: Add): Promise<void> {
   }
 }
 
+// 共用画面（BrowserGl2Port.fromContext，CatsUp 贴图主线 0-4，2026-11-10 Claude Opus 5.5）：宿主（three）会留下的 GL 状态，外加几样更狠的。
+// 共用那一轮每个用例开跑前都做一遍——内核必须自己设对，不能靠默认值（src/shell/browser-gl2-port.ts _ensureBase）。
+function dirtyHostState(gl: WebGL2RenderingContext): void {
+  gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.NEVER); gl.enable(gl.CULL_FACE); gl.cullFace(gl.FRONT_AND_BACK); gl.frontFace(gl.CW);
+  gl.enable(gl.STENCIL_TEST); gl.stencilFunc(gl.NEVER, 0, 0xff); gl.enable(gl.POLYGON_OFFSET_FILL); gl.enable(gl.SAMPLE_ALPHA_TO_COVERAGE); gl.enable(gl.SAMPLE_COVERAGE); gl.sampleCoverage(0, false);
+  gl.colorMask(false, false, false, false); gl.enable(gl.SCISSOR_TEST); gl.scissor(0, 0, 1, 1); gl.viewport(0, 0, 3, 3);
+  gl.enable(gl.BLEND); gl.blendEquation(gl.FUNC_REVERSE_SUBTRACT); gl.blendFuncSeparate(gl.ZERO, gl.ZERO, gl.ZERO, gl.ZERO);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true); gl.pixelStorei(gl.UNPACK_ALIGNMENT, 8);
+  gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 7); gl.pixelStorei(gl.UNPACK_SKIP_ROWS, 3); gl.pixelStorei(gl.PACK_ALIGNMENT, 8);
+  const pbo = gl.createBuffer(); gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, pbo); gl.bufferData(gl.PIXEL_UNPACK_BUFFER, 16, gl.STATIC_DRAW);
+  const smp = gl.createSampler()!; gl.samplerParameteri(smp, gl.TEXTURE_WRAP_S, gl.REPEAT); for (let u = 0; u < 8; u++) gl.bindSampler(u, smp);
+  gl.activeTexture(gl.TEXTURE5);
+}
+/** 记下这张画面上每一次 readPixels 读出来的字节（FNV 指纹，按顺序）：两轮逐次比 = 读回的像素逐字节一样。 */
+function tapReads(gl: WebGL2RenderingContext): string[] {
+  const log: string[] = [], orig = gl.readPixels.bind(gl) as (...a: unknown[]) => void;
+  (gl as unknown as { readPixels: (...a: unknown[]) => void }).readPixels = (...a: unknown[]) => {
+    orig(...a);
+    const dst = a[6] as ArrayBufferView | undefined;
+    if (dst && "buffer" in dst) { const u = new Uint8Array(dst.buffer, dst.byteOffset, dst.byteLength); let h = 2166136261; for (let i = 0; i < u.length; i++) { h ^= u[i]; h = Math.imul(h, 16777619); } log.push(`${u.length}:${(h >>> 0).toString(16)}`); }
+  };
+  return log;
+}
+
+/** 用到 BrowserGl2Port 的那些用例（原样搬来）：独占画面跑一轮、共用画面再跑一轮。 */
+function glCases(glctx: BrowserGl2Port): [string, (add: Add) => void | Promise<void>][] {
+  let backend: BrowserTileArena;
+  return [
+    ["program", (add) => {
+      try {
+        glctx.program("smoke",
+          `#version 300 es
+           layout(location=0) in vec2 a; void main(){ gl_Position=vec4(a*2.0-1.0,0,1); }`,
+          `#version 300 es
+           precision highp float; out vec4 o; void main(){ o=vec4(1,0,0,1); }`);
+        add("program.compile+link", true);
+      } catch (e) { add("program.compile+link", false, String(e)); }
+    }],
+    ["fbo", (add) => {
+      for (const p of ["u8", "f16", "f32"] as const) {
+        if (p !== "u8" && !glctx.caps.floatColorBuffer) continue;
+        try { const f = glctx.borrowFBO(64, 64, p); add(`fbo.${p}.complete`, f.w === 64 && f.h === 64); glctx.returnFBO(f); }
+        catch (e) { add(`fbo.${p}.complete`, false, String(e)); }
+      }
+    }],
+    ["backend", (add) => {
+      backend = glctx.createTileArena(TILE_SIZE, 8) as BrowserTileArena;
+      try {
+        const px = new Uint8Array(GPU_TILE_BYTES);
+        px[0] = 12; px[1] = 34; px[2] = 56; px[3] = 78; px[GPU_TILE_BYTES - 4] = 9; px[GPU_TILE_BYTES - 1] = 255;
+        backend.uploadSlice(2, px);
+        const out = readSliceRaw(glctx, backend, 2);
+        const head = out[0] === 12 && out[1] === 34 && out[2] === 56 && out[3] === 78;
+        const tail = out[GPU_TILE_BYTES - 4] === 9 && out[GPU_TILE_BYTES - 1] === 255;
+        add("backend.upload→read round-trip", head && tail, `head=[${out[0]},${out[1]},${out[2]},${out[3]}]`);
+      } catch (e) { add("backend.upload→read round-trip", false, String(e)); }
+    }],
+    ["reupload", (add) => {
+      try {
+        // 覆盖上传：同 slice 重传后读到新内容（新池不做 clearSlice——index 不指向即不可达）。
+        backend.uploadSlice(3, new Uint8Array(GPU_TILE_BYTES).fill(200));
+        const p2 = new Uint8Array(GPU_TILE_BYTES); p2[0] = 5; p2[3] = 255;
+        backend.uploadSlice(3, p2);
+        const out = readSliceRaw(glctx, backend, 3);
+        add("backend.reupload→overwrite", out[0] === 5 && out[3] === 255, `got=[${out[0]},${out[3]}]`);
+      } catch (e) { add("backend.reupload→overwrite", false, String(e)); }
+    }],
+    ["residency", (add) => {
+      try {
+        // context-loss 后端重建：recreate() → 全新空 array texture（旧内容没了）+ 重建后上传/读回正常。
+        const rb = glctx.createTileArena(TILE_SIZE, 4) as BrowserTileArena;
+        rb.uploadSlice(1, new Uint8Array(GPU_TILE_BYTES).fill(77));
+        rb.recreate(8);   // grow 语义：先删→flush→新建更大（spec:175）
+        const after = readSliceRaw(glctx, rb, 1); const isEmpty = after[0] === 0 && after[GPU_TILE_BYTES - 1] === 0;
+        const p = new Uint8Array(GPU_TILE_BYTES); p[0] = 55; p[3] = 255; rb.uploadSlice(2, p);
+        const back = readSliceRaw(glctx, rb, 2); const rt = back[0] === 55 && back[3] === 255;
+        add("residency:backend.recreate → 空纹理 + 重建后上传读回正常", isEmpty && rt, `empty=${isEmpty} rt=${rt}`);
+      } catch (e) { add("residency:backend.recreate", false, String(e)); }
+    }],
+    ["pool", (add) => {
+      try {
+        // 池批量分配 + 真 GPU 上传读回；evict 后 slice 复用（旧 LayerTileMap 往返测试的池化版）。
+        const pool = new GpuTilePool(backend, backend.capacity);
+        const p = new Uint8Array(GPU_TILE_BYTES); p[0] = 99; p[3] = 255;
+        const [id] = pool.uploadBatch([{ bytes: p }]);
+        const sl = pool.slotOf(id);
+        const back = readSliceRaw(glctx, backend, sl); const rt = back[0] === 99 && back[3] === 255;
+        pool.evict(id);
+        const [id2] = pool.uploadBatch([{ bytes: p }]);
+        add("pool over real GPU（批量+evict 复用）", rt && pool.slotOf(id2) === sl && id2 !== id, `rt=${rt}`);
+      } catch (e) { add("pool over real GPU（批量+evict 复用）", false, String(e)); }
+    }],
+    ["blend/clip", (add) => {
+      try {
+        const cb = glctx.createTileArena(TILE_SIZE, 4) as BrowserTileArena;
+        blendParity(glctx, cb, add, "f32"); blendParity(glctx, cb, add, "f16"); blendParity(glctx, cb, add, "u8");   // u8=S7 显示路径默认精度
+        opaqueProbe(glctx, add); clipParity(glctx, add);
+      } catch (e) { add("blend/clip parity", false, String(e)); }
+    }],
+    ["multitile", (add) => { try { multiTileParity(glctx, add); } catch (e) { add("multitile parity", false, String(e)); } }],
+    ["group", (add) => { try { groupParity(glctx, add); } catch (e) { add("group parity", false, String(e)); } }],
+    ["overlay", (add) => { try { overlayParity(glctx, add); } catch (e) { add("overlay parity", false, String(e)); } }],
+    ["bridge", (add) => { try { bridgeParity(glctx, add); } catch (e) { add("bridge parity", false, String(e)); } }],
+    ["stamp", (add) => { try { stampParity(glctx, add); } catch (e) { add("stamp parity", false, String(e)); } }],
+    ["brushpipe", (add) => { try { brushPipelineParity(glctx, add); } catch (e) { add("brushpipe parity", false, String(e)); } }],
+    ["checker", (add) => { try { checkerParity(glctx, add); } catch (e) { add("checker parity", false, String(e)); } }],
+    ["float", (add) => { try { floatParity(glctx, add); } catch (e) { add("float parity", false, String(e)); } }],
+    ["rendertree", (add) => { try { rendertreeParity(glctx, add); } catch (e) { add("rendertree parity", false, String(e)); } }],
+    ["commit", (add) => { try { commitParity(glctx, add); } catch (e) { add("commit parity", false, String(e)); } }],
+    ["clip-live", (add) => { try { clipLiveParity(glctx, add); } catch (e) { add("clip-live parity", false, String(e)); } }],
+    ["fill", (add) => { try { fillParity(glctx, add); } catch (e) { add("fill parity", false, String(e)); } }],
+    ["warp", (add) => { try { warpParity(glctx, add); } catch (e) { add("warp parity", false, String(e)); } }],
+    ["warpclip", (add) => { try { warpClipParity(glctx, add); } catch (e) { add("warpclip parity", false, String(e)); } }],
+    ["mergedown", (add) => { try { mergeDownParity(glctx, add); } catch (e) { add("mergedown parity", false, String(e)); } }],
+    ["soft tripartite", (add) => { try { softTripartite(glctx, add); } catch (e) { add("soft tripartite", false, String(e)); } }],
+    ["region", async (add) => { try { await regionParity(glctx, add); } catch (e) { add("region parity", false, String(e)); } }],
+    ["arena accounting", (add) => { try { arenaAccounting(glctx, add); } catch (e) { add("arena accounting", false, String(e)); } }],
+  ];
+}
+
 async function run(): Promise<{ ok: boolean; checks: Check[]; error: string | null }> {
   const checks: Check[] = [];
   const add: Add = (name, ok, detail = "") => checks.push({ name, ok, detail });
 
   const canvas = document.createElement("canvas"); canvas.width = 64; canvas.height = 64;
   const glctx = new BrowserGl2Port(canvas); const gl = glctx.gl;
+  const ownReads = tapReads(gl);
 
   add("caps.maxTextureSize≥4096", glctx.caps.maxTextureSize >= 4096, `${glctx.caps.maxTextureSize}`);
   add("caps.maxArrayLayers≥256", glctx.caps.maxArrayLayers >= 256, `${glctx.caps.maxArrayLayers}`);
   add("caps.maxTextureUnits≥8", glctx.caps.maxTextureUnits >= 8, `${glctx.caps.maxTextureUnits}`);
   add("caps.floatColorBuffer", glctx.caps.floatColorBuffer, `${glctx.caps.floatColorBuffer}`);
 
-  try {
-    glctx.program("smoke",
-      `#version 300 es
-       layout(location=0) in vec2 a; void main(){ gl_Position=vec4(a*2.0-1.0,0,1); }`,
-      `#version 300 es
-       precision highp float; out vec4 o; void main(){ o=vec4(1,0,0,1); }`);
-    add("program.compile+link", true);
-  } catch (e) { add("program.compile+link", false, String(e)); }
-
-  for (const p of ["u8", "f16", "f32"] as const) {
-    if (p !== "u8" && !glctx.caps.floatColorBuffer) continue;
-    try { const f = glctx.borrowFBO(64, 64, p); add(`fbo.${p}.complete`, f.w === 64 && f.h === 64); glctx.returnFBO(f); }
-    catch (e) { add(`fbo.${p}.complete`, false, String(e)); }
-  }
-
-  const backend = glctx.createTileArena(TILE_SIZE, 8) as BrowserTileArena;
-  try {
-    const px = new Uint8Array(GPU_TILE_BYTES);
-    px[0] = 12; px[1] = 34; px[2] = 56; px[3] = 78; px[GPU_TILE_BYTES - 4] = 9; px[GPU_TILE_BYTES - 1] = 255;
-    backend.uploadSlice(2, px);
-    const out = readSliceRaw(glctx, backend, 2);
-    const head = out[0] === 12 && out[1] === 34 && out[2] === 56 && out[3] === 78;
-    const tail = out[GPU_TILE_BYTES - 4] === 9 && out[GPU_TILE_BYTES - 1] === 255;
-    add("backend.upload→read round-trip", head && tail, `head=[${out[0]},${out[1]},${out[2]},${out[3]}]`);
-  } catch (e) { add("backend.upload→read round-trip", false, String(e)); }
-
-  try {
-    // 覆盖上传：同 slice 重传后读到新内容（新池不做 clearSlice——index 不指向即不可达）。
-    backend.uploadSlice(3, new Uint8Array(GPU_TILE_BYTES).fill(200));
-    const p2 = new Uint8Array(GPU_TILE_BYTES); p2[0] = 5; p2[3] = 255;
-    backend.uploadSlice(3, p2);
-    const out = readSliceRaw(glctx, backend, 3);
-    add("backend.reupload→overwrite", out[0] === 5 && out[3] === 255, `got=[${out[0]},${out[3]}]`);
-  } catch (e) { add("backend.reupload→overwrite", false, String(e)); }
-
-  try {
-    // context-loss 后端重建：recreate() → 全新空 array texture（旧内容没了）+ 重建后上传/读回正常。
-    const rb = glctx.createTileArena(TILE_SIZE, 4) as BrowserTileArena;
-    rb.uploadSlice(1, new Uint8Array(GPU_TILE_BYTES).fill(77));
-    rb.recreate(8);   // grow 语义：先删→flush→新建更大（spec:175）
-    const after = readSliceRaw(glctx, rb, 1); const isEmpty = after[0] === 0 && after[GPU_TILE_BYTES - 1] === 0;
-    const p = new Uint8Array(GPU_TILE_BYTES); p[0] = 55; p[3] = 255; rb.uploadSlice(2, p);
-    const back = readSliceRaw(glctx, rb, 2); const rt = back[0] === 55 && back[3] === 255;
-    add("residency:backend.recreate → 空纹理 + 重建后上传读回正常", isEmpty && rt, `empty=${isEmpty} rt=${rt}`);
-  } catch (e) { add("residency:backend.recreate", false, String(e)); }
-
-  try {
-    // 池批量分配 + 真 GPU 上传读回；evict 后 slice 复用（旧 LayerTileMap 往返测试的池化版）。
-    const pool = new GpuTilePool(backend, backend.capacity);
-    const p = new Uint8Array(GPU_TILE_BYTES); p[0] = 99; p[3] = 255;
-    const [id] = pool.uploadBatch([{ bytes: p }]);
-    const sl = pool.slotOf(id);
-    const back = readSliceRaw(glctx, backend, sl); const rt = back[0] === 99 && back[3] === 255;
-    pool.evict(id);
-    const [id2] = pool.uploadBatch([{ bytes: p }]);
-    add("pool over real GPU（批量+evict 复用）", rt && pool.slotOf(id2) === sl && id2 !== id, `rt=${rt}`);
-  } catch (e) { add("pool over real GPU（批量+evict 复用）", false, String(e)); }
-
-  try {
-    const cb = glctx.createTileArena(TILE_SIZE, 4) as BrowserTileArena;
-    blendParity(glctx, cb, add, "f32"); blendParity(glctx, cb, add, "f16"); blendParity(glctx, cb, add, "u8");   // u8=S7 显示路径默认精度
-    opaqueProbe(glctx, add); clipParity(glctx, add);
-  } catch (e) { add("blend/clip parity", false, String(e)); }
-  try { multiTileParity(glctx, add); } catch (e) { add("multitile parity", false, String(e)); }
-  try { groupParity(glctx, add); } catch (e) { add("group parity", false, String(e)); }
-  try { overlayParity(glctx, add); } catch (e) { add("overlay parity", false, String(e)); }
-  try { bridgeParity(glctx, add); } catch (e) { add("bridge parity", false, String(e)); }
+  // 每个用例记下自己那一段检查结果和那一段读回（共用那一轮按用例对齐比）
+  type Seg = { name: string; checks: Check[]; reads: string[] };
+  const ownSegs: Seg[] = [];
+  for (const [name, fn] of glCases(glctx)) { const c0 = checks.length, r0 = ownReads.length; await fn(add); ownSegs.push({ name, checks: checks.slice(c0), reads: ownReads.slice(r0) }); }
   try { tilePixelsParity(add); } catch (e) { add("tilepixels parity", false, String(e)); }
-  try { stampParity(glctx, add); } catch (e) { add("stamp parity", false, String(e)); }
-  try { brushPipelineParity(glctx, add); } catch (e) { add("brushpipe parity", false, String(e)); }
-  try { checkerParity(glctx, add); } catch (e) { add("checker parity", false, String(e)); }
-  try { floatParity(glctx, add); } catch (e) { add("float parity", false, String(e)); }
-  try { rendertreeParity(glctx, add); } catch (e) { add("rendertree parity", false, String(e)); }
-  try { commitParity(glctx, add); } catch (e) { add("commit parity", false, String(e)); }
-  try { clipLiveParity(glctx, add); } catch (e) { add("clip-live parity", false, String(e)); }
-  try { fillParity(glctx, add); } catch (e) { add("fill parity", false, String(e)); }
-  try { warpParity(glctx, add); } catch (e) { add("warp parity", false, String(e)); }
-  try { warpClipParity(glctx, add); } catch (e) { add("warpclip parity", false, String(e)); }
-  try { mergeDownParity(glctx, add); } catch (e) { add("mergedown parity", false, String(e)); }
-  try { softTripartite(glctx, add); } catch (e) { add("soft tripartite", false, String(e)); }
-  try { await regionParity(glctx, add); } catch (e) { add("region parity", false, String(e)); }
-  try { arenaAccounting(glctx, add); } catch (e) { add("arena accounting", false, String(e)); }
   try { await referenceComponentCheck(add); } catch (e) { add("reference component", false, String((e as Error)?.stack ?? e).slice(0, 600)); }
 
   const finalErr = gl.getError();   // 只读一次（getError 读后即清，二次读会误报 0）
   add("no GL error", finalErr === gl.NO_ERROR, `0x${finalErr.toString(16)}`);
+
+  // ---- 共用画面那一轮（0-4）：裸画面（属性照 three 的默认：antialias / depth / stencil）→ 弄脏 → fromContext → 同一串用例；每个用例前再弄脏一次 ----
+  // 这几个用例本身就画到屏幕（RenderTree 的显示那一步 = 把合成结果贴到画板上）：共用画面时默认画面归宿主、画到屏幕 = 抛（0-4 第 1 条），所以这一轮不比它们，
+  // 只在最后验它们确实被拒绝（名单不实 = 红）。三维那边从来不让内核画屏幕（合成进借来的 FBO、把贴图交给 three）。
+  const SCREEN_CASES = new Set(["rendertree", "commit", "clip-live", "fill"]);
+  // 细节本来就会变的检查（只比过没过，不比细节字）：预编译的用时 / 已编好几个 / 后台收尾了几个（跟机器快慢和前面跑过哪些用例有关）、
+  // 活着的图块仓个数（共用那一轮少跑了上面几个用例）。像素另有读回指纹逐次比。
+  const DETAIL_VARIES = [/^region:warm /, /^arena:/];
+  const t0 = performance.now();
+  const sc = document.createElement("canvas"); sc.width = 64; sc.height = 64;
+  const sgl = sc.getContext("webgl2", { antialias: true, depth: true, stencil: true, premultipliedAlpha: true, preserveDrawingBuffer: false }) as WebGL2RenderingContext;
+  const sharedReads = tapReads(sgl);
+  dirtyHostState(sgl);
+  const shared = BrowserGl2Port.fromContext(sgl);
+  const cases = glCases(shared), diffs: string[] = [];
+  let compared = 0, readsCompared = 0;
+  for (const [name, fn] of cases) {
+    if (SCREEN_CASES.has(name)) continue;
+    const got: Check[] = [], r0 = sharedReads.length;
+    dirtyHostState(sgl);
+    await fn((n, ok, d = "") => { got.push({ name: n, ok, detail: d }); add(`shared:${n}`, ok, d); });
+    const own = ownSegs.find((x) => x.name === name)!, reads = sharedReads.slice(r0);
+    compared++; readsCompared += reads.length;
+    const same = (c: Check, g: Check): boolean => { const v = DETAIL_VARIES.find((re) => re.test(c.name)); return v ? v.test(g.name) && c.ok === g.ok : c.name === g.name && c.ok === g.ok && c.detail === g.detail; };   // 名字里也可能带用时
+    const bad = own.checks.length !== got.length ? [`${own.checks.length} vs ${got.length} checks`] : own.checks.flatMap((c, i) => (same(c, got[i]) ? [] : [`${c.name}: ${c.detail} → ${got[i].name} ${got[i].detail}`]));
+    if (bad.length) diffs.push(`${name}: ${bad.join(" | ")}`);
+    if (own.reads.length !== reads.length || own.reads.some((h, i) => h !== reads[i])) diffs.push(`${name}: readback bytes differ (${own.reads.length} vs ${reads.length} reads)`);
+  }
+  add("shared:同一串用例（不画屏幕的）结果、细节、读回的像素都和独占那一轮逐字节一样", compared > 0 && diffs.length === 0, diffs.length ? diffs.join(" ;; ") : `${compared} cases · ${readsCompared} reads`);
+  const refused: string[] = [];
+  for (const [name, fn] of cases) {
+    if (!SCREEN_CASES.has(name)) continue;
+    const got: Check[] = [];
+    dirtyHostState(sgl);
+    await fn((n, ok, d = "") => { got.push({ name: n, ok, detail: d }); });
+    if (got.some((c) => /SHARED_CONTEXT_SCREEN_DRAW/.test(c.detail))) refused.push(name);
+  }
+  add("shared:画到屏幕的那几个用例在共用画面下确实被拒绝（名单没有多列）", refused.length === SCREEN_CASES.size, `${refused.join(", ")}`);
+  let sharedThrewOnScreen = false;
+  try { shared.draw({ program: "smoke", target: "screen", viewport: [0, 0, 64, 64] }); } catch (e) { sharedThrewOnScreen = /SHARED_CONTEXT_SCREEN_DRAW/.test(String(e)); }
+  add("shared:画到屏幕 = 抛", sharedThrewOnScreen);
+  const sErr = sgl.getError();
+  add("shared:no GL error", sErr === sgl.NO_ERROR, `0x${sErr.toString(16)} · ${(performance.now() - t0).toFixed(0)} ms`);
   return { ok: checks.every((c) => c.ok), checks, error: null, newGoldens: _newGoldens };
 }
 

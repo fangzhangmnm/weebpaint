@@ -56,3 +56,12 @@ readPixels——没有几何/线/点/深度。GL context 创建点全仓唯一�
   三方 golden、多 backend、mock multiplayer）只在 QA 收尾棒。
 - 新独立 CPU 像素算法 = user consent + `backend/algorithms/` 落户 + 注册清单（热路径栅格只准走
   Gl2Port）——语言层面堵不死，靠纪律 + review + 测试。
+
+## 追加注（2026-11-10，Claude Opus 5.5；CatsUp 贴图主线 0-4）：Gl2Port 的实现体还能建在别人的画面上
+
+- **多了一种建法**：`BrowserGl2Port.fromContext(gl)`，建在宿主已有的 WebGL2 画面上（CatsUp 用它把画画内核和 three 放在同一张画布上：内核合成进借来的 FBO，`glTextureOf(fbo)` 把背后的贴图交给 three 直接采样，不读回）。老的 `new BrowserGl2Port(canvas)` 一个字不变。backend 仍只见 `Gl2Port`，这条 ADR 的边界不动：多出来的两个口（`fromContext`、`glTextureOf`）和 `.gl` 一样是壳侧的，backend 摸不到。
+- **为什么要归位**：宿主会留下任意 GL 状态（three：深度、剔除、模板、颜色写、上传时的上下翻转……）。本模块靠的是「每次画自带全部状态」，但有一批它依赖、却从不自己设的状态，自己的画面上它们永远是默认值，共用时就不是了。所以共用时每个碰 GL 的入口先 `_ensureBase()` 把它们设回默认。单子和每一条的来历在 `src/shell/browser-gl2-port.ts` 的 `_ensureBase` 注释里。自己的画面上 `_ensureBase` 什么都不做：画画软件的行为和开销一个字节不变。
+- **共用时画到屏幕 = 抛**（`SHARED_CONTEXT_SCREEN_DRAW`）：默认画面归宿主，那条路没验过。所以画画软件里「合成完贴到画板」那几条（RenderTree 的显示）不能原样在共用画面上走；宿主拿贴图自己显示。
+- **守**：
+  - `test/gl-port-shared-guard.test.mjs`（npm test 里）：碰 GL（画 / 清屏 / 上传 / 读回 / 复制）的方法必须先归位；本文件不从页面元素上传贴图（有了的话归位单子要加颜色空间转换那个开关）。
+  - `test/gl-smoke/harness.ts` 的「共用画面」那一轮：裸画面 → 把宿主会留下的状态全弄脏 → `fromContext` → 现有用例再跑一遍（每个用例前再弄脏一次）。结果、细节和每一次读回的像素都要和独占画面那一轮逐字节一样；画到屏幕的那四个用例要确实被拒绝。
