@@ -29,7 +29,7 @@ import { canvasToBlob } from "./shell/image-io.ts";
 import { setOpened } from "@internal/gallery";   // active session 持久层（P5：device 回执条，永不同步）
 import type { PaintingView } from "./backend/workpiece/painting-view.ts";
 import { isMobileShareOs } from "./share-platform.ts";
-import { upscaleRgba } from "./export-upscale.ts";
+import { upscaleRgba, upscaleFits } from "./export-upscale.ts";
 
 // navigator.canShare/share 的 files 形参在部分 lib.dom 里未覆盖 → 窄化扩展（不引入 any）。
 // 抄 src/brush-io.ts 的 FileShareNavigator 模式。
@@ -103,7 +103,7 @@ export async function thumbBlobFromBytes(merged: { data: Uint8ClampedArray; w: n
 //   顺序不是随手排的——① defringe 只该管画本身的边（水印自带 α=0 边不参与回填）；② alpha 护栏统计
 //   必须先于水印跑（水印是大片半透明，混进统计会污染判据）；③ 铺底后再贴 = 水印永远在底色**之上**。
 // upscale（家族周账 F-230，2026-11-09）：整数倍最近邻放大，排在**编码前最后一步**（底色 / defringe / 护栏统计都在原尺寸上做完，放大只复制像素）；
-//   上限由调用方先核（export-upscale.largestFittingUpscale），这里不再兜。
+//   上限由调用方先核（export-upscale.largestFittingUpscale，降了要告诉人）；这里再拦一道：放不下就抛，不出空图 / 不撑爆内存（Claude Fable 5.2 审时加）。
 export async function renderDocToImageBlob(doc: PaintingView, mime = "image/png", quality?: number, scope = "merged", cropRect?: { x: number; y: number; w: number; h: number } | null, defringe = false, bg = "transparent", selMask?: Uint8Array | null, onAudit?: (a: AlphaAudit) => void, upscale = 1) {
   // S9：合成走 GL（doc-render，与 display 同源，含 clip + 组隔离）。C3（债 d）：全字节管线——
   //   合成字节 → 裁剪/铺底全在字节上做；canvas 只剩 JPEG 编码边界（提案 §4 壳域合法名单）。
@@ -132,6 +132,7 @@ export async function renderDocToImageBlob(doc: PaintingView, mime = "image/png"
     const d = plane.data;
     for (let i = 0; i < plane.w * plane.h; i++) d[i * 4 + 3] = Math.round(d[i * 4 + 3] * selMask[i] / 255);
   }
+  if (!upscaleFits(plane.w, plane.h, upscale)) throw new Error(`export upscale x${upscale} of ${plane.w}x${plane.h} is over the size limit`);
   // v0.9.14 导出底色（user 拍板：视图级，PNG 默认透明、JPG 默认白；与画板底色/UI 主题三分立不同步）。
   const bgRgb = parseExportBg(bg);
   // v134 (user：「导出 png 保留透明度！！」) PNG **默认**不涂底（bg=transparent），empty 区域 = 透明；

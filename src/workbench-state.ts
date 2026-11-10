@@ -18,6 +18,7 @@
 //   （全局 pressureToSize/Opacity 已 deprecate 2026-07-14 → 每笔自带的 sizeCoeff/opaCoeff，见 brush.ts:397。）
 
 import { migrate, splitExtra, stampFields, type Stamp, type Verdict } from "./backend/format/migrate.ts";   // 格式版本纪律：desk 的拍子（major 比本版新 → 抛 FormatTooNewError，壳层接）
+import { snapUpscale } from "./export-upscale.ts";
 import { reactive } from "../vendor/vue/vue.esm-browser.prod.js";
 import type { EditorRuntimeState, DialReactive, ToolDial } from "./app-context.ts";
 
@@ -143,6 +144,11 @@ function freshGroups() {
     //   mergeInto 静默忽略、统一升级到默认开——precedent 同 v0.10.11 lineartInk→lineartInkTh。
     //   （不改名的话 user 自己已有的画导出仍不 defringe，等于没做。）
     export:        { format: "png" as string, target: "file" as string, layerMode: "merged" as string, clipSelection: false, defringePng: true, bg: "transparent" as string },   // layerMode=scope "merged"|"active"；clipSelection=#16 仅导出选区范围；defringePng=v0.9.13 贴图防黑边（PNG，#8 起默认开）；bg=v0.9.14 导出底色（"transparent"|"#rrggbb"，PNG 透明/JPG 白）
+    // 图片导出的整数倍放大倍数（家族周账 F-230；user 2026-11-09「记住」「我同意，然后让fable做文件格式」= 跟着每幅画存）。added by Claude Fable 5.2 2026-11-09
+    //   **顶层键、一个数，不放进 export 里**：嵌在已知对象里的未知子键旧版本不直通（format/migrate.ts 头），放进 export = 旧版本（含正式版）存一次就丢；
+    //   顶层键旧版本进直通袋原样带回（拿 v0.14.54 的真代码验过）。加可选字段 = desk 拍子 minor +1（1.0.0 → 1.1.0，家族格式规矩）。
+    //   只经访问器 desk.export.upscale 读写（读出来一定是倍数表里的值；文件里是什么怪东西都不抛）。
+    exportUpscale: 1 as number,
     colorPanel:    { enabled: false, position: null as PanelPos | null },
     layersPanel:   { enabled: false, position: null as PanelPos | null },
     // refPanel.viewport：format ≤2 时代单张参考的视口；format 3 起参考的视口全在 .weebpaint/references/manifest.json，
@@ -290,6 +296,8 @@ export const desk = {
     get clipSelection(): boolean { return S.g.export.clipSelection; }, set clipSelection(v: boolean) { S.g.export.clipSelection = v; },
     get defringePng(): boolean { return S.g.export.defringePng; }, set defringePng(v: boolean) { S.g.export.defringePng = v; },
     get bg(): string { return S.g.export.bg; }, set bg(v: string) { S.g.export.bg = v; },
+    // 放大倍数（存在顶层 exportUpscale，见 freshGroups）：读出来一定是倍数表里的值（文件里的怪值 = 1、表外值往下靠；不改就把文件里的原值存回）。
+    get upscale(): number { return snapUpscale(S.g.exportUpscale); }, set upscale(v: number) { S.g.exportUpscale = snapUpscale(v); },
   },
   // panels（enabled/position 全 per-doc，决策1「desk 跟画走」）──
   colorPanel: {

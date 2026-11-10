@@ -42,7 +42,7 @@ export interface Stamp { major: number; minor: number; patch: number }
  *  desk 1 = 2026-09-29 起的形状；timelapse 1 = 2026-08-19 起的形状；brush 1 = v99 schema（brushes.ts 头）；rackMeta 1 = 2026-07 rack v2 起的形状。 */
 export const FORMAT: Readonly<Record<Component, Readonly<Stamp>>> = {
   ora: { major: 3, minor: 0, patch: 0 },
-  desk: { major: 1, minor: 0, patch: 0 },
+  desk: { major: 1, minor: 1, patch: 0 },   // 1.1.0 = 2026-11-09 加顶层键 exportUpscale（导出放大倍数）：加可选字段 = minor，旧版本直通带回、提示一次
   timelapse: { major: 1, minor: 0, patch: 0 },
   brush: { major: 1, minor: 0, patch: 0 },
   rackMeta: { major: 1, minor: 0, patch: 0 },

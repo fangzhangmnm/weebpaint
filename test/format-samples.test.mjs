@@ -195,6 +195,25 @@ describe("冻结样本 · 第二层的理由（2026-10-21 审计第 1 / 6 条）
   });
 });
 
+describe("冻结样本 · real/v3.0.0-desk1.1.0（v0.14.67 写入器：desk 1.1.0 = 多一个顶层键 exportUpscale，导出放大倍数；2026-11-09 Fable 5.2 冻）", () => {
+  it("plain：desk 拍子 1.1.0、倍数 4 读得出来；读 → 写 → 再读倍数不丢", async () => {
+    const dec = await decodeOraToPainting(load("real/v3.0.0-desk1.1.0/plain.ora"));
+    eq(dec._editorState.version, 1); eq(dec._editorState.minor, 1); eq(dec._editorState.patch, 0);
+    eq(dec._editorState.exportUpscale, 4);
+    desk.reset(); eq(desk.Unserialize(dec._editorState).verdict, "same"); eq(desk.export.upscale, 4);
+    const deck = await readDeck(dec);
+    const dec2 = await decodeOraToPainting(await rewrite(dec, deck));
+    eq(dec2._editorState.exportUpscale, 4);
+    eq(await semantics(dec2, await readDeck(dec2)), await semantics(dec, deck));
+    desk.reset();
+  });
+  it("老样本（desk 1.0.0，没有这个键）：倍数 = 1，判决 older，不提示", async () => {
+    const dec = await decodeOraToPainting(load("real/v3.0.0/plain.ora"));
+    desk.reset(); eq(desk.Unserialize(dec._editorState).verdict, "older"); eq(desk.export.upscale, 1);
+    desk.reset();
+  });
+});
+
 describe("冻结样本 · desk 结构等价（每份样本：文件里 desk 的每个顶层键，读 → 写 → 再读，值逐字段不变）", () => {
   // 家族格式版本纪律 F-69 护栏 1（统筹 10-21）：动 desk 读写之前，先钉住「现有每一种 desk 都原样往返」。
   //   比的是文件里（布局归一化之后）有的键：当前写入器会补上缺的默认组，那不算变化；version 归写入器自己（只写当前拍）。

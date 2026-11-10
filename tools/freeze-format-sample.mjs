@@ -48,7 +48,7 @@ async function write(name, blob) {
 
 // plain：没有参考、没有录像；desk 改两个非默认值（导出格式 / 底色）
 desk.reset();
-desk.export.format = "jpg"; desk.export.bg = "#ffffff";
+desk.export.format = "jpg"; desk.export.bg = "#ffffff"; desk.export.upscale = 4;   // desk 1.1.0 起：导出放大倍数（顶层键 exportUpscale）
 await write("plain.ora", await encodeDocToOra(doc(), { wroteWith: WEEBPAINT_VERSION, desk: desk.Serialize() }));
 
 // references-live-timelapse：参考窗开着 + 三张卡（图片 / 画布小窗 / 图片，当前第三张）+ 录像 json（合法的 v1 形状）+ mp4 桩字节

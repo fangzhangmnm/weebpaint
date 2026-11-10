@@ -121,7 +121,7 @@ function _updateMenuSubLabels() {
     // v0.9.14：底色非透明时 sub-label 带一眼（色名系统给人话：「白」「藏青」；词库未到 = hex 兜底）
     const bgRgb = parseExportBg(desk.export.bg);
     const bgTail = bgRgb ? ` · ${colorNameOf(bgRgb.r, bgRgb.g, bgRgb.b)}` : "";
-    eiEl.textContent = `${ei.format.toUpperCase()}${_upscale > 1 ? ` ×${_upscale}` : ""} · ${ei.scope === "active" ? t("sub.activeLayer") : t("sub.merged")} · ${ei.target === "clipboard" ? t("sub.clipboard") : ei.target === "print" ? t("sub.print") : ei.target === "cloud" ? t("sub.cloud") : t("sub.file")}${ei.clipSelection ? " · " + t("sub.selection") : ""}${bgTail}`;
+    eiEl.textContent = `${ei.format.toUpperCase()}${desk.export.upscale > 1 ? ` ×${desk.export.upscale}` : ""} · ${ei.scope === "active" ? t("sub.activeLayer") : t("sub.merged")} · ${ei.target === "clipboard" ? t("sub.clipboard") : ei.target === "print" ? t("sub.print") : ei.target === "cloud" ? t("sub.cloud") : t("sub.file")}${ei.clipSelection ? " · " + t("sub.selection") : ""}${bgTail}`;
   }
 }
 
@@ -151,9 +151,8 @@ function _openMenuConfigPopup(wrenchBtn: HTMLElement, html: string, onApply: (po
 }
 let _configPopup: { el: HTMLElement; wrench: HTMLElement } | null = null;
 
-// 图片导出的整数倍放大（家族周账 F-230，2026-11-09）：只记到这次打开（不进 desk = 不改 .ora 格式、不加新持久化，要记住先问 user）。
-//   只管图片格式（png / jpg）；工程格式灰掉。放不下的倍数在下拉里灰掉；导出时按真尺寸（选区裁剪后）再核一次，降了就说。
-let _upscale = 1;
+// 图片导出的整数倍放大（家族周账 F-230，2026-11-09）：倍数跟着每幅画存（desk.export.upscale；不标脏、存时捞，同导出的别的设置）。
+//   只管图片格式（png / jpg）；工程格式灰掉（那条路在前面就返回了，到不了放大）。放不下的倍数在下拉里灰掉；导出时按真尺寸（选区裁剪后）再核一次，降了就说。
 function _exportSize(cropRect: { w: number; h: number } | null): { w: number; h: number } {
   return cropRect ? { w: cropRect.w, h: cropRect.h } : { w: doc.width, h: doc.height };
 }
@@ -208,7 +207,8 @@ export function initExportImportMenu(ctx: AppContext) {
     const cropRect = _selCropRect();   // #16：仅导出选区范围（三种去向统一生效）
     _lastAudit = null;                 // #7：本次导出的护栏回执（四个去向共用，末尾统一说话）
     const sz = _exportSize(cropRect);
-    const upscale = largestFittingUpscale(sz.w, sz.h, _upscale);   // F-230：按真尺寸再核一次上限
+    const wantUp = desk.export.upscale;
+    const upscale = largestFittingUpscale(sz.w, sz.h, wantUp);   // F-230：按真尺寸再核一次上限
     try {
       if (c.target === "clipboard") {
         // 剪贴板恒为 PNG（ClipboardItem image/png）——格式选择只作用于文件/分享路径；底色/防黑边同享（v0.9.14）
@@ -252,7 +252,7 @@ export function initExportImportMenu(ctx: AppContext) {
         if (r.method !== "cancel") _alphaGuardNotice();   // 用户取消分享 = 没导出，不啰嗦
         if (r.method === "cancel") return;
       }
-      _upscaleClampNotice(upscale, _upscale);   // F-230：放大倍数被上限压低了 = 说一次
+      _upscaleClampNotice(upscale, wantUp);   // F-230：放大倍数被上限压低了 = 说一次
     } catch (e) { reportError(new Error(t("tm.exportFailed", { err: String(errMsg(e)) })), "warning"); }   // #34：剪贴板/分享权限被拒也走 banner，不再静默状态栏
   };
 
@@ -339,7 +339,7 @@ export function initExportImportMenu(ctx: AppContext) {
     const fmtItems = [...listExportersByKind("image"), ...listExportersByKind("project")].map((exp) => ({ value: exp.id, label: exp.label }));
     let fmtV = c.format, scopeV: string = proj0 ? "all" : (c.scope || "merged"), tgtV: string = tgt0;
     const fields: { fmt?: SelectField; scope?: SelectField; tgt?: SelectField; up?: SelectField } = {};
-    let upV = _upscale;
+    let upV = desk.export.upscale;
     const applyLocks = (popup: HTMLElement) => {
       const clipEl = popup.querySelector('input[name="clipsel"]') as HTMLInputElement;
       const defrEl = popup.querySelector('input[name="defringe"]') as HTMLInputElement;
@@ -439,7 +439,7 @@ export function initExportImportMenu(ctx: AppContext) {
         const fits = upscaleFits(sz.w, sz.h, k);
         return { value: String(k), label: (k === 1 ? t("tm.upscaleNone") : `×${k}`) + (fits ? "" : t("tm.upscaleTooBig")), disabled: !fits };
       });
-    }, () => String(upV), (v) => { upV = Number(v) || 1; _upscale = upV; });
+    }, () => String(upV), (v) => { desk.export.upscale = Number(v) || 1; upV = desk.export.upscale; });
     applyLocks(popup);   // 初始锁定态（disabled 钮 / 值收敛）就位
   });
 }

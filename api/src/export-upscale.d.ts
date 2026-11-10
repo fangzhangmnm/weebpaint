@@ -11,3 +11,5 @@ export declare function upscaleRgba(data: Uint8ClampedArray, w: number, h: numbe
     w: number;
     h: number;
 };
+/** 任意值 → 倍数表里的值：不是有限数 / 小于 2 = 1；表外的往下靠（5 → 4，99 → 8）。文件里读出来的倍数过这一道。 */
+export declare function snapUpscale(v: unknown): number;

@@ -1,8 +1,8 @@
 // export-upscale.ts —— 图片导出的整数倍放大（像素画发社交媒体：一个像素变 N×N 块，最近邻、不糊）。
 // created 2026-11-09 by Claude Opus 5.5（家族周账 F-230；user 2026-11-08 深夜「像素化的导出能不能做一个上采样的选项，
 //   就是一个像素变多个像素，方便社交媒体分享这种」）。纯函数：倍数表 + 上限 + 放大本身（复用 resample-bytes 的最近邻）。
-// 倍数只记到这次打开（export-import-menu 的模块变量）：写进 desk = 改 .ora 里 desk 的格式（拍子 + 冻结样本）+ 新的持久化，
-//   要先问 user，这一版没做（同 KudsRocket 截图「选项先不记住」）。
+// 倍数跟着每幅画存（desk 顶层键 exportUpscale，访问器 desk.export.upscale；user 2026-11-09「记住」「我同意，然后让fable做文件格式」）。
+//   edited by Claude Fable 5.2 2026-11-09（原先只记到这次打开）。
 
 import { nearestResampleBytes } from "./backend/algorithms/resample-bytes.ts";
 
@@ -29,4 +29,12 @@ export function largestFittingUpscale(w: number, h: number, want: number): numbe
 export function upscaleRgba(data: Uint8ClampedArray, w: number, h: number, k: number): { data: Uint8ClampedArray; w: number; h: number } {
   if (!(k > 1)) return { data, w, h };
   return { data: nearestResampleBytes(data, w, h, w * k, h * k), w: w * k, h: h * k };
+}
+
+/** 任意值 → 倍数表里的值：不是有限数 / 小于 2 = 1；表外的往下靠（5 → 4，99 → 8）。文件里读出来的倍数过这一道。 */
+export function snapUpscale(v: unknown): number {
+  if (typeof v !== "number" || !Number.isFinite(v)) return 1;
+  let got = 1;
+  for (const k of UPSCALE_FACTORS) if (k <= v) got = k;
+  return got;
 }

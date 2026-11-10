@@ -2,7 +2,7 @@
 //   纯函数（倍数表 / 上限 / 最近邻放大）+ 接线守卫（编码前最后一步、四个去向都传、不进 desk）。真 GL 合成那段没在 node 里跑。
 import { describe, it, assert, eq } from "./runner.mjs";
 import { readFileSync } from "node:fs";
-import { UPSCALE_FACTORS, UPSCALE_MAX_SIDE, UPSCALE_MAX_PIXELS, upscaleFits, largestFittingUpscale, upscaleRgba } from "../src/export-upscale.ts";
+import { UPSCALE_FACTORS, UPSCALE_MAX_SIDE, UPSCALE_MAX_PIXELS, upscaleFits, largestFittingUpscale, upscaleRgba, snapUpscale } from "../src/export-upscale.ts";
 
 const src = (p) => readFileSync(new URL("../" + p, import.meta.url), "utf8");
 
@@ -37,13 +37,53 @@ describe("export-upscale · 接线守卫（F-230）", () => {
     assert(/const up = upscaleRgba\(flattenToBg\([^\n]*\), plane\.w, plane\.h, upscale\);/.test(s), "JPG 支");
     assert(/onAudit\?: \(a: AlphaAudit\) => void, upscale = 1\) \{\n[\s\S]*?renderDocToImageBlob\(doc, "image\/png", undefined, scope, cropRect, defringe, bg, selMask, onAudit, upscale\)/.test(s), "剪贴板那条也传");
   });
-  it("png / jpg 导出器把 upscale 传下去；导出菜单四个去向都带；倍数不写进 desk（不改 .ora 格式）", () => {
+  it("png / jpg 导出器把 upscale 传下去；导出菜单四个去向都带；倍数从 desk 读", () => {
     const e = src("src/exporters.ts");
     eq((e.match(/, upscale\) as Promise<Blob>/g) ?? []).length, 2, "png + jpg");
     const m = src("src/export-import-menu.ts");
     eq((m.match(/onAudit: _auditSink, upscale \}/g) ?? []).length, 3, "打印 / 云盘 / 文件分享");
     assert(/copyImageToClipboard\([^)]*_auditSink, upscale\)/.test(m), "剪贴板");
-    assert(/const upscale = largestFittingUpscale\(sz\.w, sz\.h, _upscale\)/.test(m), "导出时按真尺寸再核一次");
-    assert(!/desk\.export\.upscale/.test(m) && !/upscale/.test(src("src/workbench-state.ts")), "倍数不进 desk / workbench-state");
+    assert(/const upscale = largestFittingUpscale\(sz\.w, sz\.h, wantUp\)/.test(m), "导出时按真尺寸再核一次");
+    assert(/const wantUp = desk\.export\.upscale;/.test(m) && !/let _upscale/.test(m), "倍数从这幅画的 desk 读，不再是模块变量");
+  });
+});
+
+// 倍数跟着每幅画存（user 2026-11-09「记住」「我同意，然后让fable做文件格式」；Claude Fable 5.2 2026-11-09）。
+const { desk, deskKnownKeys } = await import("../src/workbench-state.ts");
+const { FORMAT } = await import("../src/backend/format/migrate.ts");
+describe("export-upscale · 跟着画存（desk 顶层键 exportUpscale）", () => {
+  it("snapUpscale：怪值 = 1，表外的往下靠", () => {
+    eq(snapUpscale(4), 4); eq(snapUpscale(5), 4); eq(snapUpscale(99), 8); eq(snapUpscale(0), 1); eq(snapUpscale(-3), 1);
+    eq(snapUpscale("4"), 1); eq(snapUpscale(null), 1); eq(snapUpscale(NaN), 1); eq(snapUpscale(2.9), 2);
+  });
+  it("存：顶层键 exportUpscale（一个数；不在 export 里——旧版本对已知对象里的未知子键不直通）；读回来还是它；新画 = 1", () => {
+    desk.reset(); eq(desk.export.upscale, 1);
+    desk.export.upscale = 4;
+    const out = desk.Serialize();
+    eq(out.exportUpscale, 4); assert(!("upscale" in out.export), "不嵌进 export");
+    assert(deskKnownKeys().includes("exportUpscale"));
+    desk.reset(); eq(desk.export.upscale, 1, "开新画回 1");
+    desk.Unserialize(JSON.parse(JSON.stringify(out))); eq(desk.export.upscale, 4);
+    desk.reset();
+  });
+  it("旧画（没这个键）= 1；文件里是什么怪东西都不抛、读成 1 / 往下靠；不改就原样存回；改了就写成表里的值", () => {
+    desk.reset(); desk.Unserialize({ version: 1, export: { format: "jpg" } }); eq(desk.export.upscale, 1);
+    for (const bad of [null, "boom", { factor: 4 }, [4], true, -2, 1e9 + 0.5]) {
+      desk.Unserialize({ version: 1, exportUpscale: bad });
+      const got = desk.export.upscale;
+      assert(got === 1 || got === 8, `怪值 ${JSON.stringify(bad)} → ${got}`);
+      desk.export.upscale = 2; eq(desk.export.upscale, 2, `怪值 ${JSON.stringify(bad)} 之后还能改`);
+    }
+    desk.Unserialize({ version: 1, exportUpscale: 6 }); eq(desk.export.upscale, 4); eq(desk.Serialize().exportUpscale, 6, "没改 = 文件里的原值存回");
+    desk.export.upscale = 3; eq(desk.Serialize().exportUpscale, 3);
+    desk.reset();
+  });
+  it("拍子：desk 1.1.0（加可选字段 = minor，家族格式规矩）", () => {
+    eq(JSON.stringify(FORMAT.desk), JSON.stringify({ major: 1, minor: 1, patch: 0 }));
+  });
+  it("编码这一层自己也拦：放不下的倍数抛，不出空图（上一层先降、先告诉人）", () => {
+    const s = src("src/session.ts");
+    assert(/if \(!upscaleFits\(plane\.w, plane\.h, upscale\)\) throw new Error\(/.test(s));
+    assert(s.indexOf("if (!upscaleFits(plane.w, plane.h, upscale)) throw") < s.indexOf("plane = upscaleRgba("), "拦在放大之前");
   });
 });

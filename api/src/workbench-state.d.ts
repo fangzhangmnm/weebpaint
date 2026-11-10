@@ -27,6 +27,7 @@ declare function freshGroups(): {
         defringePng: boolean;
         bg: string;
     };
+    exportUpscale: number;
     colorPanel: {
         enabled: boolean;
         position: PanelPos | null;
@@ -207,6 +208,7 @@ export declare const desk: {
         clipSelection: boolean;
         defringePng: boolean;
         bg: string;
+        upscale: number;
     };
     colorPanel: {
         enabled: boolean;

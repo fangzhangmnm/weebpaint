@@ -82,7 +82,7 @@ export const S = {
   "tm.configUpscale":   { zh: "放大", en: "Upscale", ja: "拡大", tok: "suli" },
   "tm.upscaleNone":     { zh: "原样", en: "Original size", ja: "等倍", tok: "sama" },
   "tm.upscaleTooBig":   { zh: "（太大）", en: " (too large)", ja: "（大きすぎ）", tok: " (suli ike)" },
-  "tm.upscaleNote":     { zh: "一个像素变成 N×N 块，不糊（像素画发社交媒体）。只记到关掉 app 为止。", en: "Each pixel becomes an N×N block, no blur (pixel art for social media). Remembered until you close the app.", ja: "1 ピクセルが N×N のブロックに（ぼけない、ドット絵の SNS 投稿向け）。アプリを閉じるまで覚えます。", tok: "kule lili wan li kama leko N×N. ni li awen lon tenpo ni taso." },
+  "tm.upscaleNote":     { zh: "一个像素变成 N×N 块，不糊（像素画发社交媒体）。倍数跟着这幅画，画保存时一起存；锁着的画不存。", en: "Each pixel becomes an N×N block, no blur (pixel art for social media). The factor stays with this artwork and is stored when the artwork is saved; a locked artwork stores nothing.", ja: "1 ピクセルが N×N のブロックに（ぼけない、ドット絵の SNS 投稿向け）。倍率はこの作品と一緒で、作品を保存するときに記録されます。ロック中の作品には記録されません。", tok: "kule lili wan li kama leko N×N. sina awen e sitelen la nanpa suli li awen lon ona. sitelen li awen la nanpa li awen ala." },
   "tm.upscaleClamped":  { zh: "放大 ×{want} 超过上限，这次按 ×{got} 导出了。", en: "Upscaling ×{want} is over the size limit; exported at ×{got} this time.", ja: "×{want} の拡大は上限を超えるため、今回は ×{got} で書き出しました。", tok: "suli ×{want} li suli mute. tenpo ni la mi pana e suli ×{got}." },
   // #13 导出自定义水印（2026-08-28，宣发需要）：扳手里的开关 + 文字；右下角、样式固定极简。
   // #7 导出 alpha 护栏（2026-08-28）：命中 = 琥珀 banner，字节照出（提示不是拦截）。

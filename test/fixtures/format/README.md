@@ -13,6 +13,7 @@
 | `real/v3/plain.ora` | **真** | 同一写入器，没有参考没有录像；desk 改了导出格式 jpg / 白底两个非默认值 |
 | `real/v3.0.0/references-live-timelapse.ora` | **真** | v0.14.46 的写入器（三级拍子起点，`tools/freeze-format-sample.mjs v3.0.0`，2026-10-21 Opus 5.5 冻）：stack.xml `weebpaint:format="3" format-minor="0" format-patch="0"`、desk `version:1 minor:0 patch:0`、录像 json 由 TimelapseDocState 真写（`v:1 minor:0 patch:0`）+ mp4 桩字节、参考清单库 0.5.0 写（1.1.0） |
 | `real/v3.0.0/plain.ora` | **真** | 同一写入器，没有参考没有录像；desk 导出 jpg / 白底 |
+| `real/v3.0.0-desk1.1.0/plain.ora`、`references-live-timelapse.ora` | **真** | v0.14.67 的写入器（`tools/freeze-format-sample.mjs v3.0.0-desk1.1.0`，2026-11-09 Fable 5.2 冻）：desk 拍子 1.1.0 = 多一个顶层键 `exportUpscale`（导出放大倍数，一个数）；plain 那份倍数 = 4；别的子结构拍子没变。**旧读者实测**（不进仓的探针，拿正式版 v0.14.54 的真代码开 plain 那份 → 改导出格式 → 存回）：判决 newer-minor，`exportUpscale: 4` 原样带回 |
 | `synthetic/future-minor/all-parts.ora` | **拼** | 「更新的 minor 写的」（`gen-future.mjs`）：stack.xml minor 1、desk minor 2 + 顶层 `futureDesk`、录像 minor 1 + 顶层 `futureTimelapse`（无 mp4）、参考清单 minor 9 + 顶层 `futureDeck`、外加 `.weebpaint/future-notes.json`。测：打开 → 改一笔 → 存 → 未知的都还在 |
 | `synthetic/future-major/ora-4.ora` | **拼** | stack.xml `weebpaint:format="4"`：整张 major 更新 → 拒开、不写 |
 | `synthetic/future-major/desk-2.ora` | **拼** | ora 3.0.0、desk `version:2`（形状变了）：desk 按默认显示、存回原字节 |

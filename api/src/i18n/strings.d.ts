@@ -373,10 +373,10 @@ export declare const S: {
         readonly tok: " (suli ike)";
     };
     readonly "tm.upscaleNote": {
-        readonly zh: "一个像素变成 N×N 块，不糊（像素画发社交媒体）。只记到关掉 app 为止。";
-        readonly en: "Each pixel becomes an N×N block, no blur (pixel art for social media). Remembered until you close the app.";
-        readonly ja: "1 ピクセルが N×N のブロックに（ぼけない、ドット絵の SNS 投稿向け）。アプリを閉じるまで覚えます。";
-        readonly tok: "kule lili wan li kama leko N×N. ni li awen lon tenpo ni taso.";
+        readonly zh: "一个像素变成 N×N 块，不糊（像素画发社交媒体）。倍数跟着这幅画，画保存时一起存；锁着的画不存。";
+        readonly en: "Each pixel becomes an N×N block, no blur (pixel art for social media). The factor stays with this artwork and is stored when the artwork is saved; a locked artwork stores nothing.";
+        readonly ja: "1 ピクセルが N×N のブロックに（ぼけない、ドット絵の SNS 投稿向け）。倍率はこの作品と一緒で、作品を保存するときに記録されます。ロック中の作品には記録されません。";
+        readonly tok: "kule lili wan li kama leko N×N. sina awen e sitelen la nanpa suli li awen lon ona. sitelen li awen la nanpa li awen ala.";
     };
     readonly "tm.upscaleClamped": {
         readonly zh: "放大 ×{want} 超过上限，这次按 ×{got} 导出了。";
