@@ -9,6 +9,7 @@ import { entries, toText, clear } from "./diag-log.ts";
 import { reportError } from "./error-badge.ts";
 import { setMenuOpen } from "./settings-menu.ts";
 import { openSheet, closeSheet } from "./ui/sheet.ts";   // 2026-09-02 C3
+import { shareSheetPlatform } from "./share-platform.ts";
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement | null;
 
@@ -68,8 +69,10 @@ export function initDiagLogSheet(deps: { status: (msg: string, persist?: boolean
   // Web Share（iPad：直接发给文件 / AirDrop / 邮件 / 任何 app）。2026-09-06 user：微信粘贴不吃 60KB 长文本、QQ 把它拆成几百条——
   //   复制的本来就是纯文本，问题是长度 → 分享改成 **.txt 文件**（canShare files 才走；不支持文件回退纯文本）；
   //   桌面浏览器没有 share → 钮变「下载 .txt」（a[download]）。
+  //   2026-11-09（家族周账 F-111，user 10-27「黑匣子的分享windows下面应该是下载，windows的分享就是个流氓软件」）：Windows 上的 Edge / Chrome
+  //   也有 navigator.share（弹系统分享面板）→ 改看 share-platform.ts：只有 iOS / iPadOS / Android 走分享，别的都下载。
   const logFile = () => new File([toText()], `weebpaint-diag-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.txt`, { type: "text/plain" });
-  const canShare = typeof navigator.share === "function";
+  const canShare = shareSheetPlatform();
   if (shareBtn) {
     if (!canShare) shareBtn.textContent = t("diag.download");
     shareBtn.addEventListener("click", async () => {

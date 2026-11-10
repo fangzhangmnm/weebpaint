@@ -220,5 +220,6 @@ if (globalThis.gc) {
 import "./cloud-gate.test.mjs";   // 掉登录 / 没网闸门 + F-147 B + F-148（工单 G，2026-11-03 Opus）
 import "./exit-rule.test.mjs";    // 加密作品的出门规则（工单 G2，2026-11-03 Opus）
 import "./cloud-return.test.mjs"; // 回来时没传的分三种（工单 G2，2026-11-03 Opus）
+import "./share-platform.test.mjs";   // 2026-11-09 F-111 黑匣子分享：只给手机 / 平板，桌面下载
 import "./sw-channels.test.mjs";  // 正式版 / 开发版壳缓存不互删（F-145）
 import "./sw-redirect.test.mjs";   // 2026-10-14 离线壳：跳转响应原样交回（家族周账 F-28）
