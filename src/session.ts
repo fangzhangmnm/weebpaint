@@ -28,6 +28,7 @@ import { flattenToBg, parseExportBg } from "./backend/algorithms/flatten-bg.ts";
 import { canvasToBlob } from "./shell/image-io.ts";
 import { setOpened } from "@internal/gallery";   // active session 持久层（P5：device 回执条，永不同步）
 import type { PaintingView } from "./backend/workpiece/painting-view.ts";
+import { isMobileShareOs } from "./share-platform.ts";
 
 // navigator.canShare/share 的 files 形参在部分 lib.dom 里未覆盖 → 窄化扩展（不引入 any）。
 // 抄 src/brush-io.ts 的 FileShareNavigator 模式。
@@ -168,13 +169,7 @@ export async function renderDocToImageBlob(doc: PaintingView, mime = "image/png"
 // 桌面（Windows/Mac/Linux）的 share 面板不能存文件（user：「windows 的 share 没有保存」）→ 直接下载。
 // #23：导出菜单的打印路径也按它分流（iOS 打印走分享面板，分享单里自带「打印」）→ 导出为公开谓词。
 export function prefersShare() { return _prefersShare(); }
-function _prefersShare() {
-  const ua = navigator.userAgent || "";
-  if (/iPhone|iPad|iPod|Android/i.test(ua)) return true;
-  // iPadOS 13+ 伪装成 MacIntel 桌面 UA，但有多点触控
-  if (navigator.platform === "MacIntel" && (navigator.maxTouchPoints || 0) > 1) return true;
-  return false;
-}
+function _prefersShare() { return isMobileShareOs(); }   // 判断搬进 share-platform.ts（黑匣子同用一份，家族周账 F-111）
 
 /**
  * 分享 / 保存合成图。移动端优先 navigator.share（→ 相册 / Files）；桌面直接下载到 Downloads。

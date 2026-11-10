@@ -1,7 +1,7 @@
 // 黑匣子「分享」只给手机 / 平板系统，桌面一律下载（家族周账 F-111）。created 2026-11-09 by Claude Opus 5.5
 import { readFileSync } from "node:fs";
 import { describe, it, assert, eq } from "./runner.mjs";
-import { shareSheetPlatform } from "../src/share-platform.ts";
+import { shareSheetPlatform, isMobileShareOs } from "../src/share-platform.ts";
 
 const share = () => {};
 const UA = {
@@ -30,5 +30,11 @@ describe("黑匣子分享 / 下载（F-111）", () => {
     const src = readFileSync("src/diag-log-sheet.ts", "utf8");
     assert(/const canShare = shareSheetPlatform\(\)/.test(src));
     assert(!/typeof navigator\.share/.test(src));
+  });
+  it("iPadOS 装成 MacIntel 平台 + 多点触控也算；作品导出那份判断（session.ts）就是它", () => {
+    eq(isMobileShareOs({ userAgent: "Mozilla/5.0 (X11; Linux x86_64)", platform: "MacIntel", maxTouchPoints: 5 }), true);
+    eq(isMobileShareOs({ userAgent: UA.macSafari, platform: "MacIntel", maxTouchPoints: 0 }), false);
+    const src = readFileSync("src/session.ts", "utf8");
+    assert(/function _prefersShare\(\) \{ return isMobileShareOs\(\); \}/.test(src), "session.ts 不再自己写一份");
   });
 });
