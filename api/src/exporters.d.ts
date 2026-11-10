@@ -11,6 +11,7 @@ export interface ExportOpts {
     defringe?: boolean;
     bg?: string;
     onAudit?: (a: AlphaAudit) => void;
+    upscale?: number;
 }
 export interface Exporter {
     id: string;

@@ -53,6 +53,8 @@ export declare class CpuTilePool {
     private _rawBytes;
     private _compressedBytes;
     private _leakRegistry;
+    /** 进程里所有池一共报过几次泄漏（只计数，app 不读）：测试的泄漏门看它——套件中途 GC 报的那些走 app 的上报口只打一行日志，以前不红（家族周账 F-190）。 */
+    static leaksSeen: number;
     private _leakTokens;
     constructor(opts: {
         tileSize: number;

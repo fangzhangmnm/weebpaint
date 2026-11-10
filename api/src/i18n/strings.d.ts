@@ -354,6 +354,36 @@ export declare const S: {
         readonly ja: "テクスチャ用フリンジ除去（透明部に縁色を延長、PNG のみ）";
         readonly tok: "pona e selo (kule pi poka li tawa insa pi ala, PNG taso)";
     };
+    readonly "tm.configUpscale": {
+        readonly zh: "放大";
+        readonly en: "Upscale";
+        readonly ja: "拡大";
+        readonly tok: "suli";
+    };
+    readonly "tm.upscaleNone": {
+        readonly zh: "原样";
+        readonly en: "Original size";
+        readonly ja: "等倍";
+        readonly tok: "sama";
+    };
+    readonly "tm.upscaleTooBig": {
+        readonly zh: "（太大）";
+        readonly en: " (too large)";
+        readonly ja: "（大きすぎ）";
+        readonly tok: " (suli ike)";
+    };
+    readonly "tm.upscaleNote": {
+        readonly zh: "一个像素变成 N×N 块，不糊（像素画发社交媒体）。只记到关掉 app 为止。";
+        readonly en: "Each pixel becomes an N×N block, no blur (pixel art for social media). Remembered until you close the app.";
+        readonly ja: "1 ピクセルが N×N のブロックに（ぼけない、ドット絵の SNS 投稿向け）。アプリを閉じるまで覚えます。";
+        readonly tok: "kule lili wan li kama leko N×N. ni li awen lon tenpo ni taso.";
+    };
+    readonly "tm.upscaleClamped": {
+        readonly zh: "放大 ×{want} 超过上限，这次按 ×{got} 导出了。";
+        readonly en: "Upscaling ×{want} is over the size limit; exported at ×{got} this time.";
+        readonly ja: "×{want} の拡大は上限を超えるため、今回は ×{got} で書き出しました。";
+        readonly tok: "suli ×{want} li suli mute. tenpo ni la mi pana e suli ×{got}.";
+    };
     readonly "tm.alphaGuard": {
         readonly zh: "导出护栏：检测到 {n} 个可疑半透明像素（{pm}‰）——可能是软橡皮误擦或喷枪喷出界。图已导出，建议在黑底上看一眼";
         readonly en: "Export check: {n} suspicious semi-transparent pixels ({pm}‰) — could be a stray soft eraser or airbrush pass. The file was exported; take a look at it on a dark background";

@@ -12,6 +12,10 @@ export type AppStateKey = keyof typeof APP_STATE_DEFAULTS;
 export declare function wireAppState(synced: Collection | undefined): void;
 export declare function initAppState(): Promise<void>;
 export declare function flushAppState(): Promise<void>;
+export declare function flushAppStateChecked(): Promise<{
+    ok: boolean;
+    error?: unknown;
+}>;
 export declare const appState: {
     currentDirectory: string;
     get galleryPasswordVerifier(): {
