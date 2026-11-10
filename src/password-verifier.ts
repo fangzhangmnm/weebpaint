@@ -9,7 +9,8 @@
 // 语义：verifier 只回答「图库密码是不是 X」。忘记密码 = 内容永久找不回（无后门，与容器一致）；
 //   重置 verifier（clearVerifier）只解锁「设新密码」流程，旧加密件仍是旧密码。
 
-import { appState } from "./app-state.ts";
+import { appState, flushAppStateChecked } from "./app-state.ts";
+import { reportError } from "./error-badge.ts";
 
 export interface VerifierRecord { v: 1; salt: string; iv: string; ct: string }
 
@@ -60,6 +61,14 @@ export function hasVerifier(): boolean { return appState.galleryPasswordVerifier
 /** 记住「图库密码 = pw」（覆盖旧 verifier；创建/首次验证成功时调）。 */
 export async function createVerifier(pw: string): Promise<void> {
   appState.galleryPasswordVerifier = await createVerifierRecord(pw);
+  // 等它落进本机再回（家族周账 F-191，同 CatsUp v0.18.27）：collection 本地写有 400 ms 防抖，设完口令马上关页 / 刷新 →
+  //   验证器没落地 → 下次开机又走「设置图库口令」= 可能两套口令。关页那一下的刷盘（app.ts flushSettingsNow）不等结果，iOS 上未必来得及。
+  await landVerifier();
+}
+/** 立刻落本机；落不进去如实上报（warning），不抛——验证器还在内存里、关页那一下还会再刷一次。 */
+async function landVerifier(): Promise<void> {
+  const r = await flushAppStateChecked().catch((e: unknown) => ({ ok: false, error: e }));
+  if (!r.ok) reportError(r.error instanceof Error ? r.error : new Error(`[app-state] gallery password verifier not written locally: ${String(r.error)}`), "warning");
 }
 
 /** 校验：ok=密码对；bad=密码错；none=没有 verifier（老账号未迁 / 已重置）。 */
@@ -70,4 +79,4 @@ export async function checkVerifier(pw: string): Promise<"ok" | "bad" | "none"> 
 }
 
 /** 重置（用户显式确认后）：只清 verifier——旧加密件仍是旧密码，永不可用新密码解。 */
-export function clearVerifier(): void { appState.galleryPasswordVerifier = null; }
+export function clearVerifier(): void { appState.galleryPasswordVerifier = null; void landVerifier(); }   // 同样立刻落本机（F-191）

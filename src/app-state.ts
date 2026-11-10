@@ -39,6 +39,10 @@ export function initAppState(): Promise<void> {
 export function flushAppState(): Promise<void> {
   return (_synced?.flushLocal() ?? Promise.resolve()).then(() => undefined);
 }
+// 同上，但把结果交回（ok=false = 本机都没写进去）：口令验证器设完要等它落地、落不进去要说（家族周账 F-191，同 CatsUp v0.18.27）。没注入 = ok。
+export function flushAppStateChecked(): Promise<{ ok: boolean; error?: unknown }> {
+  return _synced?.flushLocal() ?? Promise.resolve({ ok: true });
+}
 
 // 冷字段直读写助手：未注入前（boot 极早 / 测试）安全返 default / no-op。
 const getC = <V>(c: Collection | undefined, k: AppStateKey): V =>
