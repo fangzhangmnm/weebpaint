@@ -38,6 +38,7 @@ import "./store-ui-rename-old.test.mjs"; // store 2.2.2 改名面：照抄 galle
 import "./legacy-app-db.test.mjs";      // 老库 weebpaint → 带前缀新库的一次性搬家：条数相等、老库删、没老库不建、可重复跑、失败留着（2026-11-03 工单 B2）
 import "./cpu-tile-pool.test.mjs";
 import "./soft-gl2-port.test.mjs";   // C8 SoftGl2Port：真消费类（栅格/合成/烤定）无 GL 跑通 + 对表纪律
+import "./kernel-boundary.test.mjs";   // 2026-11-10 CatsUp 贴图主线 0-1：画画内核的边界 + 「内核自己的测试」名单（test/kernel-tests.json）不过时
 import "./fill-lockalpha.test.mjs";  // v0.9.12 lockAlpha 真 atop：α 不动/α=0 不写隐形色/erase 不受锁（fill 像素路径首次进 npm test）
 import "./defringe.test.mjs";        // v0.9.13 导出贴图防黑边：α=0 回填边缘色 + PNG 往返保底
 import "./defringe-paths.test.mjs";  // #3 对账：mergedimage.png / Blender push 现状不 defringe（默认值归 #5）
