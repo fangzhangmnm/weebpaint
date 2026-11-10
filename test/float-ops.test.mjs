@@ -34,7 +34,7 @@ function mk() {
   const lt = new LayersFace({ history: h, tree: wp2.layerTree, tiles: wp2.layerTiles, port: doc, status: () => {} });
   const ft = new FloatingTransform();
   ft.attach(doc, h, wp2.floatLayer, wp2.selection);
-  _ctxs.push({ doc, h, wp2 });
+  _ctxs.push({ doc, h, wp2, ft });   // ft 也登记：lift 留底的选区 clone 挂在它身上，测试扔下不管 = 中途 GC 报泄漏（家族周账 F-190）
   return { doc, h, wp2, lt, ft, float: wp2.floatLayer, unrec: () => unrec };
 }
 const px = (r, g, b, a) => new Uint8ClampedArray([r, g, b, a]);
@@ -615,9 +615,10 @@ describe("v0.9.2 · 越出画布的浮层（导入「保持原尺寸」）", () 
 // 测试卫生：统一释放（防 tile-pool FR 泄漏 assert 刷屏；见 shape-brush.test.mjs 同款）
 describe("float-ops 收尾", () => {
   it("清栈、收浮层并释放本文件的选区", () => {
-    for (const { doc, h, wp2 } of _ctxs) {
+    for (const { doc, h, wp2, ft } of _ctxs) {
       h.clear();
       wp2.floatLayer.dropForLoad();
+      ft.syncFromWorkpiece();   // 浮层没了 → 放掉 lift 留底的选区（app 自己那条路，floating-transform.ts syncFromWorkpiece）
       doc.clearSelectionOnLoad();
     }
     _ctxs.length = 0;

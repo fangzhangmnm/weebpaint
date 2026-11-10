@@ -14,10 +14,13 @@ function pattern(w, h, seed = 3) {
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (x >= w - 8) b[(y * w + x) * 4 + 3] = 0;   // 右缘透明带
   return b;
 }
+// 测试卫生：setup 建的叶像素统一登记、文件末尾释放（以前只 dispose rs，叶像素被 GC = tile-pool 报泄漏；家族周账 F-190）
+const _pixels = [];
 function setup(w = 70, h = 40, opts) {
   const port = new SoftGl2Port();
   const room = new GlRoom(port, 512);
   const pixels = new LayerPixels(w, h);
+  _pixels.push(pixels);
   const bytes = pattern(w, h);
   pixels.putRegion(0, 0, w, h, bytes);
   const rs = new RegionStroke(room, 7, pixels, w, h, opts?.sel ?? null, opts);
@@ -145,5 +148,13 @@ describe("region-stroke · 选区 / dirty / overlay / 守卫", () => {
     let dead = false;
     try { rs.alloc(1, 1, "rgba-f32"); } catch (e) { dead = /REGION_DISPOSED/.test(String(e)); }
     assert(dead, "dispose 后 alloc 应 throw");
+  });
+});
+
+describe("region-stroke 收尾", () => {
+  it("释放本文件 setup 建的叶像素", () => {
+    for (const p of _pixels) p.dispose();
+    _pixels.length = 0;
+    assert(true, "disposed");
   });
 });

@@ -122,6 +122,8 @@ export class CpuTilePool {
   // 泄漏 assert：句柄没 release 就被 GC = 某处拿了 tile 忘了放（refCount 永久虚高）。
   // 只上报，不代行 release（FR 时机不可靠，不能当析构）。
   private _leakRegistry: FinalizationRegistry<number> | null;
+  /** 进程里所有池一共报过几次泄漏（只计数，app 不读）：测试的泄漏门看它——套件中途 GC 报的那些走 app 的上报口只打一行日志，以前不红（家族周账 F-190）。 */
+  static leaksSeen = 0;
   private _leakTokens = new WeakMap<TileHandle, object>();
 
   constructor(opts: {
@@ -136,7 +138,7 @@ export class CpuTilePool {
     this._onLeak = opts.onLeak ?? null;
     this._leakRegistry = typeof FinalizationRegistry === "function"
       ? new FinalizationRegistry((id: number) => {
-          if (this._records.has(id)) this._onLeak?.(`TileHandle for tile#${id} GC'd without release() — refCount leaked`);
+          if (this._records.has(id)) { CpuTilePool.leaksSeen++; this._onLeak?.(`TileHandle for tile#${id} GC'd without release() — refCount leaked`); }
         })
       : null;
   }

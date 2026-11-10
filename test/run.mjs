@@ -205,12 +205,15 @@ await run();
 // 裸跑 node test/run.mjs 时门静默跳过（别让本地随手跑变红）。
 if (globalThis.gc) {
   const { setTilePoolLeakReporter } = await import("../src/backend/tiles/app-tile-pool.ts");
-  let leaks = 0;
-  setTilePoolLeakReporter((info) => { leaks++; console.error("  [leak-gate] " + info); });
+  const { CpuTilePool } = await import("../src/backend/tiles/cpu-tile-pool.ts");
+  setTilePoolLeakReporter((info) => { console.error("  [leak-gate] " + info); });
   for (let i = 0; i < 3; i++) {   // 多轮：句柄→registry 回调可能链式解除可达
     globalThis.gc();
     await new Promise((r) => setTimeout(r, 30));
   }
+  // 2026-11-09（家族周账 F-190）：数的是整个进程一共报过几次——套件中途自然 GC 报的那些走 app 的上报口（app-boot 测试接的 reportError，
+  //   日志里是「[wp] Error: [tile-pool] …」），以前不进这里的计数，push-prod 日志里躺了 10 行没人红。
+  const leaks = CpuTilePool.leaksSeen;
   if (leaks) {
     console.error(`\n  [leak-gate] ${leaks} 个 TileHandle 泄漏（GC 时仍未 release）——去修拿了句柄没放的测试/代码`);
     process.exit(1);
