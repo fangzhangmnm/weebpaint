@@ -34,6 +34,7 @@ import { reportError } from "./error-badge.ts";
 import { galleryBackend, requireStore } from "./app-store.ts";
 import { nextFreeExportName } from "@internal/gallery";
 import { withBusy } from "./fullscreen-busy.ts";
+import { UPSCALE_FACTORS, upscaleFits, largestFittingUpscale } from "./export-upscale.ts";
 
 import type { AppContext } from "./app-context.ts";
 import type { AlphaAudit } from "./backend/algorithms/alpha-audit.ts";
@@ -120,7 +121,7 @@ function _updateMenuSubLabels() {
     // v0.9.14：底色非透明时 sub-label 带一眼（色名系统给人话：「白」「藏青」；词库未到 = hex 兜底）
     const bgRgb = parseExportBg(desk.export.bg);
     const bgTail = bgRgb ? ` · ${colorNameOf(bgRgb.r, bgRgb.g, bgRgb.b)}` : "";
-    eiEl.textContent = `${ei.format.toUpperCase()} · ${ei.scope === "active" ? t("sub.activeLayer") : t("sub.merged")} · ${ei.target === "clipboard" ? t("sub.clipboard") : ei.target === "print" ? t("sub.print") : ei.target === "cloud" ? t("sub.cloud") : t("sub.file")}${ei.clipSelection ? " · " + t("sub.selection") : ""}${bgTail}`;
+    eiEl.textContent = `${ei.format.toUpperCase()}${_upscale > 1 ? ` ×${_upscale}` : ""} · ${ei.scope === "active" ? t("sub.activeLayer") : t("sub.merged")} · ${ei.target === "clipboard" ? t("sub.clipboard") : ei.target === "print" ? t("sub.print") : ei.target === "cloud" ? t("sub.cloud") : t("sub.file")}${ei.clipSelection ? " · " + t("sub.selection") : ""}${bgTail}`;
   }
 }
 
@@ -149,6 +150,16 @@ function _openMenuConfigPopup(wrenchBtn: HTMLElement, html: string, onApply: (po
   return popup;
 }
 let _configPopup: { el: HTMLElement; wrench: HTMLElement } | null = null;
+
+// 图片导出的整数倍放大（家族周账 F-230，2026-11-09）：只记到这次打开（不进 desk = 不改 .ora 格式、不加新持久化，要记住先问 user）。
+//   只管图片格式（png / jpg）；工程格式灰掉。放不下的倍数在下拉里灰掉；导出时按真尺寸（选区裁剪后）再核一次，降了就说。
+let _upscale = 1;
+function _exportSize(cropRect: { w: number; h: number } | null): { w: number; h: number } {
+  return cropRect ? { w: cropRect.w, h: cropRect.h } : { w: doc.width, h: doc.height };
+}
+function _upscaleClampNotice(got: number, want: number): void {
+  if (got < want) reportError(new Error(t("tm.upscaleClamped", { want: String(want), got: String(got) })), "warning");
+}
 
 export function initExportImportMenu(ctx: AppContext) {
   ({ doc, setStatus, board } = ctx);
@@ -196,10 +207,12 @@ export function initExportImportMenu(ctx: AppContext) {
     }
     const cropRect = _selCropRect();   // #16：仅导出选区范围（三种去向统一生效）
     _lastAudit = null;                 // #7：本次导出的护栏回执（四个去向共用，末尾统一说话）
+    const sz = _exportSize(cropRect);
+    const upscale = largestFittingUpscale(sz.w, sz.h, _upscale);   // F-230：按真尺寸再核一次上限
     try {
       if (c.target === "clipboard") {
         // 剪贴板恒为 PNG（ClipboardItem image/png）——格式选择只作用于文件/分享路径；底色/防黑边同享（v0.9.14）
-        await copyImageToClipboard(doc, c.scope, cropRect, desk.export.defringePng, desk.export.bg, null, _auditSink);
+        await copyImageToClipboard(doc, c.scope, cropRect, desk.export.defringePng, desk.export.bg, null, _auditSink, upscale);
         setStatus(t("tm.copiedPngToClipboard", { scope: c.scope === "active" ? t("tm.scopeActiveLayer") : t("tm.scopeMerged") }));
         _alphaGuardNotice();
       } else if (c.target === "print" && !prefersShare()) {
@@ -209,7 +222,7 @@ export function initExportImportMenu(ctx: AppContext) {
         //   window.open 必须在此**手势同步期**就开好，不能等 encode 的 await（iOS transient-activation 严）。
         const win = window.open("", "_blank");
         if (exp.busyHint) setStatus(exp.busyHint, true);
-        const blob = await exp.encode(doc, { scope: c.scope, cropRect, defringe: desk.export.defringePng, bg: desk.export.bg, onAudit: _auditSink });
+        const blob = await exp.encode(doc, { scope: c.scope, cropRect, defringe: desk.export.defringePng, bg: desk.export.bg, onAudit: _auditSink, upscale });
         if (win) {
           await printImageInNewWindow(win, blob);
           setStatus(t("tm.printOpenedNewTab"));
@@ -225,7 +238,7 @@ export function initExportImportMenu(ctx: AppContext) {
         if (blocked) { setStatus(blocked, true); return; }
         const exp = getExporter(c.format) || getExporter("png");
         await withBusy(t("tm.exportingCloud"), async () => {
-          const blob = await exp.encode(doc, { scope: c.scope, cropRect, defringe: desk.export.defringePng, bg: desk.export.bg, onAudit: _auditSink });
+          const blob = await exp.encode(doc, { scope: c.scope, cropRect, defringe: desk.export.defringePng, bg: desk.export.bg, onAudit: _auditSink, upscale });
           await _exportBlobToCloud(blob, exp.ext);
         });
         _alphaGuardNotice();
@@ -233,11 +246,13 @@ export function initExportImportMenu(ctx: AppContext) {
         // 文件/分享——以及 #23：iOS/iPad 上「打印」也走这里（分享面板自带打印；PWA 里 window.open 打印脆弱）
         const exp = getExporter(c.target === "print" ? (c.format === "jpg" ? "jpg" : "png") : c.format) || getExporter("png");
         if (exp.busyHint) setStatus(exp.busyHint, true);
-        const blob = await exp.encode(doc, { scope: c.scope, cropRect, defringe: desk.export.defringePng, bg: desk.export.bg, onAudit: _auditSink });
+        const blob = await exp.encode(doc, { scope: c.scope, cropRect, defringe: desk.export.defringePng, bg: desk.export.bg, onAudit: _auditSink, upscale });
         const r = await shareOrDownloadBlob(blob, `${exportBaseName()}-${downloadStamp()}.${exp.ext}`, exp.mime);
         setStatus(r.method === "share" ? t("tm.sharePanelOpened") : r.method === "cancel" ? t("tm.shareCancelled") : t("tm.extDownloadedUpper", { ext: exp.ext.toUpperCase() }));
         if (r.method !== "cancel") _alphaGuardNotice();   // 用户取消分享 = 没导出，不啰嗦
+        if (r.method === "cancel") return;
       }
+      _upscaleClampNotice(upscale, _upscale);   // F-230：放大倍数被上限压低了 = 说一次
     } catch (e) { reportError(new Error(t("tm.exportFailed", { err: String(errMsg(e)) })), "warning"); }   // #34：剪贴板/分享权限被拒也走 banner，不再静默状态栏
   };
 
@@ -323,7 +338,8 @@ export function initExportImportMenu(ctx: AppContext) {
     // 2026-09-02 C6：三个下拉 = select-field 标准件（原生 <select> 退役）；值受控在这三个变量，锁定逻辑改写值 + refresh
     const fmtItems = [...listExportersByKind("image"), ...listExportersByKind("project")].map((exp) => ({ value: exp.id, label: exp.label }));
     let fmtV = c.format, scopeV: string = proj0 ? "all" : (c.scope || "merged"), tgtV: string = tgt0;
-    const fields: { fmt?: SelectField; scope?: SelectField; tgt?: SelectField } = {};
+    const fields: { fmt?: SelectField; scope?: SelectField; tgt?: SelectField; up?: SelectField } = {};
+    let upV = _upscale;
     const applyLocks = (popup: HTMLElement) => {
       const clipEl = popup.querySelector('input[name="clipsel"]') as HTMLInputElement;
       const defrEl = popup.querySelector('input[name="defringe"]') as HTMLInputElement;
@@ -334,7 +350,8 @@ export function initExportImportMenu(ctx: AppContext) {
       else if (scopeV === "all") scopeV = "merged";   // 「所有图层」仅项目格式可选
       if (fields.scope) (fields.scope.el as HTMLButtonElement).disabled = proj;
       if (fields.tgt) (fields.tgt.el as HTMLButtonElement).disabled = projOra;
-      fields.fmt?.refresh(); fields.scope?.refresh(); fields.tgt?.refresh();
+      if (fields.up) (fields.up.el as HTMLButtonElement).disabled = proj;   // F-230：工程格式不碰像素
+      fields.fmt?.refresh(); fields.scope?.refresh(); fields.tgt?.refresh(); fields.up?.refresh();
       clipEl.disabled = proj || !doc.selection;
       desk.export.format = fmtV;
       // QA ⑥：ora 锁死去向时不把锁定值写回 desk——切回 png/jpg/psd 后用户的 cloud 偏好还在
@@ -390,9 +407,14 @@ export function initExportImportMenu(ctx: AppContext) {
         <label><input type="checkbox" name="clipsel" ${c.clipSelection ? "checked" : ""} ${(proj0 || !doc.selection) ? "disabled" : ""} /> ${t("tm.clipToSelection")}${doc.selection ? "" : `（${t("tm.noSelectionNow")}）`}</label>
         <label><input type="checkbox" name="defringe" ${desk.export.defringePng ? "checked" : ""} ${(c.format !== "png" || !!parseExportBg(bg0)) ? "disabled" : ""} /> ${t("tm.defringe")}</label>
       </div>
+      <div class="menu-config-section">
+        <div class="menu-config-title">${t("tm.configUpscale")}</div>
+        <button type="button" data-select="up" class="menu-config-select select-field"></button>
+        <div class="menu-config-note">${t("tm.upscaleNote")}</div>
+      </div>
     `, applyLocks);
     if (!popup) return;
-    const mount = (name: "fmt" | "scope" | "tgt", items: () => { value: string; label: string; disabled?: boolean }[], get: () => string, set: (v: string) => void) => {
+    const mount = (name: "fmt" | "scope" | "tgt" | "up", items: () => { value: string; label: string; disabled?: boolean }[], get: () => string, set: (v: string) => void) => {
       const el = popup.querySelector<HTMLElement>(`[data-select="${name}"]`);
       if (!el) return;
       fields[name] = mountSelectField(el, { items, value: get, onChange: (v) => { set(v); applyLocks(popup); }, band: "popover" });
@@ -411,6 +433,13 @@ export function initExportImportMenu(ctx: AppContext) {
         { value: "cloud", label: t("tm.targetCloud"), disabled: !hasGallery() },
       ];
     }, () => tgtV, (v) => { tgtV = v; });
+    mount("up", () => {
+      const sz = _exportSize(_selCropRect());
+      return UPSCALE_FACTORS.map((k) => {
+        const fits = upscaleFits(sz.w, sz.h, k);
+        return { value: String(k), label: (k === 1 ? t("tm.upscaleNone") : `×${k}`) + (fits ? "" : t("tm.upscaleTooBig")), disabled: !fits };
+      });
+    }, () => String(upV), (v) => { upV = Number(v) || 1; _upscale = upV; });
     applyLocks(popup);   // 初始锁定态（disabled 钮 / 值收敛）就位
   });
 }

@@ -29,6 +29,7 @@ import { canvasToBlob } from "./shell/image-io.ts";
 import { setOpened } from "@internal/gallery";   // active session 持久层（P5：device 回执条，永不同步）
 import type { PaintingView } from "./backend/workpiece/painting-view.ts";
 import { isMobileShareOs } from "./share-platform.ts";
+import { upscaleRgba } from "./export-upscale.ts";
 
 // navigator.canShare/share 的 files 形参在部分 lib.dom 里未覆盖 → 窄化扩展（不引入 any）。
 // 抄 src/brush-io.ts 的 FileShareNavigator 模式。
@@ -101,7 +102,9 @@ export async function thumbBlobFromBytes(merged: { data: Uint8ClampedArray; w: n
 //   贴在**管线最末**：PNG 支在 defringe/铺底之后、编码之前；JPG 支在 flattenToBg 之后合进 flat。
 //   顺序不是随手排的——① defringe 只该管画本身的边（水印自带 α=0 边不参与回填）；② alpha 护栏统计
 //   必须先于水印跑（水印是大片半透明，混进统计会污染判据）；③ 铺底后再贴 = 水印永远在底色**之上**。
-export async function renderDocToImageBlob(doc: PaintingView, mime = "image/png", quality?: number, scope = "merged", cropRect?: { x: number; y: number; w: number; h: number } | null, defringe = false, bg = "transparent", selMask?: Uint8Array | null, onAudit?: (a: AlphaAudit) => void) {
+// upscale（家族周账 F-230，2026-11-09）：整数倍最近邻放大，排在**编码前最后一步**（底色 / defringe / 护栏统计都在原尺寸上做完，放大只复制像素）；
+//   上限由调用方先核（export-upscale.largestFittingUpscale），这里不再兜。
+export async function renderDocToImageBlob(doc: PaintingView, mime = "image/png", quality?: number, scope = "merged", cropRect?: { x: number; y: number; w: number; h: number } | null, defringe = false, bg = "transparent", selMask?: Uint8Array | null, onAudit?: (a: AlphaAudit) => void, upscale = 1) {
   // S9：合成走 GL（doc-render，与 display 同源，含 clip + 组隔离）。C3（债 d）：全字节管线——
   //   合成字节 → 裁剪/铺底全在字节上做；canvas 只剩 JPEG 编码边界（提案 §4 壳域合法名单）。
   //   scope==="active"：仅当前节点（组照常整树合成）；剥掉节点**自身**的 clippingMask（基底不在导出里，
@@ -148,20 +151,22 @@ export async function renderDocToImageBlob(doc: PaintingView, mime = "image/png"
         defringeAlphaZero(plane.data, plane.w, plane.h);
       }
     }
+    plane = upscaleRgba(plane.data, plane.w, plane.h, upscale);
     const png = await encodePngFromBytes(plane.data, plane.w, plane.h);
     return new Blob([png as unknown as BlobPart], { type: "image/png" });
   }
   // JPG 无 alpha 通道 → 必须落底：配置底色，透明/缺省 = 白（v0.9.14 前是硬编码白）。纯字节数学。
-  const flat = flattenToBg(plane.data, bgRgb?.r ?? 255, bgRgb?.g ?? 255, bgRgb?.b ?? 255);
+  const up = upscaleRgba(flattenToBg(plane.data, bgRgb?.r ?? 255, bgRgb?.g ?? 255, bgRgb?.b ?? 255), plane.w, plane.h, upscale);
+  const flat = up.data;
   // canvas 仅当 JPEG 编码器（壳域名单：jpg 编码）。全走 HTMLCanvasElement.toBlob，
   // 避开 Safari OffscreenCanvas.convertToBlob JPEG 返 null 的 bug。
   const c = document.createElement("canvas");
-  c.width = plane.w; c.height = plane.h;
-  c.getContext("2d")!.putImageData(new ImageData(flat, plane.w, plane.h), 0, 0);
+  c.width = up.w; c.height = up.h;
+  c.getContext("2d")!.putImageData(new ImageData(flat, up.w, up.h), 0, 0);
   const blob = await new Promise<Blob | null>((resolve) => c.toBlob(resolve, mime, quality));
   if (blob) return blob;
   // jpg 返 null 兜底走 png（铺过底的字节直接 UPNG）
-  const png = await encodePngFromBytes(flat, plane.w, plane.h);
+  const png = await encodePngFromBytes(flat, up.w, up.h);
   return new Blob([png as unknown as BlobPart], { type: "image/png" });
 }
 
@@ -200,11 +205,11 @@ export async function shareOrDownloadBlob(blob: Blob, filename: string, mime?: s
 // ---- 剪贴板 IO ----
 
 /** 把 doc 合成图复制到剪贴板（PNG）。iPad Safari / 桌面都支持。 */
-export async function copyImageToClipboard(doc: PaintingView, scope = "merged", cropRect?: { x: number; y: number; w: number; h: number } | null, defringe = false, bg = "transparent", selMask?: Uint8Array | null, onAudit?: (a: AlphaAudit) => void) {
+export async function copyImageToClipboard(doc: PaintingView, scope = "merged", cropRect?: { x: number; y: number; w: number; h: number } | null, defringe = false, bg = "transparent", selMask?: Uint8Array | null, onAudit?: (a: AlphaAudit) => void, upscale = 1) {
   // iOS Safari 要求 clipboard.write 在 user gesture 内"同步"触达；**不能**先 await blob 再 write
   // （那个 await 跨过 gesture 窗口 → NotAllowedError）。把 renderDocToImageBlob 的 Promise<Blob>
   // 直接交给 ClipboardItem（lazy promise 写法），复用 writeImageBlobToClipboard 同款路径。
-  const blobPromise = renderDocToImageBlob(doc, "image/png", undefined, scope, cropRect, defringe, bg, selMask, onAudit)
+  const blobPromise = renderDocToImageBlob(doc, "image/png", undefined, scope, cropRect, defringe, bg, selMask, onAudit, upscale)
     .then((blob) => { if (!blob) throw new Error("PNG generation failed"); return blob; });
   await writeImageBlobToClipboard(blobPromise);
 }

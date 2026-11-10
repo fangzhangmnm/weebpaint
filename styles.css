@@ -948,6 +948,7 @@ div.version-slim { transform-origin: left center; }   /* 图库菜单的 info �
 .menu-config-popup label { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; color: var(--ink); }
 .menu-config-popup .menu-config-section { display: flex; flex-direction: column; gap: 4px; }
 .menu-config-popup .menu-config-title { font-size: 11px; color: var(--ink-soft); text-transform: uppercase; }
+.menu-config-popup .menu-config-note { font-size: 11px; color: var(--ink-soft); max-width: 16em; }   /* F-230 放大那一节的说明 */
 /* v0.6C：定宽只给 ☰ 主菜单（.menu-panel 是共享类——图层 +菜单/⋯菜单也穿它，v0.5.28 真机撑宽事故） */
 #menuPanel { width: 300px; max-width: calc(100vw - 16px); }
 

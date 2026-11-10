@@ -78,6 +78,12 @@ export const S = {
   "tm.configRange":     { zh: "裁剪", en: "Crop", ja: "切り抜き", tok: "kipisi" },
   "tm.clipToSelection": { zh: "裁到选区", en: "Clip to selection", ja: "選択範囲に切り抜き", tok: "o kipisi tawa ma wile" },
   "tm.defringe":        { zh: "贴图防黑边（透明区回填边缘色，仅 PNG）", en: "Defringe for textures (extend edge colors under transparency, PNG only)", ja: "テクスチャ用フリンジ除去（透明部に縁色を延長、PNG のみ）", tok: "pona e selo (kule pi poka li tawa insa pi ala, PNG taso)" },
+  // 家族周账 F-230（2026-11-09，Claude Opus 5.5）：图片导出整数倍放大（像素画发社交媒体）
+  "tm.configUpscale":   { zh: "放大", en: "Upscale", ja: "拡大", tok: "suli" },
+  "tm.upscaleNone":     { zh: "原样", en: "Original size", ja: "等倍", tok: "sama" },
+  "tm.upscaleTooBig":   { zh: "（太大）", en: " (too large)", ja: "（大きすぎ）", tok: " (suli ike)" },
+  "tm.upscaleNote":     { zh: "一个像素变成 N×N 块，不糊（像素画发社交媒体）。只记到关掉 app 为止。", en: "Each pixel becomes an N×N block, no blur (pixel art for social media). Remembered until you close the app.", ja: "1 ピクセルが N×N のブロックに（ぼけない、ドット絵の SNS 投稿向け）。アプリを閉じるまで覚えます。", tok: "kule lili wan li kama leko N×N. ni li awen lon tenpo ni taso." },
+  "tm.upscaleClamped":  { zh: "放大 ×{want} 超过上限，这次按 ×{got} 导出了。", en: "Upscaling ×{want} is over the size limit; exported at ×{got} this time.", ja: "×{want} の拡大は上限を超えるため、今回は ×{got} で書き出しました。", tok: "suli ×{want} li suli mute. tenpo ni la mi pana e suli ×{got}." },
   // #13 导出自定义水印（2026-08-28，宣发需要）：扳手里的开关 + 文字；右下角、样式固定极简。
   // #7 导出 alpha 护栏（2026-08-28）：命中 = 琥珀 banner，字节照出（提示不是拦截）。
   //   判据见 backend/algorithms/alpha-audit.ts。

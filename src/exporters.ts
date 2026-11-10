@@ -34,6 +34,7 @@ export interface ExportOpts {
   // #7 导出 alpha 护栏回执（2026-08-28）：仅「PNG + 透明底」会回调。字节照出——护栏是提示不是拦截，
   //   消费方（导出菜单）拿它决定要不要多说一句「黑底看一眼」。判据见 backend/algorithms/alpha-audit.ts。
   onAudit?: (a: AlphaAudit) => void;
+  upscale?: number;     // 家族周账 F-230：整数倍最近邻放大（1 = 原样；上限调用方先核，export-upscale.ts）
 }
 export interface Exporter {
   id: string;
@@ -82,9 +83,9 @@ registerExporter({
 });
 registerExporter({
   id: "png", label: "PNG", ext: "png", mime: "image/png", kind: "image",
-  encode: (doc, { scope = "merged", cropRect = null, defringe = false, bg = "transparent", onAudit } = {}) => renderDocToImageBlob(doc, "image/png", undefined, scope, cropRect, defringe, bg, undefined, onAudit) as Promise<Blob>,
+  encode: (doc, { scope = "merged", cropRect = null, defringe = false, bg = "transparent", onAudit, upscale = 1 } = {}) => renderDocToImageBlob(doc, "image/png", undefined, scope, cropRect, defringe, bg, undefined, onAudit, upscale) as Promise<Blob>,
 });
 registerExporter({
   id: "jpg", label: "JPG", ext: "jpg", mime: "image/jpeg", kind: "image",
-  encode: (doc, { scope = "merged", cropRect = null, bg = "transparent" } = {}) => renderDocToImageBlob(doc, "image/jpeg", 0.92, scope, cropRect, false, bg, undefined, undefined) as Promise<Blob>,
+  encode: (doc, { scope = "merged", cropRect = null, bg = "transparent", upscale = 1 } = {}) => renderDocToImageBlob(doc, "image/jpeg", 0.92, scope, cropRect, false, bg, undefined, undefined, upscale) as Promise<Blob>,
 });
