@@ -52,6 +52,7 @@ Procreate 级绘画 PWA。UI 中文。iPad 是手感的最终裁判。
 > 说出版本号（或明确批准）才准动手；把提议藏在 plan / 一大段文字里不算 consent。
 > （背景：形状笔上线时 AI 自判 0.5→0.6——决定本身合理，但未获显式批准。）
 > as-of v326 / 2026-06-26。`main` 分支 = dev 渠道：push 后 GH Actions 把 main 的 `dist/` + 源原样部署到 `/dev/` 路径。`prod` 是**另一条分支**，push prod 前必问 human（家族总规则 #5）。
+> **正式版现状 = v0.14.67（2026-11-10 推，user 11-10：都推；GH release + itch `html` / `standalone` 两条都是 v0.14.67；之前 v0.14.54）**。added by Claude Opus 5.5 2026-11-10
 > **push prod = `bash scripts/push-prod.sh`**（2026-08-28 user 拍板成文）：全量测试 → standalone 重打+smoke →
 > 出两份**带版本号**交付物（`dist/weebpaint-standalone-<vX.Y.Z>.html` / `dist/weebpaint-itch-<vX.Y.Z>.zip`，
 > gitignored）→ main 快进 prod → **itch 自动上传**（user 2026-08-29 拍板进 ritual；`scripts/push-itch.sh`
