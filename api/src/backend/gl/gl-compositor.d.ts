@@ -1,6 +1,7 @@
 import type { BlendMode, SourceKind } from "./blend-glsl.ts";
 import type { IndexTexture } from "./gpu-tile-pool.ts";
 import type { Gl2Port, Gl2Texture, Gl2TexSource, Gl2TileArena, PooledFBO, FBOPrec } from "../../common/gl2-port.ts";
+import type { DirtyRect } from "../../common/dirty-rects.ts";
 export interface OverlayDesc {
     tex: Gl2TexSource;
     opacity: number;
@@ -46,11 +47,24 @@ export declare class GLCompositor {
         passes: number;
         floatPasses: number;
     };
+    /**
+     * 这一帧只在这几块里画（1-4d 第 6 条；render-tree 就地增量时设、合完清掉）：本类发出的每一次 draw 都带上它，newAcc 只把这几块铺底。
+     * 单子 = 脏格子位图的行段，两两不相交（dirty-rects.ts 保证，render-tree 画之前再断言一次）。null = 照旧整幅。
+     */
+    private _rects;
+    setRects(r: readonly DirtyRect[] | null): void;
+    get rects(): readonly DirtyRect[] | null;
+    /** draw spec 里要加的那一项（没在增量 = 空）。 */
+    private _r;
     constructor(glctx: Gl2Port, accumPrec?: FBOPrec);
     private _ensureProgram;
     begin(_docW: number, _docH: number, resetStats?: boolean): void;
     end(): void;
     newAcc(docW: number, docH: number, bg?: Background): Acc;
+    /** 就地增量（1-4d 第 6 条）：拿 base（上一张结果）当累积器的 read，只在那几块里铺底；write 借一张。必须先 setRects。 */
+    accOn(base: PooledFBO, docW: number, docH: number, bg?: Background): Acc;
+    /** 把累积器铺底（bg 缺省 = 透明；"checker" = 棋盘）：整幅，或者增量时只铺那几块（别处不碰）。 */
+    fillBg(f: PooledFBO, docW: number, docH: number, bg?: Background): void;
     finishAcc(acc: Acc): PooledFBO;
     returnFBO(f: PooledFBO): void;
     private _drawChecker;

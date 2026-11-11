@@ -33,6 +33,8 @@ export declare class BrowserGl2Port implements Gl2Port {
     private _quad;
     private _instVao;
     private _instBuf;
+    private _rectVao;
+    private _rectBuf;
     private _ph2d;
     private _phArr;
     private _invalidated;
@@ -85,6 +87,7 @@ export declare class BrowserGl2Port implements Gl2Port {
     private _createFBO;
     private _quadVAO;
     private _instancedVAO;
+    private _rectVAO;
     draw(spec: Gl2DrawSpec): void;
     drawInstanced(spec: Gl2DrawSpec, instances: Float32Array, count: number): void;
     private _drawCommon;

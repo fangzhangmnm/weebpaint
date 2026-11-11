@@ -12,9 +12,9 @@ import { BLEND_MODES } from "../src/backend/gl/blend-glsl.ts";
 
 const rng = (seed) => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
 
-function trial(seed, counts) {
+function trial(seed, counts, size = null, nSteps = 24) {
   const R = rng(seed), pick = (a) => a[Math.floor(R() * a.length)];
-  const W = 33 + Math.floor(R() * 60), H = 25 + Math.floor(R() * 50);
+  const W = size ? size[0] : 33 + Math.floor(R() * 60), H = size ? size[1] : 25 + Math.floor(R() * 50);
   const lps = [];
   let nextId = 1;
   const leaf = () => {
@@ -61,7 +61,7 @@ function trial(seed, counts) {
   };
   try {
     paint(ov.bx, ov.by, ov.bw, ov.bh); step("第一帧");
-    for (let s = 0; s < 24; s++) {
+    for (let s = 0; s < nSteps; s++) {
       const k = R();
       if (k < 0.35) { const n = 1 + Math.floor(R() * 4); for (let i = 0; i < n; i++) paint(Math.floor(R() * (W + 10)) - 5, Math.floor(R() * (H + 10)) - 5, 1 + Math.floor(R() * 9), 1 + Math.floor(R() * 9)); step(`画 ${n} 块`); }
       else if (k < 0.45) { for (let i = 0; i < 22; i++) paint(Math.floor(R() * W), Math.floor(R() * H), 1 + Math.floor(R() * 3), 1 + Math.floor(R() * 3)); step("一帧 22 块"); }
@@ -71,8 +71,8 @@ function trial(seed, counts) {
       else if (k < 0.7) { paint(0, 0, W, Math.ceil(H * 0.7)); step("改一大片"); }
       else if (k < 0.75) { const which = Math.floor(R() * 4); if (which === 0) ov.opacity = R() < 0.5 ? 1 : 0.6; else if (which === 1) ov.erase = !ov.erase; else if (which === 2) ov.blendMode = R() < 0.5 ? "source-over" : "multiply"; else ov.lockAlpha = !ov.lockAlpha; step("换叠法"); }
       else if (k < 0.79) { ov.bw = Math.max(1, ov.bw - 3); step("方框缩小"); }
-      else if (k < 0.84) { target.pixels.putRegion(0, 0, 2, 2, new Uint8ClampedArray([255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 9, 9, 9, 255])); step("薄层那层的像素改了没报"); }
-      else if (k < 0.9) { const l = pick(leaves); l.pixels.putRegion(Math.floor(R() * (W - 3)), Math.floor(R() * (H - 3)), 3, 3, new Uint8ClampedArray(36).fill(200)); inc.markContentDirty(); step("别的层改了、报 dirty（缓存段重建）"); }
+      else if (k < 0.84) { target.pixels.putRegion(0, 0, 1, 1, new Uint8ClampedArray([255, 0, 0, 255])); step("薄层那层的像素改了没报"); }
+      else if (k < 0.9) { const l = pick(leaves), w = Math.min(3, W), h = Math.min(3, H); l.pixels.putRegion(Math.floor(R() * (W - w + 1)), Math.floor(R() * (H - h + 1)), w, h, new Uint8ClampedArray(w * h * 4).fill(200)); inc.markContentDirty(); step("别的层改了、报 dirty（缓存段重建）"); }
       else if (k < 0.95) { inc.markContentDirty(); step("只报 dirty"); }
       else { A._invalidated.forEach((f) => f()); step("丢上下文"); }
     }
@@ -89,5 +89,11 @@ describe("增量合成 = 整张重合（1-4d 第 6 条）", () => {
     for (let seed = 1; seed <= 40; seed++) if (!only || seed === only) trial(seed, counts);
     if (globalThis.__INC_TRACE !== undefined) console.log("  三条路", JSON.stringify(counts));
     assert(counts.rects > 200 && counts.same > 20 && counts.full > 100, `三条路：${JSON.stringify(counts)}`);
+  }, { timeout: 60000 });
+  it("画布不是 8 的倍数 / 不是 2 的幂 / 宽高是奇数（按密度开的画）：同样逐像素相同", () => {
+    const counts = { rects: 0, same: 0, full: 0 };
+    let seed = 100;
+    for (const [size, n] of [[[1, 1], 12], [[3, 7], 16], [[13, 9], 20], [[97, 131], 20], [[300, 412], 6]]) for (let k = 0; k < (size[0] < 50 ? 3 : 1); k++) trial(seed++, counts, size, n);
+    assert(counts.rects > 10 && counts.full > 5, `三条路：${JSON.stringify(counts)}`);
   }, { timeout: 60000 });
 });

@@ -153,6 +153,8 @@ export declare class GlRoom {
     };
     /** false = 池连驱逐后都塞不下（内容超显存 quota）：该层保持陈旧/部分显示。 */
     syncLeafSafe(leafId: number, pixels: LayerPixels, docW: number, docH: number): boolean;
+    /** 这一叶在显卡上的那份已经是现在的像素（同步会走快路径、什么都不传）：增量合成的条件之一（1-4d 第 6 条：本帧层的像素没变）。 */
+    leafUpToDate(leafId: number, pixels: LayerPixels, docW: number, docH: number): boolean;
     private _syncPixels;
     syncSurrogate(s: SurrogatePlaneInput, docW: number, docH: number): void;
     recAlive(rec: {

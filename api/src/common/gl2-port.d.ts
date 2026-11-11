@@ -1,3 +1,4 @@
+import type { DirtyRect } from "./dirty-rects.ts";
 export type FBOPrec = "u8" | "f16" | "f32";
 export interface Gl2Caps {
     maxTextureSize: number;
@@ -28,7 +29,20 @@ export interface ExternalTexture extends Gl2Texture {
     readonly external: true;
     readonly w: number;
     readonly h: number;
+    /**
+     * 这片薄层的像素在这一块里变了（画布像素坐标；一帧里可以叫好几次，内核自己记成单子；CatsUp 贴图主线 1-4d 第 6 条）。
+     * 叫过一次 = 宿主说「我改了像素就报」：之后合成时，要是从上次合成到现在别的什么都没变，内核只在报过的块里重合（单子两两不相交、总面积过半就整张）。
+     * 从没叫过 = 每次合成都当它整张变了（以前的样子）。说不清哪一块 = 报整张。
+     * 宿主的义务：叫过之后，改了像素没报 = 那一块在显示上留着旧的，直到下一次整张合成（抬笔落层、撤销这些）；存盘不受影响（存盘的合成图永远整张重合）。
+     */
+    markChanged(x: number, y: number, w: number, h: number): void;
 }
+/** 给显卡接口用：包出来的外来薄层挂上 markChanged。 */
+export declare function attachChangeLog<T extends object>(o: T): T & {
+    markChanged(x: number, y: number, w: number, h: number): void;
+};
+/** 内核取：这片外来薄层上次取了之后报过的块（取完清空）。null = 从没报过（宿主不报 = 当它每次整张变了）。 */
+export declare function takeExternalChanges(t: ExternalTexture): DirtyRect[] | null;
 export type TexUploadFormat = "rgba8" | "rgba16f" | "r8" | "r32f";
 export type Gl2Blend = "none" | "premult-over" | "max-alpha";
 export type Gl2TexSource = Gl2Texture | PooledFBO | Gl2TileArena;
@@ -43,6 +57,7 @@ export interface Gl2DrawSpec {
         w: number;
         h: number;
     };
+    rects?: readonly DirtyRect[];
     blend?: Gl2Blend;
     uniforms?: Record<string, number | boolean | number[] | Float32Array>;
     textures?: Record<string, Gl2TexSource | {

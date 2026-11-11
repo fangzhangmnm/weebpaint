@@ -63,6 +63,25 @@ describe("一帧改到的地方（脏格子位图 dirty-rects）", () => {
       }
     }
   });
+  it("画布不是 8 的倍数、不是 2 的幂、宽高是奇数（按密度开的画就是这种）：mark / runs / half 逐级不漏、不出界、两两不相交", () => {
+    const R = rng(11);
+    for (const [W, H] of [[300, 412], [1300, 901], [1, 1], [7, 3], [1, 977], [513, 1]]) {
+      const d = new DirtyCells(W, H);
+      for (let i = 0; i < 40; i++) d.mark(Math.floor(R() * (W + 20)) - 10, Math.floor(R() * (H + 20)) - 10, 1 + Math.floor(R() * 30), 1 + Math.floor(R() * 30));
+      d.mark(W - 1, H - 1, 1, 1);   // 右下角那一个像素（最后一格不满 8）
+      let cur = d, lvl = 0;
+      while (true) {
+        const runs = cur.runs();
+        assertRuns(runs);
+        for (const r of runs) assert(r.x >= 0 && r.y >= 0 && r.x + r.w <= cur.w && r.y + r.h <= cur.h && r.w > 0 && r.h > 0, `${W}x${H} 第 ${lvl} 级行段出界：${JSON.stringify(r)}`);
+        if (lvl === 0) { const m = maskOf(runs, W, H); assert(m[(H - 1) * W + (W - 1)] === 1, `${W}x${H}：右下角那个像素盖住了`); }
+        if (cur.w === 1 && cur.h === 1) { assert(!cur.empty, `${W}x${H}：一路缩到 1x1 还是脏的`); break; }
+        const nx = cur.half(), m0 = maskOf(runs, cur.w, cur.h), m1 = maskOf(nx.runs(), nx.w, nx.h);
+        for (let y = 0; y < cur.h; y++) for (let x = 0; x < cur.w; x++) if (m0[y * cur.w + x]) { const X = Math.min(nx.w - 1, x >> 1), Y = Math.min(nx.h - 1, y >> 1); if (!m1[Y * nx.w + X]) throw new Error(`${W}x${H} 第 ${lvl} 级 (${x}, ${y}) 脏、下一级 (${X}, ${Y}) 没标`); }
+        cur = nx; lvl++;
+      }
+    }
+  });
   it("断言：重叠的 = 抛", () => {
     let a = false; try { assertDisjoint([{ x: 0, y: 0, w: 5, h: 5 }, { x: 4, y: 4, w: 5, h: 5 }]); } catch (e) { a = /OVERLAP/.test(String(e.message)); }
     let b = false; try { assertRuns([{ x: 0, y: 0, w: 8, h: 8 }, { x: 4, y: 0, w: 8, h: 8 }]); } catch (e) { b = /OVERLAP/.test(String(e.message)); }
