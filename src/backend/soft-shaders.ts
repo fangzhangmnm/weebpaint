@@ -933,6 +933,9 @@ const liquifyWarp: CpuDraw = (c) => {
 // GPU-only 显式登记（屏显专属，headless 不需要；SoftGl2Port draw 到这些名字响亮 throw）。
 const GPU_ONLY = new Set<string>(["present-affine", "present-affine-over", "screen-bg"]);
 
+/** 这个名字是不是内核自己的程序（在内核那张表里：有 CPU 版或登记成 GPU-only）。宿主登记的程序不许用这些名字（贴图主线 1-4b）。 */
+export function isKernelProgram(name: string): boolean { return resolveCpuProgram(name) !== null; }
+
 // 按名解析：命中 CPU 实现 → 返回；GPU-only → "gpu-only"；两边都没有 → null（program() 响亮拒）。
 export function resolveCpuProgram(name: string): CpuDraw | "gpu-only" | null {
   if (GPU_ONLY.has(name)) return "gpu-only";

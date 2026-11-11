@@ -1,13 +1,15 @@
-import type { Gl2Port, Gl2Caps, FBOPrec, PooledFBO, Gl2Texture, Gl2TileArena, Gl2DrawSpec, TexUploadFormat } from "../common/gl2-port.ts";
+import type { HostProgram, Gl2Port, Gl2Caps, FBOPrec, PooledFBO, Gl2Texture, Gl2TileArena, Gl2DrawSpec, TexUploadFormat } from "../common/gl2-port.ts";
 export declare class SoftGl2Port implements Gl2Port {
     readonly caps: Gl2Caps;
     readonly isLost = false;
     readonly generation = 0;
     private _invalidated;
     private _programs;
+    private _hosted;
     private _fboPool;
     onInvalidated(cb: () => void): void;
     warmProgram(name: string, vert: string, frag: string): void;
+    registerProgram(name: string, src: HostProgram): void;
     program(name: string, _vert?: string, _frag?: string): void;
     borrowFBO(w: number, h: number, prec?: FBOPrec): PooledFBO;
     returnFBO(f: PooledFBO): void;

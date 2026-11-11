@@ -166,3 +166,10 @@ CatsUp：GLBoard.composite（参数同 render，去掉屏幕那几个）→ Rend
 - 每帧从头重走一遍（O(这一笔的长度)）；二维这边不用 frozenCount（它给三维用：定型的笔尖只往贴图上画一次）。
 - 像素笔（pixelMode）不走这里：`_extendImmediate` 沿原始点直接落层，它自己的走步循环留着（1-5 再看）。
 - 拆前拆后逐位相同：`test/stroke-core-golden.test.mjs`（12 条笔画、每帧的 collectStamps 和抬笔结果按位取哈希）。
+
+## 追记 2026-11-11（v0.14.72，Claude Opus 5.5；CatsUp 贴图主线 1-4b，统筹 11-11 定的形状）：宿主登记的程序
+
+- 显卡接口 `Gl2Port` 多一个口 `registerProgram(name, { vert, frag, cpu })`：内核以外的着色器（三维的「空间里的笔」薄层）**在这一处一起交** GLSL 和软件显卡里的 JavaScript 版（`cpu` 和内核自己的程序同一种写法 `CpuDraw`）。登记之后照常 `program(name)` / `draw`。
+- 软件显卡（`SoftGl2Port`）：JavaScript 版存在**这个实例**上（别的实例找不到）；`program(name)` 先查内核那张表（`soft-shaders.ts resolveCpuProgram`），再查这个实例登记的。真显卡（`BrowserGl2Port`）：登记时当场编 GLSL，源存进重建用的表，画面恢复后照样重编。
+- 两边都拒：名字是内核自己的程序（`isKernelProgram` = 在内核那张表里，含 GPU-only）= `PROGRAM_NAME_IS_KERNEL`；同一个名字登记两次 = `PROGRAM_ALREADY_REGISTERED`；没给 JavaScript 版 = `PROGRAM_NO_CPU`。没登记的照旧 `SHADER_NO_CPU_EQUIV`（ADR-0009 决定 5 不放松）。
+- 画画软件自己不用这个口；画画软件的每一帧、每一笔走的路一步没变。测试 `test/host-program.test.mjs`（进内核名单）。
