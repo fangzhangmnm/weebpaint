@@ -301,12 +301,16 @@ export class StrokeSession {
       // host（2026-11-10）：逐张落层（写回链同二维笔尖）；有一张没落成 = 整笔取消令牌、响亮（同区域笔：不落半笔）
       const list = this._hostLayers;
       this._hostLayers = [];
-      let failed = 0;
-      try { for (const ov of list) if (!this.deps.commitHost!(ov)) failed++; }
+      //   落层那一步自己抛（不是返回 false）也一样：先取消令牌（已落的那几张跟着回滚），再把原错误抛出去——不留一个开着的令牌挡住下一笔。
+      let failed = 0, thrown: unknown = null;
+      //   空的（范围宽或高不大于零，同 gl-room overlayEmpty 的 host 判据）没东西可落，跳过，不算没落成。
+      try { for (const ov of list) if (ov.bw > 0 && ov.bh > 0 && !this.deps.commitHost!(ov)) failed++; }
+      catch (e) { thrown = e; }
       finally { this.deps.setHostOverlays!([]); }
-      if (failed) {
+      if (failed || thrown) {
         this.token.cancel();
         this.deps.invalidate();
+        if (thrown) throw thrown;
         throw new Error(`HOST_COMMIT_FAILED (${failed}/${list.length} layers did not land; stroke dropped, token cancelled)`);
       }
       gpuCommitted = true;

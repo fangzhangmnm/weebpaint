@@ -5,7 +5,8 @@
     "src/common"
   ],
   "kernelFiles": [
-    "src/shell/browser-gl2-port.ts"
+    "src/shell/browser-gl2-port.ts",
+    "src/shell/gl-board.ts"
   ],
   "excludeDirs": [
     "src/backend/timelapse"
