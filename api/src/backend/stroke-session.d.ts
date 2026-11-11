@@ -4,6 +4,7 @@ import type { WriteToken } from "./workpiece/workpiece.ts";
 import type { Selection } from "./selection.ts";
 import { LayerPixels } from "./tiles/tile-layer.ts";
 import type { RegionStroke } from "./gl/region-stroke.ts";
+import type { HostOverlayInput } from "./gl/gl-room.ts";
 export type StampCollect = NonNullable<ReturnType<BrushEngine["collectStamps"]>>;
 export interface StrokeEngine {
     extendStroke(x: number, y: number, pressure: number, t?: number | null): void;
@@ -13,7 +14,9 @@ export interface StrokeEngine {
     collectStamps?(): StampCollect | null;
 }
 /** 预览宿（census §3.4；见文件头）。 */
-export type StrokePreview = "overlay" | "livesync" | "shadow" | "region";
+export type StrokePreview = "overlay" | "livesync" | "shadow" | "region" | "host";
+/** host 方式下宿主每帧交上来的一张（每个图层最多一张）：浓度、橡皮、混合方式由宿主给；锁透明和选区由档口补。 */
+export type HostLayerInput = Omit<HostOverlayInput, "kind" | "lockAlpha" | "selMask">;
 export interface StrokeSessionDeps {
     /** wp2.begin —— 单令牌墙的开口（第二个 begin → throw） */
     begin(historyType: string): WriteToken;
@@ -41,6 +44,10 @@ export interface StrokeSessionDeps {
     setRegions(regions: readonly RegionStroke[]): void;
     /** board.commitRegionStroke —— = bakeStamps 写回链（GPU merge→readPixels→applyRegionDiff→收养），在令牌内；false = 没落层 */
     commitRegion(region: RegionStroke): boolean;
+    /** preview="host"（贴图主线 0-5）：宿主画好的薄层交给显示那一侧（每叶最多一张）；[] = 关。不给 = 这个档口不支持 host 方式（开的时候响亮拒绝）。 */
+    setHostOverlays?(list: readonly HostOverlayInput[]): void;
+    /** preview="host"：落一张（= 落二维笔尖的那条写回链 bakeStamps），在令牌内；false = 没落层。 */
+    commitHost?(ov: HostOverlayInput): boolean;
 }
 export interface StrokeSessionSpec {
     /** 令牌事务标签（wp2.begin(label)） */
@@ -94,6 +101,8 @@ export declare class StrokeSession {
     private readonly deps;
     private _shadows;
     private _regions;
+    private readonly _host;
+    private _hostLayers;
     private _open;
     constructor(deps: StrokeSessionDeps, engine: StrokeEngine, layers: readonly ViewLeaf[], spec: StrokeSessionSpec, preview: StrokePreview);
     get open(): boolean;
@@ -104,6 +113,11 @@ export declare class StrokeSession {
         x: number;
         y: number;
     }>, pressure: number): void;
+    /**
+     * host 方式（贴图主线 0-5）：宿主每帧把自己画好的薄层交上来（每个图层最多一张、必须是这一笔的图层）。档口补上锁透明（图层的）和选区（现在的选区），转给显示那一侧。
+     * 抬笔时逐张落层；取消 = 撤掉显示、零痕迹。
+     */
+    setHostLayers(list: readonly HostLayerInput[]): void;
     /** 引擎累积的 dirty bbox（board.markDocDirty 用）；无 → null */
     flushDirty(): [number, number, number, number] | null;
     /** GPU stamp overlay 拉取（brush/形状笔有；liquify/filterBrush 无 → null，走 shadow/live-sync） */

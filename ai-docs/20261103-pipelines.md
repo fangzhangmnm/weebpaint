@@ -105,12 +105,45 @@
 画画软件：new BrowserGl2Port(canvas) ──► 自己的画面（alpha:false / preserveDrawingBuffer）──► 合成 → 贴到画板（target "screen"）
 CatsUp：  BrowserGl2Port.fromContext(three 的 gl) ──► 共用画面
             每个碰 GL 的入口先 _ensureBase()（把宿主留下的状态设回默认）
-            合成进借来的 FBO ──► glTextureOf(fbo) ──► three 的 ExternalTexture 直接采样（不读回）
+            合成进借来的 FBO（GLBoard.composite 交出合成好的那张，见「一帧」）──► glTextureOf(fbo) ──► three 的 ExternalTexture 直接采样（不读回）
             画到 "screen" = 抛；内核做完一批，宿主 renderer.resetState()
 ```
 
 - 自己的画面：`_ensureBase` 什么都不做（零开销）。共用：每个入口多二十来个设状态的调用（CatsUp 探路量过：一次 three 的 resetState 约 0.04 ms，CPU 时间）。
 - 归位单子和来历在 `_ensureBase` 的注释里；守卫 `test/gl-port-shared-guard.test.mjs`；显卡冒烟测试的「共用画面」那一轮。为什么 = ADR-0009 追加注。
+
+## 一帧（合成 → 上屏；2026-11-10 贴图主线 0-5 拆成两半，Claude Opus 5.5）
+
+```
+board.render / GLBoard.render
+ → RenderTree.renderFrame
+     = compositeFrame（合成整幅画到一张离屏图 _display）
+         装这一帧的薄层（room.setStampOverlays：每层最多一张）→ 规划（段缓存 / 实时叶）→ 合成
+         快路径：没脏、没实时叶、签名没变 → 不重合成，直接交出上一张 _display
+     + _present（把 _display 按视图变换画到屏幕：底色 / 点网格 / 缩放）
+CatsUp：GLBoard.composite（参数同 render，去掉屏幕那几个）→ RenderTree.compositeFrame → 交出 _display（预乘、和画布一样大、第 0 行 = 画布第 0 行）
+          那张图归内核：下一次合成之前有效，宿主不归还、不改采样设置；底色可以给不透明的颜色 [r, g, b, a]（材质自己的底色）→ 交出去的图不透明
+```
+
+- 两半是同一段代码，不是两份：`renderFrame` 只是先调 `compositeFrame` 再调 `_present`。合成那一半碰的东西随这一帧动了的图层涨（段缓存命中的不重合成）；上屏那一半随屏幕大小涨。
+- 和一次性合成（`RasterService.compositeOnce`：导出 / 吸管，不建缓存）结果逐像素相同：`test/host-overlay.test.mjs` B（十帧：改图层、挂撤薄层、几种底色、实时叶）。
+- 显卡冒烟测试：渲染树 / 提交 / 裁剪实时 / 填充四个用例各有一份「只合成」版，共用画面那一轮也跑、和独占那一轮逐字节比。
+
+## 一笔的第五种预览方式：宿主画好的薄层（host；2026-11-10 贴图主线 0-5，Claude Opus 5.5）
+
+```
+三维的空间层（CatsUp）：笔尖列表（空间里的）→ 画到贴图格子上 → 一张和画布一样大的预乘薄层（宿主借的 FBO）
+ → StrokeSession（preview "host"）：开写令牌
+     每帧 setHostLayers(list)：每层最多一张；浓度 / 橡皮 / 混合方式宿主给，锁透明（图层的）和选区（现在的 bboxMask）档口补 → deps.setHostOverlays
+       → room 的薄层：host 这一支直接进 _addPremulOverlay（预乘转直值 → 带选区 → 登记），和二维笔尖画完之后是同一段；宿主的图不归还
+     抬笔 end：逐张 deps.commitHost（= bakeStamps 写回链：显卡合并 → 读回范围 → applyRegionDiff → 收养）→ 一个令牌 = 一步撤销
+       有一张没落成（返回 false 或自己抛）→ 令牌取消（已落的跟着回滚）、通知重画、抛（HOST_COMMIT_FAILED 或原错误）；空的（范围宽或高 ≤ 0）跳过
+     取消：撤显示、取消令牌（真层从没被写）
+```
+
+- 一笔碰的东西：每帧 = 这一帧交上来的薄层张数（每张整幅一次预乘转直值）；落层 = 每张读回它的范围。
+- 「笔尖从硬芯到边缘怎么淡下去」只有一份：`src/backend/gl/stamp-falloff.ts`（GLSL 片段 `STAMP_FALLOFF_GLSL` + 同算式 JS `stampFalloff`，软件显卡也从 `soft-shaders.ts` 导出）；淡彩最后上色那一遍 = `GLStampRasterizer.colorize`。三维的空间层用这两样，不另写。守卫 `test/host-overlay-guard.test.mjs`。
+- 和二维笔尖同一条路：`test/host-overlay.test.mjs` A（十种：淡彩、叠色、橡皮、锁透明、选区、几种混合、浓度 < 1、椭圆笔尖；预览和落层逐像素相同）。
 
 ## 还随整张画涨的点
 

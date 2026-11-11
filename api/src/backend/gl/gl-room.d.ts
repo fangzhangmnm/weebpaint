@@ -80,7 +80,28 @@ export interface FillOverlayInput {
         oh: number;
     };
 }
-export type OverlayInput = StampOverlayInput | FillOverlayInput | RegionOverlayInput;
+export interface HostOverlayInput {
+    kind: "host";
+    /** 宿主画好的这一笔。和画布一样大，预乘，第 0 行 = 画布第 0 行。宿主借的、宿主还；内核只读，不归还，不改它的采样设置。 */
+    tex: PooledFBO;
+    bx: number;
+    by: number;
+    bw: number;
+    bh: number;
+    layerId: number;
+    opacity: number;
+    erase: boolean;
+    blendMode: string;
+    lockAlpha: boolean;
+    selMask: {
+        data: Uint8Array;
+        ox: number;
+        oy: number;
+        ow: number;
+        oh: number;
+    } | null;
+}
+export type OverlayInput = StampOverlayInput | FillOverlayInput | RegionOverlayInput | HostOverlayInput;
 export declare function overlayEmpty(ov: OverlayInput): boolean;
 export interface LeafRec {
     index: IndexTexture;
@@ -157,6 +178,11 @@ export declare class GlRoom {
     /** 装一帧的全部 overlay（每叶最多一个；空的跳过）。上一帧 stamp 分支借的 FBO 在此归还（与旧单槽「换新时还旧」同序）。 */
     setStampOverlays(list: readonly OverlayInput[], docW: number, docH: number): void;
     private _addOverlay;
+    /**
+     * 二维笔尖和宿主薄层共用的后半段（只有这一份，守卫钉）：一张和画布一样大的预乘薄层 → 转直值 → 带上选区 → 登记。
+     * owned = 这张预乘图是内核自己借的（二维笔尖：转完就还）；宿主的图 owned = false（只读、不归还）。
+     */
+    private _addPremulOverlay;
     private _uploadSelMask;
     get floats(): ReadonlyMap<number, FloatDesc>;
     setFloats(floats: FloatInput[]): void;

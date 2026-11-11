@@ -1,4 +1,4 @@
-import type { Gl2Port } from "../common/gl2-port.ts";
+import type { Gl2Port, PooledFBO } from "../common/gl2-port.ts";
 import { RasterService } from "../backend/gl/raster-service.ts";
 import { RegionStroke, type SelMaskPlane } from "../backend/gl/region-stroke.ts";
 import type { FloatInput, OverlayInput, SurrogateInput } from "../backend/gl/gl-room.ts";
@@ -59,6 +59,12 @@ export declare class GLBoard {
         dstX: number;
         dstY: number;
     } | null;
+    /**
+     * 只合成、不上屏（2026-11-10 贴图主线 0-5）：参数和 render 一样，去掉屏幕那几个；返回合成好的整幅图（预乘、和画布一样大、第 0 行 = 画布第 0 行）。
+     * 那张图归内核：下一次合成（render / composite）之前有效，宿主不许归还、不许改它的采样设置。docBg 可以是 "#rrggbb"、"checker"、null，
+     * 或者直接给一个不透明的颜色 [r, g, b, a]（0..1）当底——三维放材质自己的底色，交出去的图就是不透明的。GL 丢了 = null。
+     */
+    composite(doc: GLDoc, docBg: string | readonly [number, number, number, number] | null, floats?: FloatInput[], stampOverlays?: readonly OverlayInput[], liveSyncLeaf?: DocLeaf | null, surrogates?: readonly SurrogateInput[]): PooledFBO | null;
     render(doc: GLDoc, affine6: number[], canvasW: number, canvasH: number, scale: number, voidColor: string, docBg: string | null, floats?: FloatInput[], stampOverlays?: readonly OverlayInput[], liveSyncLeaf?: DocLeaf | null, surrogates?: readonly SurrogateInput[], gridBg?: {
         dotColor: string;
         stepPx: number;
