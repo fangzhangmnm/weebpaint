@@ -22,7 +22,7 @@
 
 // 渲染目标精度档：u8=RGBA8（present/屏显），f16=RGBA16F（合成累积，§7 banding bonus），
 //   f32=RGBA32F（精度验证/陡 blend 模式；比 f16 多一倍 transient，仅累积器一张、不乘层数）。
-import type { CpuDraw } from "../backend/soft-shaders.ts";   // 宿主程序的软件显卡版和内核自己的同一种写法
+import type { CpuDraw } from "./cpu-draw.ts";   // 宿主程序的软件显卡版和内核自己的同一种写法
 export type FBOPrec = "u8" | "f16" | "f32";
 
 // 壳填好的能力数据（Port 构造时探测一次；backend 只读）。

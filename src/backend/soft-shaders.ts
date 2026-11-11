@@ -21,36 +21,9 @@ export { stampFalloff } from "./gl/stamp-falloff.ts";   // 软件显卡里笔尖
 // ---- CPU 程序的执行环境（soft-gl2-port 组好递入）----
 // 纹理已解析成统一读面；目标写入（含 blend/量化）由 soft-gl2-port 的 write 回调收口。
 
-export interface SoftTexRead {
-  readonly w: number;
-  readonly h: number;
-  // texel 直读（越界 clamp-to-edge；float 纹理 raw 值，u8 归一 0..1）。out 长度 4。
-  fetch(x: number, y: number, out: Float32Array): void;
-}
-
-export interface SoftArenaRead {
-  readonly tileSize: number;
-  // (layer, x, y) 点采（u8 归一）。
-  fetch(layer: number, x: number, y: number, out: Float32Array): void;
-}
-
-export interface CpuDrawCtx {
-  // viewport（目标像素域；scissor 已并进 forEachPixel 的遍历域）。
-  vw: number; vh: number;
-  uniforms: Record<string, number | boolean | number[] | Float32Array>;
-  tex: (name: string) => SoftTexRead | null;         // 2D sampler（缺省 null = 未提供，视作透明占位）
-  arena: (name: string) => SoftArenaRead | null;     // sampler2DArray
-  // 遍历 viewport∩scissor 的每个像素；frag 返回 false = discard（不写不 blend）。
-  forEachPixel(frag: (px: number, py: number, out: Float32Array) => boolean): void;
-  // drawInstanced 专用：实例数据（stride 4）+ 数量；实例覆盖域内逐像素（GL 光栅化语义：
-  //   像素中心落在实例 quad 内才着色）。soft-gl2-port 保证实例序 = 数组序。
-  instances: Float32Array | null;
-  count: number;
-  // 实例路径专用写口（同一像素可被多实例先后写，逐写 blend+量化——与 GPU 逐 fragment blend 等价）。
-  writePixel(px: number, py: number, rgba: Float32Array): void;
-}
-
-export type CpuDraw = (ctx: CpuDrawCtx) => void;
+// 软件显卡程序的写法（SoftTexRead / SoftArenaRead / CpuDrawCtx / CpuDraw）搬到 common/cpu-draw.ts（2026-11-11：显卡接口的 registerProgram 要用它，common 不许 import backend）；这里原样转出。
+export type { SoftTexRead, SoftArenaRead, CpuDrawCtx, CpuDraw } from "../common/cpu-draw.ts";
+import type { CpuDraw, CpuDrawCtx, SoftTexRead, SoftArenaRead } from "../common/cpu-draw.ts";
 
 // uniform 取值助手（缺省语义 = GLSL 未设置 uniform 的 0 值；draw spec 全量传参时不触发）。
 function u1(c: CpuDrawCtx, name: string, def = 0): number {

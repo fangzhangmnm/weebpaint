@@ -173,3 +173,4 @@ CatsUp：GLBoard.composite（参数同 render，去掉屏幕那几个）→ Rend
 - 软件显卡（`SoftGl2Port`）：JavaScript 版存在**这个实例**上（别的实例找不到）；`program(name)` 先查内核那张表（`soft-shaders.ts resolveCpuProgram`），再查这个实例登记的。真显卡（`BrowserGl2Port`）：登记时当场编 GLSL，源存进重建用的表，画面恢复后照样重编。
 - 两边都拒：名字是内核自己的程序（`isKernelProgram` = 在内核那张表里，含 GPU-only）= `PROGRAM_NAME_IS_KERNEL`；同一个名字登记两次 = `PROGRAM_ALREADY_REGISTERED`；没给 JavaScript 版 = `PROGRAM_NO_CPU`。没登记的照旧 `SHADER_NO_CPU_EQUIV`（ADR-0009 决定 5 不放松）。
 - 画画软件自己不用这个口；画画软件的每一帧、每一笔走的路一步没变。测试 `test/host-program.test.mjs`（进内核名单）。
+- 软件显卡程序的写法（`SoftTexRead` / `SoftArenaRead` / `CpuDrawCtx` / `CpuDraw` 四个类型）从 `backend/soft-shaders.ts` 原样搬到 `common/cpu-draw.ts`（显卡接口要用它，C2 目录格律不许 common import backend）；`soft-shaders.ts` 原样转出，用的地方不用改。

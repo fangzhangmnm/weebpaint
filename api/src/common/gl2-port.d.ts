@@ -1,4 +1,4 @@
-import type { CpuDraw } from "../backend/soft-shaders.ts";
+import type { CpuDraw } from "./cpu-draw.ts";
 export type FBOPrec = "u8" | "f16" | "f32";
 export interface Gl2Caps {
     maxTextureSize: number;
