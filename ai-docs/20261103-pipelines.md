@@ -115,3 +115,21 @@ CatsUp：  BrowserGl2Port.fromContext(three 的 gl) ──► 共用画面
 ## 还随整张画涨的点
 
 恢复（第 2 步）和快进下载随画大小涨；「存好再刷新」的本地那步不设时限，大画遮罩会转得久。
+
+## 一笔（缓冲笔 brush / erase；2026-11-10 贴图主线 0-6 拆出 `StrokeCore`，Claude Opus 5.5）
+
+```
+指针事件（屏幕 / 画布坐标，压感，时间）
+ → BrushEngine.beginStroke / extendStroke（brush.ts：图层那一半）
+   → StrokeCore（stroke-core.ts：一笔的手感，不认识图层、不管几维）
+       extend：停顿那条规矩（死区锚没离开落笔点 → 压感 LPF 只对钟）→ PressureLPF → StrokeSmoother.push + update（屏幕上的平滑中心线 cx / cy / cp）
+       path()：没有 PathPlacer = 中心线本身（二维、unit 1）；三维的宿主给 PathPlacer = 把中心线落到模型表面上（落密、打射线、判断断开都是宿主的事）
+       collect()：walkPath 沿路从头走步（间距 = stepFor，最少 0.5 × unit；断开处不插、不算长度、余数带过去）→ 每颗 stampParamsOf（压感曲线、大小 / 流量 / 浓度、起收笔渐细；最小 0.5 × unit）
+                  → StrokeTips（位置、大小、浓度、走了多远；frozenCount = 来自路上不会再变的部分且离那部分尾巴超过收笔渐细长度的前缀）
+       finish()：平滑器收尾（弧尾、钉终点）；有收笔渐细 → 沿整条路干走一遍量总长
+ → BrushEngine.collectStamps：笔尖拼回 Stamp[] + 包围盒（画布坐标、+1 像素余量、夹边）+ 合成参数 → board 的 GLStampRasterizer（live / commit 同一份）
+```
+
+- 每帧从头重走一遍（O(这一笔的长度)）；二维这边不用 frozenCount（它给三维用：定型的笔尖只往贴图上画一次）。
+- 像素笔（pixelMode）不走这里：`_extendImmediate` 沿原始点直接落层，它自己的走步循环留着（1-5 再看）。
+- 拆前拆后逐位相同：`test/stroke-core-golden.test.mjs`（12 条笔画、每帧的 collectStamps 和抬笔结果按位取哈希）。
