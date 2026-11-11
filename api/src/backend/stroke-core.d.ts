@@ -61,6 +61,7 @@ export declare class StrokeCore {
     readonly sm: StrokeSmoother;
     private readonly _pLPF;
     private readonly _placer;
+    private _wc;
     /** 抬笔时量的总长（给收笔渐细）；没抬笔 = null（live 不做收笔渐细）。 */
     taperTotal: number | null;
     constructor(settings: ResolvedBrush, x: number, y: number, pressure: number, smooth?: {
@@ -76,13 +77,21 @@ export declare class StrokeCore {
     extend(x: number, y: number, pressure: number, t?: number | null): void;
     /** 现在的路（给了 PathPlacer = 宿主落出来的；没给 = 中心线本身）。 */
     path(): StrokePath;
+    /** 走一步多远（这一笔的笔、压感整形、单位都定了）。 */
+    private _step;
+    /** 定型缓存跟到这条路：从上次的游标接着走到最后一个不会再变的点，新走出来的笔尖原料记下；再把原料按现在的收笔总长算成笔尖（只算新的；总长变了全算）。 */
+    private _advance;
+    /** 尾巴：从定型的游标（拷一份）接着走到路的最后一个点，每颗算好交出去。 */
+    private _walkTail;
     /**
-     * 一颗一颗交出这一笔到现在的全部笔尖（每次从头走一遍，纯读；抬笔后自动含收笔渐细）：emit(第几段, x, y, z, 大小, 浓度, 走了多远)。
+     * 一颗一颗交出这一笔到现在的全部笔尖（纯读；抬笔后自动含收笔渐细）：emit(第几段, x, y, z, 大小, 浓度, 走了多远)。
+     * 定型的那一段从缓存里原样交出，只重走还会变的尾巴（每帧的走步只和尾巴有关，1-4d）；交出去的和每次从头走一遍逐位相同。
+     * path 要给就给这一笔自己的 path()（缓存靠它的前 frozenCount 个点不变）。
      * 二维的 BrushEngine.collectStamps 直接用它拼笔尖对象（不经过中间数组：画画软件每帧都收集一遍）。
      */
     forEachTip(emit: (seg: number, x: number, y: number, z: number, size: number, alpha: number, strokeDist: number) => void, path?: StrokePath): void;
     /** 收集这一笔到现在的全部笔尖（StrokeTips，含定型的前缀）。 */
     collect(): StrokeTips;
-    /** 抬笔：平滑器收尾（把直线桥换成带动量的弧尾、钉终点）；有收笔渐细就沿整条路干走一遍量总长。之后 collect() 含收笔渐细。 */
+    /** 抬笔：平滑器收尾（把直线桥换成带动量的弧尾、钉终点）；有收笔渐细就沿整条路干走一遍量总长（定型的那一段从缓存的游标接着走）。之后 collect() 含收笔渐细。 */
     finish(): void;
 }
