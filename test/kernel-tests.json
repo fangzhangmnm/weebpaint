@@ -66,6 +66,7 @@
     "test/gl-group-clip.test.mjs",
     "test/gpu-tile-pool.test.mjs",
     "test/history.test.mjs",
+    "test/hosted-steps.test.mjs",
     "test/layer-cap-budget.test.mjs",
     "test/layer-ops-undo-fuzz.test.mjs",
     "test/layer-tiles.test.mjs",
