@@ -6,6 +6,7 @@
 //   · 缩小图下一级的脏格 = 这张位图 2×2 或起来（half），直接可用；行段是纯粹的行程合并，不会出相交。
 // 量出来（真模型 wip2021 两档 + 小红帽、跨片的长笔、每帧；CatsUp probe-paint-scale J 段）：8 格见方 = 每帧总面积中位 0.44–1.28%、第 90 百分位 1.1–4.4%，
 //   行段中位 8–101、最多约 2000；16 格见方中位到 2.3%、第 90 百分位到 7%。所以取 8。总面积过半 = 这一帧整张（一张位图不如一次整张）。
+// runs / half 只扫标过的行 / 列范围（v0.14.80）：花费随碰到的范围涨，不随画布涨（1024×4096 的画上每帧扫整张位图要 0.2–0.3 毫秒）。
 // 纯逻辑、零依赖；内核（render-tree）和三维（显示图）用同一份。
 
 export interface DirtyRect { readonly x: number; readonly y: number; readonly w: number; readonly h: number }
@@ -21,6 +22,8 @@ export class DirtyCells {
   readonly cols: number; readonly rows: number;
   private readonly bits: Uint8Array;
   private n = 0;
+  /** 标过的格所在的行 / 列范围（runs / half 只扫这一块：花费随碰到的范围涨，不随画布涨）。 */
+  private r0 = Infinity; private r1 = -1; private c0 = Infinity; private c1 = -1;
   constructor(w: number, h: number, cell = DIRTY_CELL) {
     if (!(w >= 1 && h >= 1 && cell >= 1 && Number.isInteger(w) && Number.isInteger(h) && Number.isInteger(cell))) throw new Error(`DirtyCells: bad size ${w}x${h} cell ${cell}`);
     this.w = w; this.h = h; this.cell = cell;
@@ -32,6 +35,7 @@ export class DirtyCells {
     const x0 = Math.max(0, Math.floor(x)), y0 = Math.max(0, Math.floor(y)), x1 = Math.min(this.w, Math.ceil(x + w)), y1 = Math.min(this.h, Math.ceil(y + h));
     if (x1 <= x0 || y1 <= y0) return;
     const c = this.cell, c0 = Math.floor(x0 / c), c1 = Math.floor((x1 - 1) / c), r0 = Math.floor(y0 / c), r1 = Math.floor((y1 - 1) / c);
+    if (r0 < this.r0) this.r0 = r0; if (r1 > this.r1) this.r1 = r1; if (c0 < this.c0) this.c0 = c0; if (c1 > this.c1) this.c1 = c1;
     for (let r = r0; r <= r1; r++) {
       const row = r * this.cols;
       for (let k = c0; k <= c1; k++) if (!this.bits[row + k]) { this.bits[row + k] = 1; this.n++; }
@@ -48,14 +52,14 @@ export class DirtyCells {
   }
   /** 每行连着的脏格并成一段（夹在画布里）：两两不相交，按行、再按 x 排。 */
   runs(): DirtyRect[] {
-    const out: DirtyRect[] = [], c = this.cell;
-    for (let r = 0; r < this.rows; r++) {
+    const out: DirtyRect[] = [], c = this.cell, kEnd = this.c1 + 1;
+    for (let r = this.r0; r <= this.r1; r++) {
       const row = r * this.cols, y = r * c, hh = Math.min(this.h, y + c) - y;
-      let k = 0;
-      while (k < this.cols) {
+      let k = this.c0;
+      while (k < kEnd) {
         if (!this.bits[row + k]) { k++; continue; }
         const start = k;
-        while (k < this.cols && this.bits[row + k]) k++;
+        while (k < kEnd && this.bits[row + k]) k++;
         const x = start * c;
         out.push({ x, y, w: Math.min(this.w, k * c) - x, h: hh });
       }
@@ -65,10 +69,10 @@ export class DirtyCells {
   /** 下一级缩小图（w >> 1、h >> 1，至少 1）的脏格：这一级 2×2 格或起来（同样的 cell）。 */
   half(): DirtyCells {
     const nx = new DirtyCells(Math.max(1, this.w >> 1), Math.max(1, this.h >> 1), this.cell);
-    for (let r = 0; r < this.rows; r++) for (let k = 0; k < this.cols; k++) {
+    for (let r = this.r0; r <= this.r1; r++) for (let k = this.c0; k <= this.c1; k++) {
       if (!this.bits[r * this.cols + k]) continue;
-      const i = Math.min(nx.rows - 1, r >> 1) * nx.cols + Math.min(nx.cols - 1, k >> 1);
-      if (!nx.bits[i]) { nx.bits[i] = 1; nx.n++; }
+      const R = Math.min(nx.rows - 1, r >> 1), K = Math.min(nx.cols - 1, k >> 1), i = R * nx.cols + K;
+      if (!nx.bits[i]) { nx.bits[i] = 1; nx.n++; if (R < nx.r0) nx.r0 = R; if (R > nx.r1) nx.r1 = R; if (K < nx.c0) nx.c0 = K; if (K > nx.c1) nx.c1 = K; }
     }
     return nx;
   }

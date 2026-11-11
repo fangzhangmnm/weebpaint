@@ -35,6 +35,9 @@ export declare class BrowserGl2Port implements Gl2Port {
     private _instBuf;
     private _rectVao;
     private _rectBuf;
+    /** 方框缓冲里现在装的是哪张单子（按引用）+ 按多大的视口折成 [0,1] 的：同一张单子同一个视口 = 只绑不传（一帧每个 pass 传同一张，统筹 11-11）。 */
+    private _rectSrc;
+    private _rectVp;
     private _ph2d;
     private _phArr;
     private _invalidated;

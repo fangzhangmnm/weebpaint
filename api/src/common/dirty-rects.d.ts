@@ -17,6 +17,11 @@ export declare class DirtyCells {
     readonly rows: number;
     private readonly bits;
     private n;
+    /** 标过的格所在的行 / 列范围（runs / half 只扫这一块：花费随碰到的范围涨，不随画布涨）。 */
+    private r0;
+    private r1;
+    private c0;
+    private c1;
     constructor(w: number, h: number, cell?: number);
     /** 标上这个方框碰到的格（夹进画布；空的不标）。 */
     mark(x: number, y: number, w: number, h: number): void;

@@ -162,6 +162,9 @@ export class BrowserGl2Port implements Gl2Port {
   private _instBuf: WebGLBuffer | null = null;
   private _rectVao: WebGLVertexArrayObject | null = null;
   private _rectBuf: WebGLBuffer | null = null;
+  /** 方框缓冲里现在装的是哪张单子（按引用）+ 按多大的视口折成 [0,1] 的：同一张单子同一个视口 = 只绑不传（一帧每个 pass 传同一张，统筹 11-11）。 */
+  private _rectSrc: readonly unknown[] | null = null;
+  private _rectVp = "";
   // 占位纹理（未提供的 sampler 绑它，防单元 0 类型冲突）。
   private _ph2d: WebGLTexture | null = null;
   private _phArr: WebGLTexture | null = null;
@@ -517,7 +520,7 @@ export class BrowserGl2Port implements Gl2Port {
     gl.vertexAttribDivisor(2, 1);
     gl.bindVertexArray(null);
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
-    this._rectVao = vao; this._rectBuf = buf;
+    this._rectVao = vao; this._rectBuf = buf; this._rectSrc = null; this._rectVp = "";   // 新缓冲是空的：下一次一定重传
     return vao;
   }
 
@@ -583,12 +586,16 @@ export class BrowserGl2Port implements Gl2Port {
       const n = spec.rects.length;
       if (n > 0) {
         const vx = spec.target === "screen" ? spec.viewport! : (spec.viewport ?? [0, 0, (spec.target as BrowserFBO).w, (spec.target as BrowserFBO).h]);
-        const a = new Float32Array(n * 4);
-        for (let i = 0; i < n; i++) { const r = spec.rects[i]; a[4 * i] = (r.x - vx[0]) / vx[2]; a[4 * i + 1] = (r.y - vx[1]) / vx[3]; a[4 * i + 2] = r.w / vx[2]; a[4 * i + 3] = r.h / vx[3]; }
         gl.bindVertexArray(this._rectVAO());
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._rectBuf);
-        gl.bufferData(gl.ARRAY_BUFFER, a, gl.DYNAMIC_DRAW);
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+        const vk = vx.join(",");
+        if (this._rectSrc !== spec.rects || this._rectVp !== vk) {   // 同一张单子、同一个视口 = 缓冲里已经是它了
+          const a = new Float32Array(n * 4);
+          for (let i = 0; i < n; i++) { const r = spec.rects[i]; a[4 * i] = (r.x - vx[0]) / vx[2]; a[4 * i + 1] = (r.y - vx[1]) / vx[3]; a[4 * i + 2] = r.w / vx[2]; a[4 * i + 3] = r.h / vx[3]; }
+          gl.bindBuffer(gl.ARRAY_BUFFER, this._rectBuf);
+          gl.bufferData(gl.ARRAY_BUFFER, a, gl.DYNAMIC_DRAW);
+          gl.bindBuffer(gl.ARRAY_BUFFER, null);
+          this._rectSrc = spec.rects; this._rectVp = vk;
+        }
         gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, n);
       }
     } else if (instances) {
@@ -786,6 +793,7 @@ export class BrowserGl2Port implements Gl2Port {
     this._fboPool = [];   // 旧 fbo/tex 句柄已废；池清空，borrow 时重建
     this._quad = null;
     this._instVao = null; this._instBuf = null;
+    this._rectVao = null; this._rectBuf = null; this._rectSrc = null; this._rectVp = "";   // 方框缓冲跟着上下文没了：下一次重建、重传
     this._ph2d = null; this._phArr = null;
   }
 }
