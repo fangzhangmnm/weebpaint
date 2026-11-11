@@ -188,3 +188,16 @@ CatsUp：GLBoard.composite（参数同 render，去掉屏幕那几个）→ Rend
   ```
   调两次没事；之后再用任何动词 = 抛（`GLBoard: disposed`）；排着的预热片到点不做；Port 画面恢复的广播不再碰它。离屏图只还进池、不删（池归 Port、几块画板共用；宿主扔光了自己 `clearPool`）。碰多少：随这块画板占的纹理数，一次。测试 `test/gl-board-dispose.test.mjs`（数 Port 的建 / 删纹理、借 / 还离屏图，拆完相等）。
 - v0.14.76 同时加过「图块池额度的口」`setTilePoolRawQuota`，v0.14.77 撤了：池对象上本来就有 `setRawQuotaBytes(n)`（宿主拿 `appTilePool()` 直接调），新口是重复的。
+
+## 追记 2026-11-11（v0.14.79–v0.14.81，Claude Opus 5.5；CatsUp 贴图主线 1-4d 第 6 条）：只合改到的那些格
+```
+宿主报块：ExternalTexture.markChanged(x, y, w, h)（叫过一次之后，改了像素就必须报；没叫过 = 每帧整张，画画软件自己就是这样）
+  → 内核把这一帧报来的块标进脏格子位图（common/dirty-rects.ts DirtyCells，8 像素见方；两两不相交、不用合并）
+  → RenderTree.compositeFrame：条件都满足（签名没变、缓存段都命中、层的像素没变、总面积不过半）→ 在上一张 _display 上就地只重合这些格（Gl2DrawSpec.rects，一次实例化画完）
+     不满足 = 整张（lastPath.path = rects / same / full，探针读）
+```
+- 证明：`test/incremental-composite.test.mjs`（随机层栈 × 随机一串改动，每一步增量 = 整张逐像素；含奇数 / 非 8 倍数画布、换底色不报 dirty、落在半格上的浮点底色）+ 显卡冒烟 incremental（真显卡逐字节，两种形状：薄层挂在组里那层 = 底色烤在缓存段里；薄层挂在最底下那层 = 底色在增量里现铺，CatsUp 就是这种）。画画软件自己没叫 markChanged，每一帧走的路没变。
+- **v0.14.81 修了两处**（都是 CatsUp 三维那条线的探针查出来的）：
+  1. 底色进累积器之前量化成 8 位（`gl-compositor.ts fillBg` → `quantizeBg`）：整张用清屏、增量用 fill 着色器，对恰好落在半格上的值（显卡 32 位浮点里 0.3 × 255 = 76.5）取整方向不一样（SwiftShader：清屏 77、着色器 76），增量 ≠ 整张差 1。量化用的四舍五入和以前清屏的结果一样，整张的输出不变。**规矩：同一个值经两条不同的显卡路写进去，先量化成目标的精度再写**（以后铺透明、铺别的底照这个办）。
+  2. **画画软件自己的老毛病**：换底色时纯色换纯色不让缓存段作废（段的键只认底色的种类：颜色 / 棋盘 / 透明，不认颜色），最底下那段留着旧底色，直到下一次报 dirty。现在底色一变段全作废（`render-tree.ts _segBg`）。行为变化 = 变对：画画软件里换纸色时没报 dirty 的那条路，以前会短暂显示旧纸色。
+
