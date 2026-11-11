@@ -29,7 +29,7 @@ import type { HostProgram,
   Gl2Port, Gl2Caps, FBOPrec, PooledFBO, Gl2Texture, Gl2TileArena,
   Gl2DrawSpec, Gl2TexSource, TexUploadFormat,
 } from "../common/gl2-port.ts";
-import { isKernelProgram } from "../backend/soft-shaders.ts";   // 宿主登记的程序不许用内核程序的名字
+import { checkHostProgramName } from "../backend/soft-shaders.ts";   // 宿主登记的程序：要带前缀、不撞内核程序的名字
 
 // FBO 池上界（防泄露）。count 主防"许多不同尺寸的一次性 FBO"（commit/warp 每笔一张）累积；
 //   bytes 是兜底显存天花板。doc 尺寸热 FBO 每帧复用、是 MRU，不会被驱逐 → 不抖。
@@ -253,7 +253,7 @@ export class BrowserGl2Port implements Gl2Port {
   // 宿主登记（贴图主线 1-4b）：撞内核的名字 / 登记两次 = 抛；GLSL 当场编（存进重建用的源表，画面恢复后照样重编）；JavaScript 版在真显卡上不用。
   private _hosted = new Set<string>();
   registerProgram(name: string, src: HostProgram): void {
-    if (isKernelProgram(name)) throw new Error(`PROGRAM_NAME_IS_KERNEL:${name} (host programs may not reuse a kernel program name)`);
+    checkHostProgramName(name);   // 前缀 + 不撞内核（soft-shaders.ts，两种接口同一道）
     if (this._hosted.has(name)) throw new Error(`PROGRAM_ALREADY_REGISTERED:${name}`);
     if (typeof src.cpu !== "function") throw new Error(`PROGRAM_NO_CPU:${name} (a host program must come with its CPU version)`);
     this._hosted.add(name);

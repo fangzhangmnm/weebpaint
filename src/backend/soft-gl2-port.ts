@@ -19,7 +19,7 @@ import type { HostProgram,
   Gl2DrawSpec, Gl2TexSource, TexUploadFormat,
 } from "../common/gl2-port.ts";
 import type { CpuDraw, CpuDrawCtx, SoftTexRead, SoftArenaRead } from "./soft-shaders.ts";
-import { isKernelProgram, resolveCpuProgram } from "./soft-shaders.ts";
+import { checkHostProgramName, resolveCpuProgram } from "./soft-shaders.ts";
 
 // ---- 软句柄实现形 ----
 
@@ -157,7 +157,7 @@ export class SoftGl2Port implements Gl2Port {
   warmProgram(name: string, vert: string, frag: string): void { this.program(name, vert, frag); }   // 软域无编译成本：同义
   // 宿主登记（贴图主线 1-4b）：撞内核的名字 / 登记两次 = 抛；JavaScript 版必须是函数。
   registerProgram(name: string, src: HostProgram): void {
-    if (isKernelProgram(name)) throw new Error(`PROGRAM_NAME_IS_KERNEL:${name} (host programs may not reuse a kernel program name)`);
+    checkHostProgramName(name);   // 前缀 + 不撞内核（soft-shaders.ts，两种接口同一道）
     if (this._hosted.has(name)) throw new Error(`PROGRAM_ALREADY_REGISTERED:${name}`);
     if (typeof src.cpu !== "function") throw new Error(`PROGRAM_NO_CPU:${name} (a host program must come with its CPU version)`);
     this._hosted.set(name, src.cpu);

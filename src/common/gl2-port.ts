@@ -118,8 +118,9 @@ export interface Gl2Port {
   //   可选动词：SoftGl2Port = program 同义；调用方用 `port.warmProgram ?? port.program`。
   warmProgram?(name: string, vert: string, frag: string): void;
   // 内核以外的程序（宿主自己的着色器；2026-11-11 贴图主线 1-4b）：GLSL 和软件显卡里的 JavaScript 版**在这一处一起交**（ADR-0009 决定 5 照旧）。
-  //   登记挂在这个接口实例上（别的接口实例里找不到）；名字和内核自己的程序撞了 = 抛；同一个名字登记两次 = 抛。登记之后照常 program(name) / draw。
-  //   内核自己的程序仍然只认内核那张表（soft-shaders.ts），登记盖不掉它们。
+  //   名字必须带自己的前缀「前缀/名字」（比如 catsup/space-tip），没有前缀的留给内核 = 不带前缀抛；登记挂在这个接口实例上（别的接口实例里找不到）；
+  //   同一个名字登记两次 = 抛。登记之后照常 program(name) / draw。内核自己的程序现在仍然只认内核那张表（soft-shaders.ts），登记盖不掉它们；
+  //   这个门的形状（名字 + { vert, frag, cpu }）就是以后内核自己的程序也走的那个门（离那一步差什么：见 ai-docs/20261103-pipelines.md 1-4b 那一节）。
   registerProgram(name: string, src: HostProgram): void;
 
   // ---- FBO 借还（有界池：MRU 复用、LRU 驱逐真删） ----

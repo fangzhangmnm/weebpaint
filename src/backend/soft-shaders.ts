@@ -908,6 +908,14 @@ const GPU_ONLY = new Set<string>(["present-affine", "present-affine-over", "scre
 
 /** 这个名字是不是内核自己的程序（在内核那张表里：有 CPU 版或登记成 GPU-only）。宿主登记的程序不许用这些名字（贴图主线 1-4b）。 */
 export function isKernelProgram(name: string): boolean { return resolveCpuProgram(name) !== null; }
+/**
+ * 外面登记的程序名字的规矩（统筹 11-11）：必须带自己的前缀「前缀/名字」（比如 catsup/space-tip）；没有前缀的名字留给内核。
+ * 两种显卡接口的 registerProgram 都先过这一道：不带前缀 = 抛 PROGRAM_NAME_NEEDS_PREFIX；带了前缀还撞内核（不会发生，内核的名字都没有斜杠）= 抛 PROGRAM_NAME_IS_KERNEL。
+ */
+export function checkHostProgramName(name: string): void {
+  if (!/^[a-z0-9][a-z0-9_-]*\/[a-z0-9_.\/-]+$/i.test(name)) throw new Error(`PROGRAM_NAME_NEEDS_PREFIX:${name} (host programs must be named "<prefix>/<name>"; unprefixed names belong to the kernel)`);
+  if (isKernelProgram(name)) throw new Error(`PROGRAM_NAME_IS_KERNEL:${name} (host programs may not reuse a kernel program name)`);
+}
 
 // 按名解析：命中 CPU 实现 → 返回；GPU-only → "gpu-only"；两边都没有 → null（program() 响亮拒）。
 export function resolveCpuProgram(name: string): CpuDraw | "gpu-only" | null {

@@ -174,3 +174,6 @@ CatsUp：GLBoard.composite（参数同 render，去掉屏幕那几个）→ Rend
 - 两边都拒：名字是内核自己的程序（`isKernelProgram` = 在内核那张表里，含 GPU-only）= `PROGRAM_NAME_IS_KERNEL`；同一个名字登记两次 = `PROGRAM_ALREADY_REGISTERED`；没给 JavaScript 版 = `PROGRAM_NO_CPU`。没登记的照旧 `SHADER_NO_CPU_EQUIV`（ADR-0009 决定 5 不放松）。
 - 画画软件自己不用这个口；画画软件的每一帧、每一笔走的路一步没变。测试 `test/host-program.test.mjs`（进内核名单）。
 - 软件显卡程序的写法（`SoftTexRead` / `SoftArenaRead` / `CpuDrawCtx` / `CpuDraw` 四个类型）从 `backend/soft-shaders.ts` 原样搬到 `common/cpu-draw.ts`（显卡接口要用它，C2 目录格律不许 common import backend）；`soft-shaders.ts` 原样转出，用的地方不用改。
+- **v0.14.73（统筹 11-11 补两条；起因：user 提醒别拿「改动小」当理由——显卡这一层正在从「内核自己的零件」变成「两边共用的地基」，这个登记口是第一处）**：
+  - 外面登记的程序名字必须带自己的前缀「前缀/名字」（比如 `catsup/space-tip`）；没有前缀的名字留给内核。两种接口的 `registerProgram` 都先过 `soft-shaders.ts checkHostProgramName`：不带前缀 = `PROGRAM_NAME_NEEDS_PREFIX`。重名靠这条规则本身就不会发生（内核的名字都没有斜杠）。
+  - 门的形状（名字 + `{ vert, frag, cpu }`，挂在接口实例上）就是以后内核自己的程序也走的那个门。**现在离那一步差的**：① 内核的程序是「第一次用到时」`program(name, vert, frag)` 当场交 GLSL，源码散在各个用它的模块里（gl-stamp、region-programs、gl-compositor……），JavaScript 版在 `soft-shaders.ts` 那张写死的表里——两份不在同一处交；要搬就是每个模块在接口建好时（或第一次用之前）`registerProgram` 一次，把自己的 GLSL 和 JavaScript 版一起交，`resolveCpuProgram` 那张表退役成这些登记。② 内核有三个只在真显卡上画的程序（屏显的 present-affine 等，GPU-only），门现在要求 `cpu` 必须是函数——要让它们也走这个门，`cpu` 得多一种「只在真显卡上画」的写法。③ 内核的名字没有前缀：搬的时候要么给内核一个前缀（改全部程序名、所有调用处），要么规定「没有前缀 = 内核」由门自己认（现在就是这么判的）。三件都是机械的搬，没有算法要改。
