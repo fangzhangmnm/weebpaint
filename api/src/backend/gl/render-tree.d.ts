@@ -8,6 +8,8 @@ export declare class RenderTree {
     private _display;
     private _displaySig;
     private _dirty;
+    /** 缓存段建的时候用的底色（底色烤进最底下那段；段的键只认底色的种类，不认颜色）：变了 = 段全失效（2026-11-11：纯色换纯色以前不失效，最底下那段留着旧颜色）。 */
+    private _segBg;
     private _lastDocW;
     private _lastDocH;
     private _lastPlan;

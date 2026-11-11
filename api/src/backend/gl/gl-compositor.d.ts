@@ -29,6 +29,8 @@ export interface FloatDesc {
     mode: number;
 }
 export type Background = [number, number, number, number] | "checker";
+/** 底色量化成 8 位色（每个分量 round(c × 255) / 255，夹进 [0, 1]）：写进累积器的两条路（清屏 / fill 着色器）都写精确值。 */
+export declare function quantizeBg(c: readonly [number, number, number, number]): [number, number, number, number];
 export interface Acc {
     read: PooledFBO;
     write: PooledFBO;
@@ -63,7 +65,12 @@ export declare class GLCompositor {
     newAcc(docW: number, docH: number, bg?: Background): Acc;
     /** 就地增量（1-4d 第 6 条）：拿 base（上一张结果）当累积器的 read，只在那几块里铺底；write 借一张。必须先 setRects。 */
     accOn(base: PooledFBO, docW: number, docH: number, bg?: Background): Acc;
-    /** 把累积器铺底（bg 缺省 = 透明；"checker" = 棋盘）：整幅，或者增量时只铺那几块（别处不碰）。 */
+    /**
+     * 把累积器铺底（bg 缺省 = 透明；"checker" = 棋盘）：整幅，或者增量时只铺那几块（别处不碰）。
+     * 底色先量化成 8 位（k / 255，四舍五入）：整幅用清屏、增量用 fill 着色器，两条路对恰好落在半格上的值往哪边取整不保证一样——
+     *   0.3 × 255 = 76.5，SwiftShader 上清屏得 77、着色器得 76（往偶数）；CatsUp 的底色 [0.3, 0.5, 0.7] 三个分量全落在半格上，增量 ≠ 整张差 1（2026-11-11 CatsUp probe-space-rules 抓到）。
+     *   量化之后两边写的都是精确值，哪家显卡都一样；从十六进制来的底色本来就是 k / 255，不变。
+     */
     fillBg(f: PooledFBO, docW: number, docH: number, bg?: Background): void;
     finishAcc(acc: Acc): PooledFBO;
     returnFBO(f: PooledFBO): void;

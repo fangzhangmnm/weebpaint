@@ -1416,7 +1416,8 @@ function softTripartite(glctx: BrowserGl2Port, add: Add): void {
 
 // ---- 1-4d 第 6 条：增量合成在真显卡上（实例化画行段的那条路只有真显卡走）= 整张重合，逐字节 ----
 //   两块画板吃同一份层像素和同一张外来薄层（真 WebGLTexture，每步重传）：一块走增量（markChanged 报块），一块每步 markContentDirty 强制整张。
-function incrementalParity(glctx: BrowserGl2Port, add: Add): void {
+// target = 薄层挂在哪一层：2 = 组里那层（底下那层和底色烤进缓存段）；1 = 最底下那层（底色在增量里现铺 = CatsUp 的形状；2026-11-11 底色取整那个毛病只在这一种里露）
+function incrementalParity(glctx: BrowserGl2Port, add: Add, target: 1 | 2 = 2): void {
   const W = 93, H = 71;
   let seed = 11; const R = (): number => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
   const lps: LayerPixels[] = [];
@@ -1434,8 +1435,9 @@ function incrementalParity(glctx: BrowserGl2Port, add: Add): void {
   // 两块板共用一个显卡接口（同一个图块池）：交替着跑，整张那块每步重建会把增量那块的缓存段挤掉（那时增量正确地退回整张）。
   //   所以先跑增量那块一整串（记下每步的薄层像素和结果），再让整张那块按同样的薄层重放一遍比
   const box = { bx: 10, by: 8, bw: 30, bh: 25 };
-  const ov = (tex: unknown, b: typeof box) => ({ kind: "host" as const, tex: tex as never, ...b, layerId: 2, opacity: 1, erase: false, blendMode: "source-over", lockAlpha: false, selMask: null });
-  const steps: { px: Uint8Array; box: typeof box; bg: string; out: Uint8Array | null; path: string }[] = [];
+  const ov = (tex: unknown, b: typeof box) => ({ kind: "host" as const, tex: tex as never, ...b, layerId: target, opacity: 1, erase: false, blendMode: "source-over", lockAlpha: false, selMask: null });
+  type Bg = string | readonly [number, number, number, number];
+  const steps: { px: Uint8Array; box: typeof box; bg: Bg; out: Uint8Array | null; path: string }[] = [];
   let rectsRuns = 0, bad = 0, firstBad = "";
   const inc = new GLBoard(glctx, 64);
   try {
@@ -1447,7 +1449,8 @@ function incrementalParity(glctx: BrowserGl2Port, add: Add): void {
         extA.markChanged(x, y, w, h);
       }
       if (s % 7 === 3) { box.bw = Math.min(W - box.bx, box.bw + 9); box.bh = Math.min(H - box.by, box.bh + 6); }
-      const bg = s % 11 === 5 ? "checker" : "#ffffff";   // 换底 = 计划签名变 = 整张；别的步同一个底 = 能增量
+      // 换底 = 计划签名变 = 整张；别的步同一个底 = 能增量。后一半用落在半格上的浮点底色（0.3 × 255 = 76.5：清屏和着色器取整方向不一样，CatsUp 的底色就是这种；2026-11-11）
+      const bg: Bg = s % 11 === 5 ? "checker" : s < 20 ? "#ffffff" : [0.3, 0.5, 0.7, 1];
       glctx.uploadTexture(t, "rgba8", W, H, px);
       const fa = inc.composite(doc, bg, [], [ov(extA, box)]);
       const path = (inc as unknown as { _tree: { lastPath: { path: string } } })._tree.lastPath.path;
@@ -1466,8 +1469,9 @@ function incrementalParity(glctx: BrowserGl2Port, add: Add): void {
       for (let i = 0; i < b.length; i++) if (st.out[i] !== b[i]) { bad++; firstBad ||= `第 ${s} 步（${st.path}）(${(i >> 2) % W}, ${Math.floor((i >> 2) / W)}) ${st.out[i]} ≠ ${b[i]}`; break; }
     });
   } finally { for (const lp of lps) lp.dispose(); ref.dispose(); }
-  add("incremental: 增量 = 整张（真显卡，逐字节）", bad === 0, bad ? firstBad : `40 步全一样（${steps.map((x) => x.path[0]).join("")}）`);
-  add("incremental: 真的走了只合脏格那条路", rectsRuns >= 15, `rects ${rectsRuns} 步`);
+  const tag = target === 1 ? "（薄层在最底下那层：底色现铺）" : "";
+  add(`incremental${tag}: 增量 = 整张（真显卡，逐字节）`, bad === 0, bad ? firstBad : `40 步全一样（${steps.map((x) => x.path[0]).join("")}）`);
+  add(`incremental${tag}: 真的走了只合脏格那条路`, rectsRuns >= 15, `rects ${rectsRuns} 步`);
 }
 
 // ---- I) C8 ⑥ arena 租户记账（BrowserGl2Port 真 GL 面；SoftGl2 面在 node soft-gl2-port.test）----
@@ -1820,7 +1824,7 @@ function glCases(glctx: BrowserGl2Port): [string, (add: Add) => void | Promise<v
     ["soft tripartite", (add) => { try { softTripartite(glctx, add); } catch (e) { add("soft tripartite", false, String(e)); } }],
     ["region", async (add) => { try { await regionParity(glctx, add); } catch (e) { add("region parity", false, String(e)); } }],
     ["arena accounting", (add) => { try { arenaAccounting(glctx, add); } catch (e) { add("arena accounting", false, String(e)); } }],
-    ["incremental", (add) => { try { incrementalParity(glctx, add); } catch (e) { add("incremental parity", false, String(e)); } }],
+    ["incremental", (add) => { for (const t of [2, 1] as const) { try { incrementalParity(glctx, add, t); } catch (e) { add(`incremental parity (layer ${t})`, false, String(e)); } } }],
   ];
 }
 
