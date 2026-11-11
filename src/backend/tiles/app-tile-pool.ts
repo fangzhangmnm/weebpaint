@@ -15,6 +15,18 @@ import { TILE_SIZE } from "../../common/tile-geometry.ts";
 export const RAW_TILE_QUOTA_BYTES = 384 * 1024 * 1024;
 
 let _pool: CpuTilePool | null = null;
+let _rawQuota = RAW_TILE_QUOTA_BYTES;
+
+/**
+ * 额度的口（CatsUp 0-3a，2026-11-11）：没压缩的图块总共能占多少，由宿主说了算（内核占多少内存归宿主管，0-3 计划里要开的口）。
+ * 必须在第一次建池（第一次 appTilePool()）之前调；池已经建了再调 = 抛（额度不中途改，别让已经在池里的东西换规矩）。
+ * 画画软件不调（= RAW_TILE_QUOTA_BYTES）。额度要接上压缩（setTilePoolCodec）才生效，同上面的说明。
+ */
+export function setTilePoolRawQuota(bytes: number): void {
+  if (_pool) throw new Error("setTilePoolRawQuota: the tile pool already exists (set the quota before the first appTilePool())");
+  if (!(Number.isFinite(bytes) && bytes > 0)) throw new Error(`setTilePoolRawQuota: bad quota ${bytes}`);
+  _rawQuota = bytes;
+}
 let _onLeak: ((info: string) => void) | null = null;
 
 export function setTilePoolLeakReporter(fn: (info: string) => void): void { _onLeak = fn; }
@@ -29,7 +41,7 @@ export function appTilePool(): CpuTilePool {
   if (!_pool) {
     _pool = new CpuTilePool({
       tileSize: TILE_SIZE,
-      rawQuotaBytes: RAW_TILE_QUOTA_BYTES,
+      rawQuotaBytes: _rawQuota,
       codec: _codec,
       onLeak: (info) => _onLeak?.(info),
     });

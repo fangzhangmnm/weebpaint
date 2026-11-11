@@ -179,3 +179,12 @@ CatsUp：GLBoard.composite（参数同 render，去掉屏幕那几个）→ Rend
 - 精度：内核二维笔尖交进 `_addPremulOverlay` 的那张是 8 位（`rasterize` / `colorize` 都借 u8 的离屏图），所以外来的也只收 8 位。
 - 内核拿到它只做一件事：`_addPremulOverlay` 里那一遍「预乘转直」（`presentTo` 本来就收任何纹理源）；大小和画布不一样在两处查：档口 `setHostLayers` 交进来的那一刻、`_addPremulOverlay`（`HOST_OVERLAY_SIZE`）。
 - 画画软件自己不用这个门；每一帧、每一笔走的路一步没变。测试 `test/host-external.test.mjs`（进内核名单）：同一份像素放在池子里走 vs 包进来走，合成和落层逐像素相同。
+
+## 追记 2026-11-11（v0.14.76，Claude Opus 5.5；CatsUp 0-3a「内存的额度接上」，统筹定的）：画板退租 + 图块池额度的口
+
+- **画板退租** `GLBoard.dispose()`：原来只有建、没有拆（画画软件一辈子一块画板，现在也不调）；宿主有很多块、会扔，建和拆要成对。
+  ```
+  GLBoard.dispose → RenderTree.dispose（借的 _display 离屏图还进 Port 的池；段缓存的索引纹理逐个删）→ GlRoom.dispose（叶的索引纹理 / 选区 / 填充 / 浮层纹理 / live clip / overlay FBO / arena 退租）
+  ```
+  调两次没事；之后再用任何动词 = 抛（`GLBoard: disposed`）；排着的预热片到点不做；Port 画面恢复的广播不再碰它。离屏图只还进池、不删（池归 Port、几块画板共用；宿主扔光了自己 `clearPool`）。碰多少：随这块画板占的纹理数，一次。测试 `test/gl-board-dispose.test.mjs`（数 Port 的建 / 删纹理、借 / 还离屏图，拆完相等）。
+- **图块池额度的口** `setTilePoolRawQuota(bytes)`：没压缩的图块总共能占多少由宿主定；必须在第一次 `appTilePool()` 之前调，之后再调 = 抛。不调 = 384 MB（画画软件照旧）。额度要接上压缩（`setTilePoolCodec`）才生效。

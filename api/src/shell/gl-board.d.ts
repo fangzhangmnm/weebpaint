@@ -16,6 +16,10 @@ export declare class GLBoard {
     private _tree;
     private _raster;
     constructor(glctx: Gl2Port, maxSlices: number);
+    private _disposed;
+    get disposed(): boolean;
+    dispose(): void;
+    private _live;
     get memory(): {
         usedTiles: number;
         capacity: number;
