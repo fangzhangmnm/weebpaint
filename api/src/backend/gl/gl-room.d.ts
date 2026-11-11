@@ -7,7 +7,7 @@ import { LayerPixels } from "../tiles/tile-layer.ts";
 import { GLStampRasterizer } from "./gl-stamp.ts";
 import type { Stamp, StrokeShape } from "./gl-stamp.ts";
 import type { PlanNode, PlanStep, SegBuild } from "./render-plan.ts";
-import type { PooledFBO, FBOPrec, Gl2Port, Gl2TexSource, Gl2TileArena } from "../../common/gl2-port.ts";
+import type { ExternalTexture, PooledFBO, FBOPrec, Gl2Port, Gl2TexSource, Gl2TileArena } from "../../common/gl2-port.ts";
 import type { RegionOverlayInput } from "./region-stroke.ts";
 export interface SurrogatePlaneInput {
     layerId: number;
@@ -82,8 +82,8 @@ export interface FillOverlayInput {
 }
 export interface HostOverlayInput {
     kind: "host";
-    /** 宿主画好的这一笔。和画布一样大，预乘，第 0 行 = 画布第 0 行。宿主借的、宿主还；内核只读，不归还，不改它的采样设置。 */
-    tex: PooledFBO;
+    /** 宿主画好的这一笔。和画布一样大，预乘，第 0 行 = 画布第 0 行。宿主借的（池子里的离屏图）或者外面包进来的（wrapExternal）；内核只读，不归还，不删，不改它的采样设置。 */
+    tex: PooledFBO | ExternalTexture;
     bx: number;
     by: number;
     bw: number;

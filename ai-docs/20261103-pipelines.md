@@ -171,3 +171,11 @@ CatsUp：GLBoard.composite（参数同 render，去掉屏幕那几个）→ Rend
 
 - v0.14.72 给显卡接口加过 `registerProgram`（内核外面的程序在同一处交 GLSL 和软件显卡里的 JavaScript 版），v0.14.73 加过「名字要带前缀」。**两版都撤回**，源码、测试、接口签名回到 v0.14.71 的样子（`common/cpu-draw.ts`、`test/host-program.test.mjs` 删了）。
 - 原因（统筹 11-11 转 user 原话）：「画画的内核还是用一个尽可能小……你三维这边另外开一个，就相当于我们二维模式的时候，你永远不用动三维的这个内核」。画画内核的显卡那一层（gl2-port、软件显卡、程序表、离屏图的池子）是它自己的内部零件，三维不在上面登记着色器、不借它的图；三维的空间层在三维仓自己的显卡接口上画。
+
+## 追记 2026-11-11（v0.14.75，Claude Opus 5.5；CatsUp 贴图主线 1-4b，统筹定的形状）：外面的图进内核的门 `wrapExternal`
+
+- 宿主（三维）在自己那边画好一张薄层，要交给内核的档口（0-5 的 host 方式）。以前 `HostOverlayInput.tex` 只收内核池子里的离屏图；现在多收一种：`wrapExternal` 包进来的外来的图（`ExternalTexture`）。**这是外面的图进内核的唯一一道门**（以后贴一张图上去、放下浮着的那一块也走它）。
+- 两个接口各收一种形态：真显卡 `{ gl: WebGLTexture, w, h, prec: "u8" }`（包一层、不拷贝、不进任何重建 / 回收名单，画面丢了宿主自己重建再包）；软件显卡 `{ pixels, w, h, prec: "u8" }`（按引用读、不拷贝）。给错形态 / 精度不是 u8 / 宽高 ≤ 0 / 像素长度不对 = 抛；对包进来的 `deleteTexture` = 抛。
+- 精度：内核二维笔尖交进 `_addPremulOverlay` 的那张是 8 位（`rasterize` / `colorize` 都借 u8 的离屏图），所以外来的也只收 8 位。
+- 内核拿到它只做一件事：`_addPremulOverlay` 里那一遍「预乘转直」（`presentTo` 本来就收任何纹理源）；大小和画布不一样在两处查：档口 `setHostLayers` 交进来的那一刻、`_addPremulOverlay`（`HOST_OVERLAY_SIZE`）。
+- 画画软件自己不用这个门；每一帧、每一笔走的路一步没变。测试 `test/host-external.test.mjs`（进内核名单）：同一份像素放在池子里走 vs 包进来走，合成和落层逐像素相同。

@@ -13,6 +13,22 @@ export interface PooledFBO {
 export interface Gl2Texture {
     readonly kind: "tex2d";
 }
+export type ExternalImage = {
+    readonly gl: WebGLTexture;
+    readonly w: number;
+    readonly h: number;
+    readonly prec: "u8";
+} | {
+    readonly pixels: Uint8Array | Uint8ClampedArray;
+    readonly w: number;
+    readonly h: number;
+    readonly prec: "u8";
+};
+export interface ExternalTexture extends Gl2Texture {
+    readonly external: true;
+    readonly w: number;
+    readonly h: number;
+}
 export type TexUploadFormat = "rgba8" | "rgba16f" | "r8" | "r32f";
 export type Gl2Blend = "none" | "premult-over" | "max-alpha";
 export type Gl2TexSource = Gl2Texture | PooledFBO | Gl2TileArena;
@@ -66,6 +82,7 @@ export interface Gl2Port {
     createTexture(): Gl2Texture;
     uploadTexture(tex: Gl2Texture, format: TexUploadFormat, w: number, h: number, data: ArrayBufferView): void;
     deleteTexture(tex: Gl2Texture): void;
+    wrapExternal(src: ExternalImage): ExternalTexture;
     createTileArena(tileSize: number, initialSlices: number): Gl2TileArena;
     readonly arenaStats: {
         count: number;
