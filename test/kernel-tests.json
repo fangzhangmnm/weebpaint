@@ -90,6 +90,8 @@
     "test/selection-preview.test.mjs",
     "test/settle-hold.test.ts",
     "test/soft-gl2-port.test.mjs",
+    "test/stroke-core-golden.test.mjs",
+    "test/stroke-core.test.mjs",
     "test/stroke-session-region.test.mjs",
     "test/stroke-smoother.test.mjs",
     "test/tile-bridge.test.mjs",

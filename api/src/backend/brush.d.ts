@@ -1,19 +1,9 @@
 import { type PressureShaper } from "../common/pressure-curve.ts";
-import { StrokeSmoother, PressureLPF } from "./stroke-smoother.ts";
+import { PressureLPF } from "./stroke-smoother.ts";
+import { StrokeCore, type StampParams } from "./stroke-core.ts";
 import type { ViewLeaf } from "./workpiece/painting-view.ts";
 import type { ResolvedBrush } from "../common/resolved-brush.ts";
 import type { Stamp, StrokeShape } from "./gl/gl-stamp.ts";
-interface StampParams {
-    size: number;
-    stampAlpha: number;
-}
-interface Walk {
-    ci: number;
-    started: boolean;
-    accumDist: number;
-    lastP: number;
-    strokeDist: number;
-}
 type Rect = [number, number, number, number];
 interface StrokeState {
     layer: ViewLeaf;
@@ -24,14 +14,12 @@ interface StrokeState {
     lastX: number;
     lastY: number;
     lastP: number;
-    pLPF: PressureLPF;
+    pLPF: PressureLPF | null;
     accumDist: number;
     strokeDist: number;
     dirty: Rect | null;
     isBuildup: boolean;
-    _taperTotal: number | null;
-    sm: StrokeSmoother | null;
-    frozenWalk: Walk;
+    core: StrokeCore | null;
 }
 export declare class BrushEngine {
     _stroke: StrokeState | null;
@@ -44,8 +32,6 @@ export declare class BrushEngine {
     }, t?: number | null): void;
     extendStroke(x: number, y: number, pressure: number, t?: number | null): void;
     _extendImmediate(x: number, y: number, pEff: number): void;
-    _extendBuffered(x: number, y: number, pEff: number, t?: number | null): void;
-    _walkStamps(walk: Walk, endIdx: number, emit: (x: number, y: number, p: number, strokeDist: number) => void): void;
     endStroke(): ReturnType<BrushEngine["collectStamps"]>;
     cancelStroke(): void;
     stampAt(x: number, y: number, pressure: number): void;
