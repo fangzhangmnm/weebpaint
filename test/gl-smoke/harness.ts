@@ -497,12 +497,32 @@ function makeStage(glctx: BrowserGl2Port, maxSlices: number): { room: GlRoom; tr
   return { room, tree: new RenderTree(room), raster: new RasterService(room) };
 }
 
+// 0-5（2026-11-10 贴图主线）：渲染树 / 提交 / 裁剪实时 / 填充这四个用例有两种读一帧的办法——
+//   画屏幕 = renderFrame 画到屏幕、读屏幕（默认画面行序自下而上 → 翻回 doc 行序）；
+//   只合成 = RenderTree.compositeFrame 拿合成好的那张图直接读（第 0 行 = 画布第 0 行，不碰屏幕）。
+//   独占画面那一轮两种都跑；共用画面那一轮只跑只合成的（画屏幕会被拒），和独占那一轮的只合成逐字节比。
+type FrameOut = "screen" | "composite";
+function frameReader(glctx: BrowserGl2Port, tree: RenderTree, N: number, out: FrameOut): (nodes: unknown[], ovs: unknown[], liveId: number | null) => Uint8Array {
+  return (nodes, ovs, liveId) => {
+    if (out === "composite") return glctx.readPixels(tree.compositeFrame(nodes as never, N, N, undefined, [], ovs as never, [], liveId), 0, 0, N, N);
+    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], ovs as never, [], liveId);
+    const gl = glctx.gl, raw = new Uint8Array(N * N * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.readPixels(0, 0, N, N, gl.RGBA, gl.UNSIGNED_BYTE, raw);
+    const o = new Uint8Array(N * N * 4);
+    for (let y = 0; y < N; y++) o.set(raw.subarray((N - 1 - y) * N * 4, (N - y) * N * 4), y * N * 4);
+    return o;
+  };
+}
+/** 只合成那一份的检查名前面加「composite·」（和画屏幕的那一份分开记）。 */
+const outAdd = (add: Add, out: FrameOut): Add => (out === "screen" ? add : (n, ok, d) => add(`composite·${n}`, ok, d));
+
 // ---- F) render-tree 执行器端到端（S7b）：RenderTree.renderFrame 真跑（含段缓存/快路径/自愈），
 //        canvas backbuffer 读回 vs compositeLayers golden。identity affine + N×N canvas = 1:1 像素。----
-function rendertreeParity(glctx: BrowserGl2Port, add: Add): void {
+function rendertreeParity(glctx: BrowserGl2Port, add0: Add, out: FrameOut = "screen"): void {
   const N = 512;
-  const gl = glctx.gl;
-  glctx.canvas.width = N; glctx.canvas.height = N;
+  const add = outAdd(add0, out);
+  if (out === "screen") { glctx.canvas.width = N; glctx.canvas.height = N; }
   const { tree, raster } = makeStage(glctx, 512);
 
   const cA = makeLayerCanvas(N, N, (x, y) => [60, 120 + (x % 120), 60 + (y % 160), 255]);
@@ -525,15 +545,8 @@ function rendertreeParity(glctx: BrowserGl2Port, add: Add): void {
     return gctx.getImageData(0, 0, N, N).data;
   };
   // renderFrame → 读 canvas backbuffer（默认 FB 行序自下而上 → 翻回 doc 行序）。
-  const renderAndRead = (liveId: number | null): Uint8Array => {
-    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], [], [], liveId);
-    const raw = new Uint8Array(N * N * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.readPixels(0, 0, N, N, gl.RGBA, gl.UNSIGNED_BYTE, raw);
-    const out = new Uint8Array(N * N * 4);
-    for (let y = 0; y < N; y++) out.set(raw.subarray((N - 1 - y) * N * 4, (N - y) * N * 4), y * N * 4);
-    return out;
-  };
+  const frame = frameReader(glctx, tree, N, out);
+  const renderAndRead = (liveId: number | null): Uint8Array => frame(nodes, [], liveId);
   const cmp = (name: string, ref: Uint8ClampedArray, got: Uint8Array, tol = 4) => {
     const { md, at } = maxPremulDiff(ref, got, N);
     add(name, md <= tol, `maxΔ=${md} ${md > tol ? at : ""}`);
@@ -542,7 +555,7 @@ function rendertreeParity(glctx: BrowserGl2Port, add: Add): void {
   const ref0 = golden();
   const got0 = renderAndRead(null);
   cmp("rt:干净帧（整树 prefix 段）vs compositeLayers", ref0, got0);
-  checkGolden(add, "rt-clean", got0, N);
+  if (out === "screen") checkGolden(add, "rt-clean", got0, N);
   add("rt:干净帧建段", tree.frameStats.segBuilds >= 1, `builds=${tree.frameStats.segBuilds}`);
   cmp("rt:快路径重放（display 缓存）", ref0, renderAndRead(null));
   add("rt:快路径零建段", tree.frameStats.segBuilds === 0, `builds=${tree.frameStats.segBuilds}`);
@@ -566,7 +579,7 @@ function rendertreeParity(glctx: BrowserGl2Port, add: Add): void {
   tree.markDirty();
   const got2 = renderAndRead(null);
   cmp("rt:markDirty 后重建（commit 语义）", ref1, got2);
-  checkGolden(add, "rt-edited", got2, N);
+  if (out === "screen") checkGolden(add, "rt-edited", got2, N);
 
   // context-loss 自愈：全部 GPU 态作废 → 下帧从 CPU SSoT 重建。
   tree.handleContextRestored();
@@ -603,20 +616,13 @@ function rendertreeParity(glctx: BrowserGl2Port, add: Add): void {
 
 // ---- G) S8 brush GPU commit ≡ live：bakeStamps（原 commitBrushStroke；merge 同一 overlay shader → tile-diff 落层
 //        → GPU 收养）后的静态帧，必须与 commit 前带 stampOverlay 的 live 帧逐像素一致（u8 量化容差）。----
-function commitParity(glctx: BrowserGl2Port, add: Add): void {
+function commitParity(glctx: BrowserGl2Port, add0: Add, out: FrameOut = "screen"): void {
   const N = 512;
-  const gl = glctx.gl;
-  glctx.canvas.width = N; glctx.canvas.height = N;
+  const add = outAdd(add0, out);
+  if (out === "screen") { glctx.canvas.width = N; glctx.canvas.height = N; }
   const { room, tree, raster } = makeStage(glctx, 512);
 
-  const readBack = (): Uint8Array => {
-    const raw = new Uint8Array(N * N * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.readPixels(0, 0, N, N, gl.RGBA, gl.UNSIGNED_BYTE, raw);
-    const out = new Uint8Array(N * N * 4);
-    for (let y = 0; y < N; y++) out.set(raw.subarray((N - 1 - y) * N * 4, (N - y) * N * 4), y * N * 4);
-    return out;
-  };
+  const frame = frameReader(glctx, tree, N, out);
   // stamps 串（斜跨多 tile）+ collectStamps 同式 bbox。
   // 笔迹限制在左上象限（bbox ⊂ tile(0,0)∪…，tile(1,1) 恒不被覆盖 → 可验「bbox 外 tile 不动」）。
   const stamps: { x: number; y: number; size: number; alpha: number }[] = [];
@@ -650,8 +656,7 @@ function commitParity(glctx: BrowserGl2Port, add: Add): void {
       lockAlpha: c.lockAlpha, selMask: c.sel ? { data: selData, ox: bx, oy: by, ow: bw, oh: bh } : null,
     };
     // live 帧（overlay 在 shader 内合成显示）
-    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], [ov] as never, [], null);
-    const live = readBack();
+    const live = frame(nodes, [ov], null);
     // 远处 tile 句柄：commit 后必须不动（tile-diff 不背未变 tile）。bbox ⊂ 左上 → tile(1,1) 在外。
     const farBefore = pixels.getTileHandle(1, 1);
     // commit → 静态帧
@@ -660,8 +665,7 @@ function commitParity(glctx: BrowserGl2Port, add: Add): void {
     // eslint 类似场合：私有 stats 只在 smoke 里窥（断言收养生效 = 下一帧零上传）。
     const bridge = room.bridge;
     const upBefore = bridge.stats.uploads;
-    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], [], [], null);
-    const committed = readBack();
+    const committed = frame(nodes, [], null);
     let md = 0, ai = -1;
     for (let i = 0; i < live.length; i++) { const d = Math.abs(live[i] - committed[i]); if (d > md) { md = d; ai = i; } }
     const p = ai >= 0 ? ai / 4 : 0;
@@ -676,19 +680,12 @@ function commitParity(glctx: BrowserGl2Port, add: Add): void {
 // ---- G3) v0.5.11 fill overlay（选区填色预览/commit）：1×1 填色纹理拉伸到选区 bbox，
 //      live vs CPU fillOnLayer 式 golden；commit ≡ live（同 shader SSoT）；lockAlpha 变体（user 拍板：
 //      填色尊重锁α）；compositeOnce/pickColor 不带 overlay 不漏预览（导出安全）。----
-function fillParity(glctx: BrowserGl2Port, add: Add): void {
+function fillParity(glctx: BrowserGl2Port, add0: Add, out: FrameOut = "screen"): void {
   const N = 512;
-  const gl = glctx.gl;
-  glctx.canvas.width = N; glctx.canvas.height = N;
+  const add = outAdd(add0, out);
+  if (out === "screen") { glctx.canvas.width = N; glctx.canvas.height = N; }
   const { room, tree, raster } = makeStage(glctx, 512);
-  const readBack = (): Uint8Array => {
-    const raw = new Uint8Array(N * N * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.readPixels(0, 0, N, N, gl.RGBA, gl.UNSIGNED_BYTE, raw);
-    const out = new Uint8Array(N * N * 4);
-    for (let y = 0; y < N; y++) out.set(raw.subarray((N - 1 - y) * N * 4, (N - y) * N * 4), y * N * 4);
-    return out;
-  };
+  const frame = frameReader(glctx, tree, N, out);
   // 选区 mask（bbox ⊂ 左上象限 → tile(1,1) 恒不被盖）：三段 0 / 128 / 255 竖带——半透明带验 AA 边等价。
   const bx = 64, by = 72, bw = 180, bh = 160;
   const selData = new Uint8Array(bw * bh);
@@ -751,8 +748,7 @@ function fillParity(glctx: BrowserGl2Port, add: Add): void {
       add(`fill:overlay 合成${lockAlpha ? "+lockAlpha" : ""} vs CPU fillOnLayer golden`, md <= 4, `maxΔ=${md} ${md > 4 ? at : ""}`);
     }
     // live 帧（commit ≡ live 用；屏幕面）
-    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], [ov] as never, [], null);
-    const live = readBack();
+    const live = frame(nodes, [ov], null);
     // 导出安全：compositeOnce 不带 overlay = 预览不漏进导出（等于未填的 base 合成）。
     {
       const gc0 = document.createElement("canvas"); gc0.width = N; gc0.height = N;
@@ -796,8 +792,7 @@ function fillParity(glctx: BrowserGl2Port, add: Add): void {
     }
     const bridge = room.bridge;
     const upBefore = bridge.stats.uploads;
-    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], [], [], null);
-    const committed = readBack();
+    const committed = frame(nodes, [], null);
     let md2 = 0, ai = -1;
     for (let i = 0; i < live.length; i++) { const d = Math.abs(live[i] - committed[i]); if (d > md2) { md2 = d; ai = i; } }
     const p2 = ai >= 0 ? ai / 4 : 0;
@@ -810,19 +805,12 @@ function fillParity(glctx: BrowserGl2Port, add: Add): void {
 
 // ---- G2) v0.4.11 clip-above 实时跟随 live 描边：带 stampOverlay 的 live 帧（clip 蒙版采 merged
 //        整幅纹理）必须与 commit 后的静态帧一致——旧病：live 中 clip 采已提交 tile index，不含笔迹。----
-function clipLiveParity(glctx: BrowserGl2Port, add: Add): void {
+function clipLiveParity(glctx: BrowserGl2Port, add0: Add, out: FrameOut = "screen"): void {
   const N = 512;
-  const gl = glctx.gl;
-  glctx.canvas.width = N; glctx.canvas.height = N;
+  const add = outAdd(add0, out);
+  if (out === "screen") { glctx.canvas.width = N; glctx.canvas.height = N; }
   const { tree, raster } = makeStage(glctx, 512);
-  const readBack = (): Uint8Array => {
-    const raw = new Uint8Array(N * N * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.readPixels(0, 0, N, N, gl.RGBA, gl.UNSIGNED_BYTE, raw);
-    const out = new Uint8Array(N * N * 4);
-    for (let y = 0; y < N; y++) out.set(raw.subarray((N - 1 - y) * N * 4, (N - y) * N * 4), y * N * 4);
-    return out;
-  };
+  const frame = frameReader(glctx, tree, N, out);
   const stamps: { x: number; y: number; size: number; alpha: number }[] = [];
   for (let i = 0; i < 8; i++) stamps.push({ x: 90 + i * 14, y: 100 + i * 12, size: 56, alpha: 0.9 });
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -843,12 +831,10 @@ function clipLiveParity(glctx: BrowserGl2Port, add: Add): void {
       stamps, shape: { hardness: 0.7, color: [0.2, 0.8, 0.3] as [number, number, number], buildup: false },
       bx, by, bw, bh, layerId: B.id, opacity: 1, erase, blendMode: "source-over", lockAlpha: false, selMask: null,
     };
-    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], [ov] as never, [], null);
-    const live = readBack();
+    const live = frame(nodes, [ov], null);
     const ok = raster.bakeStamps(B.id, basePx, ov as never, N, N, (px, x, y, w, h) => basePx.applyRegionDiff(x, y, w, h, px));
     add(`clipLive:${erase ? "erase" : "draw"} 提交成功`, ok);
-    tree.renderFrame(nodes as never, N, N, undefined, [1, 0, 0, 1, 0, 0], N, N, 1, [0, 0, 0], [], [], [], null);
-    const committed = readBack();
+    const committed = frame(nodes, [], null);
     let md = 0, ai = -1;
     for (let i = 0; i < live.length; i++) { const d = Math.abs(live[i] - committed[i]); if (d > md) { md = d; ai = i; } }
     const p = ai >= 0 ? ai / 4 : 0;
@@ -1766,6 +1752,11 @@ function glCases(glctx: BrowserGl2Port): [string, (add: Add) => void | Promise<v
     ["commit", (add) => { try { commitParity(glctx, add); } catch (e) { add("commit parity", false, String(e)); } }],
     ["clip-live", (add) => { try { clipLiveParity(glctx, add); } catch (e) { add("clip-live parity", false, String(e)); } }],
     ["fill", (add) => { try { fillParity(glctx, add); } catch (e) { add("fill parity", false, String(e)); } }],
+    // 0-5：上面四个的只合成版（不碰屏幕）：共用画面那一轮也跑，和独占那一轮逐字节比
+    ["rendertree·composite", (add) => { try { rendertreeParity(glctx, add, "composite"); } catch (e) { add("composite·rendertree parity", false, String(e)); } }],
+    ["commit·composite", (add) => { try { commitParity(glctx, add, "composite"); } catch (e) { add("composite·commit parity", false, String(e)); } }],
+    ["clip-live·composite", (add) => { try { clipLiveParity(glctx, add, "composite"); } catch (e) { add("composite·clip-live parity", false, String(e)); } }],
+    ["fill·composite", (add) => { try { fillParity(glctx, add, "composite"); } catch (e) { add("composite·fill parity", false, String(e)); } }],
     ["warp", (add) => { try { warpParity(glctx, add); } catch (e) { add("warp parity", false, String(e)); } }],
     ["warpclip", (add) => { try { warpClipParity(glctx, add); } catch (e) { add("warpclip parity", false, String(e)); } }],
     ["mergedown", (add) => { try { mergeDownParity(glctx, add); } catch (e) { add("mergedown parity", false, String(e)); } }],
@@ -1801,6 +1792,7 @@ async function run(): Promise<{ ok: boolean; checks: Check[]; error: string | nu
   // ---- 共用画面那一轮（0-4）：裸画面（属性照 three 的默认：antialias / depth / stencil）→ 弄脏 → fromContext → 同一串用例；每个用例前再弄脏一次 ----
   // 这几个用例本身就画到屏幕（RenderTree 的显示那一步 = 把合成结果贴到画板上）：共用画面时默认画面归宿主、画到屏幕 = 抛（0-4 第 1 条），所以这一轮不比它们，
   // 只在最后验它们确实被拒绝（名单不实 = 红）。三维那边从来不让内核画屏幕（合成进借来的 FBO、把贴图交给 three）。
+  // 这四个的只合成版（rendertree·composite 等，0-5 加的：RenderTree.compositeFrame 拿合成好的图直接读）照常在这一轮跑、和独占那一轮逐字节比——这四件事共用画面下就是这么做的。
   const SCREEN_CASES = new Set(["rendertree", "commit", "clip-live", "fill"]);
   // 细节本来就会变的检查（只比过没过，不比细节字）：预编译的用时 / 已编好几个 / 后台收尾了几个（跟机器快慢和前面跑过哪些用例有关）、
   // 活着的图块仓个数（共用那一轮少跑了上面几个用例）。像素另有读回指纹逐次比。

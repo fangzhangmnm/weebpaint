@@ -7,6 +7,8 @@
 // 旧 deriveRackCloudState 已删；这里只剩笔架视图的 folder 派生。
 
 // 笔架项的最小结构（brush 本体仍是未类型化 .js；这里只读 folder 字段）。
+import { stampFalloff } from "./backend/gl/stamp-falloff.ts";
+
 interface RackBrush { folder?: string; }
 
 // 某工具的 brush 列表 → folder 名集合（保序去重；空则给默认夹）。
@@ -30,12 +32,7 @@ export function smoothstepRadialGradient(hardness: number, stops = 16): string {
   const out: string[] = [];
   for (let i = 0; i <= stops; i++) {
     const t = i / stops;
-    let alpha: number;
-    if (t <= hd) alpha = 1;
-    else {
-      const u = (t - hd) / (1 - hd);
-      alpha = 1 - u * u * (3 - 2 * u);
-    }
+    const alpha = stampFalloff(t, 1, hd);   // 笔尖边缘的曲线：和画笔同一份（backend/gl/stamp-falloff.ts）
     const pct = (t * 100).toFixed(1);
     const apct = (alpha * 100).toFixed(1);
     out.push(`color-mix(in srgb, var(--ink) ${apct}%, transparent) ${pct}%`);

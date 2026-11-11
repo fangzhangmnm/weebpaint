@@ -4,7 +4,7 @@
 // 自动走「只 present」快路径；context-loss 自愈。
 // C1：context 创建翻壳——壳（board.ts）造好 BrowserGl2Port 递入，本类只见 Gl2Port 契约。
 
-import type { Gl2Port } from "../common/gl2-port.ts";
+import type { Gl2Port, PooledFBO } from "../common/gl2-port.ts";
 import { GlRoom } from "../backend/gl/gl-room.ts";
 import { RenderTree } from "../backend/gl/render-tree.ts";
 import { RasterService } from "../backend/gl/raster-service.ts";
@@ -127,6 +127,18 @@ export class GLBoard {
   //   复用 live warp；v0.6.38 去 canvas 化）。
   warpToBytes(src: Parameters<RasterService["warpToBytes"]>[0], srcW: number, srcH: number, hinv: number[], mode: number, bx: number, by: number, bw: number, bh: number) {
     return this._raster.warpToBytes(src, srcW, srcH, hinv, mode, bx, by, bw, bh);
+  }
+
+  /**
+   * 只合成、不上屏（2026-11-10 贴图主线 0-5）：参数和 render 一样，去掉屏幕那几个；返回合成好的整幅图（预乘、和画布一样大、第 0 行 = 画布第 0 行）。
+   * 那张图归内核：下一次合成（render / composite）之前有效，宿主不许归还、不许改它的采样设置。docBg 可以是 "#rrggbb"、"checker"、null，
+   * 或者直接给一个不透明的颜色 [r, g, b, a]（0..1）当底——三维放材质自己的底色，交出去的图就是不透明的。GL 丢了 = null。
+   */
+  composite(doc: GLDoc, docBg: string | readonly [number, number, number, number] | null, floats: FloatInput[] = [], stampOverlays: readonly OverlayInput[] = [], liveSyncLeaf: DocLeaf | null = null, surrogates: readonly SurrogateInput[] = []): PooledFBO | null {
+    if (this._glctx.isLost) return null;
+    const bg: Background | undefined = Array.isArray(docBg) ? [docBg[0], docBg[1], docBg[2], docBg[3]] as [number, number, number, number]
+      : docBg === "checker" ? "checker" : typeof docBg === "string" && docBg ? [...hexToRgb(docBg), 1] as [number, number, number, number] : undefined;
+    return this._tree.compositeFrame(doc.layers, doc.width, doc.height, bg, floats, stampOverlays, surrogates, liveSyncLeaf ? liveSyncLeaf.id : null);
   }
 
   // 渲染一帧。affine6 = board _applyDocTransform 的 device-px 6 参；canvasW/H = device px。

@@ -1,3 +1,4 @@
+export { stampFalloff } from "./gl/stamp-falloff.ts";
 export interface SoftTexRead {
     readonly w: number;
     readonly h: number;

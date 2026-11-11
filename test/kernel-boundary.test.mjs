@@ -1,5 +1,5 @@
 // kernel-boundary.test.mjs —— 画画内核的边界 + 「内核自己的测试」名单不过时（created 2026-11-10 by Claude Opus 5.5；CatsUp 贴图主线 0-1）。
-// CatsUp 把内核（src/backend、src/common、src/shell/browser-gl2-port.ts，先不含 timelapse）原样拷过去用（scripts/pull-paint-kernel.sh 按 test/kernel-tests.json 拉）。
+// CatsUp 把内核（src/backend、src/common、src/shell/browser-gl2-port.ts、src/shell/gl-board.ts，先不含 timelapse）原样拷过去用（scripts/pull-paint-kernel.sh 按 test/kernel-tests.json 拉）。
 // 守三件事：
 //   ① 内核文件只 import 内核自己（不含 excludeDirs）和名单里的 vendor 文件；不许裸包名（node: 除外）。
 //   ② src/backend、src/common 不许用界面的全局（document. / window. / HTMLElement / localStorage / indexedDB / navigator.），
