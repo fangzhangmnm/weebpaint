@@ -18,6 +18,7 @@ import { GlRoom } from "../../src/backend/gl/gl-room.ts";
 import { RenderTree } from "../../src/backend/gl/render-tree.ts";
 import { RasterService } from "../../src/backend/gl/raster-service.ts";
 import { LayerPixels } from "../../src/backend/tiles/tile-layer.ts";
+import { GLBoard } from "../../src/shell/gl-board.ts";
 import { materialize, editRegion, replaceFromCanvas } from "./canvas2d-facade.ts";
 import { GLStampRasterizer } from "../../src/backend/gl/gl-stamp.ts";
 import type { Stamp } from "../../src/backend/gl/gl-stamp.ts";
@@ -1413,6 +1414,62 @@ function softTripartite(glctx: BrowserGl2Port, add: Add): void {
   }
 }
 
+// ---- 1-4d 第 6 条：增量合成在真显卡上（实例化画行段的那条路只有真显卡走）= 整张重合，逐字节 ----
+//   两块画板吃同一份层像素和同一张外来薄层（真 WebGLTexture，每步重传）：一块走增量（markChanged 报块），一块每步 markContentDirty 强制整张。
+function incrementalParity(glctx: BrowserGl2Port, add: Add): void {
+  const W = 93, H = 71;
+  let seed = 11; const R = (): number => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  const lps: LayerPixels[] = [];
+  const leaf = (id: number, mode: string): { isGroup: false; id: number; opacity: number; mode: string; clippingMask: boolean; visible: boolean; pixels: LayerPixels } => {
+    const lp = new LayerPixels(W, H), b = new Uint8ClampedArray(W * H * 4);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; b[i] = (x * 7 + id * 40) & 255; b[i + 1] = (y * 5) & 255; b[i + 2] = 120; b[i + 3] = ((x + y + id) % 3) ? 255 : 140; }
+    lp.putRegion(0, 0, W, H, b); lps.push(lp);
+    return { isGroup: false, id, opacity: 1, mode, clippingMask: false, visible: true, pixels: lp };
+  };
+  const doc = { layers: [leaf(1, "source-over"), { isGroup: true as const, id: 9, opacity: 0.8, mode: "pass-through", clippingMask: false, visible: true, children: [leaf(2, "multiply"), leaf(3, "screen")] }], width: W, height: H };
+  const px = new Uint8Array(W * H * 4), t = glctx.createTexture();
+  glctx.uploadTexture(t, "rgba8", W, H, px);
+  const glTex = (t as unknown as { tex: WebGLTexture }).tex;
+  const extA = glctx.wrapExternal({ gl: glTex, w: W, h: H, prec: "u8" }), extB = glctx.wrapExternal({ gl: glTex, w: W, h: H, prec: "u8" });
+  // 两块板共用一个显卡接口（同一个图块池）：交替着跑，整张那块每步重建会把增量那块的缓存段挤掉（那时增量正确地退回整张）。
+  //   所以先跑增量那块一整串（记下每步的薄层像素和结果），再让整张那块按同样的薄层重放一遍比
+  const box = { bx: 10, by: 8, bw: 30, bh: 25 };
+  const ov = (tex: unknown, b: typeof box) => ({ kind: "host" as const, tex: tex as never, ...b, layerId: 2, opacity: 1, erase: false, blendMode: "source-over", lockAlpha: false, selMask: null });
+  const steps: { px: Uint8Array; box: typeof box; bg: string; out: Uint8Array | null; path: string }[] = [];
+  let rectsRuns = 0, bad = 0, firstBad = "";
+  const inc = new GLBoard(glctx, 64);
+  try {
+    for (let s = 0; s < 40; s++) {
+      const n = s % 9 === 0 ? 25 : 1 + Math.floor(R() * 4);
+      for (let k = 0; k < n; k++) {
+        const x = Math.floor(R() * (W + 8)) - 4, y = Math.floor(R() * (H + 8)) - 4, w = 1 + Math.floor(R() * 12), h = 1 + Math.floor(R() * 12), a = 40 + Math.floor(R() * 215), c = [R(), R(), R()];
+        for (let yy = Math.max(0, y); yy < Math.min(H, y + h); yy++) for (let xx = Math.max(0, x); xx < Math.min(W, x + w); xx++) { const i = (yy * W + xx) * 4; px[i] = Math.round(c[0] * a); px[i + 1] = Math.round(c[1] * a); px[i + 2] = Math.round(c[2] * a); px[i + 3] = a; }
+        extA.markChanged(x, y, w, h);
+      }
+      if (s % 7 === 3) { box.bw = Math.min(W - box.bx, box.bw + 9); box.bh = Math.min(H - box.by, box.bh + 6); }
+      const bg = s % 11 === 5 ? "checker" : "#ffffff";   // 换底 = 计划签名变 = 整张；别的步同一个底 = 能增量
+      glctx.uploadTexture(t, "rgba8", W, H, px);
+      const fa = inc.composite(doc, bg, [], [ov(extA, box)]);
+      const path = (inc as unknown as { _tree: { lastPath: { path: string } } })._tree.lastPath.path;
+      if (path === "rects") rectsRuns++;
+      steps.push({ px: px.slice(), box: { ...box }, bg, out: fa ? glctx.readPixels(fa, 0, 0, W, H) : null, path });
+    }
+  } finally { inc.dispose(); }
+  const ref = new GLBoard(glctx, 64);
+  try {
+    steps.forEach((st, s) => {
+      glctx.uploadTexture(t, "rgba8", W, H, st.px);
+      ref.markContentDirty();
+      const fb = ref.composite(doc, st.bg, [], [ov(extB, st.box)]);
+      if (!st.out || !fb) { bad++; firstBad ||= `第 ${s} 步合成没出图`; return; }
+      const b = glctx.readPixels(fb, 0, 0, W, H);
+      for (let i = 0; i < b.length; i++) if (st.out[i] !== b[i]) { bad++; firstBad ||= `第 ${s} 步（${st.path}）(${(i >> 2) % W}, ${Math.floor((i >> 2) / W)}) ${st.out[i]} ≠ ${b[i]}`; break; }
+    });
+  } finally { for (const lp of lps) lp.dispose(); ref.dispose(); }
+  add("incremental: 增量 = 整张（真显卡，逐字节）", bad === 0, bad ? firstBad : `40 步全一样（${steps.map((x) => x.path[0]).join("")}）`);
+  add("incremental: 真的走了只合脏格那条路", rectsRuns >= 15, `rects ${rectsRuns} 步`);
+}
+
 // ---- I) C8 ⑥ arena 租户记账（BrowserGl2Port 真 GL 面；SoftGl2 面在 node soft-gl2-port.test）----
 function arenaAccounting(glctx: BrowserGl2Port, add: Add): void {
   const st0 = glctx.arenaStats;
@@ -1763,6 +1820,7 @@ function glCases(glctx: BrowserGl2Port): [string, (add: Add) => void | Promise<v
     ["soft tripartite", (add) => { try { softTripartite(glctx, add); } catch (e) { add("soft tripartite", false, String(e)); } }],
     ["region", async (add) => { try { await regionParity(glctx, add); } catch (e) { add("region parity", false, String(e)); } }],
     ["arena accounting", (add) => { try { arenaAccounting(glctx, add); } catch (e) { add("arena accounting", false, String(e)); } }],
+    ["incremental", (add) => { try { incrementalParity(glctx, add); } catch (e) { add("incremental parity", false, String(e)); } }],
   ];
 }
 
