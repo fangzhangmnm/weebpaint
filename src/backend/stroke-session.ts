@@ -286,13 +286,16 @@ export class StrokeSession {
     if (this._regions.length) {
       const regions = this._regions;
       this._regions = [];
-      let failed = 0;
+      // 落层那一步自己抛（不是返回 false）同样：先取消令牌（已落的叶跟着回滚）再抛原错误——以前抛了令牌开着，下一笔被单令牌墙挡住（2026-11-10 0-5 审后补，统筹定）。
+      let failed = 0, thrown: unknown = null;
       try { for (const r of regions) if (!this.deps.commitRegion(r)) failed++; }
+      catch (e) { thrown = e; }
       finally { this.deps.setRegions([]); for (const r of regions) r.dispose(); }
-      if (failed) {
+      if (failed || thrown) {
         // bakeStamps 返 false = 该叶什么都没写（GL 丢失 / 驻留不齐）：整笔令牌取消、响亮——不静默丢一笔 / 不落半组（家规：错误路径不许吞）
         this.token.cancel();
         this.deps.invalidate();
+        if (thrown) throw thrown;
         throw new Error(`REGION_COMMIT_FAILED (${failed}/${regions.length} leaves did not land; stroke dropped, token cancelled)`);
       }
       gpuCommitted = true;

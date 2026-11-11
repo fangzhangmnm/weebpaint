@@ -19,6 +19,7 @@ import { PaintingWorkpiece } from "../src/backend/workpiece/painting-workpiece.t
 import { PaintingView } from "../src/backend/workpiece/painting-view.ts";
 import { StrokeSession } from "../src/backend/stroke-session.ts";
 import { Selection } from "../src/backend/selection.ts";
+import { RegionStroke } from "../src/backend/gl/region-stroke.ts";
 
 const W = 96, H = 80;
 const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
@@ -342,6 +343,33 @@ describe("一笔的档口：host 方式（0-5 C）", () => {
     const s3 = new StrokeSession(r.deps, ENGINE(), [L1], SPEC_H, "host");   // 上面那次没开令牌
     s3.cancel();
     r.port.returnFBO(t);
+  });
+
+  it("区域笔那一支（0-5 审后补）：落层那一步自己抛 → 令牌取消、已落的那片叶回滚、抛原错误、下一笔能正常开始", () => {
+    const r = rig(), [L1, L2] = r.layers(), b1 = r.bytes(L1), b2 = r.bytes(L2), d0 = r.undo.depth(), leafOf = new Map();
+    let landed = 0;
+    const deps = {
+      ...r.deps,
+      openRegion: (leaf, opts) => { const rs = new RegionStroke(r.room, leaf.id, leaf.pixels, W, H, null, { lockAlpha: false, snapshot: !!opts?.snapshot }); leafOf.set(rs, leaf); return rs; },
+      commitRegion: (rs) => {
+        if (landed) throw new Error("REGION_TEST_BOOM");
+        const l = leafOf.get(rs), px = l.pixels.getRegion(0, 0, W, H);
+        for (let i = 0; i < px.length; i += 4) { px[i] = 255 - px[i]; px[i + 3] = 255; }   // 当作第一片叶落成了：在令牌里真写一遍
+        l.applyRegionDiff(0, 0, W, H, px); landed++;
+        return true;
+      },
+    };
+    const s = new StrokeSession(deps, ENGINE(), [L1, L2], SPEC_H, "region");
+    let err = null; try { s.end(); } catch (e) { err = e; }
+    eq(err?.message, "REGION_TEST_BOOM", "抛的是原错误");
+    eq(landed, 1, "第一片叶真的落过");
+    assert(same(r.bytes(L1), b1), "已落的那片叶跟着令牌回滚");
+    assert(same(r.bytes(L2), b2), "第二片没变");
+    eq(r.undo.depth(), d0, "不占步");
+    landed = 0;
+    const s2 = new StrokeSession({ ...deps, commitRegion: () => true }, ENGINE(), [L1], SPEC_H, "region");   // 没有开着的令牌挡路
+    s2.end();
+    eq(r.undo.depth(), d0, "下一笔正常开始、正常收口（没写东西 = 不占步）");
   });
 
   it("收尾：释放工件；小块池泄漏为零", async () => {
