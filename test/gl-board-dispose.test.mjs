@@ -1,12 +1,11 @@
-// 画板退租 + 图块池额度的口（CatsUp 贴图主线 0-3a，统筹 11-11）：原来只有建、没有拆（画画软件一辈子一块画板）；宿主有很多块、会扔，建和拆要成对。
+// 画板退租（CatsUp 贴图主线 0-3a，统筹 11-11）：原来只有建、没有拆（画画软件一辈子一块画板）；宿主有很多块、会扔，建和拆要成对。
 // ① 拆 = 显卡上它建的纹理全删、借的离屏图全还（数 Port 的 createTexture / deleteTexture、borrowFBO / returnFBO）、arena 退租；② 调两次没事；③ 拆了之后再用 = 抛；
-// ④ 额度的口：池建好之后再设 = 抛；新的一份模块（池还没建）设了 = 池按它建。画画软件不调这两个口。
+// 画画软件自己不调它。（v0.14.76 同时加过的「图块池额度的口」v0.14.77 撤了：池上本来就有 setRawQuotaBytes。）
 // 内核自己的测试：只 import 内核和测试工具。created 2026-11-11 by Claude Opus 5.5
 import { describe, it, assert, eq } from "./runner.mjs";
 import { SoftGl2Port } from "../src/backend/soft-gl2-port.ts";
 import { LayerPixels } from "../src/backend/tiles/tile-layer.ts";
 import { GLBoard } from "../src/shell/gl-board.ts";
-import { appTilePool, setTilePoolRawQuota } from "../src/backend/tiles/app-tile-pool.ts";
 
 const W = 300, H = 200;   // 跨几块图块
 const throws = (fn, re) => { try { fn(); } catch (e) { return re.test(String(e?.message ?? e)); } return false; };
@@ -63,24 +62,5 @@ describe("画板退租（GLBoard.dispose）", () => {
       else if (Array.isArray(p._invalidated)) for (const cb of p._invalidated) cb();
       assert(true, "没抛");
     } finally { L.dispose(); }
-  });
-});
-
-describe("图块池额度的口（setTilePoolRawQuota）", () => {
-  it("池已经建了再设 = 抛，额度不变", () => {
-    const before = appTilePool().stats().rawQuotaBytes;
-    assert(throws(() => setTilePoolRawQuota(64 * 1024 * 1024), /already exists/), "抛");
-    eq(appTilePool().stats().rawQuotaBytes, before, "没变");
-  });
-  it("新的一份模块（池还没建）：设了 = 池按它建；坏的数 = 抛", async () => {
-    const m = await import(`../src/backend/tiles/app-tile-pool.ts?fresh=${Date.now()}`);
-    assert(throws(() => m.setTilePoolRawQuota(0), /bad quota/) && throws(() => m.setTilePoolRawQuota(NaN), /bad quota/), "坏的数");
-    m.setTilePoolRawQuota(128 * 1024 * 1024);
-    eq(m.appTilePool().stats().rawQuotaBytes, 128 * 1024 * 1024, "按设的建");
-  });
-  it("不设 = 原来的 384 MB（画画软件不调它）", async () => {
-    const m = await import(`../src/backend/tiles/app-tile-pool.ts?fresh2=${Date.now()}`);
-    eq(m.appTilePool().stats().rawQuotaBytes, m.RAW_TILE_QUOTA_BYTES, "默认");
-    eq(m.RAW_TILE_QUOTA_BYTES, 384 * 1024 * 1024);
   });
 });
