@@ -144,7 +144,8 @@ import "./layer-cap-budget.test.mjs";        // v339 动态字节预算图层上
 import "./brush-collect-stamps.test.mjs";    // Stage 3：brush.collectStamps GPU stamp-list 出栈（复用手感数学 / 椭圆透传 / pixelMode null）
 import "./brush-dwell-pressure.test.mjs";   // 2026-09-06 起笔静止期不积压感（墨点案）
 import "./stroke-core-golden.test.mjs";     // 2026-11-10 贴图主线 0-6：一笔的手感拆出来之前冻的样本（主门）
-import "./stroke-core.test.mjs";            // 0-6 一笔的手感不管几维：三维间距 / 单位 / 断开 / 定型 / 停顿
+import "./stroke-core.test.mjs";
+import "./dirty-rects.test.mjs";             // 1-4d 第 6 条：一帧改到的那几块整理成两两不相交的单子            // 0-6 一笔的手感不管几维：三维间距 / 单位 / 断开 / 定型 / 停顿
 import "./stroke-core-guard.test.mjs";      // 0-6 守卫（扫源码，不进内核名单）
 import "./layer-composite.test.mjs";        // deep module A：clip 基底解析（同级/链共基底/基底隐显/组作基底）
 import "./tile-geometry.test.mjs";          // tile 几何纯函数（自 tile-store.test 迁出）
