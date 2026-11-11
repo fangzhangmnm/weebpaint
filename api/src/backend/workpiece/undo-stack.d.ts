@@ -37,7 +37,22 @@ export interface StackWorkpieceHooks {
     /** 某步应用完（hint 之后）：commitVersion++ + 组件变更信号。 */
     afterApply(step: UndoStep, dir: "undo" | "redo"): void;
 }
-export declare class UndoStack {
+/**
+ * Workpiece 用的那一面（UndoStack 和 HostedSteps 共有）：独占绑定、收一步、报「现在停在哪一步」、清空。
+ * 2026-11-10（贴图主线 0-2，Claude Opus 5.5）：步可以存在内核自己的栈里（UndoStack），也可以交给宿主的栈去存（hosted-steps.ts HostedSteps）。
+ */
+export interface StepSink {
+    _bindWorkpiece(hooks: StackWorkpieceHooks): void;
+    push(step: UndoStepInput): void;
+    cursorStepId(): number;
+    clear(): void;
+}
+/**
+ * 翻一步（全仓只有这一处，守卫钉）：undo = entries 倒序 swapRecord，redo = 正序再调一次（swap 自反）。只翻数据；游标、hint、通知归调用的栈。
+ * swapRecord 抛 = 状态不可信，原样传播（不可恢复协议在 History）。
+ */
+export declare function applyStep(step: UndoStep, dir: "undo" | "redo"): void;
+export declare class UndoStack implements StepSink {
     private _steps;
     private _cursor;
     private _baseId;

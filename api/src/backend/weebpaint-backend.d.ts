@@ -1,4 +1,5 @@
 import { History } from "./workpiece/history.ts";
+import { type StepHost } from "./workpiece/hosted-steps.ts";
 import { PaintingWorkpiece, type PaintingData, type PaintingDataNode } from "./workpiece/painting-workpiece.ts";
 import { PaintingView } from "./workpiece/painting-view.ts";
 import type { PerspHost } from "./workpiece/persp-component.ts";
@@ -37,6 +38,9 @@ export interface BackendInject {
      *  缺省回落 doc-render 全局接缝（壳单租户期语义不变）；多 backend 并存各持己面不串。 */
     compositorBytes?: DocCompositorBytesFn;
     hooks?: BackendShellHooks;
+    /** 给了 = 封好的步交给宿主的撤销栈去存（贴图主线 0-2：三维把画画和建模接成一条撤销线）——宿主走到哪一步调 `history.flip(step)`；
+     *  这时 undo / redo / canUndo 抛（归宿主管），onHistChange 不发。不给 = 和以前一模一样（内核自带的栈）。 */
+    stepHost?: StepHost;
 }
 export interface BackendOpenResult {
     backend: WeebPaintBackend;

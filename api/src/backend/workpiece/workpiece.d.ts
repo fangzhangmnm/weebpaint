@@ -1,4 +1,4 @@
-import type { UndoStack, RecordData, WorkpieceComponent } from "./undo-stack.ts";
+import type { StepSink, RecordData, WorkpieceComponent } from "./undo-stack.ts";
 /** 注册进 workpiece 的组件还须带 collector 面（token 协作；ADR-0008 §1）。 */
 export interface CollectorComponent extends WorkpieceComponent {
     /** commit/cancel 时打包并清空本 token 的 collector；null = 本 token 没被摸。 */
@@ -6,8 +6,8 @@ export interface CollectorComponent extends WorkpieceComponent {
 }
 export type UndoPolicy = "recorded" | "silent";
 export interface WorkpieceOpts {
-    /** 不传 = 该 workpiece 无 undo（写照走令牌，record 即弃）。 */
-    undo?: UndoStack;
+    /** 不传 = 该 workpiece 无 undo（写照走令牌，record 即弃）。UndoStack（内核自带的栈）或 HostedSteps（步交给宿主的栈；贴图主线 0-2）。 */
+    undo?: StepSink;
     /** FR 兜底报警：令牌未 commit/cancel 就被 GC（泄漏 bug）。默认 console.error。 */
     onTokenLeak?: (label?: string) => void;
 }
@@ -55,7 +55,7 @@ export declare class Workpiece {
     /** 统一变更信号（histchange/sidecarchange 后继）。commit/cancel 按 touched 发、undo/redo 按 entries 发。 */
     onChange(cb: (e: WorkpieceChangeEvent) => void): () => void;
     /** 子类协作面（load 清栈用）；app 侧栈引用走构造时自己传入的 UndoStack。 */
-    protected get undoStack(): UndoStack | null;
+    protected get undoStack(): StepSink | null;
     protected register(c: CollectorComponent, policy: {
         undo: UndoPolicy;
     }): void;

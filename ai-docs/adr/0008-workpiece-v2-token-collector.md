@@ -172,3 +172,11 @@ exchange（整幅改尺寸）与 computed（翻转 / 旋转 / 平移）靠「同
 **没走的出路 ②（记为远景，总账 #86）**：令牌里一换部件就封一个子记录，一步 = 有序子记录列表，倒放 = 真实顺序之逆。更一般，但要动
 workpiece / history 的令牌结构，并打破 `tokenBeforeImage`「整段令牌只有一份扣押」的读口假设与 computed / exchange 的双捕获断言。
 现在没有第二个需要顺序的部件；等出现再做。
+
+## 修订 2026-11-10（Claude Opus 5.5；贴图主线 0-2，施工单 CatsUp `ai-docs/20261110-paint-workorders-4.md`，形状 Fable 5.2 定）：第二种存步的地方
+
+**为什么**：user 定的「画画和建模是一条撤销线」——在三维模型上画了一笔、切了一刀、又画了一笔，按三下撤销要按相反的顺序退回去。内核自己管一个栈、三维自己管一个栈，两个栈各走各的，顺序就对不上。
+
+**加了什么**：和 `UndoStack` 并排的 `HostedSteps`（`src/backend/workpiece/hosted-steps.ts`）。对 `Workpiece` 来说两个长得一样（`StepSink`：独占绑定、收一步、报「现在停在哪一步」、清空）；`HostedSteps` 自己不存步，封好的一步交给宿主（`StepHost.onStep`），宿主的栈走到这一步再调 `History.flip(step)` 让内核翻过去。每一步多记它的前一步是谁，所以内核不看宿主的栈也知道停在哪、方向内核自己认。`History` 建的时候给了 `HostedSteps` 就不建 `UndoStack`；`WeebPaintBackend` 的注入口多一项 `stepHost`，不给 = 和以前一模一样。翻的那段循环提成一个函数（`undo-stack.ts applyStep`），两个类共用，全仓只有这一处。
+
+**那两条契约照旧**：① 部件的 swap 不依赖别的部件此刻的状态（宿主的栈里不同作品的步谁先谁后翻都行，正是因为这一条）；② 调用的人乱用要给规章定义的结果、在调用的地方响亮地报——顺序由内核把关：翻错顺序、别的作品的步、drop 过的、上一代的（clear 之前）、写令牌开着，都在动手之前抛 `StepOrderError`、什么都不碰（不算不可恢复）；swapRecord 中途抛照旧走不可恢复协议（弃令牌、`HostedSteps.clear` → 宿主收到 `onReset`、`onUnrecoverable`）。`History.flip` 不替宿主封口（封口会往宿主的栈里推一步新的，而宿主正翻到一半）：宿主开始撤销 / 重做前自己先 `sealCheckpoint()`。测试 `test/hosted-steps.test.mjs`（进内核名单）+ `test/hosted-steps-guard.test.mjs`。
