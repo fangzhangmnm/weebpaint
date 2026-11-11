@@ -1,4 +1,3 @@
-import type { CpuDraw } from "./cpu-draw.ts";
 export type FBOPrec = "u8" | "f16" | "f32";
 export interface Gl2Caps {
     maxTextureSize: number;
@@ -15,11 +14,6 @@ export interface Gl2Texture {
     readonly kind: "tex2d";
 }
 export type TexUploadFormat = "rgba8" | "rgba16f" | "r8" | "r32f";
-export interface HostProgram {
-    readonly vert: string;
-    readonly frag: string;
-    readonly cpu: CpuDraw;
-}
 export type Gl2Blend = "none" | "premult-over" | "max-alpha";
 export type Gl2TexSource = Gl2Texture | PooledFBO | Gl2TileArena;
 export interface Gl2DrawSpec {
@@ -56,7 +50,6 @@ export interface Gl2Port {
     onInvalidated(cb: () => void): void;
     program(name: string, vert?: string, frag?: string): void;
     warmProgram?(name: string, vert: string, frag: string): void;
-    registerProgram(name: string, src: HostProgram): void;
     borrowFBO(w: number, h: number, prec?: FBOPrec): PooledFBO;
     returnFBO(f: PooledFBO): void;
     clearPool(): void;

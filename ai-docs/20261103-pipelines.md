@@ -167,13 +167,7 @@ CatsUp：GLBoard.composite（参数同 render，去掉屏幕那几个）→ Rend
 - 像素笔（pixelMode）不走这里：`_extendImmediate` 沿原始点直接落层，它自己的走步循环留着（1-5 再看）。
 - 拆前拆后逐位相同：`test/stroke-core-golden.test.mjs`（12 条笔画、每帧的 collectStamps 和抬笔结果按位取哈希）。
 
-## 追记 2026-11-11（v0.14.72，Claude Opus 5.5；CatsUp 贴图主线 1-4b，统筹 11-11 定的形状）：宿主登记的程序
+## 追记 2026-11-11（v0.14.74，Claude Opus 5.5）：撤回 v0.14.72 / v0.14.73 的「宿主登记程序」口
 
-- 显卡接口 `Gl2Port` 多一个口 `registerProgram(name, { vert, frag, cpu })`：内核以外的着色器（三维的「空间里的笔」薄层）**在这一处一起交** GLSL 和软件显卡里的 JavaScript 版（`cpu` 和内核自己的程序同一种写法 `CpuDraw`）。登记之后照常 `program(name)` / `draw`。
-- 软件显卡（`SoftGl2Port`）：JavaScript 版存在**这个实例**上（别的实例找不到）；`program(name)` 先查内核那张表（`soft-shaders.ts resolveCpuProgram`），再查这个实例登记的。真显卡（`BrowserGl2Port`）：登记时当场编 GLSL，源存进重建用的表，画面恢复后照样重编。
-- 两边都拒：名字是内核自己的程序（`isKernelProgram` = 在内核那张表里，含 GPU-only）= `PROGRAM_NAME_IS_KERNEL`；同一个名字登记两次 = `PROGRAM_ALREADY_REGISTERED`；没给 JavaScript 版 = `PROGRAM_NO_CPU`。没登记的照旧 `SHADER_NO_CPU_EQUIV`（ADR-0009 决定 5 不放松）。
-- 画画软件自己不用这个口；画画软件的每一帧、每一笔走的路一步没变。测试 `test/host-program.test.mjs`（进内核名单）。
-- 软件显卡程序的写法（`SoftTexRead` / `SoftArenaRead` / `CpuDrawCtx` / `CpuDraw` 四个类型）从 `backend/soft-shaders.ts` 原样搬到 `common/cpu-draw.ts`（显卡接口要用它，C2 目录格律不许 common import backend）；`soft-shaders.ts` 原样转出，用的地方不用改。
-- **v0.14.73（统筹 11-11 补两条；起因：user 提醒别拿「改动小」当理由——显卡这一层正在从「内核自己的零件」变成「两边共用的地基」，这个登记口是第一处）**：
-  - 外面登记的程序名字必须带自己的前缀「前缀/名字」（比如 `catsup/space-tip`）；没有前缀的名字留给内核。两种接口的 `registerProgram` 都先过 `soft-shaders.ts checkHostProgramName`：不带前缀 = `PROGRAM_NAME_NEEDS_PREFIX`。重名靠这条规则本身就不会发生（内核的名字都没有斜杠）。
-  - 门的形状（名字 + `{ vert, frag, cpu }`，挂在接口实例上）就是以后内核自己的程序也走的那个门。**现在离那一步差的**：① 内核的程序是「第一次用到时」`program(name, vert, frag)` 当场交 GLSL，源码散在各个用它的模块里（gl-stamp、region-programs、gl-compositor……），JavaScript 版在 `soft-shaders.ts` 那张写死的表里——两份不在同一处交；要搬就是每个模块在接口建好时（或第一次用之前）`registerProgram` 一次，把自己的 GLSL 和 JavaScript 版一起交，`resolveCpuProgram` 那张表退役成这些登记。② 内核有三个只在真显卡上画的程序（屏显的 present-affine 等，GPU-only），门现在要求 `cpu` 必须是函数——要让它们也走这个门，`cpu` 得多一种「只在真显卡上画」的写法。③ 内核的名字没有前缀：搬的时候要么给内核一个前缀（改全部程序名、所有调用处），要么规定「没有前缀 = 内核」由门自己认（现在就是这么判的）。三件都是机械的搬，没有算法要改。
+- v0.14.72 给显卡接口加过 `registerProgram`（内核外面的程序在同一处交 GLSL 和软件显卡里的 JavaScript 版），v0.14.73 加过「名字要带前缀」。**两版都撤回**，源码、测试、接口签名回到 v0.14.71 的样子（`common/cpu-draw.ts`、`test/host-program.test.mjs` 删了）。
+- 原因（统筹 11-11 转 user 原话）：「画画的内核还是用一个尽可能小……你三维这边另外开一个，就相当于我们二维模式的时候，你永远不用动三维的这个内核」。画画内核的显卡那一层（gl2-port、软件显卡、程序表、离屏图的池子）是它自己的内部零件，三维不在上面登记着色器、不借它的图；三维的空间层在三维仓自己的显卡接口上画。

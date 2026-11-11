@@ -1,4 +1,4 @@
-import type { HostProgram, Gl2Port, Gl2Caps, FBOPrec, PooledFBO, Gl2Texture, Gl2TileArena, Gl2DrawSpec, TexUploadFormat } from "../common/gl2-port.ts";
+import type { Gl2Port, Gl2Caps, FBOPrec, PooledFBO, Gl2Texture, Gl2TileArena, Gl2DrawSpec, TexUploadFormat } from "../common/gl2-port.ts";
 export declare class BrowserTileArena implements Gl2TileArena {
     readonly kind: "arena";
     readonly tileSize: number;
@@ -61,8 +61,6 @@ export declare class BrowserGl2Port implements Gl2Port {
     /** 壳侧（off-contract，backend 摸不到）：一张 FBO / 2D 纹理背后的 WebGLTexture。共用画面时宿主拿它当自己的贴图采样（不读回）。
      *  context 恢复后旧句柄作废：等 onInvalidated 之后重新合成、重新取。 */
     glTextureOf(src: PooledFBO | Gl2Texture): WebGLTexture;
-    private _hosted;
-    registerProgram(name: string, src: HostProgram): void;
     program(name: string, vert?: string, frag?: string): void;
     warmProgram(name: string, vert: string, frag: string): void;
     private _schedulePendingPoll;
