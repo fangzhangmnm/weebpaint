@@ -1,0 +1,192 @@
+{
+"about": "仓里每一份 ora 样本「解开 → 再编（wroteWith=golden）」得到的 stack.xml 字符串和条目名单。生成 = 改 ora 图层 id 之前的代码（画画仓 3c3fe37 = v0.14.88）。守 test/ora-ids-unchanged.test.mjs：正常文档（id 都可用、不重复）写出来和以前逐字节一样（CatsUp 统筹 11-12）。created 2026-11-12 by Claude Opus 5.5",
+"samples": {
+"format/real/v1/plain.ora": {
+"stack": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<image version=\"0.0.3\" w=\"4\" h=\"4\" xres=\"72\" yres=\"72\" xmlns:weebpaint=\"https://github.com/fangzhangmnm/weebpaint/ns\" weebpaint:format=\"3\" weebpaint:format-minor=\"0\" weebpaint:format-patch=\"0\" weebpaint:wrote-with=\"golden\">\n  <stack name=\"root\">\n    <layer name=\"点\" src=\"data/layer2.png\" x=\"3\" y=\"3\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"2\" weebpaint:active=\"true\" />\n    <layer name=\"底\" src=\"data/layer1.png\" x=\"0\" y=\"0\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"1\" />\n  </stack>\n</image>\n",
+"entries": [
+"Thumbnails/thumbnail.png",
+"data/layer1.png",
+"data/layer2.png",
+"mergedimage.png",
+"mimetype",
+"stack.xml"
+]
+},
+"format/real/v1/reference-timelapse.ora": {
+"stack": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<image version=\"0.0.3\" w=\"4\" h=\"4\" xres=\"72\" yres=\"72\" xmlns:weebpaint=\"https://github.com/fangzhangmnm/weebpaint/ns\" weebpaint:format=\"3\" weebpaint:format-minor=\"0\" weebpaint:format-patch=\"0\" weebpaint:wrote-with=\"golden\">\n  <stack name=\"root\">\n    <layer name=\"点\" src=\"data/layer2.png\" x=\"3\" y=\"3\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"2\" weebpaint:active=\"true\" />\n    <layer name=\"底\" src=\"data/layer1.png\" x=\"0\" y=\"0\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"1\" />\n  </stack>\n</image>\n",
+"entries": [
+"Thumbnails/thumbnail.png",
+"data/layer1.png",
+"data/layer2.png",
+"mergedimage.png",
+"mimetype",
+"stack.xml"
+]
+},
+"format/real/v2/plain.ora": {
+"stack": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<image version=\"0.0.3\" w=\"4\" h=\"4\" xres=\"72\" yres=\"72\" xmlns:weebpaint=\"https://github.com/fangzhangmnm/weebpaint/ns\" weebpaint:format=\"3\" weebpaint:format-minor=\"0\" weebpaint:format-patch=\"0\" weebpaint:wrote-with=\"golden\">\n  <stack name=\"root\">\n    <layer name=\"点\" src=\"data/layer2.png\" x=\"3\" y=\"3\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"2\" weebpaint:active=\"true\" />\n    <layer name=\"底\" src=\"data/layer1.png\" x=\"0\" y=\"0\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"1\" />\n  </stack>\n</image>\n",
+"entries": [
+"Thumbnails/thumbnail.png",
+"data/layer1.png",
+"data/layer2.png",
+"mergedimage.png",
+"mimetype",
+"stack.xml"
+]
+},
+"format/real/v2/references-live-timelapse.ora": {
+"stack": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<image version=\"0.0.3\" w=\"4\" h=\"4\" xres=\"72\" yres=\"72\" xmlns:weebpaint=\"https://github.com/fangzhangmnm/weebpaint/ns\" weebpaint:format=\"3\" weebpaint:format-minor=\"0\" weebpaint:format-patch=\"0\" weebpaint:wrote-with=\"golden\">\n  <stack name=\"root\">\n    <layer name=\"点\" src=\"data/layer2.png\" x=\"3\" y=\"3\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"2\" weebpaint:active=\"true\" />\n    <layer name=\"底\" src=\"data/layer1.png\" x=\"0\" y=\"0\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"1\" />\n  </stack>\n</image>\n",
+"entries": [
+"Thumbnails/thumbnail.png",
+"data/layer1.png",
+"data/layer2.png",
+"mergedimage.png",
+"mimetype",
+"stack.xml"
+]
+},
+"format/real/v3.0.0-desk1.1.0/plain.ora": {
+"stack": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<image version=\"0.0.3\" w=\"4\" h=\"4\" xres=\"72\" yres=\"72\" xmlns:weebpaint=\"https://github.com/fangzhangmnm/weebpaint/ns\" weebpaint:format=\"3\" weebpaint:format-minor=\"0\" weebpaint:format-patch=\"0\" weebpaint:wrote-with=\"golden\">\n  <stack name=\"root\">\n    <layer name=\"点\" src=\"data/layer2.png\" x=\"3\" y=\"3\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"2\" weebpaint:active=\"true\" />\n    <layer name=\"底\" src=\"data/layer1.png\" x=\"0\" y=\"0\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"1\" />\n  </stack>\n</image>\n",
+"entries": [
+"Thumbnails/thumbnail.png",
+"data/layer1.png",
+"data/layer2.png",
+"mergedimage.png",
+"mimetype",
+"stack.xml"
+]
+},
+"format/real/v3.0.0-desk1.1.0/references-live-timelapse.ora": {
+"stack": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<image version=\"0.0.3\" w=\"4\" h=\"4\" xres=\"72\" yres=\"72\" xmlns:weebpaint=\"https://github.com/fangzhangmnm/weebpaint/ns\" weebpaint:format=\"3\" weebpaint:format-minor=\"0\" weebpaint:format-patch=\"0\" weebpaint:wrote-with=\"golden\">\n  <stack name=\"root\">\n    <layer name=\"点\" src=\"data/layer2.png\" x=\"3\" y=\"3\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"2\" weebpaint:active=\"true\" />\n    <layer name=\"底\" src=\"data/layer1.png\" x=\"0\" y=\"0\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"1\" />\n  </stack>\n</image>\n",
+"entries": [
+"Thumbnails/thumbnail.png",
+"data/layer1.png",
+"data/layer2.png",
+"mergedimage.png",
+"mimetype",
+"stack.xml"
+]
+},
+"format/real/v3.0.0/plain.ora": {
+"stack": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<image version=\"0.0.3\" w=\"4\" h=\"4\" xres=\"72\" yres=\"72\" xmlns:weebpaint=\"https://github.com/fangzhangmnm/weebpaint/ns\" weebpaint:format=\"3\" weebpaint:format-minor=\"0\" weebpaint:format-patch=\"0\" weebpaint:wrote-with=\"golden\">\n  <stack name=\"root\">\n    <layer name=\"点\" src=\"data/layer2.png\" x=\"3\" y=\"3\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"2\" weebpaint:active=\"true\" />\n    <layer name=\"底\" src=\"data/layer1.png\" x=\"0\" y=\"0\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"1\" />\n  </stack>\n</image>\n",
+"entries": [
+"Thumbnails/thumbnail.png",
+"data/layer1.png",
+"data/layer2.png",
+"mergedimage.png",
+"mimetype",
+"stack.xml"
+]
+},
+"format/real/v3.0.0/references-live-timelapse.ora": {
+"stack": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<image version=\"0.0.3\" w=\"4\" h=\"4\" xres=\"72\" yres=\"72\" xmlns:weebpaint=\"https://github.com/fangzhangmnm/weebpaint/ns\" weebpaint:format=\"3\" weebpaint:format-minor=\"0\" weebpaint:format-patch=\"0\" weebpaint:wrote-with=\"golden\">\n  <stack name=\"root\">\n    <layer name=\"点\" src=\"data/layer2.png\" x=\"3\" y=\"3\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"2\" weebpaint:active=\"true\" />\n    <layer name=\"底\" src=\"data/layer1.png\" x=\"0\" y=\"0\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"1\" />\n  </stack>\n</image>\n",
+"entries": [
+"Thumbnails/thumbnail.png",
+"data/layer1.png",
+"data/layer2.png",
+"mergedimage.png",
+"mimetype",
+"stack.xml"
+]
+},
+"format/real/v3/plain.ora": {
+"stack": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<image version=\"0.0.3\" w=\"4\" h=\"4\" xres=\"72\" yres=\"72\" xmlns:weebpaint=\"https://github.com/fangzhangmnm/weebpaint/ns\" weebpaint:format=\"3\" weebpaint:format-minor=\"0\" weebpaint:format-patch=\"0\" weebpaint:wrote-with=\"golden\">\n  <stack name=\"root\">\n    <layer name=\"点\" src=\"data/layer2.png\" x=\"3\" y=\"3\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"2\" weebpaint:active=\"true\" />\n    <layer name=\"底\" src=\"data/layer1.png\" x=\"0\" y=\"0\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"1\" />\n  </stack>\n</image>\n",
+"entries": [
+"Thumbnails/thumbnail.png",
+"data/layer1.png",
+"data/layer2.png",
+"mergedimage.png",
+"mimetype",
+"stack.xml"
+]
+},
+"format/real/v3/references-live-timelapse.ora": {
+"stack": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<image version=\"0.0.3\" w=\"4\" h=\"4\" xres=\"72\" yres=\"72\" xmlns:weebpaint=\"https://github.com/fangzhangmnm/weebpaint/ns\" weebpaint:format=\"3\" weebpaint:format-minor=\"0\" weebpaint:format-patch=\"0\" weebpaint:wrote-with=\"golden\">\n  <stack name=\"root\">\n    <layer name=\"点\" src=\"data/layer2.png\" x=\"3\" y=\"3\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"2\" weebpaint:active=\"true\" />\n    <layer name=\"底\" src=\"data/layer1.png\" x=\"0\" y=\"0\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"1\" />\n  </stack>\n</image>\n",
+"entries": [
+"Thumbnails/thumbnail.png",
+"data/layer1.png",
+"data/layer2.png",
+"mergedimage.png",
+"mimetype",
+"stack.xml"
+]
+},
+"format/synthetic/future-app/newer-app-same-format.ora": {
+"stack": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<image version=\"0.0.3\" w=\"4\" h=\"4\" xres=\"72\" yres=\"72\" xmlns:weebpaint=\"https://github.com/fangzhangmnm/weebpaint/ns\" weebpaint:format=\"3\" weebpaint:format-minor=\"0\" weebpaint:format-patch=\"0\" weebpaint:wrote-with=\"golden\">\n  <stack name=\"root\">\n    <layer name=\"点\" src=\"data/layer2.png\" x=\"3\" y=\"3\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"2\" weebpaint:active=\"true\" />\n    <layer name=\"底\" src=\"data/layer1.png\" x=\"0\" y=\"0\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"1\" />\n  </stack>\n</image>\n",
+"entries": [
+"Thumbnails/thumbnail.png",
+"data/layer1.png",
+"data/layer2.png",
+"mergedimage.png",
+"mimetype",
+"stack.xml"
+]
+},
+"format/synthetic/future-major/desk-2.ora": {
+"stack": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<image version=\"0.0.3\" w=\"4\" h=\"4\" xres=\"72\" yres=\"72\" xmlns:weebpaint=\"https://github.com/fangzhangmnm/weebpaint/ns\" weebpaint:format=\"3\" weebpaint:format-minor=\"0\" weebpaint:format-patch=\"0\" weebpaint:wrote-with=\"golden\">\n  <stack name=\"root\">\n    <layer name=\"点\" src=\"data/layer2.png\" x=\"3\" y=\"3\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"2\" weebpaint:active=\"true\" />\n    <layer name=\"底\" src=\"data/layer1.png\" x=\"0\" y=\"0\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"1\" />\n  </stack>\n</image>\n",
+"entries": [
+"Thumbnails/thumbnail.png",
+"data/layer1.png",
+"data/layer2.png",
+"mergedimage.png",
+"mimetype",
+"stack.xml"
+]
+},
+"format/synthetic/future-major/ora-4.ora": {
+"stack": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<image version=\"0.0.3\" w=\"4\" h=\"4\" xres=\"72\" yres=\"72\" xmlns:weebpaint=\"https://github.com/fangzhangmnm/weebpaint/ns\" weebpaint:format=\"3\" weebpaint:format-minor=\"0\" weebpaint:format-patch=\"0\" weebpaint:wrote-with=\"golden\">\n  <stack name=\"root\">\n    <layer name=\"点\" src=\"data/layer2.png\" x=\"3\" y=\"3\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"2\" weebpaint:active=\"true\" />\n    <layer name=\"底\" src=\"data/layer1.png\" x=\"0\" y=\"0\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"1\" />\n  </stack>\n</image>\n",
+"entries": [
+"Thumbnails/thumbnail.png",
+"data/layer1.png",
+"data/layer2.png",
+"mergedimage.png",
+"mimetype",
+"stack.xml"
+]
+},
+"format/synthetic/future-major/references-2.ora": {
+"stack": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<image version=\"0.0.3\" w=\"4\" h=\"4\" xres=\"72\" yres=\"72\" xmlns:weebpaint=\"https://github.com/fangzhangmnm/weebpaint/ns\" weebpaint:format=\"3\" weebpaint:format-minor=\"0\" weebpaint:format-patch=\"0\" weebpaint:wrote-with=\"golden\">\n  <stack name=\"root\">\n    <layer name=\"点\" src=\"data/layer2.png\" x=\"3\" y=\"3\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"2\" weebpaint:active=\"true\" />\n    <layer name=\"底\" src=\"data/layer1.png\" x=\"0\" y=\"0\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"1\" />\n  </stack>\n</image>\n",
+"entries": [
+"Thumbnails/thumbnail.png",
+"data/layer1.png",
+"data/layer2.png",
+"mergedimage.png",
+"mimetype",
+"stack.xml"
+]
+},
+"format/synthetic/future-minor/all-parts.ora": {
+"stack": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<image version=\"0.0.3\" w=\"4\" h=\"4\" xres=\"72\" yres=\"72\" xmlns:weebpaint=\"https://github.com/fangzhangmnm/weebpaint/ns\" weebpaint:format=\"3\" weebpaint:format-minor=\"0\" weebpaint:format-patch=\"0\" weebpaint:wrote-with=\"golden\">\n  <stack name=\"root\">\n    <layer name=\"点\" src=\"data/layer2.png\" x=\"3\" y=\"3\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"2\" weebpaint:active=\"true\" />\n    <layer name=\"底\" src=\"data/layer1.png\" x=\"0\" y=\"0\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"1\" />\n  </stack>\n</image>\n",
+"entries": [
+"Thumbnails/thumbnail.png",
+"data/layer1.png",
+"data/layer2.png",
+"mergedimage.png",
+"mimetype",
+"stack.xml"
+]
+},
+"format/synthetic/v0/webpaint-dirs.ora": {
+"stack": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<image version=\"0.0.3\" w=\"4\" h=\"4\" xres=\"72\" yres=\"72\" xmlns:weebpaint=\"https://github.com/fangzhangmnm/weebpaint/ns\" weebpaint:format=\"3\" weebpaint:format-minor=\"0\" weebpaint:format-patch=\"0\" weebpaint:wrote-with=\"golden\">\n  <stack name=\"root\">\n    <layer name=\"点\" src=\"data/layer2.png\" x=\"3\" y=\"3\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"2\" weebpaint:active=\"true\" />\n    <layer name=\"底\" src=\"data/layer1.png\" x=\"0\" y=\"0\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"1\" />\n  </stack>\n</image>\n",
+"entries": [
+"Thumbnails/thumbnail.png",
+"data/layer1.png",
+"data/layer2.png",
+"mergedimage.png",
+"mimetype",
+"stack.xml"
+]
+},
+"format/synthetic/v1/weebpaint-nondot.ora": {
+"stack": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<image version=\"0.0.3\" w=\"4\" h=\"4\" xres=\"72\" yres=\"72\" xmlns:weebpaint=\"https://github.com/fangzhangmnm/weebpaint/ns\" weebpaint:format=\"3\" weebpaint:format-minor=\"0\" weebpaint:format-patch=\"0\" weebpaint:wrote-with=\"golden\">\n  <stack name=\"root\">\n    <layer name=\"点\" src=\"data/layer2.png\" x=\"3\" y=\"3\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"2\" weebpaint:active=\"true\" />\n    <layer name=\"底\" src=\"data/layer1.png\" x=\"0\" y=\"0\" opacity=\"1.0000\" visibility=\"visible\" composite-op=\"svg:src-over\" weebpaint:id=\"1\" />\n  </stack>\n</image>\n",
+"entries": [
+"Thumbnails/thumbnail.png",
+"data/layer1.png",
+"data/layer2.png",
+"mergedimage.png",
+"mimetype",
+"stack.xml"
+]
+}
+}
+}

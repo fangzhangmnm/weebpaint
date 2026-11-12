@@ -104,26 +104,42 @@ export const ORA_FORMAT_VERSION = FORMAT.ora.major;
 /** 能写进 weebpaint:id、能拿来起像素文件名的 id：安全范围里的非负整数（读的时候也只认这种：parseNode）。 */
 export const usableLayerId = (id: unknown): id is number => typeof id === "number" && Number.isSafeInteger(id) && id >= 0;
 /**
- * 每个叶的像素文件路径（stack.xml 的 src 和 zip 里的条目必须是同一个；buildStackXml 和 encodeDocToOra 都问它，2026-11-12 CatsUp 统筹批）：
- * 有可用的 id = data/layer<id>.png（和以前逐字节一样）；没有 = data/layer-<第几个>.png（第几个 = 按 doc.layers 深度优先、子节点先后数没有 id 的叶；
- * 「-」开头的永远不和 layer<数字> 撞）。以前没有 id 的叶写成 data/layerundefined.png：两片都没有 id 就撞成一个文件、一层盖掉另一层。
+ * 写的时候每个节点的 id 能不能用、每片叶的像素文件路径（stack.xml 的 src 和 zip 里的条目必须是同一个；buildStackXml 和 encodeDocToOra 都问它，2026-11-12 CatsUp 统筹批）。
+ * 「可用」= 安全范围的非负整数，**而且这份文档里按同一种走法（doc.layers 深度优先、组先于它的子节点、子节点按先后）前面没出现过**——组的 id 也算「出现过」。
+ * 不可用的（没有 / NaN / 负数 / 小数 / 和前面的重复）：不写 weebpaint:id、不按 id 认选中和参考、经 warn 报一句；是叶的话像素路径 = data/layer-<第几个>.png
+ * （第几个 = 同一种走法里第几片不可用的叶；「-」开头的永远不和 layer<数字> 撞）。可用的照旧 data/layer<id>.png——正常文档（id 都不重复）写出来和以前逐字节一样。
+ * 以前没有 id 的叶写成 data/layerundefined.png、两片同 id 的叶写成同一个 data/layer<id>.png：一层盖掉另一层。
  */
-export function leafPaths(doc: { readonly layers: readonly OraNode[] }): Map<OraNode, string> {
-  const out = new Map<OraNode, string>();
+export function layerIdPlan(doc: { readonly layers: readonly OraNode[] }): { readonly usable: ReadonlySet<OraNode>; readonly paths: ReadonlyMap<OraNode, string>; readonly why: ReadonlyMap<OraNode, string> } {
+  const usable = new Set<OraNode>(), paths = new Map<OraNode, string>(), why = new Map<OraNode, string>(), seen = new Set<number>();
   let k = 0;
-  const walk = (ns: readonly OraNode[]): void => { for (const n of ns) { if (n.isGroup) walk(n.children || []); else out.set(n, usableLayerId(n.id) ? `data/layer${n.id}.png` : `data/layer-${k++}.png`); } };
+  const walk = (ns: readonly OraNode[]): void => {
+    for (const n of ns) {
+      const ok = usableLayerId(n.id) && !seen.has(n.id);
+      if (ok) { usable.add(n); seen.add(n.id as number); }
+      else why.set(n, usableLayerId(n.id) ? `duplicate id ${n.id} (an earlier layer already has it)` : `no usable id (${String(n.id)})`);
+      if (n.isGroup) walk(n.children || []);
+      else paths.set(n, ok ? `data/layer${n.id}.png` : `data/layer-${k++}.png`);
+    }
+  };
   walk(doc.layers);
-  return out;
+  return { usable, paths, why };
 }
-/** 写 stack.xml 时的上下文：每个叶的像素文件路径 + 报一句的口（没有可用 id 的层）。 */
-interface XmlCtx { readonly paths: Map<OraNode, string>; readonly warn?: (msg: string) => void }
+/** 叶的像素文件路径；路径表里查不到（两边的走法对不上了）= 抛、说是哪一层（不然写出 src="undefined"、这一层读不回）。 */
+function leafPathOrThrow(ctx: XmlCtx, node: OraNode): string {
+  const p = ctx.plan.paths.get(node);
+  if (p === undefined) throw new Error(`buildStackXml: layer "${node.name}" (id ${String(node.id)}) has no pixel path in the layer plan; refusing to write a layer whose pixels could not be read back`);
+  return p;
+}
+/** 写 stack.xml 时的上下文：哪些节点的 id 可用、每个叶的像素文件路径 + 报一句的口。 */
+interface XmlCtx { readonly plan: ReturnType<typeof layerIdPlan>; readonly warn?: (msg: string) => void }
 function nodeToXml(node: OraNode, doc: OraDoc, indent: number, ctx: XmlCtx): string {
   const pad = "  ".repeat(indent);
   // 没有可用的 id（调用的人没给 / 给了 NaN）：不写 weebpaint:id（绝不写出 "undefined" / "NaN"：读回来是 NaN、画板的当前图层跟着坏，CatsUp v0.19.60 及以前就这样写出过）、
   //   读的时候自动编号；经 warn 报一句是哪一层。不抛：这是存盘的路，抛 = 这次存不上；不写这个属性 = 一份合法的 ora，读回来自己好（统筹 11-12）。
-  //   「选中」「参考」两个标记只认可用的 id（以前 activeId === node.id 两边都是 undefined 也算选中）。
-  const idOk = usableLayerId(node.id);
-  if (!idOk) ctx.warn?.(`ora: layer "${node.name}" has no usable id (${String(node.id)}); written without weebpaint:id (it gets a fresh id when read)`);
+  //   「选中」「参考」两个标记只认可用的 id（以前 activeId === node.id 两边都是 undefined 也算选中）。重复的 id 也算不可用（layerIdPlan）。
+  const idOk = ctx.plan.usable.has(node);
+  if (!idOk) ctx.warn?.(`ora: layer "${node.name}" has ${ctx.plan.why.get(node) ?? "no usable id"}; written without weebpaint:id (it gets a fresh id when read)`);
   const common = [
     `name="${escapeXml(node.name)}"`,
     `opacity="${(node.opacity ?? 1).toFixed(4)}"`,
@@ -153,7 +169,7 @@ function nodeToXml(node: OraNode, doc: OraDoc, indent: number, ctx: XmlCtx): str
   }
   const attrs = [
     common[0],                                  // name
-    `src="${ctx.paths.get(node)}"`,
+    `src="${leafPathOrThrow(ctx, node)}"`,
     `x="${node.bboxX}"`,
     `y="${node.bboxY}"`,
     ...common.slice(1),                          // opacity/visibility/composite-op/id/clipping/active
@@ -164,7 +180,7 @@ function nodeToXml(node: OraNode, doc: OraDoc, indent: number, ctx: XmlCtx): str
 }
 
 export function buildStackXml(doc: OraDoc, wroteWithVersion = "", warn?: (msg: string) => void): string {
-  const ctx: XmlCtx = { paths: leafPaths(doc), ...(warn ? { warn } : {}) };
+  const ctx: XmlCtx = { plan: layerIdPlan(doc), ...(warn ? { warn } : {}) };
   // OpenRaster spec：layer 顺序 = top first（top of stack 在 XML 前）。
   // doc.layers[0] 是 bottom，所以同级倒序输出（递归在 nodeToXml 内）。
   const nodes: string[] = [];

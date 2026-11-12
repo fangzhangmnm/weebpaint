@@ -35,7 +35,7 @@ import type { Stamp } from "./format/migrate.ts";
 import { areaResampleBytes } from "./algorithms/resample-bytes.ts";
 import { encodePngFromBytes, decodePngToBytes } from "./png-codec.ts";
 // 纯树↔stack.xml 序列化（嵌套组 + id + active）抽到独立深模块（无 canvas 依赖，可纯 node 测）。
-import { buildStackXml, leafPaths, parseStackXml } from "./ora-stack-xml.ts";
+import { buildStackXml, layerIdPlan, parseStackXml } from "./ora-stack-xml.ts";
 import type { ParsedNode } from "./ora-stack-xml.ts";
 import type { PaintingData, PaintingDataNode, PaintingDataLeaf } from "./workpiece/painting-workpiece.ts";
 
@@ -225,7 +225,7 @@ export async function encodeDocToOra(doc: EncodeDoc, opts: EncodeOpts) {
   ];
 
   // 只有叶有像素；组无 PNG，结构全在 stack.xml。
-  const paths = leafPaths(doc);
+  const paths = layerIdPlan(doc).paths;
   for (const L of flattenEncodeLeaves(doc.layers)) {
     let png;
     if (L.bboxW > 0 && L.bboxH > 0) {
@@ -235,7 +235,10 @@ export async function encodeDocToOra(doc: EncodeDoc, opts: EncodeOpts) {
       // 空层 → 1×1 透明 png（C3：直接字节编码；旧 makeBitmap+getContext 的 Chromium 空 canvas 坑随之蒸发）。
       png = await encodePngFromBytes(new Uint8ClampedArray(4), 1, 1);
     }
-    entries.push({ path: paths.get(L)!, data: png });   // 和 stack.xml 的 src 同一个（leafPaths）
+    // 和 stack.xml 的 src 同一个（layerIdPlan）。取不到 = 两边的走法对不上了：写下去就是一个没名字的像素条目、这一层读不回 → 抛（不拦写出来的东西读不回）
+    const path = paths.get(L);
+    if (path === undefined) throw new Error(`encodeDocToOra: layer "${L.name}" (id ${String(L.id)}) has no pixel path in the layer plan; refusing to write a layer whose pixels could not be read back`);
+    entries.push({ path, data: png });
   }
 
   // timelapse 录像：mp4 是大块 → 中部（layer 之后）；format 2 起与 json 同住 .weebpaint/。
@@ -309,9 +312,13 @@ export async function decodeOraToPainting(blob: Blob): Promise<DecodedPainting> 
   let activeId: number | null = null;
   let referenceLayerId: number | null = null;
 
+  // 重复的 id（2026-11-12 CatsUp 统筹批）：按读的先后，后出现的那个走自动编号（nextAuto 本来就避开所有已用的号）；选中 / 参考跟着节点。正常文件（id 不重复）读出来和以前一样。
+  const claimed = new Set<number>();
+  const idOf = (spec: ParsedNode): number => { if (spec.id != null && !claimed.has(spec.id)) { claimed.add(spec.id); return spec.id; } return nextAuto(); };
+
   // spec 树 → plain data（递归）。叶按 src 载 PNG 字节；组递归建 children。
   const buildNode = async (spec: ParsedNode): Promise<PaintingDataNode> => {
-    const id = spec.id ?? nextAuto();
+    const id = idOf(spec);
     if (spec.isGroup) {
       const children: PaintingDataNode[] = [];
       for (const c of spec.children) children.push(await buildNode(c));

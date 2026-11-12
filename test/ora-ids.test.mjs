@@ -10,7 +10,7 @@ import { installDomParserShim } from "./xml-shim.mjs";
 installDomParserShim();
 const { encodeDocToOra, decodeOraToPainting, paintingDataToEncodeDoc } = await import("../src/backend/ora.ts");
 const { parseStackXml, buildStackXml, usableLayerId } = await import("../src/backend/ora-stack-xml.ts");
-const { zipReadEntry } = await import("../src/backend/zip.ts");
+const { zipReadEntry, zipUnpack, zipPack } = await import("../src/backend/zip.ts");
 const { WeebPaintBackend } = await import("../src/backend/weebpaint-backend.ts");
 
 /** CatsUp v0.19.60 写的「开始画了一笔没画就存」的空白画（64 × 64，一层，没有 id）。生成：画画仓 v0.14.88（3c3fe37）的 encodeDocToOra(paintingDataToEncodeDoc(
@@ -64,6 +64,47 @@ describe(".ora 里图层的 id（CatsUp 统筹 11-12）", () => {
     eq(L.find((n) => n.name === "丙").id, 5, "有 id 的那层还是 5");
     for (const [name, r] of [["甲", 10], ["乙", 20], ["丙", 30], ["丁", 40]]) { const n = L.find((x) => x.name === name); eq(n.pixels.bytes[0], r, `「${name}」的像素是它自己的（文件名没撞）`); }
     assert(usableLayerId(d.activeId) && ids.includes(d.activeId), "选中落在某一片叶上");
+  });
+  it("读：文件里两个节点同一个 id（两片叶 / 一个组和一片叶）→ 后出现的那个自动编号；读回来 id 各不相同、每片叶的像素是它自己的", async () => {
+    const W = 4, H = 4, px = (r) => { const u = new Uint8ClampedArray(W * H * 4); for (let i = 0; i < W * H; i++) { u[4 * i] = r; u[4 * i + 3] = 255; } return u; };
+    const leaf = (id, name, r) => ({ id, name, visible: true, opacity: 1, mode: "source-over", clippingMask: false, lockAlpha: false, pixels: { rect: { x: 0, y: 0, w: W, h: H }, bytes: px(r) } });
+    const data = { width: W, height: H, activeId: 2, nodes: [leaf(1, "甲", 10), leaf(2, "乙", 20), { id: 7, name: "组", visible: true, opacity: 1, mode: "pass-through", clippingMask: false, children: [leaf(8, "丁", 40)] }] };
+    const good = await toBytes(await encodeDocToOra(paintingDataToEncodeDoc(data), { wroteWith: "test" }));
+    const files = await zipUnpack(new Blob([good]));
+    // 改 stack.xml：乙的 id 改成 1（和甲重复），丁的 id 改成 7（和组重复）；像素文件名不动（还是各自的 src）
+    const xml = txt(files["stack.xml"]).replace('weebpaint:id="2"', 'weebpaint:id="1"').replace('weebpaint:id="8"', 'weebpaint:id="7"');
+    assert((xml.match(/weebpaint:id="1"/g) ?? []).length === 2 && (xml.match(/weebpaint:id="7"/g) ?? []).length === 2, "造出来两对重复的 id");
+    const entries = Object.entries(files).map(([path, d]) => ({ path, data: path === "stack.xml" ? xml : d }));
+    const bad = await toBytes(await zipPack(entries));
+    const d = await decode(bad), L = leaves(d.nodes), all = [];
+    const walk = (ns) => { for (const n of ns) { all.push(n.id); if ("children" in n) walk(n.children); } }; walk(d.nodes);
+    assert(all.every(usableLayerId) && new Set(all).size === all.length, `每个节点（组也算）的 id 都可用、各不相同（${all.join(",")}）`);
+    for (const [name, r] of [["甲", 10], ["乙", 20], ["丁", 40]]) eq(L.find((x) => x.name === name).pixels.bytes[0], r, `「${name}」的像素是它自己的`);
+    eq(L.find((x) => x.name === "乙").id, d.activeId, "选中跟着节点（乙原来的 active 标记）");
+  });
+  it("写：两片叶同一个 id（正常的数）→ 后出现的那个不写 id、像素各存一份、报一句；读回来各自的像素是各自的", async () => {
+    const W = 4, H = 4, px = (r) => { const u = new Uint8ClampedArray(W * H * 4); for (let i = 0; i < W * H; i++) { u[4 * i] = r; u[4 * i + 3] = 255; } return u; };
+    const leaf = (id, name, r) => ({ id, name, visible: true, opacity: 1, mode: "source-over", clippingMask: false, lockAlpha: false, pixels: { rect: { x: 0, y: 0, w: W, h: H }, bytes: px(r) } });
+    const data = { width: W, height: H, activeId: 3, nodes: [leaf(3, "甲", 10), leaf(3, "乙", 20), { id: 5, name: "组", visible: true, opacity: 1, mode: "pass-through", clippingMask: false, children: [leaf(5, "丁", 40)] }] };
+    const warns = [];
+    const bytes = await toBytes(await encodeDocToOra(paintingDataToEncodeDoc(data), { wroteWith: "test", warn: (m) => warns.push(m) }));
+    const files = await zipUnpack(new Blob([bytes])), names = Object.keys(files).filter((n) => n.startsWith("data/"));
+    eq(names.length, 3, `三片叶各存一个像素文件（${names.join(",")}）`);
+    eq(warns.length, 2, `重复的两个各报一句：${warns.join(" | ")}`);
+    assert(warns.every((w) => /duplicate id/.test(w)), "报的是重复");
+    const xml = txt(files["stack.xml"]);
+    eq((xml.match(/weebpaint:active="true"/g) ?? []).length, 1, "选中只认第一个（重复的那个不算）");
+    const d = await decode(bytes), L = leaves(d.nodes);
+    for (const [name, r] of [["甲", 10], ["乙", 20], ["丁", 40]]) eq(L.find((x) => x.name === name).pixels.bytes[0], r, `「${name}」的像素是它自己的`);
+    eq(L.find((x) => x.name === "甲").id, 3, "第一个照旧是 3");
+  });
+  it("写：叶在 stack.xml 的路径表里查不到（两边的走法对不上）= 抛、说是哪一层，不写一个没名字的像素条目", async () => {
+    const W = 4, H = 4, leafA = { isGroup: false, id: 1, name: "甲", visible: true, opacity: 1, mode: "source-over", clippingMask: false, lockAlpha: false, bboxX: 0, bboxY: 0, bboxW: 0, bboxH: 0, getImageData: () => null };
+    // 造一份「叶列表和层树不是同一批对象」的文档：layers 里是甲，但 encodeDocToOra 走叶时拿到的是一个层树里没有的对象（模拟两边走法对不上）
+    let n = 0;
+    const doc = { width: W, height: H, activeId: 1, referenceLayerId: null, get layers() { n++; return n === 1 ? [leafA] : [{ ...leafA, name: "层树里没有的那一片" }]; } };
+    let err = null; try { await encodeDocToOra(doc, { wroteWith: "test" }); } catch (e) { err = e; }
+    assert(err instanceof Error && /no pixel path/.test(err.message) && /层树里没有的那一片|甲/.test(err.message), `抛、说是哪一层（${String(err)}）`);
   });
   it("画画软件自己的路：存出来的每一层、每个组都带 weebpaint:id（调用的人该传 id，靠这条钉）", async () => {
     const be = WeebPaintBackend.blank({ width: 16, height: 16 }, { appVersion: "v0.0.0-test" });
