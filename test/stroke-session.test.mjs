@@ -100,6 +100,25 @@ describe("stroke-session · 事务生命周期（一笔=一令牌=一步）", ()
     eq(r.undo.depth(), d0, "fake GPU 未写 substrate → collector 空 → no-op 不占步");
   });
 
+  it("buffered 笔：落笔尖单子那一步抛 = 先取消令牌（写了一半的回滚）再抛原错误；下一笔照常开（2026-11-12）", () => {
+    const r = rig();
+    const before = r.wp2.layerTiles.getRegion(r.layer.id, 0, 0, 64, 64).slice();
+    const boom = new Error("locked before landing");
+    r.deps.commitStamps = (cs) => { r.layer.applyRegionDiff(0, 0, 4, 4, new Uint8ClampedArray(64).fill(200)); throw boom; };   // 先写了一点再抛 = 写了一半
+    const eng = new BrushEngine();
+    const s = new StrokeSession(r.deps, eng, [r.layer], SPEC, "overlay");
+    eng.beginStroke(r.layer, resolveBrush({ size: 8, color: "#3399ee", spacing: 0.5 }), 8, 8, 1.0, "brush");
+    s.extend(30, 8, 1.0, null);
+    const d0 = r.undo.depth();
+    let got = null; try { s.end(); } catch (e) { got = e; }
+    assert(got === boom, "原错误抛出来");
+    eq(r.undo.depth(), d0, "不占步");
+    const after = r.wp2.layerTiles.getRegion(r.layer.id, 0, 0, 64, 64);
+    assert(after.every((v, i) => v === before[i]), "写了一半的回滚了");
+    const s2 = new StrokeSession(r.deps, new BrushEngine(), [r.layer], SPEC, "overlay");   // 令牌收口了：下一笔不被单令牌墙挡
+    s2.cancel();
+  });
+
   it("finalize：pixel 笔带选区 → 抬笔选区外回滚到笔前（CPU 兜底）", () => {
     const r = rig();
     r.selection = Selection.fromGray8Region(0, 0, 32, 64, new Uint8Array(32 * 64).fill(255));   // 左半
