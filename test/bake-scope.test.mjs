@@ -1,5 +1,5 @@
 // 落层那一遍只合「这一笔的方框外扩到图块边」那一块（2026-11-12 CatsUp K2，统筹批）：和整张合成的老路比，落进图层的字节、读回报告、落层后显卡图块池里那份（合成出来读回）都逐字节一样。
-// 随机场景：画布大小随机（含跨好几个图块的）；落层的东西轮流是宿主薄层（带格 / 不带格）和笔尖单子（贴着画布边、一半在画布外）；随机橡皮、锁透明、带选区、几种混合方式。
+// 随机场景：画布大小随机（含跨好几个图块的）；落层的东西轮流是薄层的四种——笔尖单子（贴着画布边、一半在画布外）、宿主薄层（带格 / 不带格）、填色（选区外框）、区域（真的 RegionStroke，W 上跑一遍 wash-lerp，= 涂抹 / 液化 / 模糊那条路）；随机橡皮、锁透明、带选区、几种混合方式。
 // 守卫：落层那一遍的着色器（compositeFragSource 的 overlay 那一段）是逐点的——取纹理只用当前像素的坐标、没有循环；以后加带半径的取样 = 这里红，方框要按半径外扩或退回整张。
 // 内核自己的测试：只 import 内核和测试工具。created 2026-11-12 by Claude Opus 5.5
 import { describe, it, assert, eq } from "./runner.mjs";
@@ -28,7 +28,20 @@ function scene(seed) {
     for (let i = 0; i < data.length; i++) data[i] = R() < 0.6 ? 255 : Math.floor(R() * 256);
     selMask = { data, ox, oy, ow, oh };
   }
-  const kind = seed % 4 === 0 ? "host-cells" : seed % 4 === 1 ? "host" : "stamps";
+  const kind = ["host-cells", "host", "fill", "region", "stamps", "stamps"][seed % 6];
+  if (kind === "fill") {
+    // 填色：选区外框 = 方框（填色只在有选区时存在）；语义钉死 source-over，锁透明跟活动层
+    if (!selMask) { const ox = R() < 0.3 ? 0 : Math.floor(R() * W * 0.7), oy = R() < 0.3 ? H - 1 - Math.floor(R() * Math.min(40, H - 1)) : Math.floor(R() * H * 0.7), ow = 1 + Math.floor(R() * (W - ox)), oh = 1 + Math.floor(R() * (H - oy)), data = new Uint8Array(ow * oh); for (let i = 0; i < data.length; i++) data[i] = R() < 0.7 ? 255 : Math.floor(R() * 256); selMask = { data, ox, oy, ow, oh }; }
+    return { W, H, base, kind, ov: { kind: "fill", color: [Math.floor(R() * 256), Math.floor(R() * 256), Math.floor(R() * 256)], bx: selMask.ox, by: selMask.oy, bw: selMask.ow, bh: selMask.oh, layerId: 1, lockAlpha, selMask } };
+  }
+  if (kind === "region") {
+    // 区域：W 里一块（可能贴边）用 wash-lerp 混进一张随机目标色，覆盖率随机（有 0）；方框 = 写过的那块（RegionStroke 自己记）
+    const x = R() < 0.2 ? 0 : Math.floor(R() * (W - 2)), y = R() < 0.2 ? Math.max(0, H - 1 - Math.floor(R() * 30)) : Math.floor(R() * (H - 2)), w = Math.min(W - x, 1 + Math.floor(R() * 300)), h = Math.min(H - y, 1 + Math.floor(R() * 300));
+    const dst = new Float32Array(w * h * 4), cov = new Float32Array(W * H * 4);
+    for (let i = 0; i < dst.length; i++) dst[i] = Math.round(R() * 255) / 255;
+    for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) cov[(yy * W + xx) * 4 + 3] = R() < 0.15 ? 0 : Math.round(R() * 255) / 255;
+    return { W, H, base, kind, region: { x, y, w, h, dst, cov, lockAlpha } };
+  }
   if (kind === "stamps") {
     // 笔尖：一串沿随机方向走的圆，有的贴着画布边、有的一半在画布外
     const stamps = [], n = 4 + Math.floor(R() * 30), edge = R() < 0.5;
@@ -74,37 +87,46 @@ function bake(sc, whole) {
   const port = new SoftGl2Port(), board = new GLBoard(port, 64), lp = new LayerPixels(sc.W, sc.H);
   lp.putRegion(0, 0, sc.W, sc.H, sc.base);
   board._raster.bakeWhole = whole;
-  let ov;
-  if (sc.kind === "stamps") ov = sc.ov;
-  else {
+  let ov, rs = null;
+  if (sc.kind === "stamps" || sc.kind === "fill") ov = sc.ov;
+  else if (sc.kind === "region") {
+    const g = sc.region;
+    rs = board.openRegion(1, lp, sc.W, sc.H, null, g.lockAlpha, true);
+    const dst = rs.upload(g.w, g.h, g.dst), cov = rs.upload(sc.W, sc.H, g.cov);
+    rs.run("wash-lerp", "W", { u_W0: "W0", u_dst: dst, u_cov: cov }, { u_docSize: [sc.W, sc.H], u_origin: [g.x, g.y] }, { x: g.x, y: g.y, w: g.w, h: g.h });
+    ov = rs.overlay();
+  } else {
     const h = sc.host, ext = port.wrapExternal({ pixels: h.px, w: sc.W, h: sc.H, prec: "u8" }), [bx, by, bw, bh] = h.box;
     ov = { kind: "host", tex: ext, bx, by, bw, bh, layerId: 1, opacity: 1, erase: h.erase, blendMode: h.blendMode, lockAlpha: h.lockAlpha, selMask: h.selMask, ...(sc.kind === "host-cells" ? { cells: h.cells } : {}) };
   }
   const ok = board.commitBrushStroke(1, lp, ov, sc.W, sc.H, (px, x, y, w, h) => lp.applyRegionDiff(x, y, w, h, px));
+  rs?.dispose();
   const layer = lp.getRegion(0, 0, sc.W, sc.H);
   const f = board.composite({ layers: [{ isGroup: false, id: 1, opacity: 1, mode: "source-over", clippingMask: false, visible: true, pixels: lp }], width: sc.W, height: sc.H }, "#ffffff", [], []);
   const shown = f ? port.readPixels(f, 0, 0, sc.W, sc.H) : null;
-  const out = { ok, layer: hash(layer), bake: JSON.stringify(board.lastBake), shown: shown ? hash(shown) : null, rect: tileAlignedRect(ov.bx, ov.by, ov.bw, ov.bh, sc.W, sc.H) };
+  const out = { ok, kind: ov.kind ?? "stamps", layer: hash(layer), bake: JSON.stringify(board.lastBake), shown: shown ? hash(shown) : null, rect: tileAlignedRect(ov.bx, ov.by, ov.bw, ov.bh, sc.W, sc.H) };
   lp.dispose(); board.dispose();
   return out;
 }
 
 describe("落层那一遍只合方框外扩到图块边（K2）", () => {
-  it("随机场景：限方框和整张合，落进图层的字节、读回报告、落层后显卡那份合出来的整张都逐字节一样；真的有不少场景只合了一部分", () => {
+  it("随机场景（薄层四种：笔尖单子 / 宿主 / 填色 / 区域）：限方框和整张合，落进图层的字节、读回报告、落层后显卡那份合出来的整张都逐字节一样；真的有不少场景只合了一部分", () => {
     let partial = 0;
-    const kinds = { stamps: 0, host: 0, "host-cells": 0 };
-    for (let seed = 1; seed <= 40; seed++) {
+    const kinds = { stamps: 0, host: 0, "host-cells": 0, fill: 0, region: 0 }, landed = { stamps: 0, host: 0, fill: 0, region: 0 };
+    for (let seed = 1; seed <= 60; seed++) {
       const sc = scene(seed), a = bake(sc, false), b = bake(sc, true);
       kinds[sc.kind]++;
-      const tag = `种子 ${seed}（${sc.W}×${sc.H}，${sc.kind}，${(sc.ov ?? sc.host).blendMode}${(sc.ov ?? sc.host).erase ? "，橡皮" : ""}${(sc.ov ?? sc.host).lockAlpha ? "，锁透明" : ""}${(sc.ov ?? sc.host).selMask ? "，选区" : ""}）`;
+      const o = sc.ov ?? sc.host ?? sc.region, tag = `种子 ${seed}（${sc.W}×${sc.H}，${sc.kind}，${o.blendMode ?? ""}${o.erase ? "，橡皮" : ""}${o.lockAlpha ? "，锁透明" : ""}${o.selMask ? "，选区" : ""}）`;
       eq(a.ok, b.ok, `${tag}：落没落成一样`);
       eq(a.layer, b.layer, `${tag}：图层逐字节一样`);
       eq(a.bake, b.bake, `${tag}：读回报告一样`);
       eq(a.shown, b.shown, `${tag}：落层后显卡那份合出来的整张一样（图块池没被方框外的垃圾写坏）`);
       if (a.rect && a.rect.w * a.rect.h < sc.W * sc.H) partial++;
+      if (a.ok) landed[a.kind]++;
     }
-    assert(kinds.stamps > 10 && kinds.host > 5 && kinds["host-cells"] > 5, `三种都跑到了（${JSON.stringify(kinds)}）`);
-    assert(partial >= 10, `40 个场景里只合了一部分的有 ${partial} 个`);
+    assert(kinds.stamps >= 15 && kinds.host >= 8 && kinds["host-cells"] >= 8 && kinds.fill >= 8 && kinds.region >= 8, `五种场景都跑到了（${JSON.stringify(kinds)}）`);
+    assert(Object.values(landed).every((n) => n >= 8), `薄层的四种都真的落了层（${JSON.stringify(landed)}）`);
+    assert(partial >= 15, `60 个场景里只合了一部分的有 ${partial} 个`);
   }, { timeout: 120000 });
   it("方框外扩到图块边：贴边、一半出界夹在画布里；空的 = null", () => {
     eq(JSON.stringify(tileAlignedRect(10, 20, 5, 5, 1000, 1000)), JSON.stringify({ x: 0, y: 0, w: 256, h: 256 }));

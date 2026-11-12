@@ -89,6 +89,9 @@ export class RasterService {
       const boxBytes = ov.bw * ov.bh * 4;
       const plan = "kind" in ov && ov.kind === "host" && ov.cells && ov.cells.w === docW && ov.cells.h === docH ? planCells(ov.cells, ov.bx, ov.by, ov.bw, ov.bh) : null;
       const max = room.glctx.caps.maxTextureSize;
+      // 「暂存图比方框小就只读报的格」这个门槛是在软件显卡上定的（那时读回很贵）。2026-11-12 在真显卡（核显 780M）上量：一笔方框不大的笔，
+      //   这条路比读整个方框还慢约 2 ms（暂存图那一套的固定开销）；没改，因为它保的是方框很大、很稀的笔（跨好几块的长笔，那时读整个方框接近读整张）。
+      //   以后再动抬笔这条路：先在真显卡上量方框大的笔。
       let changed: { tx: number; ty: number }[] | null = null, report: BakeReport | null = null;
       if (plan && plan.sw * plan.sh * 4 < boxBytes && plan.sw <= max && plan.sh <= max) {
         const r = this._readCells(merged, rec.index, pixels, plan, ov, docW, docH, apply);
