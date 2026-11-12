@@ -18,6 +18,7 @@ import { GlRoom } from "../../src/backend/gl/gl-room.ts";
 import { RenderTree } from "../../src/backend/gl/render-tree.ts";
 import { RasterService } from "../../src/backend/gl/raster-service.ts";
 import { LayerPixels } from "../../src/backend/tiles/tile-layer.ts";
+import { DirtyCells } from "../../src/common/dirty-rects.ts";
 import { GLBoard } from "../../src/shell/gl-board.ts";
 import { materialize, editRegion, replaceFromCanvas } from "./canvas2d-facade.ts";
 import { GLStampRasterizer } from "../../src/backend/gl/gl-stamp.ts";
@@ -1416,6 +1417,52 @@ function softTripartite(glctx: BrowserGl2Port, add: Add): void {
 
 // ---- 1-4d 第 6 条：增量合成在真显卡上（实例化画行段的那条路只有真显卡走）= 整张重合，逐字节 ----
 //   两块画板吃同一份层像素和同一张外来薄层（真 WebGLTexture，每步重传）：一块走增量（markChanged 报块），一块每步 markContentDirty 强制整张。
+// 落层只读回报的格（CatsUp 1-4d 第 8 条；真显卡）：同一层、同一片薄层，报格 vs 读整个方框，写回的图层逐字节一样、走了只读格；
+//   少报一段真变了的 → box-unreported、写回一样；假叠法（合出来的那张在 α = 0 的一格里被改了）→ 核对片查得出。
+function bakeCellsParity(glctx: BrowserGl2Port, add: Add): void {
+  let seed = 31; const R = (): number => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  let same = 0, cells = 0, unrep = 0, fake = 0, total = 0, firstBad = "";
+  for (let s = 0; s < 6; s++) {
+    const W = 120 + Math.floor(R() * 300), H = 90 + Math.floor(R() * 300), base = new Uint8ClampedArray(W * H * 4), ov = new Uint8Array(W * H * 4), dc = new DirtyCells(W, H);
+    for (let k = 0; k < 5; k++) { const x0 = Math.floor(R() * W), y0 = Math.floor(R() * H), w = 1 + Math.floor(R() * W / 2), h = 1 + Math.floor(R() * H / 2), c = [R() * 255, R() * 255, R() * 255, R() < 0.5 ? 255 : 60 + R() * 180];
+      for (let y = y0; y < Math.min(H, y0 + h); y++) for (let x = x0; x < Math.min(W, x0 + w); x++) { const i = (y * W + x) * 4; base[i] = c[0]; base[i + 1] = c[1]; base[i + 2] = c[2]; base[i + 3] = c[3]; } }
+    let bx0 = Infinity, by0 = Infinity, bx1 = -1, by1 = -1;
+    for (let k = 0; k < 5; k++) { const x0 = Math.floor(R() * (W - 2)), y0 = Math.floor(R() * (H - 2)), w = 2 + Math.floor(R() * 12), h = 2 + Math.floor(R() * 12), a = 40 + Math.floor(R() * 215), c = [R(), R(), R()];
+      for (let y = y0; y < Math.min(H, y0 + h); y++) for (let x = x0; x < Math.min(W, x0 + w); x++) { const i = (y * W + x) * 4; ov[i] = Math.round(c[0] * a); ov[i + 1] = Math.round(c[1] * a); ov[i + 2] = Math.round(c[2] * a); ov[i + 3] = a; }
+      dc.mark(x0, y0, w, h); bx0 = Math.min(bx0, x0); by0 = Math.min(by0, y0); bx1 = Math.max(bx1, Math.min(W, x0 + w)); by1 = Math.max(by1, Math.min(H, y0 + h)); }
+    const t = glctx.createTexture(); glctx.uploadTexture(t, "rgba8", W, H, ov);
+    const ext = glctx.wrapExternal({ gl: (t as unknown as { tex: WebGLTexture }).tex, w: W, h: H, prec: "u8" });
+    const run = (cellsArg: DirtyCells | null, inject: { x: number; y: number; w: number; h: number } | null) => {
+      const board = new GLBoard(glctx, 64), lp = new LayerPixels(W, H); lp.putRegion(0, 0, W, H, base);
+      if (inject) { const comp = (board as unknown as { _room: { comp: GLCompositor } })._room.comp, orig = comp.finishAcc.bind(comp); let first = true;
+        comp.finishAcc = (acc) => { const f = orig(acc); if (first) { first = false; comp.setRects([inject]); comp.fillBg(f, W, H, [0.2, 0.4, 0.6, 1]); comp.setRects(null); } return f; }; }
+      const ovIn = { kind: "host" as const, tex: ext, bx: bx0, by: by0, bw: bx1 - bx0, bh: by1 - by0, layerId: 1, opacity: 1, erase: false, blendMode: "source-over", lockAlpha: false, selMask: null, ...(cellsArg ? { cells: cellsArg } : {}) };
+      board.commitBrushStroke(1, lp, ovIn as never, W, H, (px, x, y, w, h) => lp.applyRegionDiff(x, y, w, h, px));
+      const out = { bytes: lp.getRegion(0, 0, W, H), path: board.lastBake?.path ?? "none" };
+      lp.dispose(); board.dispose();
+      return out;
+    };
+    const eqB = (a: Uint8ClampedArray, b: Uint8ClampedArray) => a.length === b.length && a.every((v, i) => v === b[i]);
+    const box = run(null, null), cel = run(dc, null);
+    total++; if (eqB(box.bytes, cel.bytes)) same++; else firstBad ||= `场景 ${s}（${W}×${H}）：报格写回的和读方框不一样`;
+    if (cel.path === "cells") cells++;
+    const runs = dc.runs();
+    if (runs.length > 1) {   // 少报第一段（那一段有墨 = 真变了）
+      const part = new DirtyCells(W, H); for (const r of runs.slice(1)) part.mark(r.x, r.y, r.w, r.h);
+      const u = run(part, null);
+      if (u.path === "box-unreported" && eqB(u.bytes, box.bytes)) unrep++; else if (u.path !== "box") firstBad ||= `场景 ${s}：少报一段走了 ${u.path}`;
+    }
+    // 假叠法：方框左上角那一格（没墨就挑它）被改
+    const ix = bx0, iy = by0, inj = { x: ix, y: iy, w: Math.min(8 - (ix % 8), bx1 - ix), h: Math.min(8 - (iy % 8), by1 - iy) };
+    let inked = false; for (let y = iy - (iy % 8); y < Math.min(H, iy - (iy % 8) + 8); y++) for (let x = ix - (ix % 8); x < Math.min(W, ix - (ix % 8) + 8); x++) if (ov[(y * W + x) * 4 + 3]) inked = true;
+    if (!inked) { const fb = run(null, inj), fc = run(dc, inj); if (fc.path === "box-unreported" && eqB(fb.bytes, fc.bytes)) fake++; else if (fc.path !== "box") firstBad ||= `场景 ${s}：假叠法走了 ${fc.path}`; }
+    glctx.deleteTexture(t);
+  }
+  add("bake-cells: 报格 = 读整个方框（真显卡，逐字节）", same === total && !firstBad, firstBad || `${total} 个场景全一样`);
+  add("bake-cells: 真的走了只读格", cells >= 3, `只读格 ${cells} / ${total}`);
+  add("bake-cells: 少报真变了的一段 / 假叠法 → 查得出、写回一样", unrep >= 2 && fake >= 1, `少报 ${unrep} 次、假叠法 ${fake} 次`);
+}
+
 // target = 薄层挂在哪一层：2 = 组里那层（底下那层和底色烤进缓存段）；1 = 最底下那层（底色在增量里现铺 = CatsUp 的形状；2026-11-11 底色取整那个毛病只在这一种里露）
 function incrementalParity(glctx: BrowserGl2Port, add: Add, target: 1 | 2 = 2): void {
   const W = 93, H = 71;
@@ -1824,6 +1871,7 @@ function glCases(glctx: BrowserGl2Port): [string, (add: Add) => void | Promise<v
     ["soft tripartite", (add) => { try { softTripartite(glctx, add); } catch (e) { add("soft tripartite", false, String(e)); } }],
     ["region", async (add) => { try { await regionParity(glctx, add); } catch (e) { add("region parity", false, String(e)); } }],
     ["arena accounting", (add) => { try { arenaAccounting(glctx, add); } catch (e) { add("arena accounting", false, String(e)); } }],
+    ["bake-cells", (add) => { try { bakeCellsParity(glctx, add); } catch (e) { add("bake-cells parity", false, String(e)); } }],
     ["incremental", (add) => { for (const t of [2, 1] as const) { try { incrementalParity(glctx, add, t); } catch (e) { add(`incremental parity (layer ${t})`, false, String(e)); } } }],
   ];
 }

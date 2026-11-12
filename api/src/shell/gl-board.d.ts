@@ -1,3 +1,4 @@
+import type { BakeReport } from "../backend/gl/bake-cells.ts";
 import type { Gl2Port, PooledFBO } from "../common/gl2-port.ts";
 import { RasterService } from "../backend/gl/raster-service.ts";
 import { RegionStroke, type SelMaskPlane } from "../backend/gl/region-stroke.ts";
@@ -46,6 +47,8 @@ export declare class GLBoard {
         tx: number;
         ty: number;
     }[]): boolean;
+    /** 最近一次 commitBrushStroke 怎么读回的（CatsUp 1-4d 第 8 条）：box / cells / box-unreported + 读了几次、多少字节、报了几格、漏了几格。宿主看 path 自己记日志（内核不认识宿主的日志）。没落成 = null。 */
+    get lastBake(): BakeReport | null;
     warmUp(docW: number, docH: number, schedule: (fn: () => void) => void): void;
     private _preborrowDocFBO;
     openRegion(leafId: number, pixels: LayerPixels, docW: number, docH: number, selMask: SelMaskPlane | null, lockAlpha: boolean, snapshot?: boolean): RegionStroke;

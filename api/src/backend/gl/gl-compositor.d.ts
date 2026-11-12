@@ -70,6 +70,8 @@ export declare class GLCompositor {
      * 底色先量化成 8 位（k / 255，四舍五入）：整幅用清屏、增量用 fill 着色器，两条路对恰好落在半格上的值往哪边取整不保证一样——
      *   0.3 × 255 = 76.5，SwiftShader 上清屏得 77、着色器得 76（往偶数）；CatsUp 的底色 [0.3, 0.5, 0.7] 三个分量全落在半格上，增量 ≠ 整张差 1（2026-11-11 CatsUp probe-space-rules 抓到）。
      *   量化之后两边写的都是精确值，哪家显卡都一样；从十六进制来的底色本来就是 k / 255，不变。
+     * 规矩（不只底色）：同一个值经两条不同的显卡路写进去（清屏 / 着色器 / 上传……），先量化成目标的精度再写——各家显卡对半格值往哪边取整不保证一样。
+     *   以后铺透明、铺别的底、加别的「整张一条路、几块另一条路」，照这个办。
      */
     fillBg(f: PooledFBO, docW: number, docH: number, bg?: Background): void;
     finishAcc(acc: Acc): PooledFBO;

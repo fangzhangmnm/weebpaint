@@ -201,3 +201,20 @@ CatsUp：GLBoard.composite（参数同 render，去掉屏幕那几个）→ Rend
   1. 底色进累积器之前量化成 8 位（`gl-compositor.ts fillBg` → `quantizeBg`）：整张用清屏、增量用 fill 着色器，对恰好落在半格上的值（显卡 32 位浮点里 0.3 × 255 = 76.5）取整方向不一样（SwiftShader：清屏 77、着色器 76），增量 ≠ 整张差 1。量化用的四舍五入和以前清屏的结果一样，整张的输出不变。**规矩：同一个值经两条不同的显卡路写进去，先量化成目标的精度再写**（以后铺透明、铺别的底照这个办）。
   2. **画画软件自己的老毛病**：换底色时纯色换纯色不让缓存段作废（段的键只认底色的种类：颜色 / 棋盘 / 透明，不认颜色），最底下那段留着旧底色，直到下一次报 dirty。现在底色一变段全作废（`render-tree.ts _segBg`）。行为变化 = 变对：画画软件里换纸色时没报 dirty 的那条路，以前会短暂显示旧纸色。
 
+## 追记 2026-11-11（v0.14.82，Claude Opus 5.5；CatsUp 贴图主线 1-4d 第 8 / 9 条）：落层只读回这一笔碰过的格 + forEachTip 的 from
+```
+落层 bakeStamps（宿主薄层 host）：合出 merged（底 ⊕ 薄层，和以前一样）
+  宿主给了 cells（HostOverlayInput.cells = 这一笔碰过的格，脏格子位图）且读这些格比读方框省：
+    region-load 取这一层原来存着的字节（只取方框）= base
+    bake-pack 一次画一张小暂存图：上半 = 报了的每一格原样拷进一个格位；下半 = 核对片（方框里每格一个像素 = 这一格 merged 和 base 任一通道差的最大值，报了的格 = 0）
+    一次 readPixels 读整张暂存图 → 核对片干净 = 按格位拆回、每一段行程 apply 一次（图块里没读的部分保持原样）
+                                 → 核对片有不是 0 的 = 报漏了 → 照旧读整个方框（绝不少写）
+  没给 / 不省 = 照旧读整个方框（画画软件自己就是这条）
+  GLBoard.lastBake = { path: box | cells | box-unreported, readCalls, readBytes, cells, strayCells }（宿主看 path 自己记日志）
+```
+- 核对比的是「这一格真变了没有」（merged vs 这一层存着的字节），不是「薄层 α 是不是 0」：α = 0 不改底下只是现在几种叠法正好成立的性质（统筹 11-11）。原来的取 region-load（和 CPU 那份同一份字节），不现合一张。
+- apply 分几次调、中途抛 = 原样抛出去，借的 FBO / 纹理在 finally 里还；整笔不落归档口（host 落层抛 = 取消令牌，已写的跟着回滚）。
+- 证明：`test/bake-cells.test.mjs`（软件版：30 个随机场景只读格 = 读方框逐字节、变了的图块一样；少报真变了的一段 = 查出来；假叠法 = 合出来的那张在 α = 0 的一格被改了也查得出；读格不比方框省 = 读方框）+ 显卡冒烟 bake-cells（真 WebGL 同三条）。
+- 画画软件自己不给 cells，落层走的路没变。
+- `StrokeCore.forEachTip(emit, path?, from?)`：定型的笔尖从第 from 颗开始回调（界：0 ≤ from ≤ frozenTipCount，超了 / 负的 / 不是整数 = 抛）；不给 = 0 = 和以前一样。测试 stroke-core F3。
+
