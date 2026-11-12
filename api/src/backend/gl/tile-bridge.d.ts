@@ -16,6 +16,8 @@ export declare class CpuGpuTileBridge {
     hasLive(cpuId: number): boolean;
     purgeDead(cpuAlive: (cpuId: number) => boolean): void;
     clear(): void;
+    /** 桥记着的全部显卡片号（房间睡 / 退租时把自己的片让出来用）。 */
+    gpuIds(): IterableIterator<number>;
     get size(): number;
 }
 export declare function sliceRegionToTiles(pixels: Uint8Array, x: number, y: number, w: number, h: number, docW: number, docH: number): {

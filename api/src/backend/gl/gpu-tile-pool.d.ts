@@ -27,6 +27,8 @@ export declare class GpuTilePool {
         uploads: number;
         copies: number;
     };
+    private _initialCapacity;
+    private _parked;
     constructor(backend: GpuTileBackend, maxSlices: number);
     private _initSlices;
     get capacity(): number;
@@ -35,7 +37,15 @@ export declare class GpuTilePool {
     get allocatedCount(): number;
     get committedBytes(): number;
     get quotaBytes(): number;
-    registerPinProvider(fn: () => PinSets): void;
+    /** 登记「钉住」的一口；返回摘掉它的函数（房间退租 / 睡下去时摘：不摘 = 池一直拉着房间对象放不掉，CatsUp 施工单十九 ⑦）。 */
+    registerPinProvider(fn: () => PinSets): () => void;
+    /** 登记着的「钉住」有几口（= 合用这个池、醒着没退租的房间数）。 */
+    get pinProviderCount(): number;
+    /** 停放（自己开的池随房间睡下去）：显存还回去，只留 1 片（显卡的图组不许 0 层）；全部片号作废（generation 变）。幂等。 */
+    park(): void;
+    /** 停放之后重开回起步那么大（全部片号作废，使用者照代数重传）。没停放 = 不动。 */
+    unpark(): void;
+    get parked(): boolean;
     isAlive(id: number): boolean;
     slotOf(id: number): number;
     reserve(totalSlices: number): boolean;

@@ -78,7 +78,8 @@ export interface Gl2Port {
     readonly caps: Gl2Caps;
     readonly isLost: boolean;
     readonly generation: number;
-    onInvalidated(cb: () => void): void;
+    /** 返回摘掉这个回调的函数（画板退租时摘，不然 Port 一直拉着它）。 */
+    onInvalidated(cb: () => void): () => void;
     program(name: string, vert?: string, frag?: string): void;
     warmProgram?(name: string, vert: string, frag: string): void;
     borrowFBO(w: number, h: number, prec?: FBOPrec): PooledFBO;

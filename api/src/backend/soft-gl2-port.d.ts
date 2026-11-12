@@ -6,7 +6,9 @@ export declare class SoftGl2Port implements Gl2Port {
     private _invalidated;
     private _programs;
     private _fboPool;
-    onInvalidated(cb: () => void): void;
+    onInvalidated(cb: () => void): () => void;
+    /** 挂着的「画面丢了」回调有几个（测试看退租干不干净）。 */
+    get invalidatedListenerCount(): number;
     warmProgram(name: string, vert: string, frag: string): void;
     program(name: string, _vert?: string, _frag?: string): void;
     borrowFBO(w: number, h: number, prec?: FBOPrec): PooledFBO;

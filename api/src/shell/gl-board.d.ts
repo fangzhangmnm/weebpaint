@@ -1,5 +1,6 @@
 import type { BakeReport } from "../backend/gl/bake-cells.ts";
 import type { Gl2Port, PooledFBO } from "../common/gl2-port.ts";
+import type { SharedTilePool } from "../backend/gl/shared-tile-pool.ts";
 import { RasterService } from "../backend/gl/raster-service.ts";
 import { RegionStroke, type SelMaskPlane } from "../backend/gl/region-stroke.ts";
 import type { FloatInput, OverlayInput, SurrogateInput } from "../backend/gl/gl-room.ts";
@@ -16,11 +17,21 @@ export declare class GLBoard {
     private _room;
     private _tree;
     private _raster;
-    constructor(glctx: Gl2Port, maxSlices: number);
+    /** opts.pool = 几块画板合用的图块池（CatsUp 施工单十九第 2 刀；createSharedTilePool 建）；缺 = 照旧自己开一个（画画软件就是这样）。 */
+    constructor(glctx: Gl2Port, maxSlices: number, opts?: {
+        readonly pool?: SharedTilePool;
+    });
+    /** 摘掉挂在 Port 上的「画面丢了」回调（退租时摘：不摘 = Port 一直拉着这块画板，换很多次文件之后放不掉）。 */
+    private _unInvalidated;
     private _disposed;
     get disposed(): boolean;
     dispose(): void;
+    private _alive;
+    /** 要用显卡的口：没退租、醒着、合用的池还在。睡着时调 = 抛（先 wake()），不是悄悄画到一块没有显卡那一半的画板上。 */
     private _live;
+    get asleep(): boolean;
+    sleep(): void;
+    wake(): void;
     get memory(): {
         usedTiles: number;
         capacity: number;

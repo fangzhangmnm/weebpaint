@@ -31,6 +31,8 @@ export declare class RenderTree {
         rects: number;
         fraction: number;
     };
+    private readonly _pinsFn;
+    private _unpin;
     constructor(room: GlRoom);
     markDirty(): void;
     handleContextRestored(): void;
@@ -52,6 +54,11 @@ export declare class RenderTree {
      * 叶记录（room.leaves）归 GlRoom.dispose。之后不可再用（GLBoard 那层拦）。画画软件一辈子一块画板，不调。
      */
     dispose(): void;
+    /** 睡：摘掉「钉住」的口、显示图和段缓存的帧缓冲还池、段缓存的片让出来；标脏（醒来下一帧整张重合）。 */
+    sleep(): void;
+    /** 醒：重新登记「钉住」的口、标脏。显卡那一半下一帧按内存那份重建（和 handleContextRestored 同一条路）。 */
+    wake(): void;
+    private _releaseGpuHalf;
     private _invalidateSegs;
     private _buildSeg;
     private _present;

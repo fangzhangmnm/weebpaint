@@ -1,6 +1,7 @@
 import type { DirtyCells } from "../../common/dirty-rects.ts";
 import { GpuTilePool, IndexTexture } from "./gpu-tile-pool.ts";
 import { CpuGpuTileBridge } from "./tile-bridge.ts";
+import { type SharedTilePool } from "./shared-tile-pool.ts";
 import { GLCompositor } from "./gl-compositor.ts";
 import type { Acc, OverlayDesc, FloatDesc } from "./gl-compositor.ts";
 import type { DocNode, DocLeaf } from "./gl-doc-bridge.ts";
@@ -136,7 +137,10 @@ export declare class GlRoom {
     private _floats;
     private _liveMergedClips;
     private _invalidateListeners;
-    constructor(glctx: Gl2Port, maxSlices: number, accumPrec?: FBOPrec);
+    /** 合用的图块池（CatsUp 施工单十九第 2 刀）：有 = 池和图组是别人的，这里退租 / 睡不还图组、只让出自己的片；null = 自己开的（画画软件照旧）。 */
+    private readonly _shared;
+    private _asleep;
+    constructor(glctx: Gl2Port, maxSlices: number, accumPrec?: FBOPrec, shared?: SharedTilePool);
     get memory(): {
         usedTiles: number;
         capacity: number;
@@ -155,6 +159,14 @@ export declare class GlRoom {
     onInvalidate(cb: () => void): void;
     invalidateTree(): void;
     dispose(): void;
+    get asleep(): boolean;
+    sleep(): void;
+    wake(): void;
+    /** 合用的池先退了、房间还拿来用 = 抛、说清原因（不然是图组那一层的 ARENA_DISPOSED，看不出是谁的顺序错了）。 */
+    assertUsable(): void;
+    /** 这间房在池里占着的片全部让出来（叶的片 + 桥记着的片；段缓存的片归 RenderTree）。evict 幂等。 */
+    private _giveBackSlices;
+    private _dropPseudoTextures;
     handleContextRestored(): void;
     readonly syncStats: {
         drops: number;

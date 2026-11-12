@@ -147,6 +147,11 @@ import "./stroke-core-golden.test.mjs";     // 2026-11-10 贴图主线 0-6：一
 import "./stroke-core.test.mjs";
 import "./dirty-rects.test.mjs";             // 1-4d 第 6 条：一帧改到的那几块整理成两两不相交的单子            // 0-6 一笔的手感不管几维：三维间距 / 单位 / 断开 / 定型 / 停顿
 import "./incremental-composite.test.mjs";    // 1-4d 第 6 条：增量合成 = 整张重合（随机层栈 × 随机改动，逐像素）
+import "./gl-board-dispose.test.mjs";         // 0-3a 画板退租：建的纹理全删、借的离屏图全还、arena 退租（以前只在 kernel-tests.json、CatsUp 那边跑，这里漏登记了）
+import "./gl-board-sleep.test.mjs";           // 施工单十九第 2 刀：画板睡和醒 + 几块画板合用一个图块池（八条）
+import "./host-overlay.test.mjs";             // 宿主画好的薄层（host overlay）进合成 / 落层（以前只在 kernel-tests.json 里）
+import "./host-external.test.mjs";            // 宿主的外部纹理（wrapExternal）（以前只在 kernel-tests.json 里）
+import "./frame-demand.test.mjs";             // 一帧要多少片 → 池先长（以前只在 kernel-tests.json 里）
 import "./bake-cells.test.mjs";              // 1-4d 第 8 条：落层只读回报的格 = 读整个方框（逐字节）；报漏了 / 假叠法查得出
 import "./stroke-core-guard.test.mjs";      // 0-6 守卫（扫源码，不进内核名单）
 import "./layer-composite.test.mjs";        // deep module A：clip 基底解析（同级/链共基底/基底隐显/组作基底）

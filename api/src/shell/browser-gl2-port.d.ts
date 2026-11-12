@@ -51,7 +51,7 @@ export declare class BrowserGl2Port implements Gl2Port {
     constructor(canvas: HTMLCanvasElement | OffscreenCanvas, sharedGl?: WebGL2RenderingContext);
     get isLost(): boolean;
     get generation(): number;
-    onInvalidated(cb: () => void): void;
+    onInvalidated(cb: () => void): () => void;
     /**
      * 共用画面时把本模块依赖、却从不自己设的状态设回默认（自己的 context = 什么都不做）。
      * 逐条的来历（宿主 = three 会留下的）：深度测试 / 背面剔除（three 常开；方向还会被负缩放翻成 CW）/ 模板 / 多边形偏移 / alpha-to-coverage
