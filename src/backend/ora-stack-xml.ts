@@ -101,16 +101,37 @@ export const ORA_FORMAT_VERSION = FORMAT.ora.major;
 //   Layer → 自闭合 <layer ... />；LayerGroup → <stack ...>children</stack>。
 //   组与叶共享 name/opacity/visibility/composite-op/weebpaint:id/clipping/active；
 //   叶独有 src/x/y/lock-alpha/reference。
-function nodeToXml(node: OraNode, doc: OraDoc, indent: number): string {
+/** 能写进 weebpaint:id、能拿来起像素文件名的 id：安全范围里的非负整数（读的时候也只认这种：parseNode）。 */
+export const usableLayerId = (id: unknown): id is number => typeof id === "number" && Number.isSafeInteger(id) && id >= 0;
+/**
+ * 每个叶的像素文件路径（stack.xml 的 src 和 zip 里的条目必须是同一个；buildStackXml 和 encodeDocToOra 都问它，2026-11-12 CatsUp 统筹批）：
+ * 有可用的 id = data/layer<id>.png（和以前逐字节一样）；没有 = data/layer-<第几个>.png（第几个 = 按 doc.layers 深度优先、子节点先后数没有 id 的叶；
+ * 「-」开头的永远不和 layer<数字> 撞）。以前没有 id 的叶写成 data/layerundefined.png：两片都没有 id 就撞成一个文件、一层盖掉另一层。
+ */
+export function leafPaths(doc: { readonly layers: readonly OraNode[] }): Map<OraNode, string> {
+  const out = new Map<OraNode, string>();
+  let k = 0;
+  const walk = (ns: readonly OraNode[]): void => { for (const n of ns) { if (n.isGroup) walk(n.children || []); else out.set(n, usableLayerId(n.id) ? `data/layer${n.id}.png` : `data/layer-${k++}.png`); } };
+  walk(doc.layers);
+  return out;
+}
+/** 写 stack.xml 时的上下文：每个叶的像素文件路径 + 报一句的口（没有可用 id 的层）。 */
+interface XmlCtx { readonly paths: Map<OraNode, string>; readonly warn?: (msg: string) => void }
+function nodeToXml(node: OraNode, doc: OraDoc, indent: number, ctx: XmlCtx): string {
   const pad = "  ".repeat(indent);
+  // 没有可用的 id（调用的人没给 / 给了 NaN）：不写 weebpaint:id（绝不写出 "undefined" / "NaN"：读回来是 NaN、画板的当前图层跟着坏，CatsUp v0.19.60 及以前就这样写出过）、
+  //   读的时候自动编号；经 warn 报一句是哪一层。不抛：这是存盘的路，抛 = 这次存不上；不写这个属性 = 一份合法的 ora，读回来自己好（统筹 11-12）。
+  //   「选中」「参考」两个标记只认可用的 id（以前 activeId === node.id 两边都是 undefined 也算选中）。
+  const idOk = usableLayerId(node.id);
+  if (!idOk) ctx.warn?.(`ora: layer "${node.name}" has no usable id (${String(node.id)}); written without weebpaint:id (it gets a fresh id when read)`);
   const common = [
     `name="${escapeXml(node.name)}"`,
     `opacity="${(node.opacity ?? 1).toFixed(4)}"`,
     `visibility="${node.visible ? "visible" : "hidden"}"`,
     `composite-op="${oraCompositeOp(node.mode || "source-over")}"`,
-    `weebpaint:id="${node.id}"`,
+    ...(idOk ? [`weebpaint:id="${node.id}"`] : []),
     ...(node.clippingMask ? [`weebpaint:clipping="true"`] : []),
-    ...(doc.activeId === node.id ? [`weebpaint:active="true"`] : []),
+    ...(idOk && doc.activeId === node.id ? [`weebpaint:active="true"`] : []),
   ];
   if (node.isGroup) {
     // ORA baseline 组隔离模型（与我们 layer-composite.groupNeedsIsolation 一致，故用**标准** isolation 属性，
@@ -125,29 +146,30 @@ function nodeToXml(node: OraNode, doc: OraDoc, indent: number): string {
     const ch = node.children || [];
     const kids: string[] = [];
     for (let i = ch.length - 1; i >= 0; i--) {
-      kids.push(nodeToXml(ch[i], doc, indent + 1));
+      kids.push(nodeToXml(ch[i], doc, indent + 1, ctx));
     }
     const inner = kids.length ? `\n${kids.join("\n")}\n${pad}` : "";
     return `${pad}<stack ${groupAttrs.join(" ")}>${inner}</stack>`;
   }
   const attrs = [
     common[0],                                  // name
-    `src="data/layer${node.id}.png"`,
+    `src="${ctx.paths.get(node)}"`,
     `x="${node.bboxX}"`,
     `y="${node.bboxY}"`,
     ...common.slice(1),                          // opacity/visibility/composite-op/id/clipping/active
     ...(node.lockAlpha ? [`weebpaint:lock-alpha="true"`] : []),
-    ...(doc.referenceLayerId === node.id ? [`weebpaint:reference="true"`] : []),
+    ...(idOk && doc.referenceLayerId === node.id ? [`weebpaint:reference="true"`] : []),
   ];
   return `${pad}<layer ${attrs.join(" ")} />`;
 }
 
-export function buildStackXml(doc: OraDoc, wroteWithVersion = ""): string {
+export function buildStackXml(doc: OraDoc, wroteWithVersion = "", warn?: (msg: string) => void): string {
+  const ctx: XmlCtx = { paths: leafPaths(doc), ...(warn ? { warn } : {}) };
   // OpenRaster spec：layer 顺序 = top first（top of stack 在 XML 前）。
   // doc.layers[0] 是 bottom，所以同级倒序输出（递归在 nodeToXml 内）。
   const nodes: string[] = [];
   for (let i = doc.layers.length - 1; i >= 0; i--) {
-    nodes.push(nodeToXml(doc.layers[i], doc, 2));
+    nodes.push(nodeToXml(doc.layers[i], doc, 2, ctx));
   }
   // wrote-with：记录写入这份 .ora 时的 WeebPaint 版本号（调用方传入；encodeDocToOra 必填透传）。
   // 用途：读取端若发现比自己版本高 → 警告（避免旧版客户端静默吃掉新版图层属性）
@@ -180,7 +202,9 @@ function wpAttr(el: Element, name: string): string | null {
 function parseNode(el: Element): ParsedNode {
   const idAttr = wpAttr(el, "id");
   const common: ParsedCommon = {
-    id: idAttr != null && idAttr !== "" ? parseInt(idAttr, 10) : null,
+    // 只认安全范围里的非负整数（纯数字）；别的（"undefined"、"NaN"、"-1"、"1.5"、"12abc"、空）= 当没有，decode 时自动编号（2026-11-12 CatsUp 统筹批：
+    //   CatsUp v0.19.60 及以前写出过 weebpaint:id="undefined"，以前 parseInt 读成 NaN，NaN ?? 自动编号接不住，画板的当前图层跟着是 NaN、一笔都画不上）
+    id: idAttr != null && /^\d+$/.test(idAttr) && Number.isSafeInteger(Number(idAttr)) ? Number(idAttr) : null,
     name: el.getAttribute("name") || "Layer",   // 无名层的兜底名（写回文件的数据）
     opacity: parseFloat(el.getAttribute("opacity") || "1"),
     visible: (el.getAttribute("visibility") || "visible") === "visible",

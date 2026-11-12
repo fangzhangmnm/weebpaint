@@ -35,7 +35,7 @@ import type { Stamp } from "./format/migrate.ts";
 import { areaResampleBytes } from "./algorithms/resample-bytes.ts";
 import { encodePngFromBytes, decodePngToBytes } from "./png-codec.ts";
 // 纯树↔stack.xml 序列化（嵌套组 + id + active）抽到独立深模块（无 canvas 依赖，可纯 node 测）。
-import { buildStackXml, parseStackXml } from "./ora-stack-xml.ts";
+import { buildStackXml, leafPaths, parseStackXml } from "./ora-stack-xml.ts";
 import type { ParsedNode } from "./ora-stack-xml.ts";
 import type { PaintingData, PaintingDataNode, PaintingDataLeaf } from "./workpiece/painting-workpiece.ts";
 
@@ -118,6 +118,8 @@ const isExtraEntryPath = (p: string): boolean =>
 // encode opts：wroteWith 必填（C7：版本戳是壳知识，backend 不 import version.ts）+ 可选 WeebPaint 私有扩展。
 interface EncodeOpts {
   wroteWith: string;   // stack.xml weebpaint:wrote-with 版本戳（壳传 WEEBPAINT_VERSION；backend 装配传注入的 appVersion）
+  /** 报一句的口（有层没有可用的 id：不写 weebpaint:id、读回来自动编号；2026-11-12）。不给 = 不报。 */
+  warn?: (msg: string) => void;
   mergedBytes?: { data: Uint8ClampedArray; w: number; h: number } | null;   // S9/C3：调用方渲好的合成字节（GL renderNodesToBytes）；缺省=透明占位
   /** 参考目录（format 3）：路径 → 字节，原样写入；路径必须在 .weebpaint/references/ 下（不透明，codec 不解释）。 */
   referenceFiles?: Map<string, Uint8Array | Blob>;
@@ -218,11 +220,12 @@ export async function encodeDocToOra(doc: EncodeDoc, opts: EncodeOpts) {
   //   3. mergedimage / layer 是大块，放中间
   const entries: { path: string; data: string | Uint8Array }[] = [
     { path: "mimetype", data: "image/openraster" },
-    { path: "stack.xml", data: buildStackXml(doc, opts.wroteWith) },
+    { path: "stack.xml", data: buildStackXml(doc, opts.wroteWith, opts.warn) },
     { path: "mergedimage.png", data: mergedPng },
   ];
 
   // 只有叶有像素；组无 PNG，结构全在 stack.xml。
+  const paths = leafPaths(doc);
   for (const L of flattenEncodeLeaves(doc.layers)) {
     let png;
     if (L.bboxW > 0 && L.bboxH > 0) {
@@ -232,7 +235,7 @@ export async function encodeDocToOra(doc: EncodeDoc, opts: EncodeOpts) {
       // 空层 → 1×1 透明 png（C3：直接字节编码；旧 makeBitmap+getContext 的 Chromium 空 canvas 坑随之蒸发）。
       png = await encodePngFromBytes(new Uint8ClampedArray(4), 1, 1);
     }
-    entries.push({ path: `data/layer${L.id}.png`, data: png });
+    entries.push({ path: paths.get(L)!, data: png });   // 和 stack.xml 的 src 同一个（leafPaths）
   }
 
   // timelapse 录像：mp4 是大块 → 中部（layer 之后）；format 2 起与 json 同住 .weebpaint/。
