@@ -153,6 +153,7 @@ import "./host-overlay.test.mjs";             // 宿主画好的薄层（host ov
 import "./host-external.test.mjs";            // 宿主的外部纹理（wrapExternal）（以前只在 kernel-tests.json 里）
 import "./frame-demand.test.mjs";             // 一帧要多少片 → 池先长（以前只在 kernel-tests.json 里）
 import "./bake-cells.test.mjs";              // 1-4d 第 8 条：落层只读回报的格 = 读整个方框（逐字节）；报漏了 / 假叠法查得出
+import "./bake-scope.test.mjs";              // K2：落层那一遍只合方框外扩到图块边 = 和整张合逐字节一样；着色器逐点守卫
 import "./stroke-core-guard.test.mjs";      // 0-6 守卫（扫源码，不进内核名单）
 import "./layer-composite.test.mjs";        // deep module A：clip 基底解析（同级/链共基底/基底隐显/组作基底）
 import "./tile-geometry.test.mjs";          // tile 几何纯函数（自 tile-store.test 迁出）
