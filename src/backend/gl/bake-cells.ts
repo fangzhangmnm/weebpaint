@@ -6,6 +6,8 @@
 //   ② 一次 readPixels 读整张暂存图（只等显卡一次）。核对片有不是 0 的 = 宿主报漏了 → 照旧读整个方框（绝不少写），报告 box-unreported。
 //   ③ 没漏 = 按格位拆回：每一段行程拼成一块交给 apply（宿主的 applyRegionDiff）；图块里没读的部分保持原样。
 // 核对比的是「这一格真变了没有」，不是「薄层 α 是不是 0」：α = 0 不改底下只是现在这几种叠法正好成立的性质，以后多一种叠法 / 笔不一定（统筹 11-11）。
+//   「变了」= 任一通道不一样，只有一种例外：前后都全透明（α 都是 0）= 没变——全透明的像素存着的颜色看不见、不是画；
+//   合成一遍会把它的颜色归 0（读整个方框那条路一直就这么写回去，白白算成「这个图块变了」），只读格的路不碰它们 = 更少的假改动。
 // 纯函数部分（planCells / unpackRuns）零依赖；GLSL 的 CPU 孪生在 soft-shaders.ts（bake-pack）。
 
 import type { DirtyCells, DirtyRect } from "../../common/dirty-rects.ts";
@@ -35,8 +37,9 @@ export interface CellPlan {
   /** 报了的格的格子坐标（先后 = 格位）。 */
   readonly list: Float32Array;   // [cx0, cy0, cx1, cy1, …]
   readonly n: number;
-  /** 行段（画布像素，按格对齐、夹进画布）：拆回时一段一次 apply。 */
-  readonly runs: readonly DirtyRect[];
+  /** 行段（画布像素，夹进方框）：拆回时一段一次 apply。k0 / k1 / cy = 这一段跨的格（格位按这个先后排）。
+   *  夹进方框：方框外合出来的那张不是「落层」的那一块（薄层只合进方框；方框外全透明却带颜色的像素合一遍会变成 0，写回去 = 改了原来存着的字节）。 */
+  readonly runs: readonly (DirtyRect & { readonly k0: number; readonly k1: number; readonly cy: number })[];
   /** 方框的格子范围：左上那一格、几列几行。 */
   readonly c0x: number; readonly c0y: number; readonly cw: number; readonly ch: number;
   /** 方框里每一格报没报（cw × ch，255 = 报了，0 = 没报；r8 取样归一 → 1.0 / 0.0）。 */
@@ -52,15 +55,15 @@ export interface CellPlan {
 export function planCells(cells: DirtyCells, bx: number, by: number, bw: number, bh: number): CellPlan | null {
   if (cells.cell !== BAKE_CELL) return null;
   const c = BAKE_CELL, c0x = Math.floor(bx / c), c0y = Math.floor(by / c), c1x = Math.floor((bx + bw - 1) / c), c1y = Math.floor((by + bh - 1) / c);
-  const cw = c1x - c0x + 1, ch = c1y - c0y + 1, mask = new Uint8Array(cw * ch), coords: number[] = [], runs: DirtyRect[] = [];
+  const cw = c1x - c0x + 1, ch = c1y - c0y + 1, mask = new Uint8Array(cw * ch), coords: number[] = [], runs: (DirtyRect & { k0: number; k1: number; cy: number })[] = [];
   for (const r of cells.runs()) {
     const cy = r.y / c;
     if (cy < c0y || cy > c1y) continue;
     const k0 = Math.max(r.x / c, c0x), k1 = Math.min(Math.floor((r.x + r.w - 1) / c), c1x);
     if (k1 < k0) continue;
     for (let k = k0; k <= k1; k++) { coords.push(k, cy); mask[(cy - c0y) * cw + (k - c0x)] = 255; }   // r8 取样是归一的：255 = 1.0（写 1 = 1/255，着色器里 > 0.5 判不出来）
-    const x = k0 * c, xe = Math.min(cells.w, (k1 + 1) * c);
-    runs.push({ x, y: r.y, w: xe - x, h: r.h });
+    const x = Math.max(bx, k0 * c), xe = Math.min(bx + bw, (k1 + 1) * c), y = Math.max(by, r.y), ye = Math.min(by + bh, r.y + r.h);
+    runs.push({ x, y, w: xe - x, h: ye - y, k0, k1, cy });
   }
   const n = coords.length / 2;
   if (!n) return null;
@@ -87,12 +90,14 @@ export function unpackRuns(
   const c = BAKE_CELL, slots = plan.sw / c, seen = new Set<string>(), out: { tx: number; ty: number }[] = [];
   let k = 0;
   for (const r of plan.runs) {
-    const buf = new Uint8ClampedArray(r.w * r.h * 4), ncell = Math.ceil(r.w / c);
-    for (let j = 0; j < ncell; j++, k++) {
-      const sx = (k % slots) * c, sy = Math.floor(k / slots) * c, cwid = Math.min(c, r.w - j * c);
+    const buf = new Uint8ClampedArray(r.w * r.h * 4);
+    for (let cx = r.k0; cx <= r.k1; cx++, k++) {
+      const sx = (k % slots) * c, sy = Math.floor(k / slots) * c;
+      const xa = Math.max(r.x, cx * c), xb = Math.min(r.x + r.w, cx * c + c);   // 这一格夹进这一段（方框）的那几列
+      if (xb <= xa) continue;
       for (let yy = 0; yy < r.h; yy++) {
-        const so = ((sy + yy) * plan.sw + sx) * 4, dO = (yy * r.w + j * c) * 4;
-        buf.set(px.subarray(so, so + cwid * 4), dO);
+        const oy = r.y + yy - r.cy * c, so = ((sy + oy) * plan.sw + sx + (xa - cx * c)) * 4, dO = (yy * r.w + (xa - r.x)) * 4;
+        buf.set(px.subarray(so, so + (xb - xa) * 4), dO);
       }
     }
     for (const t of apply(buf, r.x, r.y, r.w, r.h)) { const key = `${t.tx},${t.ty}`; if (!seen.has(key)) { seen.add(key); out.push(t); } }
@@ -135,7 +140,9 @@ void main(){
   for (int yy = 0; yy < ${BAKE_CELL}; yy++) for (int xx = 0; xx < ${BAKE_CELL}; xx++) {
     ivec2 q = ivec2(cx * ${BAKE_CELL} + xx, cy * ${BAKE_CELL} + yy);
     if (q.x < int(u_box.x) || q.y < int(u_box.y) || q.x >= int(u_box.z) || q.y >= int(u_box.w)) continue;
-    vec4 e = abs(texelFetch(u_merged, q, 0) - texelFetch(u_base, q, 0));
+    vec4 m = texelFetch(u_merged, q, 0), b = texelFetch(u_base, q, 0);
+    if (m.a == 0.0 && b.a == 0.0) continue;   // 前后都全透明 = 没变（全透明的像素颜色看不见、不是画；合成一遍会把它归 0，读整框那条路本来也这样）
+    vec4 e = abs(m - b);
     d = max(d, max(max(e.r, e.g), max(e.b, e.a)));
   }
   o = vec4(d);

@@ -1442,7 +1442,8 @@ function bakeCellsParity(glctx: BrowserGl2Port, add: Add): void {
       lp.dispose(); board.dispose();
       return out;
     };
-    const eqB = (a: Uint8ClampedArray, b: Uint8ClampedArray) => a.length === b.length && a.every((v, i) => v === b[i]);
+    // 看得见的一样：前后都全透明的像素颜色不论（读整个方框那条路合成一遍会把它的颜色归 0）
+    const eqB = (a: Uint8ClampedArray, b: Uint8ClampedArray) => { if (a.length !== b.length) return false; for (let i = 0; i < a.length; i += 4) { if (a[i + 3] === 0 && b[i + 3] === 0) continue; if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2] || a[i + 3] !== b[i + 3]) return false; } return true; };
     const box = run(null, null), cel = run(dc, null);
     total++; if (eqB(box.bytes, cel.bytes)) same++; else firstBad ||= `场景 ${s}（${W}×${H}）：报格写回的和读方框不一样`;
     if (cel.path === "cells") cells++;

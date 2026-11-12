@@ -1,4 +1,4 @@
-// 落层只读回这一笔碰过的格（CatsUp 贴图主线 1-4d 第 8 条）：只读报的格 = 读整个方框，写回之后的图层逐字节一样、变了的图块一样；
+// 落层只读回这一笔碰过的格（CatsUp 贴图主线 1-4d 第 8 条）：只读报的格 = 读整个方框，写回之后的图层看得见的逐字节一样（前后都全透明的像素颜色不论）、变了的图块 ⊆ 读方框的；
 // 报漏了（报的格以外真变了）= 内核自己查出来、照旧读整个方框；核对比的是「合出来的和原来的一不一样」，不是「薄层 α 是不是 0」（假叠法：α = 0 却改了像素，照样查得出）。
 // 内核自己的测试：只 import 内核和测试工具。created 2026-11-11 by Claude Opus 5.5
 import { describe, it, assert, eq } from "./runner.mjs";
@@ -16,6 +16,10 @@ function scene(seed, size) {
   for (let k = 0; k < 6; k++) {   // 底下随机几块（有不透明的、半透明的）
     const x0 = Math.floor(R() * W), y0 = Math.floor(R() * H), w = 1 + Math.floor(R() * W / 2), h = 1 + Math.floor(R() * H / 2), c = [R() * 255, R() * 255, R() * 255, R() < 0.5 ? 255 : 40 + R() * 200];
     for (let y = y0; y < Math.min(H, y0 + h); y++) for (let x = x0; x < Math.min(W, x0 + w); x++) { const i = (y * W + x) * 4; base[i] = c[0]; base[i + 1] = c[1]; base[i + 2] = c[2]; base[i + 3] = c[3]; }
+  }
+  for (let k = 0; k < 3; k++) {   // 全透明却带颜色的像素（直值存法里常有：擦过的地方）——合成一遍会变成 0，方框外的不许被写回去
+    const x0 = Math.floor(R() * W), y0 = Math.floor(R() * H), w = 1 + Math.floor(R() * 20), h = 1 + Math.floor(R() * 20);
+    for (let y = y0; y < Math.min(H, y0 + h); y++) for (let x = x0; x < Math.min(W, x0 + w); x++) { const i = (y * W + x) * 4; base[i] = 77; base[i + 1] = 133; base[i + 2] = 201; base[i + 3] = 0; }
   }
   const ov = new Uint8Array(W * H * 4), cells = new DirtyCells(W, H), blobs = [];
   let bx0 = Infinity, by0 = Infinity, bx1 = -1, by1 = -1;
@@ -47,17 +51,20 @@ function bake(sc, cells, inject = null) {
   lp.dispose(); board.dispose();
   return out;
 }
-const sameBytes = (a, b) => { if (a.length !== b.length) return -1; let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) d++; return d; };
+/** 看得见的一样：每个像素要么四个字节都一样，要么前后都全透明（全透明的像素颜色看不见、不是画；读整个方框那条路合成一遍会把它的颜色归 0）。返回不一样的像素数。 */
+const sameBytes = (a, b) => { if (a.length !== b.length) return -1; let d = 0; for (let i = 0; i < a.length; i += 4) { if (a[i + 3] === 0 && b[i + 3] === 0) continue; if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2] || a[i + 3] !== b[i + 3]) d++; } return d; };
+/** 只读格那条路改的图块 ⊆ 读整个方框改的（方框那条路会多出「全透明像素的颜色归 0」那种假改动）。 */
+const tilesSubset = (cel, box) => { const B = new Set(box.split(" ").filter(Boolean)); return cel.split(" ").filter(Boolean).every((t) => B.has(t)); };
 
 describe("落层只读回报的格（1-4d 第 8 条）", () => {
-  it("随机场景（随机大小 / 奇数边 / 叠法 / 橡皮）：只读报的格 = 读整个方框，图层逐字节一样、变了的图块一样；真的走了只读格", () => {
+  it("随机场景（随机大小 / 奇数边 / 叠法 / 橡皮 / 全透明带颜色的像素）：只读报的格 = 读整个方框，图层看得见的逐字节一样、变了的图块 ⊆ 读方框的；真的走了只读格", () => {
     let cellsPath = 0;
     for (let seed = 1; seed <= 30; seed++) {
       const sc = scene(seed), box = bake(sc, null), cel = bake(sc, sc.cells);
       assert(box.ok && cel.ok, `种子 ${seed}：落成了`);
       eq(box.bake.path, "box", `种子 ${seed}：不给格 = 读方框`);
       eq(sameBytes(box.bytes, cel.bytes), 0, `种子 ${seed}（${sc.W}×${sc.H}，${sc.blendMode}${sc.erase ? "，橡皮" : ""}，走 ${cel.bake.path}）：图层逐字节一样`);
-      eq(cel.tiles, box.tiles, `种子 ${seed}：变了的图块一样`);
+      assert(tilesSubset(cel.tiles, box.tiles), `种子 ${seed}：变了的图块 ⊆ 读方框的（${cel.tiles} vs ${box.tiles}）`);
       assert(cel.bake.path !== "box-unreported", `种子 ${seed}：报全了不该说漏了（${JSON.stringify(cel.bake)}）`);
       if (cel.bake.path === "cells") { cellsPath++; eq(cel.bake.readCalls, 1, "只读一次"); assert(cel.bake.readBytes < sc.box[2] * sc.box[3] * 4, "读的字节比方框少"); }
     }
@@ -80,7 +87,7 @@ describe("落层只读回报的格（1-4d 第 8 条）", () => {
       if (!realChange) continue;
       eq(cel.bake.path, "box-unreported", `种子 ${seed}：少报的那一段真变了 → 查出报漏了`);
       assert(cel.bake.strayCells > 0, `种子 ${seed}：漏了 ${cel.bake.strayCells} 格`);
-      eq(cel.tiles, box.tiles, `种子 ${seed}：变了的图块一样`);
+      assert(tilesSubset(cel.tiles, box.tiles), `种子 ${seed}：变了的图块 ⊆ 读方框的`);
       hit++;
     }
     assert(hit >= 5, `查出报漏了 ${hit} 次`);

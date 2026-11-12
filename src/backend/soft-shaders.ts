@@ -963,6 +963,7 @@ const bakePack: CpuDraw = (c) => {
       const qx = cx * C + xx, qy = cy * C + yy;
       if (qx < boxU[0] || qy < boxU[1] || qx >= boxU[2] || qy >= boxU[3]) continue;
       merged!.fetch(qx, qy, a); base!.fetch(qx, qy, b);
+      if (a[3] === 0 && b[3] === 0) continue;   // 前后都全透明 = 没变
       d = Math.max(d, Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]), Math.abs(a[3] - b[3]));
     }
     out[0] = out[1] = out[2] = out[3] = d;
