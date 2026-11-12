@@ -4,6 +4,13 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 describe("一笔的手感：守卫（0-6）", () => {
+  it("内核里从跟手 / 防抖推平滑器参数只有 common/smooth-defaults.ts resolveSmooth 一处（2026-11-12，CatsUp 施工单二十 1b；前端 input.ts 吃用户改过的那份，不在内核里）", () => {
+    const files = []; const walkDir = (d) => { for (const n of readdirSync(d)) { const p = join(d, n); if (statSync(p).isDirectory()) walkDir(p); else if (/\.ts$/.test(n)) files.push(p); } };
+    walkDir(join("src", "backend")); walkDir(join("src", "common"));
+    const hits = files.filter((f) => /\b(tauMaxMs|stabMaxPx)\b/.test(readFileSync(f, "utf8"))).sort();
+    eq(hits.join(","), join("src", "common", "smooth-defaults.ts"), "出厂表的这两个常数只在它自己的文件里读");
+    assert(/resolveSmooth\(/.test(readFileSync(join("src", "backend", "weebpaint-backend.ts"), "utf8")), "后端起笔调 resolveSmooth");
+  });
   it("不认识图层的那一段（stroke-core.ts）不 import 图层、画布、显卡的任何东西", () => {
     const src = readFileSync(join("src", "backend", "stroke-core.ts"), "utf8");
     const imports = [...src.matchAll(/^import[^"]*"([^"]+)"/gm)].map((m) => m[1]);
