@@ -44,6 +44,8 @@ export declare const KNOWN_WEEBPAINT_ENTRIES: readonly string[];
 export type ExtraEntries = Map<string, Uint8Array>;
 interface EncodeOpts {
     wroteWith: string;
+    /** 报一句的口（有层没有可用的 id：不写 weebpaint:id、读回来自动编号；2026-11-12）。不给 = 不报。 */
+    warn?: (msg: string) => void;
     mergedBytes?: {
         data: Uint8ClampedArray;
         w: number;
