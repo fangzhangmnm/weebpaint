@@ -14,7 +14,7 @@ import type { PooledFBO } from "../../common/gl2-port.ts";
 import type { IndexTexture } from "./gpu-tile-pool.ts";
 import { COMPOSITE_VERT } from "./blend-glsl.ts";
 import { ensureRegionProgram } from "./region-programs.ts";
-import { BAKE_LIST_W, BAKE_PACK_FRAG, planCells, strayCount, unpackRuns, type BakeReport, type CellPlan } from "./bake-cells.ts";
+import { BAKE_LIST_W, BAKE_PACK_FRAG, planCells, strayCount, unpackTiles, type BakeReport, type CellPlan } from "./bake-cells.ts";
 import type { GlRoom, OverlayInput, SurrogateInput } from "./gl-room.ts";
 import { overlayEmpty } from "./gl-room.ts";
 
@@ -73,7 +73,7 @@ export class RasterService {
       const max = room.glctx.caps.maxTextureSize;
       let changed: { tx: number; ty: number }[] | null = null, report: BakeReport | null = null;
       if (plan && plan.sw * plan.sh * 4 < boxBytes && plan.sw <= max && plan.sh <= max) {
-        const r = this._readCells(merged, rec.index, plan, ov, docW, docH, apply);
+        const r = this._readCells(merged, rec.index, pixels, plan, ov, docW, docH, apply);
         if (r.changed) { changed = r.changed; report = { path: "cells", readCalls: 1, readBytes: r.bytes, cells: plan.n, strayCells: 0 }; }
         else report = { path: "box-unreported", readCalls: 2, readBytes: r.bytes + boxBytes, cells: plan.n, strayCells: r.stray };
       }
@@ -122,10 +122,10 @@ export class RasterService {
    * 只读报的格：先取一张「这一层原来的」（region-load：从图块池原样取这一层的字节 = CPU 那份，只取方框），再一次画暂存图（格子 + 核对片）、一次读回。
    *   比的必须是这一层真正存着的字节（region-load = 和 CPU 那份同一份），不用合成器现合一张（那是另一段着色器，取整未必和落层那一遍一样），
    *   也不用「带空薄层的同一段」：那样一种 α = 0 也改像素的叠法会把原来的也改掉、核对就看不出来了。
-   * 核对片干净 = 拆回、按段 apply，交回变了的图块；不干净 = 不 apply、交回漏了几格（调用的人读整个方框）。
+   * 核对片干净 = 拆回、一个图块一次 apply（那一块现在存着的字节贴上读回来的格），交回变了的图块；不干净 = 不 apply、交回漏了几格（调用的人读整个方框）。
    */
   private _readCells(
-    merged: PooledFBO, index: IndexTexture, plan: CellPlan, ov: OverlayInput, docW: number, docH: number,
+    merged: PooledFBO, index: IndexTexture, pixels: LayerPixels, plan: CellPlan, ov: OverlayInput, docW: number, docH: number,
     apply: (px: Uint8ClampedArray, x: number, y: number, w: number, h: number) => { tx: number; ty: number }[],
   ): { changed: { tx: number; ty: number }[] | null; stray: number; bytes: number } {
     const room = this._room, port = room.glctx, base = port.borrowFBO(docW, docH, "u8");
@@ -146,7 +146,7 @@ export class RasterService {
       const px = port.readPixels(staging, 0, 0, plan.sw, plan.sh), bytes = plan.sw * plan.sh * 4;
       const stray = strayCount(px, plan);
       if (stray) return { changed: null, stray, bytes };
-      return { changed: unpackRuns(px, plan, apply), stray: 0, bytes };
+      return { changed: unpackTiles(px, plan, TILE_SIZE, (x, y, w, h) => pixels.getRegion(x, y, w, h), apply), stray: 0, bytes };
     } finally {
       port.returnFBO(staging); port.deleteTexture(listTex); port.deleteTexture(maskTex); port.returnFBO(base);
     }

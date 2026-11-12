@@ -36,6 +36,8 @@ export interface CellPlan {
     readonly ch: number;
     /** 方框里每一格报没报（cw × ch，255 = 报了，0 = 没报；r8 取样归一 → 1.0 / 0.0）。 */
     readonly mask: Uint8Array;
+    /** 方框（画布像素 x, y, w, h）。 */
+    readonly box: readonly [number, number, number, number];
     /** 暂存图：宽（像素）、格子那一半几行像素、核对片几行、总高。 */
     readonly sw: number;
     readonly packRows: number;
@@ -50,10 +52,11 @@ export declare function planCells(cells: DirtyCells, bx: number, by: number, bw:
 /** 读回来的暂存图里核对片有几格不是 0（= 报的格以外真变了的格数）。 */
 export declare function strayCount(px: Uint8Array, plan: CellPlan): number;
 /**
- * 按格位拆回：每一段行程拼成一块（行段的宽 × 高，RGBA 字节）交给 apply。格位的先后 = planCells 的先后（行段从上到下、每段从左到右）。
- * 返回各段 apply 交回来的变了的图块（去重）。apply 中途抛 = 原样抛出去（这一笔整笔不落归调用的人：令牌取消、已写的回滚）。
+ * 按格位拆回、一个图块一次交给 apply：这一笔碰到的每个图块（TILE × TILE），取「图块 ∩ 方框」那一块现在存着的字节（current），把读回来的格贴上去，交给 apply 一次。
+ *   以前按行段一段一次（几百段 = 几百次 apply，每次都有固定花费，量出来比读整框还慢）；按图块 = 几次。没报的格在这块里原样（就是现在存着的字节）= 不改。
+ * 格位的先后 = planCells 的先后（行段从上到下、每段从左到右）。返回各次 apply 交回来的变了的图块（去重）。apply 中途抛 = 原样抛出去（整笔不落归调用的人）。
  */
-export declare function unpackRuns(px: Uint8Array, plan: CellPlan, apply: (px: Uint8ClampedArray, x: number, y: number, w: number, h: number) => {
+export declare function unpackTiles(px: Uint8Array, plan: CellPlan, tile: number, current: (x: number, y: number, w: number, h: number) => Uint8ClampedArray, apply: (px: Uint8ClampedArray, x: number, y: number, w: number, h: number) => {
     tx: number;
     ty: number;
 }[]): {

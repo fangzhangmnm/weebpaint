@@ -4,11 +4,11 @@
 //   ① 一次画一张小暂存图（bake-pack）：上半 = 报了的每一格原样拷进一个格位（一行 slots 个格位）；下半 = 核对片：方框里每一格一个像素 =
 //      这一格里「合出来的 merged」和「这一层原来的 base」任一通道差的最大值，报了的格写 0。
 //   ② 一次 readPixels 读整张暂存图（只等显卡一次）。核对片有不是 0 的 = 宿主报漏了 → 照旧读整个方框（绝不少写），报告 box-unreported。
-//   ③ 没漏 = 按格位拆回：每一段行程拼成一块交给 apply（宿主的 applyRegionDiff）；图块里没读的部分保持原样。
+//   ③ 没漏 = 按格位拆回：一个图块一次交给 apply（宿主的 applyRegionDiff）——那一块现在存着的字节贴上读回来的格；没报的格原样。
 // 核对比的是「这一格真变了没有」，不是「薄层 α 是不是 0」：α = 0 不改底下只是现在这几种叠法正好成立的性质，以后多一种叠法 / 笔不一定（统筹 11-11）。
 //   「变了」= 任一通道不一样，只有一种例外：前后都全透明（α 都是 0）= 没变——全透明的像素存着的颜色看不见、不是画；
 //   合成一遍会把它的颜色归 0（读整个方框那条路一直就这么写回去，白白算成「这个图块变了」），只读格的路不碰它们 = 更少的假改动。
-// 纯函数部分（planCells / unpackRuns）零依赖；GLSL 的 CPU 孪生在 soft-shaders.ts（bake-pack）。
+// 纯函数部分（planCells / unpackTiles）零依赖；GLSL 的 CPU 孪生在 soft-shaders.ts（bake-pack）。
 
 import type { DirtyCells, DirtyRect } from "../../common/dirty-rects.ts";
 
@@ -44,6 +44,8 @@ export interface CellPlan {
   readonly c0x: number; readonly c0y: number; readonly cw: number; readonly ch: number;
   /** 方框里每一格报没报（cw × ch，255 = 报了，0 = 没报；r8 取样归一 → 1.0 / 0.0）。 */
   readonly mask: Uint8Array;
+  /** 方框（画布像素 x, y, w, h）。 */
+  readonly box: readonly [number, number, number, number];
   /** 暂存图：宽（像素）、格子那一半几行像素、核对片几行、总高。 */
   readonly sw: number; readonly packRows: number; readonly verifyRows: number; readonly sh: number;
 }
@@ -68,7 +70,7 @@ export function planCells(cells: DirtyCells, bx: number, by: number, bw: number,
   const n = coords.length / 2;
   if (!n) return null;
   const slots = Math.min(BAKE_SLOTS_MAX, n), sw = slots * c, packRows = Math.ceil(n / slots) * c, verifyRows = Math.ceil((cw * ch) / sw);
-  return { list: Float32Array.from(coords), n, runs, c0x, c0y, cw, ch, mask, sw, packRows, verifyRows, sh: packRows + verifyRows };
+  return { list: Float32Array.from(coords), n, runs, c0x, c0y, cw, ch, mask, box: [bx, by, bw, bh], sw, packRows, verifyRows, sh: packRows + verifyRows };
 }
 
 /** 读回来的暂存图里核对片有几格不是 0（= 报的格以外真变了的格数）。 */
@@ -80,27 +82,42 @@ export function strayCount(px: Uint8Array, plan: CellPlan): number {
 }
 
 /**
- * 按格位拆回：每一段行程拼成一块（行段的宽 × 高，RGBA 字节）交给 apply。格位的先后 = planCells 的先后（行段从上到下、每段从左到右）。
- * 返回各段 apply 交回来的变了的图块（去重）。apply 中途抛 = 原样抛出去（这一笔整笔不落归调用的人：令牌取消、已写的回滚）。
+ * 按格位拆回、一个图块一次交给 apply：这一笔碰到的每个图块（TILE × TILE），取「图块 ∩ 方框」那一块现在存着的字节（current），把读回来的格贴上去，交给 apply 一次。
+ *   以前按行段一段一次（几百段 = 几百次 apply，每次都有固定花费，量出来比读整框还慢）；按图块 = 几次。没报的格在这块里原样（就是现在存着的字节）= 不改。
+ * 格位的先后 = planCells 的先后（行段从上到下、每段从左到右）。返回各次 apply 交回来的变了的图块（去重）。apply 中途抛 = 原样抛出去（整笔不落归调用的人）。
  */
-export function unpackRuns(
-  px: Uint8Array, plan: CellPlan,
+export function unpackTiles(
+  px: Uint8Array, plan: CellPlan, tile: number,
+  current: (x: number, y: number, w: number, h: number) => Uint8ClampedArray,
   apply: (px: Uint8ClampedArray, x: number, y: number, w: number, h: number) => { tx: number; ty: number }[],
 ): { tx: number; ty: number }[] {
-  const c = BAKE_CELL, slots = plan.sw / c, seen = new Set<string>(), out: { tx: number; ty: number }[] = [];
+  const c = BAKE_CELL, slots = plan.sw / c;
+  // 每个碰到的图块：它里面的格（格子坐标 + 格位）
+  const byTile = new Map<string, { tx: number; ty: number; cells: { cx: number; cy: number; slot: number; run: (typeof plan.runs)[number] }[] }>();
   let k = 0;
-  for (const r of plan.runs) {
-    const buf = new Uint8ClampedArray(r.w * r.h * 4);
-    for (let cx = r.k0; cx <= r.k1; cx++, k++) {
-      const sx = (k % slots) * c, sy = Math.floor(k / slots) * c;
-      const xa = Math.max(r.x, cx * c), xb = Math.min(r.x + r.w, cx * c + c);   // 这一格夹进这一段（方框）的那几列
-      if (xb <= xa) continue;
-      for (let yy = 0; yy < r.h; yy++) {
-        const oy = r.y + yy - r.cy * c, so = ((sy + oy) * plan.sw + sx + (xa - cx * c)) * 4, dO = (yy * r.w + (xa - r.x)) * 4;
+  for (const r of plan.runs) for (let cx = r.k0; cx <= r.k1; cx++, k++) {
+    const tx = Math.floor((cx * c) / tile), ty = Math.floor((r.cy * c) / tile), key = `${tx},${ty}`;
+    let t = byTile.get(key);
+    if (!t) { t = { tx, ty, cells: [] }; byTile.set(key, t); }
+    t.cells.push({ cx, cy: r.cy, slot: k, run: r });
+  }
+  const seen = new Set<string>(), out: { tx: number; ty: number }[] = [];
+  for (const t of byTile.values()) {
+    // 这一块 = 图块 ∩ 方框（方框 = 所有行段的外接框，行段已经夹进方框）
+    const x0 = Math.max(t.tx * tile, plan.box[0]), y0 = Math.max(t.ty * tile, plan.box[1]), x1 = Math.min((t.tx + 1) * tile, plan.box[0] + plan.box[2]), y1 = Math.min((t.ty + 1) * tile, plan.box[1] + plan.box[3]);
+    if (x1 <= x0 || y1 <= y0) continue;
+    const w = x1 - x0, h = y1 - y0, buf = current(x0, y0, w, h);
+    for (const q of t.cells) {
+      const sx = (q.slot % slots) * c, sy = Math.floor(q.slot / slots) * c;
+      const xa = Math.max(x0, q.run.x, q.cx * c), xb = Math.min(x1, q.run.x + q.run.w, q.cx * c + c);
+      const ya = Math.max(y0, q.run.y, q.cy * c), yb = Math.min(y1, q.run.y + q.run.h, q.cy * c + c);
+      if (xb <= xa || yb <= ya) continue;
+      for (let y = ya; y < yb; y++) {
+        const so = ((sy + (y - q.cy * c)) * plan.sw + sx + (xa - q.cx * c)) * 4, dO = ((y - y0) * w + (xa - x0)) * 4;
         buf.set(px.subarray(so, so + (xb - xa) * 4), dO);
       }
     }
-    for (const t of apply(buf, r.x, r.y, r.w, r.h)) { const key = `${t.tx},${t.ty}`; if (!seen.has(key)) { seen.add(key); out.push(t); } }
+    for (const ch of apply(buf, x0, y0, w, h)) { const key = `${ch.tx},${ch.ty}`; if (!seen.has(key)) { seen.add(key); out.push(ch); } }
   }
   return out;
 }

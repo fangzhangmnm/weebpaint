@@ -59,8 +59,8 @@ const tilesSubset = (cel, box) => { const B = new Set(box.split(" ").filter(Bool
 describe("落层只读回报的格（1-4d 第 8 条）", () => {
   it("随机场景（随机大小 / 奇数边 / 叠法 / 橡皮 / 全透明带颜色的像素）：只读报的格 = 读整个方框，图层看得见的逐字节一样、变了的图块 ⊆ 读方框的；真的走了只读格", () => {
     let cellsPath = 0;
-    for (let seed = 1; seed <= 30; seed++) {
-      const sc = scene(seed), box = bake(sc, null), cel = bake(sc, sc.cells);
+    for (let seed = 1; seed <= 34; seed++) {
+      const sc = scene(seed, seed > 30 ? [600, 520] : null), box = bake(sc, null), cel = bake(sc, sc.cells);   // 后四个跨好几个图块（一个图块交一次 apply）
       assert(box.ok && cel.ok, `种子 ${seed}：落成了`);
       eq(box.bake.path, "box", `种子 ${seed}：不给格 = 读方框`);
       eq(sameBytes(box.bytes, cel.bytes), 0, `种子 ${seed}（${sc.W}×${sc.H}，${sc.blendMode}${sc.erase ? "，橡皮" : ""}，走 ${cel.bake.path}）：图层逐字节一样`);
@@ -68,7 +68,7 @@ describe("落层只读回报的格（1-4d 第 8 条）", () => {
       assert(cel.bake.path !== "box-unreported", `种子 ${seed}：报全了不该说漏了（${JSON.stringify(cel.bake)}）`);
       if (cel.bake.path === "cells") { cellsPath++; eq(cel.bake.readCalls, 1, "只读一次"); assert(cel.bake.readBytes < sc.box[2] * sc.box[3] * 4, "读的字节比方框少"); }
     }
-    assert(cellsPath >= 15, `30 个场景里只读格走了 ${cellsPath} 次`);
+    assert(cellsPath >= 15, `34 个场景里只读格走了 ${cellsPath} 次`);
   }, { timeout: 60000 });
   it("报漏了几格：少报的那一段真变了 → 内核查出来（box-unreported、漏了几格），照旧读整个方框；没变的漏报不丢画（两种都和读方框一样）", () => {
     let hit = 0;
